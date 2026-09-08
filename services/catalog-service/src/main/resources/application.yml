@@ -8,6 +8,8 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:5432/${DB_NAME:bookrush}
     username: ${DB_USERNAME:bookrush}
     password: ${DB_PASSWORD:bookrush}
+    hikari:
+      connection-timeout: 3000
   jpa:
     hibernate:
       ddl-auto: validate

@@ -65,3 +65,30 @@ kubectl apply -k infrastructure/kubernetes/base
 As imagens padrão são exemplos. O Jenkins substitui as imagens pelos artefatos
 publicados. Veja `infrastructure/kubernetes/README.md` para configurar o
 registro e o acesso ao cluster.
+
+## Teste de conexão da aplicação
+
+Suba a aplicação e aguarde os checks de saúde (Jenkins é opcional):
+
+```bash
+docker compose -f infrastructure/compose.yaml --env-file .env up -d --build --wait
+```
+
+Abra `http://127.0.0.1:18080` no servidor ou o domínio configurado no proxy
+reverso. A tela React consulta `GET /api/status`, e a API Java executa
+`SELECT 1` no PostgreSQL. O botão **Testar conexão novamente** repete a
+verificação. A API retorna HTTP 503 quando não consegue consultar o banco;
+a tela informa a falha, sem confirmar uma conexão inexistente.
+
+```bash
+curl --fail http://127.0.0.1:18080/api/status
+docker compose -f infrastructure/compose.yaml --env-file .env ps
+docker compose -f infrastructure/compose.yaml --env-file .env logs --tail=100 catalog-service frontend
+```
+
+Resposta esperada: `{"service":"catalog-service","status":"ok","database":"up"}`
+(a ordem dos campos pode variar). Redis e pgAdmin sobem junto; esse teste
+verifica apenas React, proxy, Java e PostgreSQL. As credenciais locais ficam
+no `.env`, ignorado pelo Git. Os testes da API rodam durante o build Java.
+Para desenvolver com Vite fora do Docker, `/api` é encaminhado para uma
+API Java em `localhost:8080`.

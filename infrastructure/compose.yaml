@@ -59,6 +59,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     networks: [bookrush]
 
   frontend:
@@ -66,7 +72,8 @@ services:
     build:
       context: ../frontend
     depends_on:
-      - catalog-service
+      catalog-service:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${BOOKRUSH_FRONTEND_PORT:-18080}:8080"
     networks: [bookrush]
