@@ -1,16 +1,45 @@
-:root { font-family: Inter, system-ui, sans-serif; color: #1f2937; background: #f4f6fa; }
+:root { font-family: Inter, system-ui, sans-serif; color: #ecf3ed; background: #0c1714; font-synthesis: none; }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-main { width: 100%; max-width: 640px; }
-h1 { font-size: 3rem; margin: 8px 0; letter-spacing: -.04em; }
-h2 { font-size: 1.2rem; margin-top: 0; }
-p { line-height: 1.6; }
-.eyebrow { font-size: .75rem; font-weight: 700; letter-spacing: .12em; color: #475569; }
-section { background: white; padding: 28px; border: 1px solid #dce2eb; border-radius: 16px; margin-top: 28px; }
-dl > div { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid #e5e7eb; }
-dd { margin: 0; font-weight: 600; text-align: right; }
-.success { color: #166534; }
-.error { color: #b91c1c; }
-button { background: #233e83; color: white; border: 0; padding: 12px 18px; border-radius: 8px; font: inherit; cursor: pointer; }
+body { margin: 0; min-height: 100vh; padding: 0 32px 48px; background: radial-gradient(ellipse at 85% 20%, #233b2f 0, transparent 55%); }
+main { max-width: 1120px; margin: auto; }
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 28px 0; border-bottom: 1px solid #35483e; }
+.brand { font-size: 1.6rem; font-weight: 800; letter-spacing: -.05em; color: #ecf3ed; text-decoration: none; }
+.brand span { color: #c1f277; margin-left: 8px; }
+.edition { border: 1px solid #6a8550; color: #d1f6a0; padding: 8px 14px; border-radius: 999px; font-size: .72rem; font-weight: 700; letter-spacing: .08em; white-space: nowrap; }
+.hero { display: grid; grid-template-columns: 1.3fr 1fr; align-items: center; gap: 52px; padding: 70px 0; }
+.eyebrow { font-size: .72rem; font-weight: 700; letter-spacing: .15em; color: #c1f277; }
+h1 { font-size: clamp(2.5rem, 5vw, 4.4rem); line-height: 1.06; margin: 24px 0; letter-spacing: -.055em; }
+h1 em { color: #c1f277; font-style: normal; }
+p { line-height: 1.7; }
+.intro { color: #bdcfc3; font-size: 1.1rem; max-width: 450px; }
+.version { display: inline-block; margin-top: 14px; color: #bdcfc3; font-size: .82rem; }
+.book-art { position: relative; min-height: 300px; }
+.book { position: absolute; width: 190px; height: 265px; border-radius: 4px 12px 12px 4px; box-shadow: 12px 22px 32px #0005; border-left: 9px solid #0002; }
+.book-back { right: 0; top: 0; transform: rotate(13deg); background: #9cbfa9; color: #183a2a; padding: 35px 20px; font-size: 2.5rem; line-height: 1; font-weight: 900; }
+.book-front { left: 16px; top: 28px; transform: rotate(-9deg); background: #c1f277; color: #16311f; padding: 24px 18px; display: flex; flex-direction: column; justify-content: space-between; }
+.book-front span { font-size: .56rem; font-weight: 800; letter-spacing: .06em; }
+.book-front strong { font-family: Georgia, serif; font-size: 2.1rem; line-height: 1.1; }
+section { background: #15271f; padding: 28px; border: 1px solid #3b5144; border-radius: 18px; }
+.section-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+h2 { font-size: 1.2rem; margin: 0; }
+.section-heading > span { font-size: .65rem; letter-spacing: .12em; color: #bdcfc3; }
+dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }
+dl > div { background: #0d1d16; border: 1px solid #35483e; border-radius: 10px; padding: 18px; }
+dt { color: #bdcfc3; font-size: .85rem; }
+dd { margin: 10px 0 0; font-weight: 700; }
+.success { color: #c1f277; font-size: .88rem; }
+.error { color: #ffb6ac; }
+button { background: #c1f277; color: #16311f; border: 0; padding: 13px 20px; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
+button:hover:not(:disabled) { background: #d5ffa0; }
 button:disabled { opacity: .6; cursor: wait; }
-button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 3px; }
+button:focus-visible, a:focus-visible { outline: 3px solid #f8e7a3; outline-offset: 4px; }
+@media (max-width: 760px) {
+  body { padding: 0 20px 32px; }
+  .hero { grid-template-columns: 1fr; gap: 28px; padding: 40px 0; }
+  .book-art { width: 300px; max-width: 100%; margin: auto; min-height: 320px; }
+  .section-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  dl { grid-template-columns: 1fr; }
+  dl > div { display: flex; justify-content: space-between; gap: 12px; }
+  dd { margin: 0; }
+  section { padding: 20px; }
+}
