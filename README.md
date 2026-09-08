@@ -92,3 +92,10 @@ verifica apenas React, proxy, Java e PostgreSQL. As credenciais locais ficam
 no `.env`, ignorado pelo Git. Os testes da API rodam durante o build Java.
 Para desenvolver com Vite fora do Docker, `/api` é encaminhado para uma
 API Java em `localhost:8080`.
+
+## Deploy pelo Jenkins
+
+O painel usa `https://jenkins-bookrush.jteodoro.tec.br`. O job `bookrush-deploy`
+permite informar a branch e executar build/deploy no Compose deste servidor,
+com tentativa de restauração das imagens anteriores em caso de falha.
+Veja [instalação e uso do Jenkins](infrastructure/jenkins/README.md).
