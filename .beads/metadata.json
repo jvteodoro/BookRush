@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "bookrush",
+  "project_id": "cd76a491-2012-45a3-8053-4a1123377f68"
+}

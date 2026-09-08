@@ -38,3 +38,9 @@ jenkins_home/
 
 # Kubernetes secrets (keep only the example in version control)
 infrastructure/kubernetes/base/db-secret.yaml
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
