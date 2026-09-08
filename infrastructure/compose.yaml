@@ -1,0 +1,97 @@
+name: bookrush
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bookrush}
+      POSTGRES_USER: ${POSTGRES_USER:-bookrush}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [bookrush]
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+    networks: [bookrush]
+
+  pgadmin:
+    image: dpage/pgadmin4:8.14
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${BOOKRUSH_PGADMIN_PORT:-18083}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks: [bookrush]
+
+  catalog-service:
+    image: ${BACKEND_IMAGE:-bookrush/catalog-service:local}
+    build:
+      context: ../services/catalog-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      REDIS_HOST: redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [bookrush]
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-bookrush/frontend:local}
+    build:
+      context: ../frontend
+    depends_on:
+      - catalog-service
+    ports:
+      - "127.0.0.1:${BOOKRUSH_FRONTEND_PORT:-18080}:8080"
+    networks: [bookrush]
+
+  jenkins:
+    build:
+      context: ./jenkins
+    image: bookrush/jenkins:lts
+    profiles: [ci]
+    ports:
+      - "127.0.0.1:${BOOKRUSH_JENKINS_PORT:-18082}:8080"
+      - "127.0.0.1:15000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:-999}"
+    networks: [bookrush]
+
+networks:
+  bookrush:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+  jenkins_home:

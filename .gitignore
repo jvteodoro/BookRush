@@ -22,3 +22,19 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Local infrastructure configuration
+.env
+.env.*
+!.env.example
+
+# Node / Java build output
+node_modules/
+dist/
+target/
+
+# Jenkins local state
+jenkins_home/
+
+# Kubernetes secrets (keep only the example in version control)
+infrastructure/kubernetes/base/db-secret.yaml
