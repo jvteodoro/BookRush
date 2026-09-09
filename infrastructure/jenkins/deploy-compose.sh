@@ -20,7 +20,6 @@ diagnose() {
   done
 }
 rollback() {
-  diagnose
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
     if [[ -n "$old_ingestion" ]]; then
       BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend book-ingestion-service
@@ -28,8 +27,26 @@ rollback() {
       BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
     fi
 }
-trap 'rollback' ERR
-# Atualiza as APIs e o frontend; não reinicia o Jenkins nem os serviços de dados.
-"${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service book-ingestion-service frontend
-"${compose[@]}" exec -T frontend wget -q -O - http://127.0.0.1:8080/api/status
-trap - ERR
+
+deploy_services=(reverse-proxy catalog-service book-ingestion-service frontend)
+echo "Iniciando deploy das imagens:" >&2
+printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${FRONTEND_IMAGE}" >&2
+
+# Não usar somente trap ERR: docker compose pode falhar durante --wait e o
+# diagnóstico precisa ocorrer antes do rollback, preservando o exit code.
+if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${deploy_services[@]}"; then
+  echo 'Falha ao iniciar ou aguardar os serviços novos.' >&2
+  diagnose
+  rollback
+  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  exit 1
+fi
+
+if ! "${compose[@]}" exec -T frontend wget -q -O - http://127.0.0.1:8080/api/status; then
+  echo 'Smoke test do catálogo pelo frontend falhou.' >&2
+  diagnose
+  rollback
+  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  exit 1
+fi
+echo 'Deploy e smoke test concluídos.' >&2
