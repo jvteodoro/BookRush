@@ -51,7 +51,7 @@ public class AssetSecurity {
         .authorizeHttpRequests(a->a
           .requestMatchers("/api/admin/**","/actuator/metrics","/actuator/metrics/**").hasRole("ASSET_ADMIN")
           .requestMatchers("/api/internal/v1/catalog/**").hasRole("CATALOG_SERVICE")
-          .requestMatchers(HttpMethod.GET,"/api/status","/actuator/health","/actuator/health/**","/api/books/*/assets/*/download-url").permitAll()
+          .requestMatchers(HttpMethod.GET,"/api","/api/","/api/status","/actuator/health","/actuator/health/**","/api/books/*/assets/*/download-url","/swagger-ui.html","/swagger-ui/**","/v3/api-docs/**").permitAll()
           .anyRequest().denyAll())
         .exceptionHandling(e->e.authenticationEntryPoint((req,res,error)->res.sendError(401))
             .accessDeniedHandler((req,res,error)->res.sendError(403))).build();

@@ -17,6 +17,14 @@ class StatusController {
     this.jdbc = jdbc;
   }
 
+  @GetMapping({"", "/"})
+  ResponseEntity<Map<String, String>> apiInfo() {
+    return ResponseEntity.ok(Map.of(
+        "service", "catalog-service",
+        "status", "ok",
+        "health", "/api/status"));
+  }
+
   @GetMapping("/status")
   ResponseEntity<Map<String, String>> status() {
     try {

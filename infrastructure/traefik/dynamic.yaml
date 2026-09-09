@@ -1,5 +1,19 @@
 http:
   routers:
+    ingestion-docs:
+      rule: PathPrefix(`/ingestion-docs`)
+      entryPoints:
+        - web
+      priority: 120
+      service: ingestion
+
+    catalog-docs:
+      rule: PathPrefix(`/swagger-ui`) || PathPrefix(`/v3/api-docs`)
+      entryPoints:
+        - web
+      priority: 110
+      service: catalog
+
     catalog:
       rule: PathPrefix(`/api`)
       entryPoints:

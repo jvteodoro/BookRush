@@ -1,5 +1,13 @@
 # API administrativa (resumo)
 
+## Swagger
+
+Com o gateway ativo, a documentação interativa fica disponível em
+`https://bookrush.jteodoro.tec.br/ingestion-docs/swagger-ui.html` e o contrato
+OpenAPI em `/ingestion-docs/v3/api-docs`. O Springdoc gera ambos a partir dos
+controllers e das anotações `@OpenAPIDefinition`; não há um contrato JSON
+duplicado para manter manualmente.
+
 | Método | Rota | Finalidade |
 |---|---|---|
 | POST | `/api/admin/v1/ingestion/run?dryRun=true` | iniciar uma execução ou apenas validar |

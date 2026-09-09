@@ -40,6 +40,12 @@ containerizado. Ele atende o frontend em `/`, o catálogo em `/api/...` e a
 ingestão em `/ingestion/api/...`; o prefixo `/ingestion/` é removido pelo
 gateway antes de encaminhar ao serviço interno.
 
+As interfaces OpenAPI são geradas automaticamente pelo Springdoc: catálogo em
+`/swagger-ui.html` (especificação `/v3/api-docs`) e ingestão em
+`/ingestion-docs/swagger-ui.html` (especificação `/ingestion-docs/v3/api-docs`).
+As rotas de documentação são públicas para consulta; endpoints administrativos
+continuam protegidos pela segurança de cada serviço.
+
 Antes de subir o Jenkins em Linux, configure `DOCKER_GID` no `.env` com o grupo
 do socket Docker: `stat -c '%g' /var/run/docker.sock`.
 

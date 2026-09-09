@@ -41,11 +41,24 @@ public class IngestionSecurityConfiguration {
     http.csrf(csrf -> csrf.disable())
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+            .requestMatchers("/actuator/health", "/actuator/health/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/ingestion-docs/**").permitAll()
             .requestMatchers("/admin/v1/ingestion/**").hasAnyRole("OPERATOR", "REVIEWER", "CLEANUP")
             .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(rolesConverter())));
     return http.build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "ingestion.security", name = "enabled", havingValue = "false", matchIfMissing = true)
+  SecurityFilterChain localSecurity(HttpSecurity http) throws Exception {
+    // Keep local Compose usable when OIDC is intentionally disabled. Without
+    // this chain Spring Security installs a generated-password chain that
+    // protects Swagger and every controller unexpectedly.
+    return http.csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/actuator/health", "/actuator/health/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/ingestion-docs/**").permitAll()
+            .anyRequest().denyAll())
+        .build();
   }
 
   private Converter<Jwt, ? extends AbstractAuthenticationToken> rolesConverter() {
