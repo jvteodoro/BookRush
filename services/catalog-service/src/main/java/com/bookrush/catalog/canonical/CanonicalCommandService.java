@@ -50,7 +50,7 @@ public class CanonicalCommandService {
         WHERE i.source_id = ? AND i.identifier_type = ? AND i.identifier_value = ?
         """, rs -> rs.next() ? rs.getObject("book_id", UUID.class) : null,
         sourceId, command.identifierType(), command.identifierValue());
-    UUID bookId = existing.isEmpty() ? null : existing.get(0);
+    UUID bookId = existing;
     String result;
     if (bookId == null) {
       bookId = UUID.randomUUID();
