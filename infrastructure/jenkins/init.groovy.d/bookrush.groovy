@@ -6,9 +6,17 @@ import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
 
 def instance = Jenkins.get()
 JenkinsLocationConfiguration.get().setUrl('https://jenkins-bookrush.jteodoro.tec.br/')
-if (instance.getItem('bookrush-deploy') == null) {
-    def job = instance.createProject(WorkflowJob, 'bookrush-deploy')
-    job.setDefinition(new CpsFlowDefinition(new File('/opt/bookrush/bookrush.Jenkinsfile').text, true))
+def pipelineFile = new File('/opt/bookrush/bookrush.Jenkinsfile')
+def job = instance.getItem('bookrush-deploy')
+if (job == null) {
+    job = instance.createProject(WorkflowJob, 'bookrush-deploy')
+}
+def pipelineScript = pipelineFile.text
+if (!(job.getDefinition() instanceof CpsFlowDefinition) || job.getDefinition().getScript() != pipelineScript) {
+    job.setDefinition(new CpsFlowDefinition(pipelineScript, true))
+    job.save()
+}
+if (job.getProperty(ParametersDefinitionProperty.class) == null) {
     job.addProperty(new ParametersDefinitionProperty([
         new StringParameterDefinition('BRANCH', 'main', 'Branch a compilar e implantar.'),
         new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação após o build.'),
