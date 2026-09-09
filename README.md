@@ -99,3 +99,8 @@ O painel usa `https://jenkins-bookrush.jteodoro.tec.br`. O job `bookrush-deploy`
 permite informar a branch e executar build/deploy no Compose deste servidor,
 com tentativa de restauração das imagens anteriores em caso de falha.
 Veja [instalação e uso do Jenkins](infrastructure/jenkins/README.md).
+
+## Agentes de IA e Beads
+
+O fluxo de desenvolvimento dos agentes está em [AGENTS.md](AGENTS.md).
+Use Beads (`bd`) para tarefas e dependências; veja [configuração e uso](docs/beads.md).
