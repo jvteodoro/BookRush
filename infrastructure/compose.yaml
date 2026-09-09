@@ -2,18 +2,23 @@ name: bookrush
 
 services:
   reverse-proxy:
-    image: traefik:v3.1
+    # Routing is loaded from a file so the proxy does not depend on the Docker
+    # API version exposed by the production daemon.
+    image: traefik:v3.5.3
     command:
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=bookrush
+      - --providers.docker=false
+      - --providers.file.filename=/etc/traefik/dynamic.yaml
+      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --api.dashboard=false
       - --ping=true
     ports:
       - "127.0.0.1:${BOOKRUSH_PROXY_PORT:-18081}:80"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Jenkins runs Compose from inside a container while Docker creates the
+      # proxy on the host. Use the host repository path for this bind mount;
+      # override BOOKRUSH_REPO_ROOT in .env on another host.
+      - ${BOOKRUSH_REPO_ROOT:-/home/enoch/projects/LabSoft/BookRush}/infrastructure/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 10s
@@ -126,12 +131,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 40s
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.catalog.rule=PathPrefix(`/api`)
-      - traefik.http.routers.catalog.entrypoints=web
-      - traefik.http.routers.catalog.priority=100
-      - traefik.http.services.catalog.loadbalancer.server.port=8080
     networks: [bookrush]
 
   book-ingestion-service:
@@ -167,14 +166,6 @@ services:
       start_period: 30s
     ports:
       - "127.0.0.1:${BOOKRUSH_INGESTION_PORT:-18090}:8090"
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.ingestion.rule=PathPrefix(`/ingestion`)
-      - traefik.http.routers.ingestion.entrypoints=web
-      - traefik.http.routers.ingestion.priority=100
-      - traefik.http.routers.ingestion.middlewares=ingestion-strip
-      - traefik.http.middlewares.ingestion-strip.stripprefix.prefixes=/ingestion
-      - traefik.http.services.ingestion.loadbalancer.server.port=8090
     networks: [bookrush]
 
   frontend:
@@ -184,12 +175,6 @@ services:
     depends_on:
       catalog-service:
         condition: service_healthy
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.frontend.rule=PathPrefix(`/`)
-      - traefik.http.routers.frontend.entrypoints=web
-      - traefik.http.routers.frontend.priority=1
-      - traefik.http.services.frontend.loadbalancer.server.port=8080
     ports:
       - "127.0.0.1:${BOOKRUSH_FRONTEND_PORT:-18080}:8080"
     networks: [bookrush]
@@ -217,6 +202,8 @@ services:
 
 networks:
   bookrush:
+    # Keep the service DNS network name stable across deployments.
+    name: bookrush_bookrush
     driver: bridge
 
 volumes:

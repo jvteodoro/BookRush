@@ -244,3 +244,47 @@ O smoke test do catálogo retornou:
 ```json
 {"database":"up","status":"ok","service":"catalog-service"}
 ```
+## 2026-09-09 — 404 no domínio após ativação do proxy Traefik
+
+### Sintomas
+
+O domínio `bookrush.jteodoro.tec.br` retornava `404 page not found` em `/` e
+`/api`, embora o frontend e o catálogo estivessem saudáveis.
+
+### Diagnóstico
+
+O Nginx encaminhava corretamente para `127.0.0.1:18081`, mas o Traefik não
+possuía routers carregados. Seus logs mostravam repetidamente:
+
+```text
+client version 1.24 is too old. Minimum supported API version is 1.40
+```
+
+O provider Docker do Traefik dependia de uma versão antiga da API do daemon.
+As labels dos containers, portanto, nunca eram descobertas e o Traefik
+respondia 404 para qualquer caminho.
+
+### Solução aplicada
+
+O proxy foi atualizado para `traefik:v3.5.3` e passou a usar o provider de
+arquivo (`infrastructure/traefik/dynamic.yaml`). O arquivo define explicitamente
+as rotas para `catalog-service:8080`, `book-ingestion-service:8090` e
+`frontend:8080`, usando o DNS da rede Compose. A rede foi fixada em
+`bookrush_bookrush`, preservando a rede persistente da instalação.
+
+Essa abordagem elimina a dependência da versão da API Docker para discovery.
+Novos serviços devem ser adicionados ao arquivo dinâmico e validados com
+`docker compose config` antes do deploy.
+
+### Validação
+
+Foram executados:
+
+```bash
+curl -i http://127.0.0.1:18081/
+curl -i http://127.0.0.1:18081/api/status
+curl -k -i https://bookrush.jteodoro.tec.br/
+curl -k -i https://bookrush.jteodoro.tec.br/api/status
+```
+
+Todos retornaram `200`; a API respondeu `{"service":"catalog-service","status":"ok","database":"up"}`.

@@ -1,0 +1,44 @@
+http:
+  routers:
+    catalog:
+      rule: PathPrefix(`/api`)
+      entryPoints:
+        - web
+      priority: 100
+      service: catalog
+
+    ingestion:
+      rule: PathPrefix(`/ingestion`)
+      entryPoints:
+        - web
+      priority: 100
+      middlewares:
+        - ingestion-strip
+      service: ingestion
+
+    frontend:
+      rule: PathPrefix(`/`)
+      entryPoints:
+        - web
+      priority: 1
+      service: frontend
+
+  middlewares:
+    ingestion-strip:
+      stripPrefix:
+        prefixes:
+          - /ingestion
+
+  services:
+    catalog:
+      loadBalancer:
+        servers:
+          - url: http://catalog-service:8080
+    ingestion:
+      loadBalancer:
+        servers:
+          - url: http://book-ingestion-service:8090
+    frontend:
+      loadBalancer:
+        servers:
+          - url: http://frontend:8080
