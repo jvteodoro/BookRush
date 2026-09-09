@@ -2,6 +2,11 @@ server:
   port: 8080
   shutdown: graceful
 spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 101MB
+      file-size-threshold: 0
   application:
     name: catalog-service
   datasource:
@@ -27,8 +32,25 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info,metrics
   endpoint:
     health:
       probes:
         enabled: true
+storage:
+  enabled: ${STORAGE_ENABLED:false}
+  endpoint: ${STORAGE_ENDPOINT:}
+  public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:}
+  region: ${STORAGE_REGION:us-east-1}
+  access-key: ${STORAGE_ACCESS_KEY:}
+  secret-key: ${STORAGE_SECRET_KEY:}
+  path-style: ${STORAGE_PATH_STYLE:true}
+  url-ttl-seconds: ${STORAGE_URL_TTL_SECONDS:300}
+  max-upload-bytes: ${STORAGE_MAX_UPLOAD_BYTES:104857600}
+  timeout: ${STORAGE_TIMEOUT:30s}
+  admin-token: ${ASSET_ADMIN_TOKEN:}
+  buckets:
+    source: ${STORAGE_BUCKET_SOURCE:books-source}
+    public-bucket: ${STORAGE_BUCKET_PUBLIC:books-public}
+    processing: ${STORAGE_BUCKET_PROCESSING:books-processing}
+    ml: ${STORAGE_BUCKET_ML:books-ml}

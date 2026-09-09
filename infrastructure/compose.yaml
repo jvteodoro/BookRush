@@ -1,6 +1,24 @@
 name: bookrush
 
 services:
+  seaweedfs:
+    build:
+      context: ./seaweedfs
+    image: bookrush/seaweedfs:4.46
+    environment:
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Set STORAGE_ACCESS_KEY in .env}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Set STORAGE_SECRET_KEY in .env}
+    volumes:
+      - seaweedfs_data:/data
+    ports:
+      - "127.0.0.1:${BOOKRUSH_S3_PORT:-18333}:8333"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8888/"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [bookrush]
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -54,10 +72,27 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
       REDIS_HOST: redis
+      STORAGE_ENABLED: "true"
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_PATH_STYLE: ${STORAGE_PATH_STYLE:-true}
+      STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-300}
+      STORAGE_MAX_UPLOAD_BYTES: ${STORAGE_MAX_UPLOAD_BYTES:-104857600}
+      STORAGE_TIMEOUT: ${STORAGE_TIMEOUT:-30s}
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      ASSET_ADMIN_TOKEN: ${ASSET_ADMIN_TOKEN:?Set ASSET_ADMIN_TOKEN in .env}
+      STORAGE_BUCKET_SOURCE: ${STORAGE_BUCKET_SOURCE:-books-source}
+      STORAGE_BUCKET_PUBLIC: ${STORAGE_BUCKET_PUBLIC:-books-public}
+      STORAGE_BUCKET_PROCESSING: ${STORAGE_BUCKET_PROCESSING:-books-processing}
+      STORAGE_BUCKET_ML: ${STORAGE_BUCKET_ML:-books-ml}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      seaweedfs:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/actuator/health"]
@@ -101,6 +136,7 @@ networks:
     driver: bridge
 
 volumes:
+  seaweedfs_data:
   postgres_data:
   redis_data:
   pgadmin_data:

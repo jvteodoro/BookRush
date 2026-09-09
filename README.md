@@ -110,3 +110,11 @@ Use Beads (`bd`) para tarefas e dependências; veja [configuração e uso](docs/
 O catálogo usa migrations Flyway no schema `catalog`, com validação Hibernate.
 Veja [documentação do banco](docs/database/README.md) e execute os testes isolados
 com `bash scripts/test-database.sh`.
+
+## Arquivos dos livros
+
+Os arquivos ficam no object storage SeaweedFS, acessado por API S3; PostgreSQL
+armazena referências e metadados. Configure as variáveis STORAGE_* e
+ASSET_ADMIN_TOKEN do .env.example e suba o Compose normalmente. Veja
+[documentação de storage](docs/storage/README.md); a suíte completa é
+`bash scripts/test-storage.sh`. Todos os buckets começam privados.

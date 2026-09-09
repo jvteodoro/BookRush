@@ -1,0 +1,51 @@
+# Disposable integration stack; no production volumes or fixed host ports.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bookrush_test
+      POSTGRES_USER: bookrush_test
+      POSTGRES_PASSWORD: test-only-not-for-production
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U bookrush_test -d bookrush_test"]
+      interval: 2s
+      retries: 30
+  seaweedfs:
+    build:
+      context: ./seaweedfs
+    environment:
+      STORAGE_ACCESS_KEY: storage-test
+      STORAGE_SECRET_KEY: storage-test-secret
+    volumes:
+      - storage_test_data:/data
+    ports:
+      - "127.0.0.1:${STORAGE_TEST_PORT:-}:8333"
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8888/"]
+      interval: 2s
+      retries: 60
+  tests:
+    build:
+      context: ../services/catalog-service
+      target: build
+    environment:
+      DB_HOST: postgres
+      DB_NAME: bookrush_test
+      DB_USERNAME: bookrush_test
+      DB_PASSWORD: test-only-not-for-production
+      STORAGE_HOST_ENDPOINT: ${STORAGE_HOST_ENDPOINT:-http://localhost:18333}
+      STORAGE_ENABLED: "true"
+      STORAGE_ENDPOINT: http://seaweedfs:8333
+      STORAGE_PUBLIC_ENDPOINT: http://seaweedfs:8333
+      STORAGE_ACCESS_KEY: storage-test
+      STORAGE_SECRET_KEY: storage-test-secret
+      ASSET_ADMIN_TOKEN: test-admin-token-at-least-thirty-two-characters
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    command: [mvn, -B, -Pintegration-tests, verify]
+volumes:
+  storage_test_data:
