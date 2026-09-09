@@ -97,10 +97,12 @@ public class AssetService {
           var current=asset(book,r.assetId());em.lock(current,LockModeType.PESSIMISTIC_WRITE);
           if(current.getStatus()==BookAssetStatus.DELETED) throw new IllegalArgumentException("Asset deleted during upload");
           var v=em.find(BookAssetVersion.class,r.versionId());v.setStatus(BookAssetVersionStatus.AVAILABLE);em.flush();
-          em.createNativeQuery("UPDATE catalog.book_asset SET current_version_id=:version WHERE id=:asset")
-              .setParameter("version", r.versionId()).setParameter("asset", r.assetId()).executeUpdate();
-          em.createNativeQuery("UPDATE catalog.book_asset_version SET availability_status='AVAILABLE', current_eligible=true, verified_at=clock_timestamp(), verification_method='HEAD_SHA256' WHERE id=:version")
-              .setParameter("version", r.versionId()).executeUpdate();
+          if (jdbc != null) {
+            em.createNativeQuery("UPDATE catalog.book_asset SET current_version_id=:version WHERE id=:asset")
+                .setParameter("version", r.versionId()).setParameter("asset", r.assetId()).executeUpdate();
+            em.createNativeQuery("UPDATE catalog.book_asset_version SET availability_status='AVAILABLE', current_eligible=true, verified_at=clock_timestamp(), verification_method='HEAD_SHA256' WHERE id=:version")
+                .setParameter("version", r.versionId()).executeUpdate();
+          }
           return new UploadResult(view(asset(book,r.assetId())),view(v));
         });
         log.info("asset upload result=ok bookId={} assetId={} versionId={}",book,r.assetId(),r.versionId());

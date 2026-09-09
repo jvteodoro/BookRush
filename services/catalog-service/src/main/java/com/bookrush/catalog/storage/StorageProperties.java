@@ -22,7 +22,7 @@ public record StorageProperties(
     @DefaultValue("104857600") @Min(1) @Max(104857600) long maxUploadBytes,
     @DefaultValue("30s") Duration timeout,
     @DefaultValue("") String adminToken,
-    @DefaultValue @Valid Buckets buckets) {
+    @Valid Buckets buckets) {
   public record Buckets(
       @DefaultValue("books-source") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String source,
       @DefaultValue("books-public") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String publicBucket,
