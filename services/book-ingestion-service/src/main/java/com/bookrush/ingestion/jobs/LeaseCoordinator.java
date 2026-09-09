@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +14,7 @@ public final class LeaseCoordinator {
   private final JdbcTemplate jdbc;
   private final Clock clock;
 
+  @Autowired
   public LeaseCoordinator(JdbcTemplate jdbc) {
     this(jdbc, Clock.systemUTC());
   }
