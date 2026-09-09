@@ -1,0 +1,30 @@
+# Isolated disposable database: no published ports or application volumes.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bookrush_test
+      POSTGRES_USER: bookrush_test
+      POSTGRES_PASSWORD: test-only-not-for-production
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U bookrush_test -d bookrush_test']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  tests:
+    build:
+      context: ../services/catalog-service
+      target: build
+    command: [mvn, -B, -Pintegration-tests, verify]
+    volumes:
+      - ../docs/database/queries.sql:/workspace/documented-queries.sql:ro
+    environment:
+      DB_HOST: postgres
+      DB_NAME: bookrush_test
+      DB_USERNAME: bookrush_test
+      DB_PASSWORD: test-only-not-for-production
+    depends_on:
+      postgres:
+        condition: service_healthy

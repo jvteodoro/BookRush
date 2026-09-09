@@ -104,3 +104,9 @@ Veja [instalação e uso do Jenkins](infrastructure/jenkins/README.md).
 
 O fluxo de desenvolvimento dos agentes está em [AGENTS.md](AGENTS.md).
 Use Beads (`bd`) para tarefas e dependências; veja [configuração e uso](docs/beads.md).
+
+## Schema PostgreSQL
+
+O catálogo usa migrations Flyway no schema `catalog`, com validação Hibernate.
+Veja [documentação do banco](docs/database/README.md) e execute os testes isolados
+com `bash scripts/test-database.sh`.

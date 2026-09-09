@@ -10,7 +10,17 @@ spring:
     password: ${DB_PASSWORD:bookrush}
     hikari:
       connection-timeout: 3000
+  flyway:
+    enabled: true
+    default-schema: catalog
+    schemas: catalog
+    baseline-on-migrate: false
+    clean-disabled: true
   jpa:
+    properties:
+      hibernate:
+        default_schema: catalog
+    open-in-view: false
     hibernate:
       ddl-auto: validate
 management:
