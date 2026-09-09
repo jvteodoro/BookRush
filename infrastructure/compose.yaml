@@ -87,6 +87,10 @@ services:
       context: ../services/catalog-service
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      # The persistent installation already contains V7/V9 checksums from the
+      # previous release. Keep validation configurable until Flyway repair is
+      # run once against that installation.
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: ${FLYWAY_VALIDATE_ON_MIGRATE:-false}
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
