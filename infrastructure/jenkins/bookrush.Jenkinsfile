@@ -49,6 +49,12 @@ pipeline {
       }
     }
 
+    stage('Integração PostgreSQL e S3') {
+      steps {
+        sh 'bash scripts/test-storage.sh'
+      }
+    }
+
     stage('Publicar') {
       when { expression { return params.REGISTRY?.trim() } }
       steps {

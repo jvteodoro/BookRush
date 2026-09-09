@@ -85,3 +85,17 @@ A URL em **Manage Jenkins → System → Jenkins Location** deve ser
 `https://jenkins-bookrush.jteodoro.tec.br/`. No Cloudflare, use **Full (strict)**.
 Com HTTPS no Nginx, `$scheme` e `$server_port` encaminham `https` e `443`
 ao Jenkins. Apenas ter HTTPS entre o navegador e o Cloudflare não basta.
+
+## Integração de storage
+
+A pipeline executa scripts/test-storage.sh antes de publicar/deploy: banco e
+SeaweedFS reais em projeto temporário, sem volumes/portas fixas da aplicação.
+O script usa docker cp em vez de bind do workspace porque o daemon está no host.
+Presigned GET externo usa container com rede do host Linux. Os dois Jenkinsfiles
+devem permanecer iguais.
+
+Antes do primeiro deploy da API com storage, configurar STORAGE_* e
+ASSET_ADMIN_TOKEN no .env do host e provisionar SeaweedFS conforme
+docs/storage/operations.md. Reconstruir a imagem Jenkins para atualizar o script
+de deploy copiado em /opt/bookrush. Ele recusa deploy se storage não estiver
+saudável. As alterações precisam estar publicadas na branch remota selecionada.
