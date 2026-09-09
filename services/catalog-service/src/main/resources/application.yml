@@ -1,6 +1,11 @@
 server:
   port: 8080
   shutdown: graceful
+
+springdoc:
+  swagger-ui:
+    disable-swagger-default-url: true
+    url: /v3/api-docs
 spring:
   servlet:
     multipart:

@@ -27,6 +27,8 @@ springdoc:
   swagger-ui:
     path: /ingestion-docs/swagger-ui.html
     config-url: /ingestion-docs/v3/api-docs/swagger-config
+    disable-swagger-default-url: true
+    url: /ingestion-docs/v3/api-docs
 
 management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
