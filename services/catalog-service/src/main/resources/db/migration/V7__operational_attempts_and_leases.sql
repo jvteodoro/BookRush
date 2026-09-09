@@ -12,12 +12,14 @@ DECLARE c RECORD;
 BEGIN
   FOR c IN
     SELECT conname FROM pg_constraint
-    WHERE conrelid = 'catalog.ingestion_job'::regclass
+    WHERE conrelid = format('%I.ingestion_job', current_schema())::regclass
       AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%status%'
   LOOP
-    EXECUTE format('ALTER TABLE catalog.ingestion_job DROP CONSTRAINT %I', c.conname);
+    EXECUTE format('ALTER TABLE %I.ingestion_job DROP CONSTRAINT %I', current_schema(), c.conname);
   END LOOP;
 END $$;
+
+ALTER TABLE ingestion_job DROP CONSTRAINT IF EXISTS ingestion_job_status_check;
 
 ALTER TABLE ingestion_job
   ADD CONSTRAINT ingestion_job_status_check CHECK

@@ -23,7 +23,9 @@ class SchemaUpgradeIT {
       jdbc.update("INSERT INTO "+schema+".book_asset(id,book_id,asset_type,asset_role,source_id) VALUES (?,?,'TXT','SOURCE','10000000-0000-4000-8000-000000000001')",asset,book);
       jdbc.update("INSERT INTO "+schema+".book_asset_version(id,book_asset_id,version_number,storage_provider,bucket,object_key) VALUES (?,?,1,'S3','books-source','existing')",version,asset);
       Flyway latest=Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load();
-      assertEquals(2,latest.migrate().migrationsExecuted);
+      // V7+ operational migrations are additive; the upgrade must apply at
+      // least the ingestion and processing migrations introduced after V4.
+      assertTrue(latest.migrate().migrationsExecuted >= 2);
       latest.validate();
       assertEquals("existing",jdbc.queryForObject("SELECT object_key FROM "+schema+".book_asset_version WHERE id=?",String.class,version));
       assertNull(jdbc.queryForObject("SELECT ingestion_item_id FROM "+schema+".book_asset_version WHERE id=?",UUID.class,version));

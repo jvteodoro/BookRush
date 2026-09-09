@@ -8,6 +8,7 @@ import java.net.URI;
 import java.time.*;
 import java.util.*;
 import org.slf4j.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class AssetService {
   public AssetService(EntityManager em,PlatformTransactionManager manager,ObjectStorage storage,StorageProperties props,BucketSelector buckets) {
     this(em, manager, storage, props, buckets, null);
   }
+  @Autowired
   public AssetService(EntityManager em,PlatformTransactionManager manager,ObjectStorage storage,StorageProperties props,
       BucketSelector buckets, JdbcTemplate jdbc) {
     this.em=em;this.tx=new TransactionTemplate(manager);this.storage=storage;this.props=props;this.buckets=buckets;this.jdbc=jdbc;
@@ -51,16 +53,8 @@ public class AssetService {
   public UploadResult upload(UUID book,UUID existing,UUID edition,UUID source,UUID license,
       BookAssetAssetType type,BookAssetAssetRole role,String filename,String declared,InputStream input) throws IOException {
     try(UploadFile file=UploadFile.read(input,filename,declared,type,props.maxUploadBytes())) {
-      if (existing != null && role == BookAssetAssetRole.SOURCE) {
-        UploadResult noop = tx.execute(status -> {
-          var current = asset(book, existing);
-          var matches = em.createQuery("select v from BookAssetVersion v where v.bookAssetId=:id and v.sha256=:sha and v.status=:status order by v.versionNumber desc", BookAssetVersion.class)
-              .setParameter("id", existing).setParameter("sha", file.sha256())
-              .setParameter("status", BookAssetVersionStatus.AVAILABLE).setMaxResults(1).getResultList();
-          return matches.isEmpty() ? null : new UploadResult(view(current), view(matches.get(0)));
-        });
-        if (noop != null) return noop;
-      }
+      if (existing != null && role == BookAssetAssetRole.SOURCE)
+        throw new IllegalArgumentException("Source assets are immutable");
       Reservation r=tx.execute(status->{
         if(em.find(Book.class,book)==null) throw missing();
         BookAsset a;
@@ -96,12 +90,14 @@ public class AssetService {
         UploadResult result=tx.execute(status->{
           var current=asset(book,r.assetId());em.lock(current,LockModeType.PESSIMISTIC_WRITE);
           if(current.getStatus()==BookAssetStatus.DELETED) throw new IllegalArgumentException("Asset deleted during upload");
+          if (jdbc != null) {
+            em.createNativeQuery("UPDATE catalog.book_asset_version SET verified_at=clock_timestamp(), verification_method='HEAD_SHA256', availability_status='AVAILABLE', current_eligible=true WHERE id=:version")
+                .setParameter("version", r.versionId()).executeUpdate();
+          }
           var v=em.find(BookAssetVersion.class,r.versionId());v.setStatus(BookAssetVersionStatus.AVAILABLE);em.flush();
           if (jdbc != null) {
             em.createNativeQuery("UPDATE catalog.book_asset SET current_version_id=:version WHERE id=:asset")
                 .setParameter("version", r.versionId()).setParameter("asset", r.assetId()).executeUpdate();
-            em.createNativeQuery("UPDATE catalog.book_asset_version SET availability_status='AVAILABLE', current_eligible=true, verified_at=clock_timestamp(), verification_method='HEAD_SHA256' WHERE id=:version")
-                .setParameter("version", r.versionId()).executeUpdate();
           }
           return new UploadResult(view(asset(book,r.assetId())),view(v));
         });
@@ -156,7 +152,7 @@ public class AssetService {
           AND (valid_from IS NULL OR valid_from <= clock_timestamp())
           AND (valid_until IS NULL OR valid_until > clock_timestamp())
         """, Integer.class, a.getId(), a.getEditionId());
-    return approved != null && approved > 0;
+    return (approved != null && approved > 0) || licensed(a);
   }
   private BookAssetVersion latest(UUID asset) {
     return em.createQuery("select v from BookAssetVersion v where v.bookAssetId=:id and v.status=:status order by v.versionNumber desc",BookAssetVersion.class)

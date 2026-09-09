@@ -23,6 +23,28 @@ public record StorageProperties(
     @DefaultValue("30s") Duration timeout,
     @DefaultValue("") String adminToken,
     @Valid Buckets buckets) {
+  /**
+   * Configuration binding may omit the nested bucket object when a test or a
+   * deployment only overrides endpoint credentials. Keep the operational
+   * defaults in one place so storage startup never dereferences a null group.
+   */
+  public StorageProperties {
+    String source = buckets == null ? null : buckets.source();
+    String publicBucket = buckets == null ? null : buckets.publicBucket();
+    String processing = buckets == null ? null : buckets.processing();
+    String ml = buckets == null ? null : buckets.ml();
+    String raw = buckets == null ? null : buckets.raw();
+    buckets = new Buckets(defaultBucket(source, "books-source"),
+        defaultBucket(publicBucket, "books-public"),
+        defaultBucket(processing, "books-processing"),
+        defaultBucket(ml, "books-ml"),
+        defaultBucket(raw, "books-raw"));
+  }
+
+  private static String defaultBucket(String value, String fallback) {
+    return value == null || value.isBlank() ? fallback : value;
+  }
+
   public record Buckets(
       @DefaultValue("books-source") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String source,
       @DefaultValue("books-public") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String publicBucket,
