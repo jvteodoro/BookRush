@@ -1,4 +1,4 @@
-# Linhagem implementada em V6
+# Linhagem implementada em V6–V9
 
 asset_processing registra uma tentativa de transformação entre versões físicas,
 com processador, sua versão, tipo da operação, estado, horários, metadata JSONB
@@ -7,11 +7,10 @@ output pode faltar em tentativa pendente/falha, mas é exigido em SUCCEEDED.
 Tipo é um código extensível uppercase (ex.: NORMALIZATION, TEXT_EXTRACTION,
 CHAPTER_SEGMENTATION), e não um enum fechado de todos os pipelines futuros.
 
-O modelo mínimo é uma entrada/uma saída por registro. Para múltiplas saídas,
-registrar uma aresta por saída; não é um orquestrador de execução multi-input.
-Retries recebem novos IDs e preservam as tentativas anteriores. Multi-input
-exigirá uma entidade de execução com tabelas de entradas/saídas quando houver
-produtor real. Todas as FKs são RESTRICT.
+V9 adiciona `processing_input` e `processing_output` como conjuntos ordenados de
+entradas e saídas. Os campos unitários de V6 continuam preenchidos para
+compatibilidade, e retries recebem novos IDs preservando as tentativas anteriores.
+Todas as FKs são RESTRICT.
 
 Autoaresta é rejeitada no banco. Ciclos indiretos não são bloqueados na DDL;
 um futuro coordenador deve validá-los sob concorrência. As consultas recursivas

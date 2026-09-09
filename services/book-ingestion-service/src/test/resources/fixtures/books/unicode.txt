@@ -1,0 +1,3 @@
+﻿Capítulo 1 — Ação e emoção
+
+😀 é devem manter posições em Unicode code points.

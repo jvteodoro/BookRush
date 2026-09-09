@@ -71,7 +71,15 @@ reconciliação periódica continua manual, conforme operations.md de storage.
 
 Não guardar URLs absolutas: elas dependem de endpoint, expiração e futura CDN.
 Construí-las a partir de bucket/key após autorização permite migrar o fornecedor.
-Não há blobs, deduplicação física nem chamadas S3 nesta migration.
+V9 adiciona `storage_intent` para tornar o PUT e a confirmação recuperáveis sem
+apagar prematuramente um objeto verificado. `operation_key` identifica a
+intenção; provider/bucket/object_key identifica a localização física. O status
+de disponibilidade é separado de `current_eligible`, e o asset guarda uma
+referência explícita à versão corrente.
+
+`processing_input` e `processing_output` permitem vários inputs/outputs
+ordenados, preservando os campos unitários de V6 para compatibilidade. Não há
+blobs, deduplicação física nem chamadas S3 dentro das migrations.
 
 ## Consulta da última versão disponível
 

@@ -13,6 +13,8 @@ livros binários, texto integral ou URLs assinadas.
 | V4 | book_asset e book_asset_version |
 | V5 | source_record, ingestion_job, ingestion_item; origem da versão |
 | V6 | asset_processing |
+| V7 | logical ingestion items, job/task attempts, leases, fencing tokens, command idempotency and audit events |
+| V8 | source revisions/observations, field provenance, Open Library author IDs and ISBN checksums |
 
 ## ER completo
 
@@ -40,6 +42,10 @@ erDiagram
     SOURCE ||--o{ SOURCE_RECORD : snapshots
     SOURCE ||--o{ INGESTION_JOB : runs
     INGESTION_JOB ||--o{ INGESTION_ITEM : attempts
+    INGESTION_JOB ||--o{ INGESTION_LOGICAL_ITEM : contains
+    INGESTION_LOGICAL_ITEM ||--o{ INGESTION_ITEM : attempts
+    INGESTION_JOB ||--o{ INGESTION_JOB_ATTEMPT : executes
+    INGESTION_TASK ||--o{ INGESTION_TASK_ATTEMPT : retries
     SOURCE_RECORD o|--o{ INGESTION_ITEM : payload
     BOOK o|--o{ INGESTION_ITEM : resolves
     EDITION o|--o{ INGESTION_ITEM : resolves
@@ -61,16 +67,28 @@ Edition(id,book_id) sustenta integridade composta de assets/itens. Versões são
 únicas por asset/número e provider/bucket/key, mesmo após remoção lógica.
 Hash não é unique. Checks rejeitam números negativos, SHA-256 inválido, estados
 desconhecidos, datas finais anteriores ao início e contadores inconsistentes.
+V7 preserva os itens de tentativa de V5 e cria `ingestion_logical_item` para a
+unicidade job/chave sem invalidar tentativas históricas. `ingestion_task` mantém
+operation key, lease, heartbeat e fence token; sua confirmação deve comparar o
+token no commit.
 
 Source_record usa JSONB somente no payload original; processamento em metadata
 variável. Campos estruturais são relacionais. FK histórica usa RESTRICT; não há
 CascadeType.ALL ou remoção em cascata. Apenas assets/versões têm estado DELETED,
 sem mecanismo genérico de soft delete.
 
+V8 mantém `source_record` como a revisão semântica selecionada e registra cada
+aparência em `source_record_observation`, incluindo snapshot, hash bruto,
+localizador RAW e anomalias. `field_provenance` conserva histórico por entidade e
+campo, regra, confiança, decisão, valor anterior e ator. ISBN10/ISBN13 passaram a
+usar funções imutáveis de checksum; identificadores de terceiros continuam
+limitados ao contexto da fonte.
+
 Limites explícitos: ciclos indiretos de merge/processamento exigem coordenação
 futura; queries de linhagem detectam ciclos e terminam. DDL não implementa
 autorização, cálculo de hash, máquina de estados, checksum ISBN, reconciliação,
-imutabilidade física ou atribuição legal. Schema de capítulos foi adiado por
-ausência de produtor e contrato de offsets, conforme ADR.
+imutabilidade física ou atribuição legal. O schema de capítulos será adicionado
+quando o produtor de texto e o contrato de offsets forem implementados; V7 não
+cria tabelas literárias.
 
 Ver [campos](entities.md), [índices](indexes.md) e [ADR](../adr/ADR-001-book-storage-data-model.md).

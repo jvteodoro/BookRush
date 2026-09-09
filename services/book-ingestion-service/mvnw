@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+if command -v docker >/dev/null 2>&1; then
+  exec docker run --rm -v "$PWD":/workspace -w /workspace maven:3.9-eclipse-temurin-21 mvn "$@"
+fi
+if command -v mvn >/dev/null 2>&1; then
+  exec mvn "$@"
+fi
+echo "Maven local não está instalado e Docker não está disponível; use o Dockerfile do serviço." >&2
+exit 127

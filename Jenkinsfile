@@ -41,11 +41,13 @@ pipeline {
           env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
           env.BACKEND_IMAGE = "${registry}/bookrush/catalog-service:${env.IMAGE_TAG}"
           env.FRONTEND_IMAGE = "${registry}/bookrush/frontend:${env.IMAGE_TAG}"
+          env.INGESTION_IMAGE = "${registry}/bookrush/book-ingestion-service:${env.IMAGE_TAG}"
         }
         sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" services/catalog-service'
         sh 'docker run --rm "bookrush/catalog-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$BACKEND_IMAGE" services/catalog-service'
         sh 'docker build -t "$FRONTEND_IMAGE" frontend'
+        sh 'docker build -t "$INGESTION_IMAGE" services/book-ingestion-service'
       }
     }
 
@@ -60,7 +62,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin'
-          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE"'
+          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE"'
         }
       }
     }
@@ -68,7 +70,7 @@ pipeline {
     stage('Deploy Compose') {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
       steps {
-        sh 'bash /opt/bookrush/deploy-compose.sh'
+        sh 'bash infrastructure/jenkins/deploy-compose.sh'
       }
     }
 

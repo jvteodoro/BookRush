@@ -66,8 +66,8 @@ o TTL. Backup de produção, proxy HTTPS externo e cloud não foram executados;
 procedimentos para validação estão em operations/local-development/migration.
 
 Código permanece local: sem commit, push, sync remoto de beads ou deploy.
-Para Jenkins usar a entrega, publicar a branch, provisionar storage e atualizar
-a imagem Jenkins conforme operations.md.
+Para Jenkins usar a entrega, publicar a branch, provisionar storage e usar a pipeline
+atualizada conforme operations.md.
 
 ## Executar
 

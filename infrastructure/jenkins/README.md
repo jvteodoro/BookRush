@@ -96,6 +96,6 @@ devem permanecer iguais.
 
 Antes do primeiro deploy da API com storage, configurar STORAGE_* e
 ASSET_ADMIN_TOKEN no .env do host e provisionar SeaweedFS conforme
-docs/storage/operations.md. Reconstruir a imagem Jenkins para atualizar o script
-de deploy copiado em /opt/bookrush. Ele recusa deploy se storage não estiver
+docs/storage/operations.md. A pipeline executa infrastructure/jenkins/deploy-compose.sh da branch selecionada,
+sem depender da cópia antiga em /opt/bookrush. Ela recusa deploy se storage não estiver
 saudável. As alterações precisam estar publicadas na branch remota selecionada.

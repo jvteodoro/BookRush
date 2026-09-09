@@ -1,0 +1,12 @@
+package com.bookrush.ingestion.retry;
+
+public enum FailureClass {
+  RETRYABLE_IO,
+  PAUSED_AUTHORIZATION,
+  OBSERVED_ABSENCE,
+  QUARANTINED_INPUT,
+  REVIEW_REQUIRED,
+  PAUSED_RESOURCE,
+  TRANSIENT_DATABASE,
+  FATAL_BUG
+}

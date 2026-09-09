@@ -13,8 +13,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class AssetCompensationTest {
-  @Test void failedCommitCompensatesEvenWhenDeletionAlsoFails() throws Exception { exercise(true); }
-  @Test void failedCommitCompensatesSuccessfulUpload() throws Exception { exercise(false); }
+  @Test void failedCommitRetainsObjectForReconciliationWhenDeletionWouldFail() throws Exception { exercise(true); }
+  @Test void failedCommitRetainsObjectForReconciliation() throws Exception { exercise(false); }
   @SuppressWarnings("unchecked")
   private void exercise(boolean deleteFails) throws Exception {
     EntityManager em=mock(EntityManager.class);PlatformTransactionManager manager=mock(PlatformTransactionManager.class);
@@ -41,7 +41,7 @@ class AssetCompensationTest {
     var service=new AssetService(em,manager,storage,p,new BucketSelector(p.buckets()));
     assertThrows(org.springframework.transaction.TransactionSystemException.class,()->service.upload(book,null,null,source,null,
         BookAssetAssetType.TXT,BookAssetAssetRole.SOURCE,"a.txt","text/plain",new ByteArrayInputStream("abc".getBytes())));
-    verify(storage).delete(any());assertEquals(BookAssetVersionStatus.FAILED,version[0].getStatus());
+    verify(storage, never()).delete(any());assertEquals(BookAssetVersionStatus.FAILED,version[0].getStatus());
     assertNotNull(version[0].getObjectKey());assertEquals(3,commits.get());
   }
 }

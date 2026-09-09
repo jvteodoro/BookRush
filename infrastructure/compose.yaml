@@ -1,6 +1,26 @@
 name: bookrush
 
 services:
+  reverse-proxy:
+    image: traefik:v3.1
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=bookrush
+      - --entrypoints.web.address=:80
+      - --api.dashboard=false
+      - --ping=true
+    ports:
+      - "127.0.0.1:${BOOKRUSH_PROXY_PORT:-18081}:80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [bookrush]
+
   seaweedfs:
     build:
       context: ./seaweedfs
@@ -83,10 +103,12 @@ services:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       ASSET_ADMIN_TOKEN: ${ASSET_ADMIN_TOKEN:?Set ASSET_ADMIN_TOKEN in .env}
+      CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
       STORAGE_BUCKET_SOURCE: ${STORAGE_BUCKET_SOURCE:-books-source}
       STORAGE_BUCKET_PUBLIC: ${STORAGE_BUCKET_PUBLIC:-books-public}
       STORAGE_BUCKET_PROCESSING: ${STORAGE_BUCKET_PROCESSING:-books-processing}
       STORAGE_BUCKET_ML: ${STORAGE_BUCKET_ML:-books-ml}
+      STORAGE_BUCKET_RAW: ${STORAGE_BUCKET_RAW:-books-raw}
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,6 +122,55 @@ services:
       timeout: 5s
       retries: 12
       start_period: 40s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.catalog.rule=PathPrefix(`/api`)
+      - traefik.http.routers.catalog.entrypoints=web
+      - traefik.http.routers.catalog.priority=100
+      - traefik.http.services.catalog.loadbalancer.server.port=8080
+    networks: [bookrush]
+
+  book-ingestion-service:
+    image: ${INGESTION_IMAGE:-bookrush/book-ingestion-service:local}
+    build:
+      context: ../services/book-ingestion-service
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      INGESTION_ROLE: ${INGESTION_ROLE:-ALL}
+      INGESTION_SCHEDULER_ENABLED: ${INGESTION_SCHEDULER_ENABLED:-false}
+      INGESTION_STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      STORAGE_BUCKET_RAW: ${STORAGE_BUCKET_RAW:-books-raw}
+      CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8080}
+      CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
+      INGESTION_SECURITY_ENABLED: ${INGESTION_SECURITY_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8090/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    ports:
+      - "127.0.0.1:${BOOKRUSH_INGESTION_PORT:-18090}:8090"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.ingestion.rule=PathPrefix(`/ingestion`)
+      - traefik.http.routers.ingestion.entrypoints=web
+      - traefik.http.routers.ingestion.priority=100
+      - traefik.http.routers.ingestion.middlewares=ingestion-strip
+      - traefik.http.middlewares.ingestion-strip.stripprefix.prefixes=/ingestion
+      - traefik.http.services.ingestion.loadbalancer.server.port=8090
     networks: [bookrush]
 
   frontend:
@@ -109,6 +180,12 @@ services:
     depends_on:
       catalog-service:
         condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=PathPrefix(`/`)
+      - traefik.http.routers.frontend.entrypoints=web
+      - traefik.http.routers.frontend.priority=1
+      - traefik.http.services.frontend.loadbalancer.server.port=8080
     ports:
       - "127.0.0.1:${BOOKRUSH_FRONTEND_PORT:-18080}:8080"
     networks: [bookrush]

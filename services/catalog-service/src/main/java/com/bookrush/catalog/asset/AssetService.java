@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Service
 @ConditionalOnProperty(name="storage.enabled",havingValue="true")
@@ -24,8 +25,13 @@ public class AssetService {
   private final ObjectStorage storage;
   private final StorageProperties props;
   private final BucketSelector buckets;
+  private final JdbcTemplate jdbc;
   public AssetService(EntityManager em,PlatformTransactionManager manager,ObjectStorage storage,StorageProperties props,BucketSelector buckets) {
-    this.em=em;this.tx=new TransactionTemplate(manager);this.storage=storage;this.props=props;this.buckets=buckets;
+    this(em, manager, storage, props, buckets, null);
+  }
+  public AssetService(EntityManager em,PlatformTransactionManager manager,ObjectStorage storage,StorageProperties props,
+      BucketSelector buckets, JdbcTemplate jdbc) {
+    this.em=em;this.tx=new TransactionTemplate(manager);this.storage=storage;this.props=props;this.buckets=buckets;this.jdbc=jdbc;
   }
   /** Asset metadata only: no signed capability or permanent URL is persisted. */
   public record AssetView(UUID id,UUID bookId,UUID editionId,BookAssetAssetType type,BookAssetAssetRole role,BookAssetStatus status) {}
@@ -45,6 +51,16 @@ public class AssetService {
   public UploadResult upload(UUID book,UUID existing,UUID edition,UUID source,UUID license,
       BookAssetAssetType type,BookAssetAssetRole role,String filename,String declared,InputStream input) throws IOException {
     try(UploadFile file=UploadFile.read(input,filename,declared,type,props.maxUploadBytes())) {
+      if (existing != null && role == BookAssetAssetRole.SOURCE) {
+        UploadResult noop = tx.execute(status -> {
+          var current = asset(book, existing);
+          var matches = em.createQuery("select v from BookAssetVersion v where v.bookAssetId=:id and v.sha256=:sha and v.status=:status order by v.versionNumber desc", BookAssetVersion.class)
+              .setParameter("id", existing).setParameter("sha", file.sha256())
+              .setParameter("status", BookAssetVersionStatus.AVAILABLE).setMaxResults(1).getResultList();
+          return matches.isEmpty() ? null : new UploadResult(view(current), view(matches.get(0)));
+        });
+        if (noop != null) return noop;
+      }
       Reservation r=tx.execute(status->{
         if(em.find(Book.class,book)==null) throw missing();
         BookAsset a;
@@ -59,7 +75,7 @@ public class AssetService {
           a.setAssetType(type);a.setAssetRole(role);a.setStatus(BookAssetStatus.INACTIVE);em.persist(a);em.flush();
         } else {
           a=asset(book,existing); em.lock(a,LockModeType.PESSIMISTIC_WRITE);
-          if(a.getStatus()==BookAssetStatus.DELETED || a.getAssetRole()==BookAssetAssetRole.SOURCE) throw new IllegalArgumentException("Asset is immutable or deleted");
+          if(a.getStatus()==BookAssetStatus.DELETED) throw new IllegalArgumentException("Asset is deleted");
           if(a.getAssetType()!=type) throw new IllegalArgumentException("Version type differs");
           a.setStatus(BookAssetStatus.INACTIVE); // Every new version requires explicit approval again.
         }
@@ -81,16 +97,18 @@ public class AssetService {
           var current=asset(book,r.assetId());em.lock(current,LockModeType.PESSIMISTIC_WRITE);
           if(current.getStatus()==BookAssetStatus.DELETED) throw new IllegalArgumentException("Asset deleted during upload");
           var v=em.find(BookAssetVersion.class,r.versionId());v.setStatus(BookAssetVersionStatus.AVAILABLE);em.flush();
+          em.createNativeQuery("UPDATE catalog.book_asset SET current_version_id=:version WHERE id=:asset")
+              .setParameter("version", r.versionId()).setParameter("asset", r.assetId()).executeUpdate();
+          em.createNativeQuery("UPDATE catalog.book_asset_version SET availability_status='AVAILABLE', current_eligible=true, verified_at=clock_timestamp(), verification_method='HEAD_SHA256' WHERE id=:version")
+              .setParameter("version", r.versionId()).executeUpdate();
           return new UploadResult(view(asset(book,r.assetId())),view(v));
         });
         log.info("asset upload result=ok bookId={} assetId={} versionId={}",book,r.assetId(),r.versionId());
         return result;
       } catch(RuntimeException failure) {
         collision=failure instanceof StorageFailure s && s.kind()==StorageFailure.Kind.CONFLICT;
-        if(!collision) {
-          try { storage.delete(r.location()); }
-          catch(RuntimeException ignored) { log.error("asset compensation result=failed bookId={} assetId={} versionId={}",book,r.assetId(),r.versionId()); }
-        }
+        // Keep the object for storage_intent/reconciliation. A failed database
+        // confirmation must not eagerly delete a possibly verified immutable object.
         try { tx.executeWithoutResult(status->{em.find(BookAssetVersion.class,r.versionId()).setStatus(BookAssetVersionStatus.FAILED);}); }
         catch(RuntimeException ignored) { log.error("asset recovery required bookId={} assetId={} versionId={}",book,r.assetId(),r.versionId()); }
         // A committed pending/failed row retains the exact key even if DB or compensation is unavailable.
@@ -113,7 +131,7 @@ public class AssetService {
   public void approve(UUID book,UUID id) {
     tx.executeWithoutResult(s->{
       BookAsset a=asset(book,id);em.lock(a,LockModeType.PESSIMISTIC_WRITE);
-      if(a.getStatus()==BookAssetStatus.DELETED || a.getAssetRole()!=BookAssetAssetRole.PUBLIC || !licensed(a))
+      if(a.getStatus()==BookAssetStatus.DELETED || a.getAssetRole()!=BookAssetAssetRole.PUBLIC || !distributionAllowed(a))
         throw new ResponseStatusException(HttpStatus.CONFLICT,"Public distribution requires explicit redistribution permission");
       long pending=em.createQuery("select count(v) from BookAssetVersion v where v.bookAssetId=:id and v.status=:status",Long.class)
           .setParameter("id",id).setParameter("status",BookAssetVersionStatus.PENDING_UPLOAD).getSingleResult();
@@ -127,6 +145,17 @@ public class AssetService {
     if(id==null && a.getEditionId()!=null) id=em.find(Edition.class,a.getEditionId()).getLicenseId();
     return id!=null && Boolean.TRUE.equals(em.find(License.class,id).getRedistributionAllowed());
   }
+  private boolean distributionAllowed(BookAsset a) {
+    if (jdbc == null) return licensed(a);
+    Integer approved = jdbc.queryForObject("""
+        SELECT count(*) FROM catalog.rights_decision
+        WHERE action='DISTRIBUTION' AND distribution_status='APPROVED' AND territory='GLOBAL'
+          AND (asset_id=? OR edition_id=?)
+          AND (valid_from IS NULL OR valid_from <= clock_timestamp())
+          AND (valid_until IS NULL OR valid_until > clock_timestamp())
+        """, Integer.class, a.getId(), a.getEditionId());
+    return approved != null && approved > 0;
+  }
   private BookAssetVersion latest(UUID asset) {
     return em.createQuery("select v from BookAssetVersion v where v.bookAssetId=:id and v.status=:status order by v.versionNumber desc",BookAssetVersion.class)
         .setParameter("id",asset).setParameter("status",BookAssetVersionStatus.AVAILABLE).setMaxResults(1).getResultStream().findFirst().orElseThrow(AssetService::missing);
@@ -136,7 +165,7 @@ public class AssetService {
       BookAsset a=asset(book,id);
       if(a.getStatus()==BookAssetStatus.DELETED) throw missing();
       if(publicRequest && (a.getStatus()!=BookAssetStatus.ACTIVE || a.getAssetRole()!=BookAssetAssetRole.PUBLIC
-          || em.find(Book.class,book).getStatus()!=BookStatus.ACTIVE || !licensed(a))) throw missing();
+          || em.find(Book.class,book).getStatus()!=BookStatus.ACTIVE || !distributionAllowed(a))) throw missing();
       var v=latest(id);
       if(storage.head(location(v)).isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Object missing; reconciliation required");
       Duration ttl=Duration.ofSeconds(props.urlTtlSeconds());

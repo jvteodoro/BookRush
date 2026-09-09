@@ -54,3 +54,7 @@ storage:
     public-bucket: ${STORAGE_BUCKET_PUBLIC:books-public}
     processing: ${STORAGE_BUCKET_PROCESSING:books-processing}
     ml: ${STORAGE_BUCKET_ML:books-ml}
+    raw: ${STORAGE_BUCKET_RAW:books-raw}
+canonical:
+  service:
+    token: ${CANONICAL_SERVICE_TOKEN:}

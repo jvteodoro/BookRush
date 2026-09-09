@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE rdf:RDF [ <!ENTITY forbidden SYSTEM "file:///etc/passwd"> ]>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns:dcterms="http://purl.org/dc/terms/"
+         xmlns:pgterms="http://www.gutenberg.org/2009/pgterms/">
+  <pgterms:ebook rdf:about="ebooks/1342">
+    <dcterms:title>Pride and Prejudice</dcterms:title>
+    <dcterms:language><rdf:Description><rdf:value>en</rdf:value></rdf:Description></dcterms:language>
+    <dcterms:creator><pgterms:agent rdf:about="agents/126"><pgterms:name>Jane Austen</pgterms:name></pgterms:agent></dcterms:creator>
+    <dcterms:rights>Public domain in the United States.</dcterms:rights>
+    <dcterms:issued>2008-08-26</dcterms:issued>
+    <dcterms:subject><rdf:Description><rdf:value>Love stories</rdf:value></rdf:Description></dcterms:subject>
+    <dcterms:type><rdf:Description><rdf:value>Text</rdf:value></rdf:Description></dcterms:type>
+    <dcterms:hasFormat><pgterms:file rdf:about="https://example.test/cache/epub/1342/pg1342.epub"><dcterms:format><rdf:Description><rdf:value>application/epub+zip</rdf:value></rdf:Description></dcterms:format></pgterms:file></dcterms:hasFormat>
+  </pgterms:ebook>
+</rdf:RDF>

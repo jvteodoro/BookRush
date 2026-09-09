@@ -27,9 +27,13 @@ public record StorageProperties(
       @DefaultValue("books-source") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String source,
       @DefaultValue("books-public") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String publicBucket,
       @DefaultValue("books-processing") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String processing,
-      @DefaultValue("books-ml") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String ml) {
-    public List<String> all() { return List.of(source, publicBucket, processing, ml); }
-    @AssertTrue public boolean isDistinct() { return all().stream().distinct().count()==4; }
+      @DefaultValue("books-ml") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String ml,
+      @DefaultValue("books-raw") @Pattern(regexp="[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]") String raw) {
+    public Buckets(String source, String publicBucket, String processing, String ml) {
+      this(source, publicBucket, processing, ml, "books-raw");
+    }
+    public List<String> all() { return List.of(source, publicBucket, processing, ml, raw); }
+    @AssertTrue public boolean isDistinct() { return all().stream().distinct().count()==5; }
   }
   @AssertTrue public boolean isCredentialPairValid() {
     return (accessKey == null || accessKey.isBlank()) == (secretKey == null || secretKey.isBlank());

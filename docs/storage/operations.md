@@ -8,8 +8,7 @@ docker compose -f infrastructure/compose.yaml --env-file .env up -d --build --wa
 ```
 Só então implantar o backend novo; ele cria buckets antes de ficar pronto.
 Jenkins continua recriando só API/frontend. O script novo verifica saúde de
-bookrush-seaweedfs-1 e recusa deploy se ausente. Reconstruir a imagem Jenkins
-para atualizar o script /opt/bookrush/deploy-compose.sh; a pipeline remota usa
+bookrush-seaweedfs-1 e recusa deploy se ausente. A pipeline executa o script de deploy do checkout selecionado; a pipeline remota usa
 a branch publicada, nunca alterações locais. Não provisionamos o servidor
 automaticamente durante testes.
 

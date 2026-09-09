@@ -26,12 +26,19 @@ localmente com Docker Compose quanto em Kubernetes.
    docker compose -f infrastructure/compose.yaml --env-file .env --profile ci up --build
    ```
 
-O frontend fica restrito a `http://127.0.0.1:18080` e o Jenkins a
-`http://127.0.0.1:18082`; o pgAdmin fica em `http://127.0.0.1:18083`.
-PostgreSQL, Redis e a API não são publicados no host.
+O gateway fica restrito a `http://127.0.0.1:18081`; o frontend fica em
+`http://127.0.0.1:18080` para desenvolvimento direto, o Jenkins em
+`http://127.0.0.1:18082`, o pgAdmin em `http://127.0.0.1:18083` e o serviço de
+ingestão em `http://127.0.0.1:18090`. PostgreSQL, Redis e o catálogo não são
+publicados diretamente no host.
 Para expor a aplicação, adicione o modelo em
 `infrastructure/nginx/bookrush.conf.example` ao Nginx do servidor, alterando o
 domínio e, quando aplicável, a configuração TLS.
+
+Com o modelo Nginx aplicado, todas as requisições seguem para o gateway
+containerizado. Ele atende o frontend em `/`, o catálogo em `/api/...` e a
+ingestão em `/ingestion/api/...`; o prefixo `/ingestion/` é removido pelo
+gateway antes de encaminhar ao serviço interno.
 
 Antes de subir o Jenkins em Linux, configure `DOCKER_GID` no `.env` com o grupo
 do socket Docker: `stat -c '%g' /var/run/docker.sock`.
