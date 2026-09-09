@@ -51,8 +51,6 @@ CREATE TABLE ingestion_job_attempt (
 
 ALTER TABLE ingestion_item
   ADD COLUMN IF NOT EXISTS item_key TEXT;
-ALTER TABLE ingestion_item
-
 -- V5 stores attempts as rows and therefore permits the same external item more
 -- than once. Keep those rows intact and introduce a logical item owner instead
 -- of adding an invalid unique index over historical attempts.
@@ -69,17 +67,16 @@ CREATE TABLE ingestion_logical_item (
 ALTER TABLE ingestion_item ADD COLUMN logical_item_id UUID;
 INSERT INTO ingestion_logical_item(id, ingestion_job_id, source_id, item_key, external_identifier)
 SELECT md5(i.ingestion_job_id::text || ':' || i.source_id::text || ':' || i.external_identifier)::uuid,
+       i.ingestion_job_id, i.source_id,
        s.code || ':' || i.external_identifier, i.external_identifier
 FROM ingestion_item i JOIN source s ON s.id = i.source_id
 GROUP BY i.ingestion_job_id, i.source_id, s.code, i.external_identifier;
 UPDATE ingestion_item i
 SET item_key = l.item_key, logical_item_id = l.id
-FROM source s
-JOIN ingestion_logical_item l
-  ON l.ingestion_job_id = i.ingestion_job_id
- AND l.source_id = i.source_id
- AND l.external_identifier = i.external_identifier
-WHERE s.id = i.source_id;
+FROM ingestion_logical_item l
+WHERE l.ingestion_job_id = i.ingestion_job_id
+  AND l.source_id = i.source_id
+  AND l.external_identifier = i.external_identifier;
 ALTER TABLE ingestion_item
   ADD CONSTRAINT ingestion_item_logical_fk FOREIGN KEY (logical_item_id)
     REFERENCES ingestion_logical_item(id) ON DELETE RESTRICT;

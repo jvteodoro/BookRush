@@ -12,8 +12,15 @@ fi
 old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1)"
 old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1)"
 old_ingestion="$(docker inspect --format '{{.Config.Image}}' bookrush-book-ingestion-service-1 2>/dev/null || true)"
+diagnose() {
+  for service in bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-frontend-1; do
+    echo "--- diagnóstico $service ---" >&2
+    docker inspect --format 'state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} image={{.Config.Image}}' "$service" >&2 || true
+    docker logs --tail=120 --timestamps "$service" >&2 || true
+  done
+}
 rollback() {
-    docker inspect --format 'Backend state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}}' bookrush-catalog-service-1 >&2 || true
+  diagnose
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
     if [[ -n "$old_ingestion" ]]; then
       BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend book-ingestion-service
