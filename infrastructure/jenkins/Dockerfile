@@ -12,5 +12,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
 COPY init.groovy.d/ /usr/share/jenkins/ref/init.groovy.d/
-COPY bookrush.Jenkinsfile deploy-compose.sh /opt/bookrush/
+COPY bookrush.Jenkinsfile backstage.Jenkinsfile deploy-compose.sh /opt/bookrush/
 USER jenkins

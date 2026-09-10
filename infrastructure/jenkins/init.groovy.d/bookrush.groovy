@@ -11,6 +11,17 @@ def job = instance.getItem('bookrush-deploy')
 if (job == null) {
     job = instance.createProject(WorkflowJob, 'bookrush-deploy')
 }
+
+def backstagePipelineFile = new File('/opt/bookrush/backstage.Jenkinsfile')
+def backstageJob = instance.getItem('bookrush-backstage')
+if (backstageJob == null) {
+    backstageJob = instance.createProject(WorkflowJob, 'bookrush-backstage')
+}
+def backstageScript = backstagePipelineFile.text
+if (!(backstageJob.getDefinition() instanceof CpsFlowDefinition) || backstageJob.getDefinition().getScript() != backstageScript) {
+    backstageJob.setDefinition(new CpsFlowDefinition(backstageScript, true))
+    backstageJob.save()
+}
 def pipelineScript = pipelineFile.text
 if (!(job.getDefinition() instanceof CpsFlowDefinition) || job.getDefinition().getScript() != pipelineScript) {
     job.setDefinition(new CpsFlowDefinition(pipelineScript, true))

@@ -231,6 +231,7 @@ services:
       - ../.env:/run/bookrush.env:ro
       - ./compose.yaml:/opt/bookrush/compose.yaml:ro
       - ./jenkins/bookrush.Jenkinsfile:/opt/bookrush/bookrush.Jenkinsfile:ro
+      - ./jenkins/backstage.Jenkinsfile:/opt/bookrush/backstage.Jenkinsfile:ro
       - ./jenkins/deploy-compose.sh:/opt/bookrush/deploy-compose.sh:ro
       - ./jenkins/init.groovy.d/bookrush.groovy:/var/jenkins_home/init.groovy.d/bookrush.groovy:ro
     group_add:
