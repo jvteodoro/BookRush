@@ -20,4 +20,4 @@ acrescente uma rota e um serviço no provider de arquivo. Não publique a porta 
 novo serviço no host. O socket Docker não é necessário; o dashboard do Traefik
 permanece desativado.
 
-Para aplicar a entrada do host, use `infrastructure/nginx/bookrush.conf.example`, apontando o `proxy_pass` para `http://127.0.0.1:18081`. Depois valide `nginx -t` e recarregue o serviço. O TLS continua sendo responsabilidade do Nginx externo.
+Para instalar a entrada do host, execute `sudo bash infrastructure/nginx/install-bookrush-vhosts.sh`. O módulo `infrastructure/nginx/conf.d/bookrush-gateway.conf` aponta o `proxy_pass` para `http://127.0.0.1:18081`. O script faz backup, valida `nginx -t` e recarrega apenas após aprovação. O TLS continua sendo responsabilidade do Nginx externo.

@@ -13,10 +13,10 @@ docker compose --profile auth up -d keycloak
 ## Acesso por domínio público
 
 O endereço público padrão é `keycloak-bookrush.jteodoro.tec.br`. Crie um
-registro DNS apontando esse nome para o servidor e instale o virtual host
-[`infrastructure/nginx/bookrush-keycloak.conf.example`](../../infrastructure/nginx/bookrush-keycloak.conf.example)
-no Nginx do host. Emita o certificado TLS para esse nome e habilite as
-diretivas HTTPS do exemplo. O Nginx encaminha para o Traefik em
+registro DNS apontando esse nome para o servidor e execute
+`sudo bash infrastructure/nginx/install-bookrush-vhosts.sh` no checkout. O
+módulo `infrastructure/nginx/conf.d/bookrush-keycloak.conf` é instalado com os
+demais virtual hosts. Emita o certificado TLS para esse nome. O Nginx encaminha para o Traefik em
 `127.0.0.1:18081`, que encaminha o host para o container Keycloak.
 
 Defina no `.env` do servidor a URL externa completa antes de iniciar o
