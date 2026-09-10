@@ -53,9 +53,12 @@ ela faz checkout, executa `scripts/test-portal.sh` e cria uma imagem local;
 `PUBLISH` e `DEPLOY` são opt-ins.
 
 Para publicar, informe `REGISTRY`, habilite `PUBLISH` e configure a credential
-`REGISTRY_CREDENTIAL_ID`. Para atualizar o Compose do portal, habilite `DEPLOY`
-no host que possui `backstage/.env` e acesso ao Docker. O deploy usa a imagem
-gerada no próprio build e aguarda PostgreSQL e Backstage ficarem saudáveis.
+`REGISTRY_CREDENTIAL_ID`. Para atualizar o Compose do portal, habilite `DEPLOY`.
+Por padrão o job usa `/run/bookrush.env`, que é montado no container Jenkins
+pelo Compose principal; altere `BACKSTAGE_ENV_FILE` somente quando o agente usar
+outro caminho. O arquivo deve conter `BACKSTAGE_POSTGRES_PASSWORD` ou
+`POSTGRES_PASSWORD`. O deploy usa a imagem gerada no próprio build e aguarda
+PostgreSQL e Backstage ficarem saudáveis.
 
 ### Importação Gutenberg (opt-in)
 

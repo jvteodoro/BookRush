@@ -6,6 +6,7 @@ pipeline {
     string(name: 'GIT_CREDENTIAL_ID', defaultValue: '', description: 'Credential Git opcional para repositório privado.')
     string(name: 'REGISTRY', defaultValue: '', description: 'Registry sem barra final. Vazio: mantém a imagem local.')
     string(name: 'REGISTRY_CREDENTIAL_ID', defaultValue: 'docker-registry', description: 'Credential Jenkins de usuário/senha do registry.')
+    string(name: 'BACKSTAGE_ENV_FILE', defaultValue: '/run/bookrush.env', description: 'Arquivo de ambiente disponível no agente/host de deploy.')
     booleanParam(name: 'PUBLISH', defaultValue: false, description: 'Publicar a imagem do portal no registry.')
     booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Atualizar o stack Backstage via Compose no host de deploy.')
   }
@@ -65,8 +66,9 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          test -f backstage/.env || { echo 'backstage/.env ausente no host/workspace de deploy' >&2; exit 2; }
-          BACKSTAGE_IMAGE="$PORTAL_IMAGE" docker compose --env-file backstage/.env -f backstage/compose.yaml up -d --wait backstage-postgres backstage
+          env_file="${BACKSTAGE_ENV_FILE:-/run/bookrush.env}"
+          test -f "$env_file" || { echo "arquivo de ambiente ausente: $env_file" >&2; exit 2; }
+          BACKSTAGE_IMAGE="$PORTAL_IMAGE" docker compose --env-file "$env_file" -f backstage/compose.yaml up -d --wait backstage-postgres backstage
         '''
       }
     }
