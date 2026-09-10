@@ -90,7 +90,9 @@ services:
       KC_HTTP_ENABLED: "true"
     volumes:
       - keycloak_data:/opt/keycloak/data
-      - ./keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
+      # This path is resolved by the Docker daemon, not by the Jenkins
+      # container that invokes Compose through the Docker socket.
+      - ${BOOKRUSH_REPO_ROOT:-/home/enoch/projects/LabSoft/BookRush}/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
     ports:
       - "127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}:8080"
     healthcheck:
