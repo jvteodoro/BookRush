@@ -7,6 +7,13 @@ http:
       priority: 120
       service: ingestion
 
+    keycloak:
+      rule: Host(`keycloak-bookrush.jteodoro.tec.br`)
+      entryPoints:
+        - web
+      priority: 200
+      service: keycloak
+
     catalog-docs:
       rule: PathPrefix(`/swagger-ui`) || PathPrefix(`/v3/api-docs`)
       entryPoints:
@@ -56,3 +63,7 @@ http:
       loadBalancer:
         servers:
           - url: http://frontend:8080
+    keycloak:
+      loadBalancer:
+        servers:
+          - url: http://keycloak:8080

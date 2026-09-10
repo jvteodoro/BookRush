@@ -44,11 +44,35 @@ O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
 
+### Importação Gutenberg (opt-in)
+
+O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para
+executá-lo, marque `RUN_GUTENBERG_IMPORT`, informe apenas IDs numéricos em
+`GUTENBERG_EXTERNAL_IDS` e mantenha `GUTENBERG_DRY_RUN` marcado na primeira
+execução. O job usa a credential Jenkins Secret text indicada por
+`INGESTION_CREDENTIAL_ID` como Bearer token; o token nunca é gravado no
+relatório. A chave de idempotência é derivada do commit, IDs, modo e URL, então
+repetir o build não cria uma segunda execução lógica.
+
+O estágio consulta o job até o limite escolhido em
+`GUTENBERG_TIMEOUT_MINUTES`, arquiva `gutenberg-import-report.json` e falha a
+pipeline para estados `FAILED`, `COMPLETED_WITH_ERRORS`, `CANCELLED` ou timeout.
+Desmarcar `RUN_GUTENBERG_IMPORT` garante que pushes e deploys normais não
+disparem importação.
+
 O deploy usa o Compose do servidor montado em `/opt/bookrush/compose.yaml`
-e o `.env` em `/run/bookrush.env`, ambos somente leitura. Atualiza somente
-`catalog-service` e `frontend`, recriando o frontend para renovar a resolução
-DNS da API. Faz um teste HTTP em `/api/status` e tenta restaurar as imagens
-anteriores se o deploy falhar. PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
+e o `.env` em `/run/bookrush.env`, ambos somente leitura. O profile `auth` é
+ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
+ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
+faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
+deploy falhar. PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
+
+Para o acesso público do Keycloak, o `.env` do servidor deve conter
+`KEYCLOAK_ADMIN_PASSWORD`, `KEYCLOAK_PUBLIC_URL` e o
+`INGESTION_OIDC_ISSUER` HTTPS correspondente ao DNS configurado. Sem essas
+variáveis, o serviço pode iniciar com configuração local ou falhar por falta de
+credenciais; o domínio e o certificado continuam sendo responsabilidade do
+Nginx/DNS conforme [a documentação do Keycloak](../ingestion/keycloak.md).
 Não há migração automática de banco neste esqueleto.
 
 Para Compose, **REGISTRY** pode ficar vazio. Para repositório privado, cadastre

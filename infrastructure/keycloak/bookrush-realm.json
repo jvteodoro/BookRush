@@ -1,0 +1,54 @@
+{
+  "realm": "bookrush",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {"name": "OPERATOR"},
+      {"name": "REVIEWER"},
+      {"name": "CLEANUP"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "bookrush-ingestion",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:18090/*"],
+      "webOrigins": ["+"],
+      "protocolMappers": [
+        {
+          "name": "bookrush-ingestion-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-ingestion",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "bookrush-catalog-service",
+      "enabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret"
+    }
+  ],
+  "users": [
+    {
+      "username": "operator",
+      "enabled": true,
+      "email": "operator@example.invalid",
+      "emailVerified": true,
+      "firstName": "BookRush",
+      "lastName": "Operator",
+      "requiredActions": [],
+      "credentials": [{"type": "password", "value": "operator", "temporary": false}],
+      "realmRoles": ["OPERATOR"]
+    }
+  ]
+}

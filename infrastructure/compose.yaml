@@ -38,7 +38,10 @@ services:
     ports:
       - "127.0.0.1:${BOOKRUSH_S3_PORT:-18333}:8333"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8888/"]
+      # The master/filer ports can be ready before the S3 API accepts requests.
+      # Treat the expected unauthenticated S3 403 as ready so dependent apps do
+      # not race bucket initialization.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8888/ && wget -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -q '403 Forbidden'"]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -71,6 +74,32 @@ services:
       - redis_data:/data
     networks: [bookrush]
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    profiles: [auth]
+    command: ["start-dev", "--http-port=8080", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
+      # TLS is terminated by the host Nginx. These settings make Keycloak
+      # generate redirects and OIDC metadata for the public HTTPS hostname.
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-}
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
+    ports:
+      - "127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks: [bookrush]
+
   pgadmin:
     image: dpage/pgadmin4:8.14
     environment:
@@ -92,6 +121,7 @@ services:
       context: ../services/catalog-service
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      BOOKRUSH_PUBLIC_URL: ${BOOKRUSH_PUBLIC_URL:-https://bookrush.jteodoro.tec.br}
       # The persistent installation already contains V7/V9 checksums from the
       # previous release. Keep validation configurable until Flyway repair is
       # run once against that installation.
@@ -150,7 +180,14 @@ services:
       STORAGE_BUCKET_RAW: ${STORAGE_BUCKET_RAW:-books-raw}
       CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8080}
       CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
-      INGESTION_SECURITY_ENABLED: ${INGESTION_SECURITY_ENABLED:-false}
+      INGESTION_ASSET_TOKEN: ${INGESTION_ASSET_TOKEN:-}
+      INGESTION_SECURITY_ENABLED: ${INGESTION_SECURITY_ENABLED:-true}
+      INGESTION_OIDC_ISSUER: ${INGESTION_OIDC_ISSUER:-http://keycloak:8080/realms/bookrush}
+      INGESTION_OIDC_AUDIENCE: ${INGESTION_OIDC_AUDIENCE:-bookrush-ingestion}
+      INGESTION_OIDC_JWK_SET_URI: ${INGESTION_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      INGESTION_SECURITY_LOCAL_FIXTURE_MODE: ${INGESTION_SECURITY_LOCAL_FIXTURE_MODE:-false}
+      INGESTION_SECURITY_LOCAL_FIXTURE_TOKEN: ${INGESTION_SECURITY_LOCAL_FIXTURE_TOKEN:-}
+      INGESTION_PUBLIC_URL: ${INGESTION_PUBLIC_URL:-https://bookrush.jteodoro.tec.br/ingestion}
     depends_on:
       postgres:
         condition: service_healthy
@@ -212,3 +249,4 @@ volumes:
   redis_data:
   pgadmin_data:
   jenkins_home:
+  keycloak_data:

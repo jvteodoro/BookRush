@@ -14,4 +14,9 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 cd "$service_dir"
-./mvnw -q test
+if command -v docker >/dev/null 2>&1; then
+  docker run --rm -v "$service_dir:/workspace" \
+    -w /workspace maven:3.9-eclipse-temurin-21 mvn -q test
+else
+  ./mvnw -q test
+fi
