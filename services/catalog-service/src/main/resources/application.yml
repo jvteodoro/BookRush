@@ -1,11 +1,16 @@
 server:
   port: 8080
   shutdown: graceful
+  # Use the original HTTPS scheme from Nginx/Traefik for generated links.
+  forward-headers-strategy: framework
 
 springdoc:
   swagger-ui:
     disable-swagger-default-url: true
     url: /v3/api-docs
+bookrush:
+  openapi:
+    server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}
 spring:
   servlet:
     multipart:

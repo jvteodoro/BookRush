@@ -29,6 +29,7 @@ public final class S3ObjectStorage implements ObjectStorage {
     try { return action.get(); }
     catch(SdkException e) {
       result="error";
+      log.warn("storage operation failed operation={} bucket={} key={} exception={} status={}", operation, location.bucket(), location.key(), e.getClass().getSimpleName(), e instanceof S3Exception s ? s.statusCode() : "n/a");
       var kind=e instanceof S3Exception s && s.statusCode()==404 ? StorageFailure.Kind.NOT_FOUND :
           e instanceof S3Exception s && (s.statusCode()==409 || s.statusCode()==412) ? StorageFailure.Kind.CONFLICT : StorageFailure.Kind.UNAVAILABLE;
       throw new StorageFailure(kind);

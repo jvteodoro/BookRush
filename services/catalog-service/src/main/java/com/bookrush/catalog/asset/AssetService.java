@@ -42,6 +42,7 @@ public class AssetService {
   public record DownloadLink(URI url,Instant expiresAt) {}
   private record Reservation(UUID assetId,UUID versionId,ObjectStorage.Location location) {}
   private static ResponseStatusException missing() { return new ResponseStatusException(HttpStatus.NOT_FOUND,"Asset or book not found"); }
+  private static String intentKey(UUID versionId) { return "asset-object:" + versionId; }
   private BookAsset asset(UUID book,UUID id) {
     BookAsset a=em.find(BookAsset.class,id);
     if(a==null || !a.getBookId().equals(book)) throw missing();
@@ -53,8 +54,17 @@ public class AssetService {
   public UploadResult upload(UUID book,UUID existing,UUID edition,UUID source,UUID license,
       BookAssetAssetType type,BookAssetAssetRole role,String filename,String declared,InputStream input) throws IOException {
     try(UploadFile file=UploadFile.read(input,filename,declared,type,props.maxUploadBytes())) {
-      if (existing != null && role == BookAssetAssetRole.SOURCE)
-        throw new IllegalArgumentException("Source assets are immutable");
+      if (existing != null && role == BookAssetAssetRole.SOURCE) {
+        throw new IllegalArgumentException("SOURCE assets are immutable");
+      }
+      UploadResult duplicate = null;
+      if (jdbc != null && existing == null) {
+        duplicate=tx.execute(status -> em.createQuery("select v from BookAssetVersion v where v.sha256=:hash and v.status in :statuses and v.bookAssetId in (select a.id from BookAsset a where a.bookId=:book and a.assetRole=:role and a.assetType=:type)", BookAssetVersion.class)
+            .setParameter("hash", file.sha256()).setParameter("statuses", List.of(BookAssetVersionStatus.AVAILABLE, BookAssetVersionStatus.PENDING_UPLOAD))
+            .setParameter("book", book).setParameter("role", role).setParameter("type", type).setMaxResults(1).getResultStream()
+            .map(v -> new UploadResult(view(em.find(BookAsset.class, v.getBookAssetId())), view(v))).findFirst().orElse(null));
+      }
+      if (duplicate != null) return duplicate;
       Reservation r=tx.execute(status->{
         if(em.find(Book.class,book)==null) throw missing();
         BookAsset a;
@@ -79,10 +89,19 @@ public class AssetService {
         v.setBucket(buckets.select(a.getAssetRole()));v.setObjectKey(ObjectKeyBuilder.build(book,a.getId(),a.getAssetRole(),number,file.filename()));
         v.setOriginalFilename(file.filename());v.setContentType(file.contentType());v.setSizeBytes(file.size());v.setSha256(file.sha256());
         v.setStatus(BookAssetVersionStatus.PENDING_UPLOAD);em.persist(v);em.flush();
+        if (jdbc != null) {
+          jdbc.update("""
+              INSERT INTO catalog.storage_intent
+                (id, operation_key, asset_id, asset_version_id, storage_provider, bucket, object_key, expected_sha256, state, next_attempt_at)
+              VALUES (?, ?, ?, ?, 'S3', ?, ?, ?, 'PLANNED', clock_timestamp())
+              ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
+              """, UUID.randomUUID(), intentKey(v.getId()), a.getId(), v.getId(), v.getBucket(), v.getObjectKey(), v.getSha256());
+        }
         return new Reservation(a.getId(),v.getId(),location(v));
       });
       boolean collision=false;
       try {
+        if (jdbc != null) jdbc.update("UPDATE catalog.storage_intent SET state='UPLOADING', attempt_count=attempt_count+1, updated_at=clock_timestamp() WHERE operation_key=?", intentKey(r.versionId()));
         storage.upload(r.location(),file.path(),file.contentType(),file.sha256());
         var metadata=storage.head(r.location()).orElseThrow(()->new StorageFailure(StorageFailure.Kind.NOT_FOUND));
         if(metadata.size()!=file.size() || !file.sha256().equals(metadata.sha256()) || !file.contentType().equals(metadata.contentType()))
@@ -98,17 +117,20 @@ public class AssetService {
           if (jdbc != null) {
             em.createNativeQuery("UPDATE catalog.book_asset SET current_version_id=:version WHERE id=:asset")
                 .setParameter("version", r.versionId()).setParameter("asset", r.assetId()).executeUpdate();
+            jdbc.update("UPDATE catalog.storage_intent SET state='COMMITTED', next_attempt_at=NULL, last_error=NULL, updated_at=clock_timestamp() WHERE operation_key=?", intentKey(r.versionId()));
           }
           return new UploadResult(view(asset(book,r.assetId())),view(v));
         });
         log.info("asset upload result=ok bookId={} assetId={} versionId={}",book,r.assetId(),r.versionId());
         return result;
       } catch(RuntimeException failure) {
+        log.warn("asset upload failed bookId={} assetId={} versionId={} kind={} message={}", book, r.assetId(), r.versionId(), failure.getClass().getSimpleName(), failure.getMessage());
         collision=failure instanceof StorageFailure s && s.kind()==StorageFailure.Kind.CONFLICT;
         // Keep the object for storage_intent/reconciliation. A failed database
         // confirmation must not eagerly delete a possibly verified immutable object.
         try { tx.executeWithoutResult(status->{em.find(BookAssetVersion.class,r.versionId()).setStatus(BookAssetVersionStatus.FAILED);}); }
         catch(RuntimeException ignored) { log.error("asset recovery required bookId={} assetId={} versionId={}",book,r.assetId(),r.versionId()); }
+        if (jdbc != null) jdbc.update("UPDATE catalog.storage_intent SET state='FAILED', last_error=?, next_attempt_at=clock_timestamp(), updated_at=clock_timestamp() WHERE operation_key=?", String.valueOf(failure.getMessage()), intentKey(r.versionId()));
         // A committed pending/failed row retains the exact key even if DB or compensation is unavailable.
         throw failure;
       }
@@ -176,8 +198,22 @@ public class AssetService {
       return em.createQuery("select v from BookAssetVersion v where v.bookAssetId=:id",BookAssetVersion.class).setParameter("id",id).getResultList().stream().map(this::view).toList();
     });
     for(var v:versions) if(v.status()!=BookAssetVersionStatus.DELETED) {
-      storage.delete(new ObjectStorage.Location(v.bucket(),v.objectKey()));
-      tx.executeWithoutResult(s->em.find(BookAssetVersion.class,v.id()).setStatus(BookAssetVersionStatus.DELETED));
+      var key = intentKey(v.id());
+      if (jdbc != null) jdbc.update("""
+          INSERT INTO catalog.storage_intent
+            (id, operation_key, asset_id, asset_version_id, storage_provider, bucket, object_key, state, next_attempt_at)
+          VALUES (?, ?, ?, ?, 'S3', ?, ?, 'DELETE_CANDIDATE', clock_timestamp())
+          ON CONFLICT (operation_key) DO UPDATE SET state='DELETE_CANDIDATE', last_error=NULL, next_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
+          """, UUID.randomUUID(), key, id, v.id(), v.bucket(), v.objectKey());
+      try {
+        if (jdbc != null) jdbc.update("UPDATE catalog.storage_intent SET state='UPLOADING', attempt_count=attempt_count+1, updated_at=clock_timestamp() WHERE operation_key=?", key);
+        storage.delete(new ObjectStorage.Location(v.bucket(),v.objectKey()));
+        tx.executeWithoutResult(s->em.find(BookAssetVersion.class,v.id()).setStatus(BookAssetVersionStatus.DELETED));
+        if (jdbc != null) jdbc.update("UPDATE catalog.storage_intent SET state='DELETED', next_attempt_at=NULL, last_error=NULL, updated_at=clock_timestamp() WHERE operation_key=?", key);
+      } catch (RuntimeException failure) {
+        if (jdbc != null) jdbc.update("UPDATE catalog.storage_intent SET state='RETRY_WAIT', last_error=?, next_attempt_at=clock_timestamp(), updated_at=clock_timestamp() WHERE operation_key=?", String.valueOf(failure.getMessage()), key);
+        throw failure;
+      }
     }
   }
 }

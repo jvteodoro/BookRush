@@ -15,4 +15,8 @@ public record CanonicalCommand(
     @NotBlank String title,
     String language,
     String description,
-    JsonNode metadata) {}
+    JsonNode metadata,
+    String publisher,
+    Integer publicationYear,
+    String authorName,
+    String authorRole) {}

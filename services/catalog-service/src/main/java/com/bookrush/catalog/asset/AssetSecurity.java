@@ -32,13 +32,18 @@ public class AssetSecurity {
     var filter=new OncePerRequestFilter() {
       protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
         String auth=request.getHeader("Authorization");
+        // Internal service calls may use a dedicated header so a gateway cannot
+        // accidentally reinterpret the service credential as a user bearer token.
+        String serviceToken = request.getHeader("X-Canonical-Service-Token");
         if(props.enabled() && auth!=null && auth.startsWith("Bearer ")
             && MessageDigest.isEqual(auth.substring(7).getBytes(StandardCharsets.UTF_8),props.adminToken().getBytes(StandardCharsets.UTF_8))) {
           SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
               "asset-admin",null,List.of(new SimpleGrantedAuthority("ROLE_ASSET_ADMIN"))));
         }
-        if (auth != null && auth.startsWith("Bearer ")
-            && MessageDigest.isEqual(auth.substring(7).getBytes(StandardCharsets.UTF_8), canonical.token().getBytes(StandardCharsets.UTF_8))) {
+        String presentedServiceToken = serviceToken != null ? serviceToken
+            : (auth != null && auth.startsWith("Bearer ") ? auth.substring(7) : null);
+        if (presentedServiceToken != null
+            && MessageDigest.isEqual(presentedServiceToken.getBytes(StandardCharsets.UTF_8), canonical.token().getBytes(StandardCharsets.UTF_8))) {
           SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
               "catalog-service", null, List.of(new SimpleGrantedAuthority("ROLE_CATALOG_SERVICE"))));
         }
