@@ -21,6 +21,11 @@ Documentos futuros do serviço ficam nesta árvore: arquitetura, modelo, fontes,
 configuração, API, runbook, testes, segurança e relatório final. Os contratos
 devem sempre refletir o código e as migrations realmente aplicadas.
 
+O procedimento operacional está em [runbook.md](runbook.md).
+
+As evidências e limitações da validação estão em
+[validation-report.md](validation-report.md).
+
 A política compartilhada de falhas está em `com.bookrush.ingestion.retry`:
 timeouts/408/429/5xx usam até cinco tentativas com jitter persistido, 401/403
 pausam, 404/410 registram ausência e erros de formato vão para quarentena. O
