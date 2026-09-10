@@ -20,6 +20,8 @@ spring:
 server:
   port: ${INGESTION_PORT:8090}
   shutdown: graceful
+  # Springdoc must preserve the public HTTPS scheme behind the reverse proxy.
+  forward-headers-strategy: framework
 
 springdoc:
   api-docs:
@@ -29,12 +31,16 @@ springdoc:
     config-url: /ingestion-docs/v3/api-docs/swagger-config
     disable-swagger-default-url: true
     url: /ingestion-docs/v3/api-docs
-
 management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
   endpoint.health.probes.enabled: true
 
 ingestion:
+  openapi:
+    server-url: ${INGESTION_PUBLIC_URL:https://bookrush.jteodoro.tec.br/ingestion}
+  gutenberg:
+    base-url: ${INGESTION_GUTENBERG_BASE_URL:https://www.gutenberg.org}
+    allow-private-addresses: ${INGESTION_GUTENBERG_ALLOW_PRIVATE_ADDRESSES:false}
   role: ${INGESTION_ROLE:ALL}
   scheduler-enabled: ${INGESTION_SCHEDULER_ENABLED:false}
   staging-root: ${INGESTION_STAGING_ROOT:/var/lib/bookrush/ingestion}
@@ -64,7 +70,9 @@ ingestion:
     audience: ${INGESTION_OIDC_AUDIENCE:bookrush-ingestion}
     jwk-set-uri: ${INGESTION_OIDC_JWK_SET_URI:http://localhost:8081/realms/bookrush/protocol/openid-connect/certs}
     local-fixture-mode: ${INGESTION_SECURITY_LOCAL_FIXTURE_MODE:false}
+    local-fixture-token: ${INGESTION_SECURITY_LOCAL_FIXTURE_TOKEN:}
   catalog:
     base-url: ${CATALOG_SERVICE_URL:http://catalog-service:8080}
     service-token: ${CANONICAL_SERVICE_TOKEN:}
+    asset-token: ${INGESTION_ASSET_TOKEN:}
     request-timeout: ${CATALOG_SERVICE_REQUEST_TIMEOUT:30s}

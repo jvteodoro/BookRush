@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
+import com.bookrush.ingestion.retry.FailureClass;
+import com.bookrush.ingestion.retry.RetryPolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,10 @@ public final class LeaseCoordinator {
   }
 
   public Optional<Lease> claim(String workerId, Duration leaseDuration) {
+    return claim(workerId, leaseDuration, null);
+  }
+
+  public Optional<Lease> claim(String workerId, Duration leaseDuration, UUID jobId) {
     if (workerId == null || workerId.isBlank() || leaseDuration.isNegative() || leaseDuration.isZero()) {
       throw new IllegalArgumentException("worker and positive lease are required");
     }
@@ -34,6 +40,7 @@ public final class LeaseCoordinator {
           WHERE status IN ('PENDING','RETRY_WAIT')
             AND next_attempt_at <= clock_timestamp()
             AND (lease_until IS NULL OR lease_until <= clock_timestamp())
+            AND (?::uuid IS NULL OR ingestion_job_id = ?::uuid)
           ORDER BY next_attempt_at, created_at, id
           FOR UPDATE SKIP LOCKED LIMIT 1
         )
@@ -45,7 +52,7 @@ public final class LeaseCoordinator {
         FROM candidate c WHERE t.id=c.id
         RETURNING t.id, t.fence_token, t.lease_until
         """, (rs, rowNum) -> new Lease(rs.getObject("id", UUID.class), rs.getLong("fence_token"), rs.getTimestamp("lease_until").toInstant(), workerId),
-        workerId, leaseDuration.toSeconds());
+        jobId, jobId, workerId, leaseDuration.toSeconds());
     return rows.stream().findFirst();
   }
 
@@ -68,6 +75,14 @@ public final class LeaseCoordinator {
         WHERE id=? AND status='RUNNING' AND claimed_by=? AND fence_token=? AND lease_until > clock_timestamp()
         """, status, reason, lease.taskId(), lease.workerId(), lease.fenceToken());
     if (count != 1) throw new StaleLeaseException(lease.taskId());
+  }
+
+  public boolean retry(Lease lease, FailureClass failure, String message) {
+    var attempt = jdbc.queryForObject("SELECT attempt_count FROM catalog.ingestion_task WHERE id=?", Integer.class, lease.taskId());
+    var decision = new RetryPolicy(java.util.random.RandomGenerator.getDefault()).next(failure, attempt == null ? 1 : attempt, clock.instant(), null);
+    if (!decision.retry()) return false;
+    var updated = jdbc.update("UPDATE catalog.ingestion_task SET status='RETRY_WAIT', reason_code=?, next_attempt_at=?, lease_until=NULL, claimed_by=NULL, updated_at=clock_timestamp() WHERE id=? AND status='RUNNING' AND claimed_by=? AND fence_token=?", decision.reason(), decision.nextAttemptAt(), lease.taskId(), lease.workerId(), lease.fenceToken());
+    return updated == 1;
   }
 
   public record Lease(UUID taskId, long fenceToken, java.time.Instant leaseUntil, String workerId) {

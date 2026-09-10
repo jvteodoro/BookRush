@@ -11,4 +11,5 @@ public record IngestionSecurityProperties(
     @NotBlank String issuer,
     @NotBlank String audience,
     @NotBlank String jwkSetUri,
-    boolean localFixtureMode) {}
+    boolean localFixtureMode,
+    String localFixtureToken) {}

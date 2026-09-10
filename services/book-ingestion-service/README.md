@@ -33,5 +33,11 @@ O serviço usa Java 21, PostgreSQL para o JobRepository futuro e DuckDB somente
 para staging. Os valores padrão são de desenvolvimento e não contêm credenciais
 reais. Consulte `docs/ingestion/` para ownership, limites, fontes e contratos.
 
-O módulo ainda não adquire fontes nem cria entidades canônicas: essas operações
-serão habilitadas apenas pelos jobs e portas dos beads posteriores.
+O endpoint Gutenberg é configurável por `INGESTION_GUTENBERG_BASE_URL`, o que
+permite apontar o harness offline para um servidor de fixtures sem alterar o
+job. Em produção, mantenha o valor padrão `https://www.gutenberg.org`; o
+serviço valida host, redirects, limites e snapshots antes de publicar no RAW.
+
+`INGESTION_GUTENBERG_ALLOW_PRIVATE_ADDRESSES` permanece `false` por padrão e
+só deve ser habilitado na rede descartável do harness. Em produção, mantê-lo
+desabilitado preserva a proteção contra SSRF para endereços privados.

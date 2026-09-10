@@ -7,7 +7,7 @@ public final class PlainTextNormalizer {
     if (input == null) return "";
     var value = input.replace("\uFEFF", "").replace("\r\n", "\n").replace('\r', '\n');
     value = Normalizer.normalize(value, Normalizer.Form.NFC);
-    value = value.replaceAll("[ \\t]+", " ").replaceAll("\\n{3,}", "\\n\\n");
+    value = value.replaceAll("[ \\t]+", " ").replaceAll("\\n{3,}", "\n\n");
     return value.strip() + "\n";
   }
 

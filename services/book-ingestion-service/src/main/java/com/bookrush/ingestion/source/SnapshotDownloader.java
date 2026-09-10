@@ -32,9 +32,20 @@ public final class SnapshotDownloader {
     Files.createDirectories(target.toAbsolutePath().normalize().getParent());
     Path part = target.resolveSibling(target.getFileName() + ".part");
     long offset = Files.exists(part) ? Files.size(part) : 0;
-    HttpRequest.Builder builder = HttpRequest.newBuilder(requested).timeout(Duration.ofMinutes(2)).GET();
-    if (offset > 0) builder.header("Range", "bytes=" + offset + "-");
-    var response = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+    URI effective = requested;
+    HttpResponse<InputStream> response;
+    int redirects = 0;
+    while (true) {
+      urlPolicy.validate(effective, redirects);
+      HttpRequest.Builder builder = HttpRequest.newBuilder(effective).timeout(Duration.ofMinutes(2)).GET();
+      if (offset > 0) builder.header("Range", "bytes=" + offset + "-");
+      response = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
+      if (response.statusCode() / 100 != 3) break;
+      var location = response.headers().firstValue("Location").orElseThrow(() -> new IllegalStateException("redirect without Location"));
+      response.body().close();
+      effective = effective.resolve(location);
+      redirects++;
+    }
     if (response.statusCode() == 416 && offset > 0) {
       Files.deleteIfExists(part);
       return download(requested, target, objectKey, expectedSha256, raw);
@@ -61,8 +72,11 @@ public final class SnapshotDownloader {
     if (expectedSha256 != null && !expectedSha256.equals(hash)) throw new IllegalStateException("snapshot checksum mismatch");
     try { Files.move(part, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
     catch (java.nio.file.AtomicMoveNotSupportedException e) { Files.move(part, target, StandardCopyOption.REPLACE_EXISTING); }
-    try (InputStream content = Files.newInputStream(target)) { raw.put(objectKey, content, total, hash); }
-    return new SnapshotResult(requested, target, objectKey, total, hash, response.headers().firstValue("ETag").orElse(null));
+    long persistedLength = Files.size(target);
+    if (raw != null) {
+      try (InputStream content = Files.newInputStream(target)) { raw.put(objectKey, content, persistedLength, hash); }
+    }
+    return new SnapshotResult(effective, target, objectKey, persistedLength, hash, response.headers().firstValue("ETag").orElse(null));
   }
 
   private static String sha256(Path file) throws Exception {

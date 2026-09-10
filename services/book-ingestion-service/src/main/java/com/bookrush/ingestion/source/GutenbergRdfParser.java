@@ -41,7 +41,12 @@ public final class GutenbergRdfParser {
         }
       } else if (event == XMLStreamConstants.END_ELEMENT) {
         if ("file".equals(reader.getLocalName())) {
-          if (currentFileAbout != null && currentFileAbout.endsWith(".epub")) formatUrl = currentFileAbout;
+          // Gutenberg representation URLs commonly use suffixes such as
+          // .epub.images or .epub.noimages rather than ending in .epub.
+          if (currentFileAbout != null && currentFileAbout.toLowerCase(java.util.Locale.ROOT).contains(".epub")) {
+            if (formatUrl == null || currentFileAbout.toLowerCase(java.util.Locale.ROOT).contains(".epub.noimages"))
+              formatUrl = currentFileAbout;
+          }
         }
         if ("ebook".equals(reader.getLocalName()) && id != null) {
           records.add(new GutenbergRecord(id, title, language, creator, rights, issued, formatUrl, List.copyOf(subjects)));

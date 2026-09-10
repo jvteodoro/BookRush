@@ -9,4 +9,4 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "ingestion.catalog")
 public record CanonicalCatalogProperties(@NotNull URI baseUrl, String serviceToken,
-    @NotNull Duration requestTimeout) {}
+    String assetToken, @NotNull Duration requestTimeout) {}
