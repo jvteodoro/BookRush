@@ -68,7 +68,15 @@ pipeline {
           set -euo pipefail
           env_file="${BACKSTAGE_ENV_FILE:-/run/bookrush.env}"
           test -f "$env_file" || { echo "arquivo de ambiente ausente: $env_file" >&2; exit 2; }
-          BACKSTAGE_IMAGE="$PORTAL_IMAGE" docker compose --env-file "$env_file" -f backstage/compose.yaml up -d --wait backstage-postgres backstage
+          deploy_env=$(mktemp)
+          trap 'rm -f "$deploy_env"' EXIT
+          cp "$env_file" "$deploy_env"
+          if ! grep -Eq '^BACKSTAGE_POSTGRES_PASSWORD=.+$' "$deploy_env"; then
+            postgres_line=$(grep -E '^POSTGRES_PASSWORD=.+$' "$deploy_env" || true)
+            test -n "$postgres_line" || { echo 'BACKSTAGE_POSTGRES_PASSWORD ou POSTGRES_PASSWORD precisa estar definido' >&2; exit 2; }
+            printf 'BACKSTAGE_POSTGRES_PASSWORD%s\n' "${postgres_line#POSTGRES_PASSWORD}" >> "$deploy_env"
+          fi
+          BACKSTAGE_IMAGE="$PORTAL_IMAGE" docker compose --env-file "$deploy_env" -f backstage/compose.yaml up -d --wait backstage-postgres backstage
         '''
       }
     }

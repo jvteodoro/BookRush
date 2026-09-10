@@ -7,7 +7,7 @@ services:
       dockerfile: backstage/Dockerfile
       target: runtime
     environment:
-      POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD or POSTGRES_PASSWORD}}
+      POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD}
     ports:
       - '127.0.0.1:17007:7007'
     volumes:
@@ -25,7 +25,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: backstage
-      POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:-${POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD or POSTGRES_PASSWORD}}
+      POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD}
     volumes:
       - backstage_postgres_data:/var/lib/postgresql/data
     healthcheck:

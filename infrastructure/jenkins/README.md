@@ -56,9 +56,10 @@ Para publicar, informe `REGISTRY`, habilite `PUBLISH` e configure a credential
 `REGISTRY_CREDENTIAL_ID`. Para atualizar o Compose do portal, habilite `DEPLOY`.
 Por padrão o job usa `/run/bookrush.env`, que é montado no container Jenkins
 pelo Compose principal; altere `BACKSTAGE_ENV_FILE` somente quando o agente usar
-outro caminho. O arquivo deve conter `BACKSTAGE_POSTGRES_PASSWORD` ou
-`POSTGRES_PASSWORD`. O deploy usa a imagem gerada no próprio build e aguarda
-PostgreSQL e Backstage ficarem saudáveis.
+outro caminho. O job exige `BACKSTAGE_POSTGRES_PASSWORD`; quando ela não existe,
+cria um arquivo temporário a partir de `POSTGRES_PASSWORD` e o remove ao sair.
+O deploy usa a imagem gerada no próprio build e aguarda PostgreSQL e Backstage
+ficarem saudáveis.
 
 ### Importação Gutenberg (opt-in)
 
