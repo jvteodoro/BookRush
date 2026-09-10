@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: book-catalog
+  description: Obras, edições, ingestão e distribuição.
+spec:
+  owner: group:default/book-platform
+  domain: book-platform

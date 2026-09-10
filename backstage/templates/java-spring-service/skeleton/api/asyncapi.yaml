@@ -1,0 +1,7 @@
+asyncapi: 3.0.0
+info:
+  title: ${{ values.name }} event design
+  version: 0.1.0
+  description: Not applicable yet. Nenhuma mensagem ou broker implementado; não registrar como API no catálogo até definir o contrato real.
+channels: {}
+operations: {}

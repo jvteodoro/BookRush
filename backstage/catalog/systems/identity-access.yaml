@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: identity-access
+  description: Autenticação e identidades via Keycloak.
+spec:
+  owner: group:default/book-platform
+  domain: book-platform

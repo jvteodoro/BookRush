@@ -1,0 +1,5 @@
+# Copy to app-config.local.yaml (ignored). Optional GitHub private-repo access.
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}

@@ -1,0 +1,334 @@
+openapi: 3.0.1
+info:
+  title: BookRush Book Ingestion API
+  description: Operações administrativas de ingestão, staging e recuperação.
+  version: v1
+servers:
+- url: https://bookrush.jteodoro.tec.br/ingestion
+  description: Gateway público BookRush /ingestion
+tags:
+- name: Operações
+  description: Rotinas de recuperação para tarefas expiradas e falhas operacionais.
+- name: Ingestão administrativa
+  description: Executa e acompanha importações controladas. Requer JWT do Keycloak
+    com role OPERATOR, REVIEWER ou CLEANUP conforme a operação.
+paths:
+  /api/admin/v1/operations/requeue-expired:
+    post:
+      tags:
+      - Operações
+      summary: Reenfileirar tarefas expiradas
+      description: Recoloca tarefas expiradas em estado elegível para nova tentativa.
+      operationId: requeue
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/ingestion/run:
+    post:
+      tags:
+      - Ingestão administrativa
+      summary: Iniciar uma execução de ingestão
+      description: Submete uma execução assíncrona. Use Idempotency-Key estável para
+        retries; a resposta 202 contém o jobId e a URL de acompanhamento.
+      operationId: run
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      - name: X-Principal
+        in: header
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestionRunRequest'
+        required: true
+      responses:
+        '202':
+          description: Execução aceita
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+        '200':
+          description: Requisição repetida; resultado idempotente devolvido
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+        '401':
+          description: JWT ausente ou inválido
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+        '409':
+          description: Conflito de idempotência ou parâmetros inválidos
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/ingestion/jobs/{jobId}/resume:
+    post:
+      tags:
+      - Ingestão administrativa
+      summary: Retomar execução
+      description: Retoma itens elegíveis de um job interrompido, preservando tentativas
+        e fencing.
+      operationId: resume
+      parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Principal
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/ingestion/jobs/{jobId}/cancel:
+    post:
+      tags:
+      - Ingestão administrativa
+      summary: Cancelar execução
+      description: Solicita cancelamento cooperativo de um job em execução.
+      operationId: cancel
+      parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Principal
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/ingestion/cancel:
+    post:
+      tags:
+      - Ingestão administrativa
+      summary: Cancelar o job mais recente
+      description: Atalho operacional para cancelar a execução mais recente.
+      operationId: cancelLatest
+      parameters:
+      - name: X-Principal
+        in: header
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/operations/stale-tasks:
+    get:
+      tags:
+      - Operações
+      summary: Listar tarefas obsoletas
+      description: Identifica leases expirados que podem exigir reconciliação.
+      operationId: stale
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/ingestion/state:
+    get:
+      tags:
+      - Ingestão administrativa
+      summary: Consultar estado mais recente
+      description: Retorna o último job conhecido ou estado IDLE quando não há execução.
+      operationId: state
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/ingestion/jobs/{jobId}:
+    get:
+      tags:
+      - Ingestão administrativa
+      summary: Consultar execução
+      description: Retorna o estado, contadores, erros e timestamps de um job.
+      operationId: job
+      parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+  /api/admin/v1/ingestion/jobs/{jobId}/items:
+    get:
+      tags:
+      - Ingestão administrativa
+      summary: Listar itens de uma execução
+      description: Retorna os itens descobertos e seus estados, com paginação.
+      operationId: items
+      parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 100
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - keycloak: []
+components:
+  schemas:
+    IngestionRunRequest:
+      type: object
+      properties:
+        source:
+          type: string
+          description: Código da fonte de dados
+          example: GUTENBERG
+          default: GUTENBERG
+        externalIds:
+          type: array
+          description: IDs externos específicos. Para Gutenberg, use apenas números;
+            vazio significa descobrir itens conforme a fonte.
+          example:
+          - '1342'
+          - '84'
+          items:
+            type: string
+            description: IDs externos específicos. Para Gutenberg, use apenas números;
+              vazio significa descobrir itens conforme a fonte.
+            example: '["1342","84"]'
+        languages:
+          type: array
+          description: Filtro de idiomas em ISO 639-1 minúsculo.
+          example:
+          - en
+          items:
+            type: string
+            description: Filtro de idiomas em ISO 639-1 minúsculo.
+            example: '["en"]'
+        maxItems:
+          maximum: 10000
+          minimum: 1
+          type: integer
+          description: Limite máximo de itens processados nesta execução (1–10000).
+          format: int32
+          example: 10
+        dryRun:
+          type: boolean
+          description: Quando true, executa descoberta e validações sem persistir
+            alterações canônicas ou baixar assets.
+          example: true
+        processAssets:
+          type: boolean
+          description: Quando true, continua para descoberta/download e normalização
+            de assets; quando false, processa somente metadata.
+          example: false
+  securitySchemes:
+    keycloak:
+      type: oauth2
+      description: Bearer JWT emitido pelo realm bookrush do Keycloak.
+      flows:
+        password:
+          tokenUrl: https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush/protocol/openid-connect/token
+          scopes: {}

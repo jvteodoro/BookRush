@@ -1,0 +1,100 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: java-spring-service
+  title: Java Spring Boot — BookRush
+  description: Gera serviço, contratos e TechDocs e propõe PR em repositório existente.
+spec:
+  owner: group:default/platform-engineering
+  type: service
+  parameters:
+  - title: Serviço Java Spring Boot
+    required:
+    - name
+    - description
+    - owner
+    - system
+    - lifecycle
+    - apiType
+    - repoUrl
+    properties:
+      name:
+        title: Service name
+        type: string
+        pattern: ^[a-z][a-z0-9-]{2,50}$
+      description:
+        type: string
+        minLength: 10
+      owner:
+        type: string
+        ui:field: OwnerPicker
+        ui:options:
+          catalogFilter:
+            kind: Group
+      system:
+        type: string
+        ui:field: EntityPicker
+        ui:options:
+          catalogFilter:
+            kind: System
+      lifecycle:
+        type: string
+        enum:
+        - experimental
+        - production
+        default: experimental
+      apiType:
+        type: string
+        enum:
+        - rest
+        - events
+        - both
+        - none
+        default: rest
+      database:
+        type: string
+        enum:
+        - none
+        - resource:default/books-postgres
+        default: none
+      messaging:
+        type: string
+        description: Referência Resource do broker previamente cadastrado; vazio se
+          não aplicável.
+        default: ''
+      repoUrl:
+        type: string
+        ui:field: RepoUrlPicker
+        ui:options:
+          allowedHosts:
+          - github.com
+  steps:
+  - id: fetch
+    name: Gerar código e documentação
+    action: fetch:template
+    input:
+      url: ./skeleton
+      values:
+        name: ${{ parameters.name }}
+        description: ${{ parameters.description }}
+        owner: ${{ parameters.owner }}
+        system: ${{ parameters.system }}
+        lifecycle: ${{ parameters.lifecycle }}
+        apiType: ${{ parameters.apiType }}
+        database: ${{ parameters.database }}
+        messaging: ${{ parameters.messaging }}
+        repoUrl: ${{ parameters.repoUrl }}
+  - id: publish
+    name: Publicar proposta no GitHub
+    action: publish:github:pull-request
+    input:
+      repoUrl: ${{ parameters.repoUrl }}
+      branchName: backstage/${{ parameters.name }}
+      title: Add ${{ parameters.name }} with TechDocs
+      description: Serviço gerado pelo padrão BookRush. Revise ownership, segurança
+        e contratos antes do merge.
+      targetPath: services/${{ parameters.name }}
+  output:
+    links:
+    - title: Pull request para revisão
+      url: ${{ steps.publish.output.remoteUrl }}

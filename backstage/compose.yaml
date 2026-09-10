@@ -1,0 +1,38 @@
+name: bookrush-portal
+services:
+  backstage:
+    image: ${BACKSTAGE_IMAGE:-bookrush/backstage:local}
+    build:
+      context: ..
+      dockerfile: backstage/Dockerfile
+      target: runtime
+    environment:
+      POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD}
+    ports:
+      - '127.0.0.1:17007:7007'
+    volumes:
+      - backstage_techdocs:/app/techdocs
+    depends_on:
+      backstage-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:7007/healthcheck').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+  backstage-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: backstage
+      POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD}
+    volumes:
+      - backstage_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U backstage']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  backstage_postgres_data:
+  backstage_techdocs:

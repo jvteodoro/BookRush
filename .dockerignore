@@ -1,0 +1,16 @@
+.git
+.env
+**/.env
+**/.env.*
+**/node_modules
+**/.venv
+**/dist
+**/target
+**/site
+**/app-config.local.yaml
+**/app-config.*.local.yaml
+.beads
+backups
+
+**/.local
+**/__pycache__

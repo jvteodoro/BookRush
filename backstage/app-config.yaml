@@ -1,0 +1,42 @@
+app:
+  title: BookRush Developer Portal
+  baseUrl: http://localhost:3000
+  packages: all
+  extensions:
+    - page:catalog:
+        config:
+          path: /
+organization:
+  name: BookRush
+backend:
+  baseUrl: http://localhost:7007
+  listen:
+    port: 7007
+  cors:
+    origin: http://localhost:3000
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
+integrations:
+  github:
+    - host: github.com
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local
+auth:
+  providers:
+    guest: {}
+permission:
+  enabled: true
+catalog:
+  readonly: true
+  rules:
+    - allow: [Domain, System, Component, API, Resource, Group, User, Location, Template]
+  locations:
+    - type: file
+      target: ../../.local/catalog.yaml

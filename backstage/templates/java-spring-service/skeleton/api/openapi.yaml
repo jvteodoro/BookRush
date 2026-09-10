@@ -1,0 +1,15 @@
+openapi: 3.0.3
+info:
+  title: ${{ values.name }} runtime health
+  version: 0.1.0
+  description: Health do skeleton; endpoints de domínio ainda não implementados.
+paths:
+  /actuator/health:
+    get:
+      summary: Consultar saúde do runtime
+      operationId: health
+      responses:
+        '200':
+          description: Runtime saudável
+        '503':
+          description: Runtime indisponível

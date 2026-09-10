@@ -44,6 +44,19 @@ O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
 
+### Pipeline dedicada do Backstage
+
+`backstage.Jenkinsfile` valida e empacota somente o Developer Portal. Cadastre
+esse arquivo como um segundo job Jenkins multibranch ou Pipeline SCM para que a
+documentação possa ser verificada sem reconstruir os microserviços. Por padrão,
+ela faz checkout, executa `scripts/test-portal.sh` e cria uma imagem local;
+`PUBLISH` e `DEPLOY` são opt-ins.
+
+Para publicar, informe `REGISTRY`, habilite `PUBLISH` e configure a credential
+`REGISTRY_CREDENTIAL_ID`. Para atualizar o Compose do portal, habilite `DEPLOY`
+no host que possui `backstage/.env` e acesso ao Docker. O deploy usa a imagem
+gerada no próprio build e aguarda PostgreSQL e Backstage ficarem saudáveis.
+
 ### Importação Gutenberg (opt-in)
 
 O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para

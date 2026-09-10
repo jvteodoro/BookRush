@@ -1,0 +1,34 @@
+# Remote deployment overlay; guest login remains disabled in NODE_ENV=production.
+app:
+  baseUrl: ${BACKSTAGE_PUBLIC_URL}
+backend:
+  baseUrl: ${BACKSTAGE_PUBLIC_URL}
+  cors:
+    origin: ${BACKSTAGE_PUBLIC_URL}
+  database:
+    client: pg
+    connection:
+      host: ${POSTGRES_HOST}
+      port: 5432
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
+catalog:
+  locations:
+    - type: url
+      target: ${BACKSTAGE_CATALOG_URL}
+techdocs:
+  builder: external
+  publisher:
+    type: awsS3
+    awsS3:
+      bucketName: ${TECHDOCS_BUCKET}
+      region: ${AWS_REGION}
+      endpoint: ${TECHDOCS_S3_ENDPOINT}
+      s3ForcePathStyle: true
+      credentials:
+        accessKeyId: ${TECHDOCS_ACCESS_KEY}
+        secretAccessKey: ${TECHDOCS_SECRET_KEY}

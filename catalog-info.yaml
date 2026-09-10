@@ -1,0 +1,39 @@
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: bookrush
+  description: "Ponto de entrada \xFAnico de descoberta do monorepo."
+spec:
+  targets:
+  - ./backstage/catalog/domains/book-platform.yaml
+  - ./backstage/catalog/groups/book-platform.yaml
+  - ./backstage/catalog/groups/platform-engineering.yaml
+  - ./backstage/catalog/jenkins.yaml
+  - ./backstage/catalog/keycloak.yaml
+  - ./backstage/catalog/resources/backstage-postgres.yaml
+  - ./backstage/catalog/resources/books-object-storage.yaml
+  - ./backstage/catalog/resources/books-postgres.yaml
+  - ./backstage/catalog/resources/books-redis.yaml
+  - ./backstage/catalog/systems/book-catalog.yaml
+  - ./backstage/catalog/systems/identity-access.yaml
+  - ./backstage/catalog/systems/platform-infrastructure.yaml
+  - ./backstage/catalog/systems/recommendation.yaml
+  - ./services/catalog-service/catalog-info.yaml
+  - ./services/book-ingestion-service/catalog-info.yaml
+  - ./frontend/catalog-info.yaml
+  - ./backstage/catalog-info.yaml
+  - ./backstage/templates/java-spring-service/template.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: platform-handbook
+  description: "Documenta\xE7\xE3o transversal, ADRs, banco, storage e opera\xE7\xE3\
+    o."
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: documentation
+  lifecycle: production
+  owner: group:default/platform-engineering
+  system: platform-infrastructure

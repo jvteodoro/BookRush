@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: books-redis
+  description: Redis existente no Compose.
+spec:
+  type: cache
+  owner: group:default/platform-engineering
+  system: book-catalog

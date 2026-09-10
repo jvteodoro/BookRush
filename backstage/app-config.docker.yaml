@@ -1,0 +1,25 @@
+app:
+  baseUrl: http://localhost:17007
+backend:
+  baseUrl: http://localhost:17007
+  listen:
+    host: 0.0.0.0
+    port: 7007
+  cors:
+    origin: http://localhost:17007
+  database:
+    client: pg
+    connection:
+      host: backstage-postgres
+      port: 5432
+      user: backstage
+      password: ${POSTGRES_PASSWORD}
+catalog:
+  locations:
+    - type: file
+      target: /repo/backstage/.local/catalog.yaml
+techdocs:
+  publisher:
+    type: local
+    local:
+      publishDirectory: /app/techdocs

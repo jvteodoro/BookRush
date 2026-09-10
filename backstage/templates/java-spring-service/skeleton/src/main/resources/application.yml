@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: ${{ values.name }}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

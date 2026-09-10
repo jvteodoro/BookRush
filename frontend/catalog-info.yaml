@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bookrush-frontend
+  description: Frontend React; verifica conexão com o catálogo.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: jvteodoro/BookRush
+spec:
+  type: website
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  consumesApis:
+  - catalog-api

@@ -1,0 +1,34 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: book-ingestion-service
+  description: Aquisição Gutenberg, normalização e jobs recuperáveis.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: jvteodoro/BookRush
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  dependsOn:
+  - resource:default/books-postgres
+  - resource:default/books-object-storage
+  - resource:default/books-redis
+  providesApis:
+  - book-ingestion-api
+  consumesApis:
+  - catalog-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: book-ingestion-api
+  description: Aquisição Gutenberg, normalização e jobs recuperáveis.
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  definition:
+    $text: ./api/openapi.yaml

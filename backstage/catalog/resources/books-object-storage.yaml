@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: books-object-storage
+  description: SeaweedFS S3; buckets raw, source, public, processing e ml privados.
+spec:
+  type: object-storage
+  owner: group:default/platform-engineering
+  system: book-catalog

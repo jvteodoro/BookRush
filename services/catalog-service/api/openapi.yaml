@@ -1,0 +1,678 @@
+openapi: 3.0.1
+info:
+  title: BookRush Catalog API
+  description: Catálogo bibliográfico e distribuição de assets de livros.
+  version: v1
+servers:
+- url: https://bookrush.jteodoro.tec.br
+  description: Gateway público BookRush
+tags:
+- name: Processamento interno
+  description: Registra a linhagem entre versões de assets após uma transformação.
+- name: Assets administrativos
+  description: Ingestão, versionamento, aprovação e remoção de arquivos associados
+    a livros. Os binários são enviados ao object storage; o PostgreSQL guarda apenas
+    metadata.
+- name: Catálogo interno
+  description: Boundary idempotente usado pelo ingestion-service para projetar obras,
+    edições, autores e identificadores.
+- name: Status
+  description: Verificação pública da disponibilidade do catálogo e da conexão com
+    PostgreSQL.
+- name: Distribuição
+  description: Acesso de leitura a assets aprovados por URL pré-assinada.
+paths:
+  /api/internal/v1/catalog/processings:
+    post:
+      tags:
+      - Processamento interno
+      summary: Registrar processamento
+      description: Registra um input e um ou mais outputs, preservando hashes e metadata
+        do processador para auditoria.
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Request'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - catalogService: []
+  /api/internal/v1/catalog/processings/chapters:
+    post:
+      tags:
+      - Processamento interno
+      summary: Projetar capítulos
+      description: Materializa chapters.json no PostgreSQL de forma idempotente para
+        a versão de texto informada.
+      operationId: chapters
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChapterRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - catalogService: []
+  /api/internal/v1/catalog/commands:
+    post:
+      tags:
+      - Catálogo interno
+      summary: Aplicar comando canônico
+      description: Cria ou atualiza uma obra a partir de identificador externo. operationKey
+        e requestHash tornam o retry idempotente; fenceToken rejeita workers obsoletos.
+      operationId: apply
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CanonicalCommand'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+      security:
+      - catalogService: []
+  /api/admin/books/{bookId}/assets:
+    get:
+      tags:
+      - Assets administrativos
+      summary: Listar assets de um livro
+      description: Lista assets paginados, incluindo tipo, papel, estado e referência
+        à versão atual.
+      operationId: list
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetView'
+      security:
+      - assetAdmin: []
+    post:
+      tags:
+      - Assets administrativos
+      summary: Enviar um novo asset
+      description: Cria um asset lógico e sua primeira versão física. O arquivo é
+        validado, recebe hash SHA-256 e é persistido no bucket definido pelo papel.
+      operationId: upload
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: sourceId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: editionId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: licenseId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: type
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - EPUB
+          - PDF
+          - TXT
+          - HTML
+          - COVER
+          - THUMBNAIL
+          - JSON
+          - PARQUET
+          - AUDIO
+          - OTHER
+      - name: role
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - SOURCE
+          - NORMALIZED
+          - PUBLIC
+          - PROCESSING
+          - ANALYTICS
+          - ML
+          - COVER
+          - DERIVED
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              required:
+              - file
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UploadResult'
+      security:
+      - assetAdmin: []
+  /api/admin/books/{bookId}/assets/{assetId}/versions:
+    get:
+      tags:
+      - Assets administrativos
+      summary: Listar versões
+      description: Lista todas as versões físicas de um asset, incluindo hash, bucket,
+        object key e estado.
+      operationId: versions
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VersionView'
+      security:
+      - assetAdmin: []
+    post:
+      tags:
+      - Assets administrativos
+      summary: Criar nova versão de asset
+      description: Adiciona uma versão ao asset existente. Assets SOURCE não podem
+        ser sobrescritos; use esta operação apenas para versões permitidas pelo domínio.
+      operationId: version
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              required:
+              - file
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UploadResult'
+      security:
+      - assetAdmin: []
+  /api/admin/books/{bookId}/assets/{assetId}/approve:
+    post:
+      tags:
+      - Assets administrativos
+      summary: Aprovar asset
+      description: Marca o asset como disponível para distribuição após revisão administrativa.
+      operationId: approve
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+      security:
+      - assetAdmin: []
+  /api/status:
+    get:
+      tags:
+      - Status
+      summary: Verificar catálogo e banco
+      description: Executa uma consulta simples no PostgreSQL. Retorna 503 quando
+        o banco não está disponível.
+      operationId: status
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/books/{bookId}/assets/{assetId}/download-url:
+    get:
+      tags:
+      - Distribuição
+      summary: Gerar URL pública temporária
+      description: Retorna uma URL pré-assinada somente quando o asset está aprovado.
+        O arquivo é baixado diretamente do object storage.
+      operationId: download
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DownloadLink'
+  /api/admin/books/{bookId}/assets/{assetId}:
+    get:
+      tags:
+      - Assets administrativos
+      summary: Consultar um asset
+      description: Retorna a metadata do asset sem transferir o binário.
+      operationId: get
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/AssetView'
+      security:
+      - assetAdmin: []
+    delete:
+      tags:
+      - Assets administrativos
+      summary: Excluir asset
+      description: Marca o asset como excluído e agenda/realiza a remoção física conforme
+        a política de storage.
+      operationId: delete
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: No Content
+      security:
+      - assetAdmin: []
+  /api/admin/books/{bookId}/assets/{assetId}/download-url:
+    get:
+      tags:
+      - Assets administrativos
+      summary: Gerar URL administrativa de download
+      description: Retorna uma URL pré-assinada temporária para inspeção do arquivo.
+        Não faz proxy do conteúdo pelo catálogo.
+      operationId: link
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DownloadLink'
+      security:
+      - assetAdmin: []
+  /api/:
+    get:
+      tags:
+      - Status
+      summary: Informações básicas da API
+      description: Retorna o nome do serviço e o caminho do healthcheck detalhado.
+      operationId: apiInfo
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api:
+    get:
+      tags:
+      - Status
+      summary: Informações básicas da API
+      description: Retorna o nome do serviço e o caminho do healthcheck detalhado.
+      operationId: apiInfo_1
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+components:
+  schemas:
+    Request:
+      type: object
+      properties:
+        inputVersionId:
+          type: string
+          format: uuid
+        outputVersionIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        processingType:
+          type: string
+        processor:
+          type: string
+        processorVersion:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: object
+    Chapter:
+      type: object
+      properties:
+        key:
+          type: string
+        parent:
+          type: string
+        position:
+          type: integer
+          format: int32
+        title:
+          type: string
+        start:
+          type: integer
+          format: int32
+        end:
+          type: integer
+          format: int32
+        confidence:
+          type: string
+    ChapterRequest:
+      type: object
+      properties:
+        bookId:
+          type: string
+          format: uuid
+        editionId:
+          type: string
+          format: uuid
+        textAssetVersionId:
+          type: string
+          format: uuid
+        chapters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Chapter'
+    CanonicalCommand:
+      required:
+      - identifierType
+      - identifierValue
+      - operationKey
+      - requestHash
+      - sourceCode
+      - title
+      type: object
+      properties:
+        operationKey:
+          type: string
+        requestHash:
+          pattern: '[0-9a-f]{64}'
+          type: string
+        fenceToken:
+          type: integer
+          format: int64
+        sourceCode:
+          type: string
+        identifierType:
+          type: string
+        identifierValue:
+          type: string
+        title:
+          type: string
+        language:
+          type: string
+        description:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/JsonNode'
+        publisher:
+          type: string
+        publicationYear:
+          type: integer
+          format: int32
+        authorName:
+          type: string
+        authorRole:
+          type: string
+    JsonNode:
+      type: object
+    AssetView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        bookId:
+          type: string
+          format: uuid
+        editionId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+          - EPUB
+          - PDF
+          - TXT
+          - HTML
+          - COVER
+          - THUMBNAIL
+          - JSON
+          - PARQUET
+          - AUDIO
+          - OTHER
+        role:
+          type: string
+          enum:
+          - SOURCE
+          - NORMALIZED
+          - PUBLIC
+          - PROCESSING
+          - ANALYTICS
+          - ML
+          - COVER
+          - DERIVED
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+          - DELETED
+    UploadResult:
+      type: object
+      properties:
+        asset:
+          $ref: '#/components/schemas/AssetView'
+        version:
+          $ref: '#/components/schemas/VersionView'
+    VersionView:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        number:
+          type: integer
+          format: int32
+        status:
+          type: string
+          enum:
+          - PENDING_UPLOAD
+          - AVAILABLE
+          - MISSING
+          - FAILED
+          - DELETED
+        bucket:
+          type: string
+        objectKey:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+    DownloadLink:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+  securitySchemes:
+    catalogService:
+      type: http
+      description: Token interno usado pelo book-ingestion-service.
+      scheme: bearer
+      bearerFormat: opaque
+    assetAdmin:
+      type: http
+      description: Token ASSET_ADMIN_TOKEN para operações administrativas de assets.
+      scheme: bearer
+      bearerFormat: opaque

@@ -1,7 +1,6 @@
 package com.bookrush.ingestion;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
-import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.security.OAuthFlow;
@@ -15,7 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@SecurityScheme(name = "keycloak", type = SecuritySchemeType.OAUTH2, in = SecuritySchemeIn.HEADER, description = "Bearer JWT emitido pelo realm bookrush do Keycloak.", flows = @OAuthFlows(password = @OAuthFlow(tokenUrl = "https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush/protocol/openid-connect/token")))
+@SecurityScheme(name = "keycloak", type = SecuritySchemeType.OAUTH2, description = "Bearer JWT emitido pelo realm bookrush do Keycloak.", flows = @OAuthFlows(password = @OAuthFlow(tokenUrl = "https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush/protocol/openid-connect/token")))
 @OpenAPIDefinition(info = @Info(
     title = "BookRush Book Ingestion API",
     version = "v1",

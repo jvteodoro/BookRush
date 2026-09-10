@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: recommendation
+  description: Fronteira planejada para recomendação; sem componentes implementados.
+spec:
+  owner: group:default/book-platform
+  domain: book-platform

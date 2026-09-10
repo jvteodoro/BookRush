@@ -1,0 +1,5 @@
+INHERIT: mkdocs.base.yml
+site_name: Developer Portal
+docs_dir: docs
+hooks:
+- scripts/mermaid_hook.py

@@ -1,0 +1,9 @@
+site_name: Jenkins
+docs_dir: docs
+nav:
+  - Início: index.md
+  - Operação: operations.md
+theme:
+  name: material
+plugins:
+  - techdocs-core

@@ -31,9 +31,10 @@ O gateway fica restrito a `http://127.0.0.1:18081`; o frontend fica em
 `http://127.0.0.1:18082`, o pgAdmin em `http://127.0.0.1:18083` e o serviço de
 ingestão em `http://127.0.0.1:18090`. PostgreSQL, Redis e o catálogo não são
 publicados diretamente no host.
-Para expor a aplicação, adicione o modelo em
-`infrastructure/nginx/bookrush.conf.example` ao Nginx do servidor, alterando o
-domínio e, quando aplicável, a configuração TLS.
+Para expor a aplicação e os serviços auxiliares, execute
+`sudo bash infrastructure/nginx/install-bookrush-vhosts.sh`. O instalador
+coloca os módulos em `/etc/nginx/conf.d/`, cria backup, valida a configuração e
+recarrega o Nginx somente após aprovação.
 
 Com o modelo Nginx aplicado, todas as requisições seguem para o gateway
 containerizado. Ele atende o frontend em `/`, o catálogo em `/api/...` e a
@@ -52,9 +53,8 @@ do socket Docker: `stat -c '%g' /var/run/docker.sock`.
 ## Administração do banco
 
 O pgAdmin é publicado pelo Nginx exclusivamente em
-`admin.bookrush.jteodoro.tec.br`. Copie
-`infrastructure/nginx/bookrush-admin.conf.example` para a configuração do
-Nginx e crie antes o usuário da camada adicional de Basic Auth:
+`admin-bookrush.jteodoro.tec.br`. O instalador modulariza esse virtual host;
+crie antes o usuário da camada adicional de Basic Auth:
 
 ```bash
 sudo htpasswd -c /etc/nginx/.htpasswd-bookrush-admin seu-usuario-admin
@@ -131,3 +131,9 @@ armazena referências e metadados. Configure as variáveis STORAGE_* e
 ASSET_ADMIN_TOKEN do .env.example e suba o Compose normalmente. Veja
 [documentação de storage](docs/storage/README.md); a suíte completa é
 `bash scripts/test-storage.sh`. Todos os buckets começam privados.
+
+## Developer Portal
+
+O [Backstage](backstage/README.md) é o portal oficial de consulta de serviços, APIs,
+ADRs e TechDocs. Git continua sendo a fonte canônica; a
+[política de documentação](docs/documentation-policy.md) define o fluxo de revisão.

@@ -40,6 +40,12 @@ pipeline {
       }
     }
 
+    stage('Developer Portal e documentação') {
+      steps {
+        sh 'bash scripts/test-portal.sh'
+      }
+    }
+
     stage('Imagens') {
       steps {
         script {

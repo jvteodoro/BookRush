@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-engineering
+  description: Responsáveis pela infraestrutura e pelo portal.
+spec:
+  type: team
+  profile:
+    displayName: platform-engineering
+  children: []

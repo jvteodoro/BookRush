@@ -1,0 +1,5 @@
+INHERIT: mkdocs.base.yml
+site_name: ${{ values.name }}
+docs_dir: docs
+hooks:
+  - mermaid_hook.py

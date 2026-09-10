@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keycloak
+  description: Identity provider existente; configuração versionada em infrastructure/keycloak.
+  annotations:
+    backstage.io/techdocs-ref: dir:./keycloak-docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform-engineering
+  system: identity-access

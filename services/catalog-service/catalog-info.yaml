@@ -1,0 +1,31 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: catalog-service
+  description: Catálogo canônico, assets e distribuição S3.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: jvteodoro/BookRush
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  dependsOn:
+  - resource:default/books-postgres
+  - resource:default/books-object-storage
+  providesApis:
+  - catalog-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: catalog-api
+  description: Catálogo canônico, assets e distribuição S3.
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  definition:
+    $text: ./api/openapi.yaml

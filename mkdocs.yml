@@ -1,0 +1,5 @@
+INHERIT: backstage/mkdocs.base.yml
+site_name: BookRush Engineering Handbook
+docs_dir: docs
+hooks:
+- backstage/scripts/mermaid_hook.py

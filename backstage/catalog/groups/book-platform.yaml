@@ -1,0 +1,10 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: book-platform
+  description: Responsáveis pelo domínio de livros.
+spec:
+  type: team
+  profile:
+    displayName: book-platform
+  children: []

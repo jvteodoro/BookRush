@@ -1,0 +1,12 @@
+site_name: BookRush
+plugins:
+- techdocs-core
+markdown_extensions:
+- admonition
+- pymdownx.details
+- pymdownx.superfences
+validation:
+  links:
+    not_found: warn
+    unrecognized_links: warn
+strict: true

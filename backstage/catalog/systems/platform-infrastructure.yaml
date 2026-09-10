@@ -1,0 +1,8 @@
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: platform-infrastructure
+  description: Infraestrutura e ferramentas de engenharia.
+spec:
+  owner: group:default/book-platform
+  domain: book-platform

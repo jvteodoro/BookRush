@@ -1,0 +1,9 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: books-postgres
+  description: PostgreSQL 16; schema catalog compartilhado pelos serviços atuais.
+spec:
+  type: database
+  owner: group:default/platform-engineering
+  system: book-catalog

@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: developer-portal
+  description: Portal oficial docs-as-code da plataforma.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: jvteodoro/BookRush
+spec:
+  type: website
+  lifecycle: experimental
+  owner: group:default/platform-engineering
+  system: platform-infrastructure
+  dependsOn:
+  - resource:default/backstage-postgres
