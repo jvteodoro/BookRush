@@ -25,6 +25,8 @@ kind: API
 metadata:
   name: book-ingestion-api
   description: Aquisição Gutenberg, normalização e jobs recuperáveis.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
 spec:
   type: openapi
   lifecycle: experimental
