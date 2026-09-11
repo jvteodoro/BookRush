@@ -8,6 +8,7 @@ services:
       target: runtime
     environment:
       POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD}
+      BACKSTAGE_PUBLIC_URL: ${BACKSTAGE_PUBLIC_URL:-http://localhost:17007}
     ports:
       - '127.0.0.1:17007:7007'
     volumes:

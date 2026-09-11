@@ -9,7 +9,7 @@ Configuração carregada depois prevalece. Não inclua configurações locais na
 |---|---|---|---|
 | BACKSTAGE_POSTGRES_PASSWORD | Compose portal DB | Docker | nenhum; gere localmente |
 | GITHUB_TOKEN | leitura privada / PRs | somente Git privado e template publish | nenhum |
-| BACKSTAGE_PUBLIC_URL | URL pública HTTPS | produção | https://docs-bookrush.jteodoro.tec.br |
+| BACKSTAGE_PUBLIC_URL | URL usada pelo navegador para o portal, a descoberta do backend e o TechDocs | local: `http://localhost:17007`; produção: `https://docs-bookrush.jteodoro.tec.br` | `http://localhost:17007` |
 | BACKSTAGE_CATALOG_URL | Location raiz no Git | produção | URL blob/main/catalog-info.yaml |
 | POSTGRES_HOST | banco portal | produção | backstage-postgres em Docker |
 | POSTGRES_USER | usuário portal | produção | backstage em Docker |

@@ -1,12 +1,14 @@
 app:
-  baseUrl: http://localhost:17007
+  # The browser uses this URL for discovery. It must be the public portal URL
+  # in deployments behind the host reverse proxy.
+  baseUrl: ${BACKSTAGE_PUBLIC_URL}
 backend:
-  baseUrl: http://localhost:17007
+  baseUrl: ${BACKSTAGE_PUBLIC_URL}
   listen:
     host: 0.0.0.0
     port: 7007
   cors:
-    origin: http://localhost:17007
+    origin: ${BACKSTAGE_PUBLIC_URL}
   database:
     client: pg
     connection:
@@ -19,6 +21,9 @@ catalog:
     - type: file
       target: /repo/backstage/.local/catalog.yaml
 techdocs:
+  # Keep static documentation on the same origin so public HTTPS deployments
+  # do not send the browser to localhost or an HTTP endpoint.
+  storageUrl: ${BACKSTAGE_PUBLIC_URL}/api/techdocs/static/docs
   publisher:
     type: local
     local:
