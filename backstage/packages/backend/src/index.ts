@@ -22,5 +22,6 @@ backend.add(import('@backstage/plugin-search-backend-module-pg'));
 backend.add(import('@backstage/plugin-search-backend-module-catalog'));
 backend.add(import('@backstage/plugin-search-backend-module-techdocs'));
 backend.add(import('@backstage/plugin-user-settings-backend'));
+backend.add(import('@backstage/plugin-signals-backend'));
 
 backend.start();
