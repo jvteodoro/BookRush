@@ -43,6 +43,22 @@ volumes Docker nomeados `postgres_data`, `seaweedfs_data`, `redis_data`,
 `backstage_techdocs`. Não use `docker compose down --volumes` em uma instalação
 que contenha dados.
 
+O ciclo de vida também possui comandos dedicados:
+
+```bash
+# Iniciar/recriar somente o Jenkins e aguardar o endpoint /login
+bash infrastructure/bootstrap/start-jenkins.sh
+
+# Iniciar toda a plataforma, incluindo Jenkins, Keycloak e Backstage
+bash infrastructure/bootstrap/start-environment.sh
+```
+
+`start-environment.sh` inicia o Compose principal com os perfis de autenticação,
+aguarda os healthchecks, sobe o portal em seu Compose próprio e por último
+chama `start-jenkins.sh`. Ambos aceitam `--no-build`, `--env-file FILE` e as
+opções para omitir CI, autenticação ou portal. O Jenkins possui healthcheck
+próprio para que `docker compose --wait` não retorne antes de estar acessível.
+
 ## Nginx e HTTPS
 
 Depois da configuração, instale os virtual hosts no Nginx do host:
