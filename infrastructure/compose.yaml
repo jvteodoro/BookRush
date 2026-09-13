@@ -18,7 +18,7 @@ services:
       # Jenkins runs Compose from inside a container while Docker creates the
       # proxy on the host. Use the host repository path for this bind mount;
       # override BOOKRUSH_REPO_ROOT in .env on another host.
-      - ${BOOKRUSH_REPO_ROOT:-/home/enoch/projects/LabSoft/BookRush}/infrastructure/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 10s
@@ -92,7 +92,7 @@ services:
       - keycloak_data:/opt/keycloak/data
       # This path is resolved by the Docker daemon, not by the Jenkins
       # container that invokes Compose through the Docker socket.
-      - ${BOOKRUSH_REPO_ROOT:-/home/enoch/projects/LabSoft/BookRush}/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
+      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
     ports:
       - "127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}:8080"
     healthcheck:
@@ -230,7 +230,7 @@ services:
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
-      - ../.env:/run/bookrush.env:ro
+      - ${BOOKRUSH_ENV_FILE:-../.env}:/run/bookrush.env:ro
       - ./compose.yaml:/opt/bookrush/compose.yaml:ro
       - ./jenkins/bookrush.Jenkinsfile:/opt/bookrush/bookrush.Jenkinsfile:ro
       - ./jenkins/backstage.Jenkinsfile:/opt/bookrush/backstage.Jenkinsfile:ro

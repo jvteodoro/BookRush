@@ -26,6 +26,17 @@ localmente com Docker Compose quanto em Kubernetes.
    docker compose -f infrastructure/compose.yaml --env-file .env --profile ci up --build
    ```
 
+Para reproduzir o ambiente em um Ubuntu novo, use o bootstrap versionado:
+
+```bash
+bash infrastructure/bootstrap/install-ubuntu.sh
+bash infrastructure/bootstrap/configure-ubuntu.sh
+```
+
+O primeiro comando instala as dependências do host; o segundo valida e sobe
+todos os Compose. Consulte [o guia de bootstrap](infrastructure/bootstrap/README.md)
+para copiar um `.env` privado, opções de perfis e volumes persistentes.
+
 O gateway fica restrito a `http://127.0.0.1:18081`; o frontend fica em
 `http://127.0.0.1:18080` para desenvolvimento direto, o Jenkins em
 `http://127.0.0.1:18082`, o pgAdmin em `http://127.0.0.1:18083` e o serviço de
