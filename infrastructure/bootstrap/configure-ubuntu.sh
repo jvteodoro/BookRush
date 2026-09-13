@@ -30,6 +30,11 @@ done
 chmod 600 "$env_file" 2>/dev/null || true
 command -v docker >/dev/null || { echo 'Docker ausente; execute install-ubuntu.sh.' >&2; exit 2; }
 docker compose version >/dev/null || { echo 'Docker Compose v2 ausente.' >&2; exit 2; }
+docker info >/dev/null 2>&1 || { echo 'Usuário sem acesso ao Docker; abra uma nova sessão após entrar no grupo docker ou execute com sudo.' >&2; exit 2; }
+if [[ "$build" == true ]] && ! docker buildx version >/dev/null 2>&1; then
+  echo 'Docker Buildx ausente. Execute install-ubuntu.sh ou instale docker-buildx-plugin antes de usar --build.' >&2
+  exit 2
+fi
 
 # O caminho não é segredo e precisa acompanhar o host para que execuções
 # futuras do Jenkins, que montam o .env diretamente, usem o mesmo clone.
@@ -57,6 +62,7 @@ for variable in "${required_vars[@]}"; do
   grep -Eq "^${variable}=.+$" "$runtime_env" || { echo "Variável obrigatória ausente ou vazia: $variable" >&2; exit 2; }
 done
 export BOOKRUSH_REPO_ROOT="$repo_dir" BOOKRUSH_ENV_FILE="$env_file" COMPOSE_PROJECT_NAME=bookrush
+export COMPOSE_PARALLEL_LIMIT=1
 compose=(docker compose --project-name bookrush -f "$repo_dir/infrastructure/compose.yaml" --env-file "$runtime_env")
 portal_compose=(docker compose --project-name bookrush-portal -f "$repo_dir/backstage/compose.yaml" --env-file "$runtime_env")
 profiles=(); [[ "$with_auth" == true ]] && profiles+=(--profile auth); [[ "$with_ci" == true ]] && profiles+=(--profile ci)

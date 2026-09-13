@@ -19,6 +19,9 @@ sudo bash infrastructure/bootstrap/install-ubuntu.sh
 O instalador instala Docker Engine + Compose v2, Git, Nginx, Certbot,
 OpenSSL, `jq`, Python e ferramentas auxiliares. O usuário que executa o script
 é adicionado ao grupo `docker`; abra uma nova sessão após a instalação.
+O instalador também garante o plugin Buildx, necessário para os Dockerfiles.
+Se aparecer `permission denied` no socket, encerre e abra a sessão novamente
+ou execute com um usuário que pertença ao grupo `docker`.
 
 ## Configuração e subida
 

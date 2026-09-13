@@ -9,7 +9,7 @@ as_root apt-get update
 as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   ca-certificates curl git jq openssl python3 python3-venv nginx apache2-utils certbot
 
-if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
+if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1 || ! docker buildx version >/dev/null 2>&1; then
   as_root install -m 0755 -d /etc/apt/keyrings
   if [[ ! -s /etc/apt/keyrings/docker.asc ]]; then
     as_root curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc

@@ -27,6 +27,11 @@ done
 [[ -f "$env_file" ]] || { echo "Arquivo de ambiente ausente: $env_file" >&2; exit 2; }
 command -v docker >/dev/null || { echo 'Docker ausente.' >&2; exit 2; }
 docker compose version >/dev/null || { echo 'Docker Compose v2 ausente.' >&2; exit 2; }
+docker info >/dev/null 2>&1 || { echo 'Usuário sem acesso ao Docker; abra uma nova sessão após entrar no grupo docker ou execute com sudo.' >&2; exit 2; }
+if [[ "$build" == true ]] && ! docker buildx version >/dev/null 2>&1; then
+  echo 'Docker Buildx ausente. Execute install-ubuntu.sh ou instale docker-buildx-plugin antes de usar --build.' >&2
+  exit 2
+fi
 runtime_env="$(mktemp "${TMPDIR:-/tmp}/bookrush-env-start.XXXXXX")"
 trap 'rm -f -- "$runtime_env"' EXIT
 cp -- "$env_file" "$runtime_env"; chmod 600 "$runtime_env"
@@ -37,6 +42,7 @@ if ! grep -Eq '^BACKSTAGE_POSTGRES_PASSWORD=.+$' "$runtime_env"; then
 fi
 export BOOKRUSH_REPO_ROOT="$repo_dir" BOOKRUSH_ENV_FILE="$env_file" COMPOSE_PROJECT_NAME=bookrush
 export DOCKER_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo 999)"
+export COMPOSE_PARALLEL_LIMIT=1
 compose=(docker compose --project-name bookrush -f "$repo_dir/infrastructure/compose.yaml" --env-file "$runtime_env")
 portal=(docker compose --project-name bookrush-portal -f "$repo_dir/backstage/compose.yaml" --env-file "$runtime_env")
 profiles=(); [[ "$with_auth" == true ]] && profiles+=(--profile auth)
