@@ -16,6 +16,12 @@ backend:
       port: 5432
       user: backstage
       password: ${POSTGRES_PASSWORD}
+  # The public portal uses the guest provider. TechDocs renders its generated
+  # HTML in an iframe, whose CSS/JS requests cannot carry the API bearer token.
+  # Keep catalog permissions enabled, but allow the backend auth layer to pass
+  # those public read requests through to the plugin routes.
+  auth:
+    dangerouslyDisableDefaultAuthPolicy: true
 catalog:
   locations:
     - type: file

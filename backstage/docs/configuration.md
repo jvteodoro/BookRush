@@ -15,6 +15,19 @@ Configuração carregada depois prevalece. Não inclua configurações locais na
 | POSTGRES_USER | usuário portal | produção | backstage em Docker |
 | POSTGRES_PASSWORD | senha banco portal | produção | nenhum |
 | TECHDOCS_BUCKET | bucket dedicado | produção | bookrush-techdocs sugerido |
+
+## Catálogo Graph e TechDocs
+
+O `page:catalog-graph` possui raízes explícitas em `app-config.yaml`. O plugin
+do Backstage inicia sem raízes quando essa configuração não existe e, nesse
+caso, mostra um canvas vazio mesmo com entidades persistidas.
+
+O ambiente com autenticação guest mantém as permissões do catálogo ativas, mas
+desabilita a política de autenticação obrigatória do backend para os recursos
+estáticos do TechDocs. O conteúdo HTML é carregado em um `iframe`; seus CSS e
+JavaScript não conseguem enviar o bearer token das chamadas da aplicação. A
+proteção de operações administrativas continua sendo responsabilidade das
+permissões e dos serviços de domínio.
 | AWS_REGION | assinatura S3 | produção | us-east-1 sugerido |
 | TECHDOCS_S3_ENDPOINT | endpoint compatível S3 | produção | http://seaweedfs:8333 |
 | TECHDOCS_ACCESS_KEY | leitura/publicação TechDocs | produção | nenhum |

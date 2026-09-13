@@ -6,12 +6,25 @@ app:
     - page:catalog:
         config:
           path: /
+    - page:catalog-graph:
+        config:
+          # The graph page needs at least one root entity. Without this
+          # explicit seed the current Backstage graph intentionally renders
+          # an empty canvas even when the catalog contains entities.
+          rootEntityRefs:
+            - component:default/catalog-service
+            - component:default/book-ingestion-service
 organization:
   name: BookRush
 backend:
   baseUrl: http://localhost:7007
   listen:
     port: 7007
+  auth:
+    # TechDocs pages load generated CSS/JS in an iframe without forwarding
+    # the browser's bearer token. The portal is guest-readable; catalog
+    # permissions remain enabled for plugin-level authorization.
+    dangerouslyDisableDefaultAuthPolicy: true
   cors:
     origin: http://localhost:3000
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
