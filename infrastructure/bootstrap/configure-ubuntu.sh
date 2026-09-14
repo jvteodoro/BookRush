@@ -70,12 +70,11 @@ profiles=(); [[ "$with_auth" == true ]] && profiles+=(--profile auth); [[ "$with
 [[ "$with_portal" != true ]] || "${portal_compose[@]}" config >/dev/null
 
 if [[ "$start" == true ]]; then
-  up_args=(-d --wait --wait-timeout 300); [[ "$build" == true ]] && up_args+=(--build)
-  "${compose[@]}" "${profiles[@]}" up "${up_args[@]}"
-  if [[ "$with_portal" == true ]]; then
-    portal_up=(-d --wait --wait-timeout 300); [[ "$build" == true ]] && portal_up+=(--build)
-    "${portal_compose[@]}" up "${portal_up[@]}" backstage-postgres backstage
-  fi
+  start_args=(--env-file "$env_file"); [[ "$build" == true ]] || start_args+=(--no-build)
+  [[ "$with_ci" == true ]] || start_args+=(--without-ci)
+  [[ "$with_auth" == true ]] || start_args+=(--without-auth)
+  [[ "$with_portal" == true ]] || start_args+=(--without-portal)
+  bash "$repo_dir/infrastructure/bootstrap/start-environment.sh" "${start_args[@]}"
 fi
 echo "Ambiente validado no clone: $repo_dir"
 [[ "$start" != true ]] || echo 'Containers iniciados e aguardados como saudáveis.'

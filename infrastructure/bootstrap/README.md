@@ -61,6 +61,11 @@ aguarda os healthchecks, sobe o portal em seu Compose próprio e por último
 chama `start-jenkins.sh`. Ambos aceitam `--no-build`, `--env-file FILE` e as
 opções para omitir CI, autenticação ou portal. O Jenkins possui healthcheck
 próprio para que `docker compose --wait` não retorne antes de estar acessível.
+Antes da subida, o script reconcilia containers antigos dos projetos Compose
+`bookrush` e `bookrush-portal`. Se um daemon não conseguir removê-los pela
+operação normal do Compose, ele remove somente os containers com esses labels;
+volumes nomeados nunca são removidos. Assim, uma implantação anterior com
+imagens diferentes não deixa nomes conflitantes nem impede a recriação.
 
 ## Nginx e HTTPS
 

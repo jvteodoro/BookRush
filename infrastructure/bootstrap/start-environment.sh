@@ -48,6 +48,36 @@ portal=(docker compose --project-name bookrush-portal -f "$repo_dir/backstage/co
 profiles=(); [[ "$with_auth" == true ]] && profiles+=(--profile auth)
 "${compose[@]}" "${profiles[@]}" config >/dev/null
 [[ "$with_portal" != true ]] || "${portal[@]}" config >/dev/null
+
+# A previous Jenkins deployment may have left containers with the same Compose
+# labels but a different image/configuration.  Let Compose stop them first;
+# when Docker refuses to remove a stale running container, remove only
+# containers belonging to this Compose project.  Volumes are deliberately not
+# touched, so PostgreSQL, object storage and Jenkins data remain persistent.
+reconcile_main_stack() {
+  echo 'Reconciliando containers antigos do projeto bookrush (volumes preservados).'
+  if ! "${compose[@]}" --profile auth --profile ci down --remove-orphans --timeout 30; then
+    echo 'Compose não conseguiu remover todos os containers antigos; aplicando remoção forçada apenas ao projeto bookrush.' >&2
+    mapfile -t stale_ids < <(docker ps -aq --filter 'label=com.docker.compose.project=bookrush')
+    if ((${#stale_ids[@]})); then
+      docker rm -f "${stale_ids[@]}"
+    fi
+  fi
+}
+
+reconcile_portal_stack() {
+  echo 'Reconciliando containers antigos do portal bookrush (volumes preservados).'
+  if ! "${portal[@]}" down --remove-orphans --timeout 30; then
+    echo 'Compose não conseguiu remover todos os containers antigos do portal; aplicando remoção forçada apenas ao projeto bookrush-portal.' >&2
+    mapfile -t stale_ids < <(docker ps -aq --filter 'label=com.docker.compose.project=bookrush-portal')
+    if ((${#stale_ids[@]})); then
+      docker rm -f "${stale_ids[@]}"
+    fi
+  fi
+}
+
+reconcile_main_stack
+[[ "$with_portal" != true ]] || reconcile_portal_stack
 up_args=(-d --wait --wait-timeout 300); [[ "$build" == true ]] && up_args+=(--build)
 "${compose[@]}" "${profiles[@]}" up "${up_args[@]}"
 if [[ "$with_portal" == true ]]; then

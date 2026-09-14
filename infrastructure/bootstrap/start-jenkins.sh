@@ -30,6 +30,15 @@ export DOCKER_GID="$(stat -c '%g' /var/run/docker.sock)"
 export COMPOSE_PARALLEL_LIMIT=1
 compose=(docker compose --project-name bookrush -f "$repo_dir/infrastructure/compose.yaml" --env-file "$env_file" --profile ci)
 "${compose[@]}" config >/dev/null
+# Remove only the previous Jenkins container. The named jenkins_home volume is
+# intentionally preserved. This also handles containers left by a deployment
+# that used the same project labels with an older image.
+if ! "${compose[@]}" rm --force --stop jenkins; then
+  mapfile -t stale_ids < <(docker ps -aq --filter 'label=com.docker.compose.project=bookrush' --filter 'label=com.docker.compose.service=jenkins')
+  if ((${#stale_ids[@]})); then
+    docker rm -f "${stale_ids[@]}"
+  fi
+fi
 args=(-d --wait --wait-timeout 300); [[ "$build" == true ]] && args+=(--build)
 "${compose[@]}" up "${args[@]}" jenkins
 "${compose[@]}" ps jenkins
