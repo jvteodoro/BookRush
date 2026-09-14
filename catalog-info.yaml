@@ -23,6 +23,7 @@ spec:
   - ./services/book-analytics-service/catalog-info.yaml
   - ./frontend/catalog-info.yaml
   - ./backstage/catalog-info.yaml
+  - ./platform/catalog-info.yaml
   - ./backstage/templates/java-spring-service/template.yaml
 ---
 apiVersion: backstage.io/v1alpha1

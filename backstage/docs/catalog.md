@@ -20,10 +20,11 @@ Todos os owners usam refs Group, nunca nomes pessoais.
 ## Equipes e recursos
 
 Crie YAML Group em catalog/groups, inclua no Location raiz e execute validação.
-Grupos usam spec.type=team, children=[] e profile.displayName. Usuários reais,
-quando necessários para login, entram como User com spec.profile.email e memberOf.
-Não invente pessoas ou credenciais. Só usuários cujo email corresponda ao Keycloak
-podem autenticar no perfil público.
+Grupos usam spec.type=team, children=[] e profile.displayName. Entidades User
+podem ser adicionadas para ownership e navegação, mas não são necessárias para
+login: o Keycloak controla identidade e acesso. Quando uma entidade User existir,
+seu e-mail deve corresponder ao Keycloak e o arquivo deve ser revisado junto com
+a concessão no realm administrativo.
 
 Resource requer type, owner e system existentes. Não cadastre Kafka ou Elasticsearch
 só por constarem na visão futura: atualmente não estão no Compose funcional.

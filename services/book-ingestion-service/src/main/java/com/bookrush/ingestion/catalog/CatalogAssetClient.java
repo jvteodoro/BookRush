@@ -21,14 +21,16 @@ import org.springframework.web.client.RestClientResponseException;
 public final class CatalogAssetClient {
   private final RestClient client;
   private final CanonicalCatalogProperties properties;
+  private final OidcServiceTokenProvider tokens;
 
-  public CatalogAssetClient(RestClient.Builder builder, CanonicalCatalogProperties properties) {
+  public CatalogAssetClient(RestClient.Builder builder, CanonicalCatalogProperties properties, OidcServiceTokenProvider tokens) {
     this.properties = properties;
+    this.tokens = tokens;
     this.client = builder.baseUrl(properties.baseUrl().toString()).build();
   }
 
   public Map<?, ?> uploadSource(UUID bookId, UUID editionId, UUID sourceId, Path file, String filename) {
-    if (properties.assetToken() == null || properties.assetToken().isBlank()) return Map.of("skipped", true);
+    String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
     MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
     form.add("sourceId", sourceId.toString());
     form.add("editionId", editionId.toString());
@@ -37,15 +39,15 @@ public final class CatalogAssetClient {
     form.add("file", filePart(file, MediaType.parseMediaType("application/epub+zip")));
     try {
       var existing = client.get().uri("/api/admin/books/{bookId}/assets", bookId)
-          .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.assetToken()).retrieve().body(java.util.List.class);
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).retrieve().body(java.util.List.class);
       for (Object value : existing == null ? java.util.List.of() : existing) {
         if (!(value instanceof Map<?, ?> item) || !"SOURCE".equals(String.valueOf(item.get("role"))) || !"EPUB".equals(String.valueOf(item.get("type")))) continue;
         return client.post().uri("/api/admin/books/{bookId}/assets/{assetId}/versions", bookId, item.get("id"))
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.assetToken())
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
             .contentType(MediaType.MULTIPART_FORM_DATA).body(form).retrieve().body(Map.class);
       }
       return client.post().uri("/api/admin/books/{bookId}/assets", bookId)
-          .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.assetToken())
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
           .contentType(MediaType.MULTIPART_FORM_DATA)
           .body(form).retrieve().body(Map.class);
     } catch (RestClientResponseException e) {
@@ -54,13 +56,13 @@ public final class CatalogAssetClient {
   }
 
   public Map<?, ?> uploadDerived(UUID bookId, UUID editionId, UUID sourceId, Path file, String filename, String type) {
-    if (properties.assetToken() == null || properties.assetToken().isBlank()) return Map.of("skipped", true);
+    String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
     MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
     form.add("sourceId", sourceId.toString()); form.add("editionId", editionId.toString());
     form.add("type", type); form.add("role", "PROCESSING");
     form.add("file", filePart(file, mediaType(type)));
     return client.post().uri("/api/admin/books/{bookId}/assets", bookId)
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.assetToken())
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
         .contentType(MediaType.MULTIPART_FORM_DATA).body(form).retrieve().body(Map.class);
   }
 

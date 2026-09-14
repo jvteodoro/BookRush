@@ -1,9 +1,9 @@
 package com.bookrush.ingestion.jobs;
 
+import com.bookrush.platform.core.Sha256;
 import com.bookrush.ingestion.processing.PlainTextNormalizer;
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.HexFormat;
-import java.security.MessageDigest;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -13,6 +13,12 @@ public class AssetNormalizeJob {
     String text = normalizer.normalize(input);
     return new Normalized(text, sha256(text));
   }
-  private String sha256(String value) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); } catch (Exception e) { throw new IllegalStateException(e); } }
+  private String sha256(String value) {
+    try {
+      return Sha256.digest(new ByteArrayInputStream(value.getBytes(StandardCharsets.UTF_8)), Long.MAX_VALUE);
+    } catch (java.io.IOException e) {
+      throw new IllegalStateException("normalized text hash failed", e);
+    }
+  }
   public record Normalized(String text, String sha256) {}
 }

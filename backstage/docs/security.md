@@ -7,10 +7,31 @@ usuário deve negar login; não permitir resolver que crie identidade irrestrita
 
 ## Keycloak
 
-Crie cliente confidencial bookrush-backstage no realm existente, authorization code,
-redirect URI `https://docs-bookrush.jteodoro.tec.br/api/auth/oidc/handler/frame` e Web Origin exata.
-Não habilite password grant. Configure as AUTH_* externamente e carregue a overlay
-app-config.oidc.yaml após production. Configure email verificado e User no Git.
+O portal usa o cliente confidencial `bookrush-backstage` no realm
+`bookrush-platform`, com Authorization Code e redirect URI exata:
+`https://docs-bookrush.jteodoro.tec.br/api/auth/oidc/handler/frame`. A Web Origin
+é `https://docs-bookrush.jteodoro.tec.br`; password grant permanece desabilitado.
+
+O Compose recebe `BACKSTAGE_OIDC_ENABLED`, `AUTH_OIDC_METADATA_URL`,
+`AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_CLIENT_SECRET` e `AUTH_SESSION_SECRET` do
+`.env` protegido. O entrypoint carrega `app-config.oidc.yaml` somente quando
+`BACKSTAGE_OIDC_ENABLED=true`; sem essa flag, o desenvolvimento usa guest.
+O overlay remove guest, habilita o provider OIDC e usa o resolver
+`emailMatchingUserEntityProfileEmail`, com
+`dangerouslyAllowSignInWithoutUserInCatalog: true`. O Keycloak é a fonte de
+autenticação e autorização; uma entidade `User` no catálogo é opcional.
+O provedor usa `prompt: auto`: com uma sessão Keycloak existente o SSO é
+silencioso; sem sessão, o popup mostra o formulário de login em vez de falhar
+com `login_required`.
+
+O realm declara mappers explícitos para `preferred_username`, `email`,
+`email_verified` e `groups`. O frontend inicia o fluxo com `openid` e o backend acrescenta
+`profile email` (`additionalScopes`) para garantir que o perfil retornado pelo
+provedor contenha o e-mail usado pelo resolver. Os mappers continuam sendo a
+fonte explícita das claims; os client scopes são apenas suporte ao protocolo.
+Entidades `User` fornecem ownership, grupos e navegação do catálogo, mas não são
+pré-requisito para login. Quando usadas, são cadastradas por revisão no Git;
+não há criação automática de entidades no catálogo.
 Esta implementação não altera o realm de produção nem provisiona contas pessoais.
 
 O certificado e a terminação TLS do hostname são responsabilidade do proxy do
@@ -20,6 +41,26 @@ servidor. O processo do Backstage continua ouvindo HTTP apenas na rede local;
 A política allow-all oficial pressupõe que todos os usuários admitidos sejam membros
 confiáveis de engenharia. Não é um modelo multitenant. Antes de admitir usuários com
 privilégios distintos, restrinja permissões de scaffolder e publicação por Group.
+
+## Autorização nas APIs exibidas no catálogo
+
+O widget OpenAPI do portal reutiliza o access token OIDC mantido em memória pela
+sessão atual do Backstage. Ao usar **Try it out**, ele acrescenta automaticamente
+`Authorization: Bearer ...` às requisições destinadas aos hosts BookRush públicos ou
+ao próprio host do portal. O token nunca é salvo em `localStorage`, colocado na URL,
+gravado em documentação ou enviado para uma definição OpenAPI externa.
+
+Essa integração apenas preenche a credencial da chamada no navegador; a autorização
+continua sendo responsabilidade do microserviço. O serviço deve validar issuer,
+assinatura, expiração, audience e permissões do token. Portanto, um `401` após o
+preenchimento automático indica incompatibilidade de issuer/audience ou sessão
+expirada, e um `403` indica falta de permissão. O portal não transforma a sessão
+humana em credencial de serviço nem concede acesso a endpoints administrativos.
+
+Para testar, entre no Backstage pelo Keycloak, abra uma entidade `API`, acesse a
+definição OpenAPI e clique em **Try it out**. O interceptor só permite os hosts
+`bookrush.jteodoro.tec.br`, o host atual e `localhost`/`127.0.0.1`; destinos externos
+permanecem sem o token.
 
 ## GitHub
 

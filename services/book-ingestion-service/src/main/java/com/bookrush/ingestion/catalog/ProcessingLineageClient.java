@@ -12,15 +12,16 @@ public final class ProcessingLineageClient {
   private final RestClient client;
   private final CanonicalCatalogProperties properties;
   private final ObjectMapper mapper;
-  public ProcessingLineageClient(RestClient.Builder builder, CanonicalCatalogProperties properties, ObjectMapper mapper) {
+  private final OidcServiceTokenProvider tokens;
+  public ProcessingLineageClient(RestClient.Builder builder, CanonicalCatalogProperties properties, ObjectMapper mapper, OidcServiceTokenProvider tokens) {
     this.properties = properties; this.client = builder.baseUrl(properties.baseUrl().toString()).build();
-    this.mapper = mapper;
+    this.mapper = mapper; this.tokens = tokens;
   }
   public void record(UUID input, List<UUID> outputs, String type, Map<String,Object> metadata) {
-    if (properties.serviceToken() == null || properties.serviceToken().isBlank()) return;
-    client.post().uri("/api/internal/v1/catalog/processings")
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.serviceToken())
-        .header("X-Canonical-Service-Token", properties.serviceToken())
+    String token = tokens.token(OidcServiceTokenProvider.Kind.CANONICAL);
+    var request = client.post().uri("/api/internal/v1/catalog/processings").header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+    if (properties.legacyStaticEnabled()) request.header("X-Canonical-Service-Token", token);
+    request
         .contentType(MediaType.APPLICATION_JSON)
         .body(Map.of("inputVersionId", input, "outputVersionIds", outputs, "processingType", type,
             "processor", "bookrush-text-processing", "processorVersion", "1", "metadata", metadata))
@@ -28,7 +29,7 @@ public final class ProcessingLineageClient {
   }
 
   public void projectChapters(UUID bookId, UUID editionId, UUID textVersionId, byte[] chaptersJson) throws Exception {
-    if (properties.serviceToken() == null || properties.serviceToken().isBlank()) return;
+    String token = tokens.token(OidcServiceTokenProvider.Kind.CANONICAL);
     JsonNode document = mapper.readTree(chaptersJson);
     var chapters = new ArrayList<Map<String,Object>>();
     for (JsonNode c : document.path("chapters")) {
@@ -42,9 +43,9 @@ public final class ProcessingLineageClient {
       chapter.put("confidence", c.path("confidence").asText());
       chapters.add(chapter);
     }
-    client.post().uri("/api/internal/v1/catalog/processings/chapters")
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.serviceToken())
-        .header("X-Canonical-Service-Token", properties.serviceToken())
+    var request = client.post().uri("/api/internal/v1/catalog/processings/chapters").header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+    if (properties.legacyStaticEnabled()) request.header("X-Canonical-Service-Token", token);
+    request
         .contentType(MediaType.APPLICATION_JSON)
         .body(Map.of("bookId", bookId, "editionId", editionId, "textAssetVersionId", textVersionId, "chapters", chapters))
         .retrieve().toBodilessEntity();

@@ -1,5 +1,6 @@
 package com.bookrush.ingestion.security;
 
+import com.bookrush.platform.core.TechnicalIdentity;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -9,11 +10,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -23,27 +20,10 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2TokenValidator;
-import org.springframework.security.oauth2.core.OAuth2Error;
-import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 
 @Configuration
 @EnableConfigurationProperties(IngestionSecurityProperties.class)
 public class IngestionSecurityConfiguration {
-  @Bean
-  @ConditionalOnProperty(prefix = "ingestion.security", name = "enabled", havingValue = "true")
-  JwtDecoder ingestionJwtDecoder(IngestionSecurityProperties properties) {
-    var decoder = NimbusJwtDecoder.withJwkSetUri(properties.jwkSetUri()).build();
-    OAuth2TokenValidator<Jwt> audience = token -> token.getAudience() != null
-        && token.getAudience().contains(properties.audience())
-        ? OAuth2TokenValidatorResult.success()
-        : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "audience mismatch", null));
-    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-        JwtValidators.createDefaultWithIssuer(properties.issuer()), audience));
-    return decoder;
-  }
-
   @Bean
   @ConditionalOnProperty(prefix = "ingestion.security", name = "enabled", havingValue = "true")
   SecurityFilterChain ingestionSecurity(HttpSecurity http, IngestionSecurityProperties properties) throws Exception {
@@ -82,15 +62,14 @@ public class IngestionSecurityConfiguration {
   }
 
   private Converter<Jwt, ? extends AbstractAuthenticationToken> rolesConverter() {
-    var converter = new JwtAuthenticationConverter();
-    converter.setJwtGrantedAuthoritiesConverter((Jwt jwt) -> {
+    return jwt -> {
       List<GrantedAuthority> result = new ArrayList<>();
       Object roles = jwt.getClaims().get("roles");
       if (roles instanceof List<?> values) values.forEach(value -> result.add(new SimpleGrantedAuthority("ROLE_" + value)));
       Object realm = jwt.getClaims().get("realm_access");
       if (realm instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> values) values.forEach(value -> result.add(new SimpleGrantedAuthority("ROLE_" + value)));
-      return result;
-    });
-    return converter;
+      var identity = new TechnicalIdentity(jwt.getIssuer().toString(), jwt.getSubject());
+      return new JwtAuthenticationToken(jwt, result, identity.toString());
+    };
   }
 }

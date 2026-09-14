@@ -3,20 +3,40 @@
   "enabled": true,
   "roles": {
     "realm": [
+      {"name": "READER"},
       {"name": "OPERATOR"},
       {"name": "REVIEWER"},
-      {"name": "CLEANUP"}
+      {"name": "CLEANUP"},
+      {"name": "ASSET_ADMIN"}
     ]
   },
   "clients": [
     {
+      "clientId": "bookrush-web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "https://bookrush.jteodoro.tec.br/*",
+        "http://localhost:18080/*"
+      ],
+      "webOrigins": [
+        "https://bookrush.jteodoro.tec.br",
+        "http://localhost:18080"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://bookrush.jteodoro.tec.br/*##http://localhost:18080/*"
+      }
+    },
+    {
       "clientId": "bookrush-ingestion",
       "enabled": true,
       "publicClient": true,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "standardFlowEnabled": true,
       "redirectUris": ["http://localhost:18090/*"],
-      "webOrigins": ["+"],
+      "webOrigins": ["http://localhost:18090"],
       "protocolMappers": [
         {
           "name": "bookrush-ingestion-audience",
@@ -36,19 +56,6 @@
       "serviceAccountsEnabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret"
-    }
-  ],
-  "users": [
-    {
-      "username": "operator",
-      "enabled": true,
-      "email": "operator@example.invalid",
-      "emailVerified": true,
-      "firstName": "BookRush",
-      "lastName": "Operator",
-      "requiredActions": [],
-      "credentials": [{"type": "password", "value": "operator", "temporary": false}],
-      "realmRoles": ["OPERATOR"]
     }
   ]
 }

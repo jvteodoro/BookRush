@@ -15,6 +15,9 @@ FROM dependencies AS source
 COPY backstage/ ./
 COPY catalog-info.yaml mkdocs.yml /repo/
 COPY docs /repo/docs
+COPY platform /repo/platform
+COPY examples/platform-consumer /repo/examples/platform-consumer
+COPY infrastructure/secrets/README.md /repo/infrastructure/secrets/README.md
 COPY services/catalog-service/catalog-info.yaml services/catalog-service/mkdocs.yml /repo/services/catalog-service/
 COPY services/catalog-service/docs /repo/services/catalog-service/docs
 COPY services/catalog-service/api /repo/services/catalog-service/api
@@ -38,8 +41,8 @@ RUN node .yarn/releases/yarn-4.13.0.cjs build:all && tar -xzf packages/backend/d
 FROM build AS runtime
 # The runtime includes MkDocs for isolated local builds; production uses external publishing.
 ENV NODE_ENV=development
-RUN mkdir -p /app/techdocs && chown -R node:node /app /repo/backstage
+RUN chmod 0755 entrypoint.sh && mkdir -p /app/techdocs && chown -R node:node /app /repo/backstage
 USER node
 WORKDIR /repo/backstage/packages/backend
 EXPOSE 7007
-CMD ["node", "dist/index.cjs.js", "--config", "../../app-config.yaml", "--config", "../../app-config.docker.yaml"]
+ENTRYPOINT ["/repo/backstage/entrypoint.sh"]

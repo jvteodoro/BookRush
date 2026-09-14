@@ -8,6 +8,14 @@ Git é a fonte canônica. Backstage é o portal oficial de descoberta e consulta
 - [Ingestão](ingestion/README.md)
 - [Decisões arquiteturais](adr/README.md)
 - [Incidentes de deploy](operations/deployment-incident-study.md)
+- [Baseline da plataforma e autenticação](platform/baseline-inventory.md)
+- [Plataforma Java compartilhada](platform/README.md)
+- [Autenticação e autorização](auth/README.md)
+- [OIDC do Jenkins com Keycloak](auth/jenkins-oidc.md)
+- [Matriz de migração de realms](auth/realm-migration.md)
+- [Ciclo de acesso administrativo](auth/access-lifecycle.md)
+- [Inventário de interfaces](auth/interface-inventory.md)
+- [Lifecycle e IaC das aplicações](platform/lifecycle.md)
 - [Beads](beads.md)
 
 O catálogo do portal registra separadamente os serviços e suas APIs; este handbook

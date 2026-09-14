@@ -35,6 +35,16 @@ management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
   endpoint.health.probes.enabled: true
 
+bookrush:
+  security:
+    enabled: ${INGESTION_SECURITY_ENABLED:false}
+    issuer: ${INGESTION_OIDC_ISSUER:http://keycloak:8080/realms/bookrush-platform}
+    jwk-set-uri: ${INGESTION_OIDC_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
+    audience: ${INGESTION_OIDC_AUDIENCE:bookrush-ingestion}
+  observability:
+    correlation:
+      enabled: ${BOOKRUSH_CORRELATION_ENABLED:true}
+
 ingestion:
   openapi:
     server-url: ${INGESTION_PUBLIC_URL:https://bookrush.jteodoro.tec.br/ingestion}
@@ -66,9 +76,9 @@ ingestion:
     timeout: ${INGESTION_STORAGE_TIMEOUT:30s}
   security:
     enabled: ${INGESTION_SECURITY_ENABLED:false}
-    issuer: ${INGESTION_OIDC_ISSUER:http://localhost:8081/realms/bookrush}
+    issuer: ${INGESTION_OIDC_ISSUER:http://localhost:8081/realms/bookrush-platform}
     audience: ${INGESTION_OIDC_AUDIENCE:bookrush-ingestion}
-    jwk-set-uri: ${INGESTION_OIDC_JWK_SET_URI:http://localhost:8081/realms/bookrush/protocol/openid-connect/certs}
+    jwk-set-uri: ${INGESTION_OIDC_JWK_SET_URI:http://localhost:8081/realms/bookrush-platform/protocol/openid-connect/certs}
     local-fixture-mode: ${INGESTION_SECURITY_LOCAL_FIXTURE_MODE:false}
     local-fixture-token: ${INGESTION_SECURITY_LOCAL_FIXTURE_TOKEN:}
   catalog:
@@ -76,3 +86,12 @@ ingestion:
     service-token: ${CANONICAL_SERVICE_TOKEN:}
     asset-token: ${INGESTION_ASSET_TOKEN:}
     request-timeout: ${CATALOG_SERVICE_REQUEST_TIMEOUT:30s}
+    oidc-enabled: ${INGESTION_OIDC_S2S_ENABLED:false}
+    legacy-static-enabled: ${INGESTION_LEGACY_STATIC_TOKENS_ENABLED:false}
+    oidc-token-uri: ${INGESTION_OIDC_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+    canonical-client-id: ${INGESTION_CANONICAL_CLIENT_ID:}
+    canonical-client-secret: ${INGESTION_CANONICAL_CLIENT_SECRET:}
+    canonical-scope: ${INGESTION_CANONICAL_SCOPE:bookrush.catalog.write}
+    asset-client-id: ${INGESTION_ASSET_CLIENT_ID:}
+    asset-client-secret: ${INGESTION_ASSET_CLIENT_SECRET:}
+    asset-scope: ${INGESTION_ASSET_SCOPE:bookrush.assets.write}

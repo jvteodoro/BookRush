@@ -11,6 +11,14 @@ springdoc:
 bookrush:
   openapi:
     server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}
+  observability:
+    correlation:
+      enabled: ${BOOKRUSH_CORRELATION_ENABLED:true}
+  security:
+    enabled: ${CATALOG_OIDC_ENABLED:false}
+    issuer: ${CATALOG_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+    jwk-set-uri: ${CATALOG_OIDC_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
+    audience: ${CATALOG_OIDC_AUDIENCE:bookrush-catalog-admin}
 spring:
   servlet:
     multipart:
@@ -68,3 +76,10 @@ storage:
 canonical:
   service:
     token: ${CANONICAL_SERVICE_TOKEN:}
+catalog:
+  security:
+    oidc:
+      enabled: ${CATALOG_OIDC_ENABLED:false}
+      issuer: ${CATALOG_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      audience: ${CATALOG_OIDC_AUDIENCE:bookrush-catalog-admin}
+      legacy-static-enabled: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:false}

@@ -38,6 +38,22 @@ permissões e dos serviços de domínio.
 | AUTH_SESSION_SECRET | criptografia de sessão | OIDC | valor aleatório longo |
 | CHROME_BIN | Chromium para render Mermaid | docs | /usr/bin/chromium na imagem |
 
+Para ativar OIDC no Compose, defina `BACKSTAGE_OIDC_ENABLED=true` e preencha
+as quatro variáveis `AUTH_*` acima. O script de entrada falha antes de iniciar
+o backend se faltar secret ou session secret. Aplique o client/mappers antes de
+recriar o portal:
+
+```bash
+bash infrastructure/keycloak/reconcile.sh --env-file .env
+docker compose --project-name bookrush-portal \
+  --file backstage/compose.yaml --env-file .env up -d --build --wait \
+  backstage-postgres backstage
+```
+
+Para desenvolvimento local, mantenha `BACKSTAGE_OIDC_ENABLED=false`; guest
+continua disponível apenas no processo local. O domínio público deve usar
+HTTPS e o callback configurado no client Keycloak.
+
 O catálogo readonly impede registro manual via API. Editar YAML no Git é o caminho
 de atualização. Scaffolder ainda cria tasks e PRs; o merge e registro são revisados.
 

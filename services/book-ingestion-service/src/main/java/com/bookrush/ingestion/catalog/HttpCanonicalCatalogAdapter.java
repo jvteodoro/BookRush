@@ -12,9 +12,11 @@ import org.springframework.web.client.RestClientResponseException;
 public final class HttpCanonicalCatalogAdapter implements CanonicalCatalogPort {
   private final RestClient client;
   private final CanonicalCatalogProperties properties;
+  private final OidcServiceTokenProvider tokens;
 
-  public HttpCanonicalCatalogAdapter(RestClient.Builder builder, CanonicalCatalogProperties properties) {
+  public HttpCanonicalCatalogAdapter(RestClient.Builder builder, CanonicalCatalogProperties properties, OidcServiceTokenProvider tokens) {
     this.properties = properties;
+    this.tokens = tokens;
     this.client = builder.baseUrl(properties.baseUrl().toString()).build();
   }
 
@@ -22,7 +24,7 @@ public final class HttpCanonicalCatalogAdapter implements CanonicalCatalogPort {
   public Map<String, Object> apply(CanonicalCatalogCommand command) {
     try {
       return client.post().uri("/api/internal/v1/catalog/commands")
-          .header(HttpHeaders.AUTHORIZATION, "Bearer " + properties.serviceToken())
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.token(OidcServiceTokenProvider.Kind.CANONICAL))
           .body(command).retrieve().body(Map.class);
     } catch (RestClientResponseException e) {
       if (e.getStatusCode().value() == 409) throw new CanonicalConflict(e.getResponseBodyAsString());

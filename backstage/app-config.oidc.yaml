@@ -3,11 +3,19 @@ auth:
   session:
     secret: ${AUTH_SESSION_SECRET}
   providers:
+    guest: null
     oidc:
       production:
         metadataUrl: ${AUTH_OIDC_METADATA_URL}
         clientId: ${AUTH_OIDC_CLIENT_ID}
         clientSecret: ${AUTH_OIDC_CLIENT_SECRET}
+        # Backstage's OIDC module defaults to prompt=none. `auto` allows the
+        # popup to show the Keycloak login form when no SSO session exists.
+        prompt: auto
+        additionalScopes:
+          - profile
+          - email
         signIn:
           resolvers:
             - resolver: emailMatchingUserEntityProfileEmail
+              dangerouslyAllowSignInWithoutUserInCatalog: true
