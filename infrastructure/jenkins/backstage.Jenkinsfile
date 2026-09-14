@@ -38,7 +38,10 @@ pipeline {
     }
 
     stage('Validar catálogo e TechDocs') {
-      steps { sh 'bash scripts/test-portal.sh' }
+      steps {
+        sh 'bash scripts/validate-change.sh --ci'
+        sh 'bash scripts/test-portal.sh'
+      }
     }
 
     stage('Preparar imagem') {

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+repo_dir="$(git rev-parse --show-toplevel)"
+exec "$repo_dir/scripts/validate-change.sh" --push

@@ -133,6 +133,15 @@ Veja [instalação e uso do Jenkins](infrastructure/jenkins/README.md).
 
 O fluxo de desenvolvimento dos agentes está em [AGENTS.md](AGENTS.md).
 Use Beads (`bd`) para tarefas e dependências; veja [configuração e uso](docs/beads.md).
+Após clonar, instale os hooks que exigem documentação e validam os contratos
+Jenkins antes de commits e pushes:
+
+```bash
+bash scripts/install-hooks.sh
+```
+
+O gate autoritativo também roda no Jenkins; consulte a
+[política de documentação](docs/documentation-policy.md).
 
 ## Schema PostgreSQL
 

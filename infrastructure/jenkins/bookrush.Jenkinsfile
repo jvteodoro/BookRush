@@ -42,6 +42,7 @@ pipeline {
 
     stage('Developer Portal e documentação') {
       steps {
+        sh 'bash scripts/validate-change.sh --ci'
         sh 'bash scripts/test-portal.sh'
       }
     }

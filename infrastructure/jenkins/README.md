@@ -44,6 +44,11 @@ O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
 
+Antes dos builds, as pipelines executam `scripts/validate-change.sh --ci`.
+Esse gate exige documentação ou contrato para mudanças de código, infraestrutura
+e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
+executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
+
 ### Pipeline dedicada do Backstage
 
 `backstage.Jenkinsfile` valida e empacota somente o Developer Portal. Cadastre
