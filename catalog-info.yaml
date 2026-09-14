@@ -20,6 +20,7 @@ spec:
   - ./backstage/catalog/systems/recommendation.yaml
   - ./services/catalog-service/catalog-info.yaml
   - ./services/book-ingestion-service/catalog-info.yaml
+  - ./services/book-analytics-service/catalog-info.yaml
   - ./frontend/catalog-info.yaml
   - ./backstage/catalog-info.yaml
   - ./backstage/templates/java-spring-service/template.yaml

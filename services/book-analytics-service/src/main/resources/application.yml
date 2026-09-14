@@ -1,0 +1,38 @@
+server:
+  port: ${SERVER_PORT:8091}
+  forward-headers-strategy: framework
+spring:
+  application:
+    name: book-analytics-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/${DB_NAME:bookrush}
+    username: ${DB_USERNAME:bookrush}
+    password: ${DB_PASSWORD:bookrush}
+    hikari:
+      connection-timeout: 3000
+  flyway:
+    enabled: true
+    default-schema: analytics
+    schemas: analytics
+    baseline-on-migrate: false
+    clean-disabled: true
+management:
+  endpoints.web.exposure.include: health,info,metrics
+  endpoint.health.probes.enabled: true
+springdoc:
+  swagger-ui.disable-swagger-default-url: true
+  swagger-ui.path: /swagger-ui.html
+bookrush:
+  openapi.server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}/analytics
+  security.enabled: ${ANALYTICS_SECURITY_ENABLED:false}
+analytics:
+  worker:
+    enabled: ${ANALYTICS_WORKER_ENABLED:false}
+    poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://seaweedfs:8333}
+    region: ${STORAGE_REGION:us-east-1}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    path-style: ${STORAGE_PATH_STYLE:true}
+    timeout-seconds: ${ANALYTICS_STORAGE_TIMEOUT_SECONDS:30}

@@ -207,6 +207,38 @@ services:
       - "127.0.0.1:${BOOKRUSH_INGESTION_PORT:-18090}:8090"
     networks: [bookrush]
 
+  book-analytics-service:
+    image: ${ANALYTICS_IMAGE:-bookrush/book-analytics-service:local}
+    build:
+      context: ../services/book-analytics-service
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      SERVER_PORT: 8091
+      BOOKRUSH_PUBLIC_URL: ${BOOKRUSH_PUBLIC_URL:-https://bookrush.jteodoro.tec.br}
+      ANALYTICS_WORKER_ENABLED: ${ANALYTICS_WORKER_ENABLED:-true}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      STORAGE_PATH_STYLE: ${STORAGE_PATH_STYLE:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    ports:
+      - "127.0.0.1:${BOOKRUSH_ANALYTICS_PORT:-18091}:8091"
+    networks: [bookrush]
+
   frontend:
     image: ${FRONTEND_IMAGE:-bookrush/frontend:local}
     build:

@@ -1,58 +1,47 @@
-# Matriz de lacunas — conclusão da importação Gutenberg
+# Matriz de lacunas — estado real da ingestão e próximos incrementos
 
-Esta matriz confronta o `PROMPT_CONCLUSAO_INGESTAO_GUTENBERG_BOOKRUSH.md` com o
-código existente. Interfaces, migrations e ADRs são tratados como contexto;
-um item só será considerado concluído quando houver efeito observável no
-PostgreSQL, no SeaweedFS e nos endpoints reais.
+Esta matriz confronta o código executável, as migrations, os testes e o
+relatório de validação. Um item só é concluído quando há efeito observável no
+PostgreSQL, no SeaweedFS e nos endpoints reais. O vertical Gutenberg já foi
+validado; os itens abaixo descrevem o que foi comprovado e o que continua como
+evolução futura.
 
-## Estado encontrado
+| Requisito | Evidência atual | Limitação verdadeira | Próximo passo |
+|---|---|---|---|
+| Disparar importação | `IngestionAdminController`, `IngestionJobService` e dispatcher persistem jobs e itens | Novas fontes ainda não usam todo o fluxo | Evoluir por fonte |
+| Fila e leases | V7/V9, `LeaseCoordinator`, fencing e tentativas persistentes | Cancelamento e métricas de throughput podem evoluir | Instrumentar analytics |
+| Aquisição Gutenberg | Parser RDF, downloader, RAW privado e fixture | Prova online depende de rede | Manter prova controlada |
+| Catálogo canônico | Adapter HTTP, comando idempotente, obra/edição/créditos/ID, subjects e provenance por campo | Aplicação de candidatos Wikidata ao catálogo ainda é uma etapa explícita de revisão | Consumir candidatos aprovados |
+| Asset SOURCE | Reserva, upload S3, confirmação, hash e `books-source` | Reconciliação de órfãos é operacional | Integrar fontes adicionais |
+| Processamento | TXT normalizado, `chapters.json`, `book_chapter`, excerpts/features/ranking offline e linhagem | Worker persistente ainda precisa conectar todos os analyzers a jobs de produção | Integrar worker |
+| Recuperação | Retry persistente, resume, reconciliation e cleanup | Retenção configurável pode evoluir | Medir e documentar |
+| Segurança | OIDC condicional, papéis administrativos e token canônico | Provisionamento é responsabilidade do ambiente | Reutilizar contratos no analytics |
+| Gateway | Traefik e Nginx públicos configurados | Rotas futuras precisam ser registradas | Atualizar catálogo Backstage |
+| Jenkins | Validação de documentação e deploy | Importação automática é opt-in | Adicionar jobs analytics explícitos |
+| Prova | Fixture bibliográfica e analytics offline, lote parcial, dry-run, restart, Gutenberg 1342 e benchmark sintético | Benchmark é baseline de harness, não SLA; storage remoto depende de ambiente | Repetir com volume operacional |
 
-| Requisito | Evidência no repositório | Lacuna atual | Alteração planejada | Evidência de conclusão |
-|---|---|---|---|---|
-| Disparar uma importação | `BootstrapPipeline` usa `AtomicReference`; `IngestionAdminController` chama apenas `start()` | Não existe job persistente, seleção, `202`, idempotência ou dispatcher | Evoluir API para criar `ingestion_job`, itens lógicos e tarefas | POST retorna `jobId`; consulta sobrevive restart |
-| Fila e leases | V7 possui `ingestion_task`, tentativas, `fence_token`; `LeaseCoordinator` faz claim/heartbeat/complete | Nenhum worker executa a fila e não há validação canônica do fence | Conectar dispatcher e confirmação protegida pela mesma autoridade | Corrida com lease expirada é rejeitada |
-| Aquisição Gutenberg | `GutenbergRdfParser` e `SnapshotDownloader` existem; fixtures RDF existem | Nenhum job baixa RDF, cria snapshot, registra `source_record` ou seleciona itens | Implementar aquisição limitada e rastreável | Snapshot hashado em `books-raw` e itens com resultado |
-| Catálogo canônico | `CanonicalCatalogPort`, adapter HTTP e endpoint interno existem | Comando não demonstra edição, créditos, identificador Gutenberg e resposta recuperável completos | Evoluir comando transacional e idempotente | Retorno contém obra, edição, contribuintes e operação |
-| Asset SOURCE | `S3RawObjectStore`, `ObjectStorage`, `storage_intent` V9 e `AssetService` existem | Não há encadeamento descoberta → reserva → PUT → GET → confirmação | Implementar job de asset com `books-source` e versões SOURCE | Hash local e hash por GET coincidem |
-| Processamento | Normalizador, extratores, `ChapterStructureWriter` e V11 existem | `AssetNormalizeJob` só normaliza uma string; não cria assets, linhagem nem capítulos no fluxo | Conectar TXT, JSON, `processing_input/output` e `book_chapter` | Derivados versionados ligados à entrada exata |
-| Recuperação | Políticas de retry, reconciliação e cleanup existem | São serviços isolados; não há retomada de jobs nem reconciliação automática de intents | Integrar dispatcher, retries persistidos e resume | Falhas pós-PUT e respostas perdidas recuperam sem duplicação |
-| Segurança | OIDC condicional da ingestão e token canônico existem | Perfil de produção precisa de provisionamento e testes de operador; modo sem OIDC nega admin | Definir papéis e harness seguro | Token/papel correto funciona; inválidos falham |
-| Gateway | Traefik file provider em `infrastructure/traefik/dynamic.yaml` | Rotas existem, mas prefixos administrativos precisam ser validados junto da API final | Testar rota externa e atualizar runbook | API, Swagger e health respondem pelo domínio correto |
-| Jenkins | Pipeline de deploy existe | Não há estágio opt-in de importação, polling ou relatório | Adicionar execução Gutenberg limitada e auditável | Build não importa por padrão; execução explícita arquiva relatório |
-| Prova | Fixtures e testes unitários/integração parciais existem | Não há harness end-to-end acionado pela API nem prova 1342 | Criar harness offline e depois prova online | IDs, hashes, contagens e segunda execução registrados |
+## Estado comprovado do vertical Gutenberg
 
-## Contratos que orientam a implementação
+O relatório [`validation-report.md`](validation-report.md) registra job
+persistente, replay idempotente, criação de obra/edição, asset SOURCE, texto
+normalizado, `chapters.json`, projeção de capítulos, lineage, recuperação,
+dry-run, lote parcial e verificação de hashes no S3/SeaweedFS. Portanto, esses
+itens não devem ser reimplementados por causa de uma matriz antiga.
 
-O request de importação terá fonte, IDs externos, idiomas, limite, `dryRun` e
-`processAssets`. A URL, SQL, path local ou bucket não serão aceitos no corpo.
-`Idempotency-Key` identifica a submissão; mesma chave com corpo diferente é
-conflito.
+## Contratos preservados
 
-O fluxo usará os buckets assim:
+O catálogo continua dono do schema `catalog`; migrations V1–V13 são imutáveis.
+O fluxo usa `books-raw`, `books-source` e `books-processing`, mantém I/O fora
+de transações abertas e referencia sempre a versão física exata do conteúdo.
+Analytics será aditivo e terá ownership próprio.
 
-```text
-books-raw        RDF, snapshots e manifests antes da canonização
-books-source     EPUB/HTML/TXT original associado à edição
-books-processing normalized.txt, chapters.json e derivados privados
-```
+## Estado analytics da fase atual
 
-O `catalog-service` continua dono das entidades bibliográficas e da decisão de
-disponibilidade. O serviço de ingestão coordena aquisição, tarefas e chamadas
-autenticadas. Nenhuma migration já aplicada será editada; evoluções de schema
-serão aditivas.
-
-Uma execução real só será terminal quando seus efeitos forem verificáveis:
-metadados canônicos no PostgreSQL, bytes lidos do S3, hashes confirmados,
-derivados ligados por linhagem e contadores por item lógico separados das
-tentativas físicas.
-
-## Ordem de execução
-
-1. Persistir job, seleção, idempotência e dispatcher.
-2. Conectar aquisição Gutenberg e comando canônico.
-3. Implementar reserva/upload/confirmação de SOURCE.
-4. Conectar normalização, capítulos e linhagem.
-5. Integrar recuperação, segurança, gateway e Jenkins.
-6. Provar o fluxo em fixture offline e, somente depois, no ID Gutenberg 1342.
-
-As migrations V1–V12 existentes foram apenas inspecionadas nesta etapa.
+`book-analytics-service` já possui migrations próprias até V5, worker persistente
+determinístico (ativado por `ANALYTICS_WORKER_ENABLED`), geração de
+candidates/features/ranking determinísticos, providers local/LLM desabilitados
+com segurança, APIs administrativas idempotentes, leitura interna paginada,
+métricas e scripts offline (`scripts/test-analytics-e2e.sh` e
+`scripts/benchmark-analytics.sh`). Embeddings, emoção e LLM continuam providers
+opcionais, desligados por padrão, e só devem ser habilitados após registrar
+artefato, versão e checksum.

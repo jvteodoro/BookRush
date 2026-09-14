@@ -51,3 +51,10 @@ status: não existem consultas de produto que os justifiquem. EXPLAIN das oito
 consultas documentadas é executado no teste; uma fixture pequena não demonstra
 ganho de performance real. Medir uma carga representativa antes de acrescentar
 índices ou afirmar latência.
+
+### Subjects (V14)
+
+`subject_parent_idx` atende navegação hierárquica; `book_subject_subject_idx`
+filtra obras por termo; `book_subject_source_idx` atende auditoria por fonte.
+A unicidade `(scheme, normalized_name)` é uma constraint de identidade e não
+apenas um índice de consulta.

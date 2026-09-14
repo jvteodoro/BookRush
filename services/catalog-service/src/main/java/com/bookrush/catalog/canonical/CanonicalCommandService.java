@@ -39,6 +39,10 @@ public class CanonicalCommandService {
     var existing = jdbc.query("SELECT COALESCE(i.book_id, e.book_id) AS book_id, i.edition_id FROM catalog.external_identifier i LEFT JOIN catalog.edition e ON e.id=i.edition_id WHERE i.source_id=? AND i.identifier_type=? AND i.identifier_value=?", (rs, row) -> new Target(rs.getObject("book_id", UUID.class), rs.getObject("edition_id", UUID.class)), sourceId, identifierType, identifierValue).stream().findFirst().orElse(null);
     UUID bookId = existing == null ? null : existing.bookId();
     UUID editionId = existing == null ? null : existing.editionId();
+    String previousTitle = existing == null ? null : jdbc.queryForObject(
+        "SELECT canonical_title FROM catalog.book WHERE id=?", String.class, bookId);
+    String previousDescription = existing == null ? null : jdbc.queryForObject(
+        "SELECT description FROM catalog.book WHERE id=?", String.class, bookId);
     String result;
     if (bookId == null) {
       bookId = UUID.randomUUID(); editionId = UUID.randomUUID();
@@ -70,15 +74,28 @@ public class CanonicalCommandService {
       }
       authorIds.add(authorId);
     }
-    recordProvenance(sourceId, bookId, "canonical_title", command.title());
+    var rule = command.sourceCode().toUpperCase(Locale.ROOT) + "_CANONICAL";
+    recordProvenance(sourceId, bookId, "canonical_title", command.title(), previousTitle, rule, command.metadata());
+    if (command.description() != null && !command.description().isBlank()
+        && !java.util.Objects.equals(previousDescription, command.description())) {
+      recordProvenance(sourceId, bookId, "description", command.description(), previousDescription, rule, command.metadata());
+    }
     var body = new LinkedHashMap<String, Object>();
     body.put("result", result); body.put("bookId", bookId); body.put("editionId", editionId); body.put("authorIds", authorIds); body.put("operationKey", command.operationKey()); body.put("fenceToken", command.fenceToken());
     jdbc.update("INSERT INTO catalog.ingestion_command_result(id, principal, endpoint, idempotency_key, request_hash, response_status, response_body) VALUES (?, ?, ?, ?, ?, 200, ?::jsonb)", UUID.randomUUID(), PRINCIPAL, ENDPOINT, command.operationKey(), command.requestHash(), mapper.valueToTree(body).toString());
     return body;
   }
 
-  private void recordProvenance(UUID sourceId, UUID entityId, String field, String value) {
-    jdbc.update("INSERT INTO catalog.field_provenance(id, entity_type, entity_id, field_name, value, source_id, rule_code, actor) VALUES (?, 'BOOK', ?, ?, ?::jsonb, ?, ?, ?)", UUID.randomUUID(), entityId, field, mapper.valueToTree(value).toString(), sourceId, "GUTENBERG_CANONICAL", PRINCIPAL);
+  private void recordProvenance(UUID sourceId, UUID entityId, String field, String value,
+      String previousValue, String rule, com.fasterxml.jackson.databind.JsonNode metadata) {
+    UUID sourceRecordId = null;
+    if (metadata != null && metadata.hasNonNull("sourceRecordId")) {
+      try { sourceRecordId = UUID.fromString(metadata.path("sourceRecordId").asText()); }
+      catch (IllegalArgumentException ignored) { /* invalid optional provenance reference is ignored */ }
+    }
+    jdbc.update("INSERT INTO catalog.field_provenance(id, entity_type, entity_id, field_name, value, source_id, source_record_id, rule_code, previous_value, actor) VALUES (?, 'BOOK', ?, ?, ?::jsonb, ?, ?, ?, ?::jsonb, ?)",
+        UUID.randomUUID(), entityId, field, mapper.valueToTree(value).toString(), sourceId, sourceRecordId,
+        rule, mapper.valueToTree(previousValue).toString(), PRINCIPAL);
   }
   private String normalizeLanguage(String value) { return value == null || value.isBlank() ? null : value.trim().toLowerCase(Locale.ROOT); }
   private String normalizeName(String value) { return value.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT); }

@@ -47,6 +47,18 @@ paths:
                   type: object
       security:
       - catalogService: []
+  /api/internal/v1/catalog/processings/text-versions/{versionId}:
+    get:
+      tags: [Processamento interno]
+      summary: Consultar versão textual e capítulos
+      parameters:
+        - name: versionId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Metadados da versão e capítulos históricos}
+        '404': {description: Versão inexistente}
   /api/internal/v1/catalog/processings/chapters:
     post:
       tags:
@@ -95,6 +107,31 @@ paths:
                 type: object
                 additionalProperties:
                   type: object
+      security:
+      - catalogService: []
+  /api/internal/v1/catalog/subjects:
+    post:
+      tags:
+      - Catálogo interno
+      summary: Atribuir subject bibliográfico
+      description: Cria ou reutiliza um subject por scheme e nome normalizado e atribui-o à obra com fonte e proveniência. Repetições da mesma atribuição são NOOP.
+      operationId: assignSubject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubjectCommand'
+      responses:
+        '200':
+          description: Subject atribuído ou atribuição já existente
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '409':
+          description: Fonte, obra ou proveniência incompatível
       security:
       - catalogService: []
   /api/admin/books/{bookId}/assets:
@@ -536,6 +573,33 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Chapter'
+    SubjectCommand:
+      type: object
+      required:
+      - bookId
+      - scheme
+      - term
+      - sourceCode
+      properties:
+        bookId:
+          type: string
+          format: uuid
+        scheme:
+          type: string
+          description: Vocabulário de origem, por exemplo GUTENBERG ou OPEN_LIBRARY.
+        term:
+          type: string
+          description: Termo bruto preservado para auditoria e exibição.
+        sourceCode:
+          type: string
+        sourceRecordId:
+          type: string
+          format: uuid
+        confidence:
+          type: number
+          format: double
+        assignmentMethod:
+          type: string
     CanonicalCommand:
       required:
       - identifierType

@@ -5,7 +5,7 @@
 14 tabelas: book, edition, author, book_author, edition_author, source, license,
 external_identifier, book_asset, book_asset_version, source_record, ingestion_job,
 ingestion_item, asset_processing. O [ER completo](schema.md) corresponde a essas
-tabelas. Não foram criadas tabelas de capítulos, trechos ou analytics.
+tabelas. Capítulos foram adicionados pelo catálogo em V11/V13. Trechos e observações de analytics agora pertencem ao schema separado `analytics`, criado pelo `book-analytics-service`; não são tabelas do catálogo.
 
 Migrations em services/catalog-service/src/main/resources/db/migration:
 V1__initialize_catalog, V2__bibliographic_catalog, V3__sources_licenses_identifiers,
@@ -95,3 +95,8 @@ Rollback de aplicação não desfaz migration. Rebuild foi validado em banco
 descartável; não há down migration destrutiva. Restore de banco real e backup
 coordenado S3 pertencem à operação de storage. Não houve commit, push, sync
 remoto dos beads ou deploy desta implementação.
+
+
+## Analytics de conteúdo
+
+A fundação inicial está em `services/book-analytics-service`, com Flyway próprio e migration `analytics.V1__analytics_foundation.sql`. Ela registra analyzers, runs, definições e observações tipadas, excerpts com offsets Unicode e hashes, e metadados de embeddings apontando para object storage. Nenhum blob integral ou vetor arbitrário é gravado no catálogo.

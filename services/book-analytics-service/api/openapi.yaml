@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: BookRush Analytics API
+  version: 1.0.0
+  description: APIs internas para consultar analytics versionado de conteúdo.
+servers:
+  - url: https://bookrush.jteodoro.tec.br/analytics
+paths:
+  /api/internal/v1/analytics/books/{bookId}/summary:
+    get:
+      summary: Resumo de analytics
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: Resumo por versão textual }
+  /api/internal/v1/analytics/books/{bookId}/excerpts:
+    get:
+      summary: Listar excerpts do livro
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200': { description: Excerpts paginados ligados à versão exata }
+  /api/admin/v1/analytics/jobs:
+    post:
+      summary: Criar job idempotente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [operationKey, inputAssetVersionIds]
+              properties:
+                operationKey: {type: string}
+                inputAssetVersionIds: {type: array, items: {type: string, format: uuid}}
+      responses:
+        '202': {description: Job criado ou recuperado}
+  /api/admin/v1/analytics/jobs/{jobId}:
+    get:
+      summary: Consultar job
+      parameters:
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses: {'200': {description: Estado persistido}}
+  /api/admin/v1/analytics/jobs/{jobId}/items:
+    get:
+      summary: Listar itens e falhas do job
+      parameters:
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Itens persistidos do job}
+        '404': {description: Job inexistente}
+  /api/admin/v1/analytics/jobs/{jobId}/cancel:
+    post:
+      summary: Solicitar cancelamento cooperativo
+      parameters:
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '202': {description: Cancelamento solicitado}
+  /api/admin/v1/analytics/jobs/{jobId}/resume:
+    post:
+      summary: Retomar job interrompido
+      parameters:
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '202': {description: Job recolocado na fila}
+        '404': {description: Job inexistente ou não retomável}

@@ -322,3 +322,15 @@ ADMIN_UPLOAD, INTERNAL_PIPELINE; source_type DIGITAL_LIBRARY, EXTERNAL_CATALOG,
 ADMIN_UPLOAD, INTERNAL_PIPELINE. Licenças PUBLIC_DOMAIN, CC0, CC_BY, CC_BY_SA,
 CC_BY_NC, UNKNOWN, todas com permissões inicialmente NULL. Registro literário
 Gutenberg 1342 existe somente na fixture de teste.
+
+## subject e book_subject (V14)
+
+`subject` é um termo bibliográfico normalizado dentro de um `scheme`, não uma
+ontologia universal nem necessariamente um gênero. `parent_id` permite uma
+hierarquia opcional. A chave `(scheme, normalized_name)` impede duplicação
+trivial entre fontes, enquanto `canonical_name` preserva a forma exibida.
+
+`book_subject` associa o termo à obra com fonte, revisão opcional, confiança e
+método. O termo original da fonte permanece no `source_record`/staging; a
+associação canônica não substitui a proveniência. Os valores desconhecidos ou
+não classificados não são convertidos em zero ou em um subject genérico.

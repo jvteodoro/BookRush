@@ -3,6 +3,7 @@ package com.bookrush.ingestion.jobs;
 import com.bookrush.ingestion.catalog.CanonicalCatalogPort;
 import com.bookrush.ingestion.catalog.CatalogAssetClient;
 import com.bookrush.ingestion.catalog.ProcessingLineageClient;
+import com.bookrush.ingestion.catalog.SubjectCatalogClient;
 import com.bookrush.ingestion.source.GutenbergRdfParser;
 import com.bookrush.ingestion.source.GutenbergProperties;
 import com.bookrush.ingestion.source.SnapshotDownloader;
@@ -31,12 +32,13 @@ public class GutenbergImportService {
   private final CatalogAssetClient assets;
   private final TextProcessingService processing;
   private final ProcessingLineageClient lineage;
+  private final SubjectCatalogClient subjects;
   private final GutenbergProperties gutenberg;
   private final Path staging = Path.of(System.getProperty("java.io.tmpdir"), "bookrush-ingestion");
   private final GutenbergRdfParser parser = new GutenbergRdfParser();
 
-  public GutenbergImportService(JdbcTemplate jdbc, SnapshotDownloader downloader, RawObjectStore raw, CanonicalCatalogPort catalog, ObjectMapper mapper, CatalogAssetClient assets, TextProcessingService processing, ProcessingLineageClient lineage, GutenbergProperties gutenberg) {
-    this.jdbc = jdbc; this.downloader = downloader; this.raw = raw; this.catalog = catalog; this.mapper = mapper; this.assets = assets; this.processing = processing; this.lineage = lineage; this.gutenberg = gutenberg;
+  public GutenbergImportService(JdbcTemplate jdbc, SnapshotDownloader downloader, RawObjectStore raw, CanonicalCatalogPort catalog, ObjectMapper mapper, CatalogAssetClient assets, TextProcessingService processing, ProcessingLineageClient lineage, SubjectCatalogClient subjects, GutenbergProperties gutenberg) {
+    this.jdbc = jdbc; this.downloader = downloader; this.raw = raw; this.catalog = catalog; this.mapper = mapper; this.assets = assets; this.processing = processing; this.lineage = lineage; this.subjects = subjects; this.gutenberg = gutenberg;
   }
 
   public void process(LeaseCoordinator.Lease lease) throws Exception {
@@ -58,8 +60,12 @@ public class GutenbergImportService {
     var sourceRecordId = UUID.randomUUID();
     var metadata = mapper.createObjectNode().put("title", record.title()).put("language", record.language()).put("creator", record.creator()).put("rights", record.rights()).put("rdfUrl", rdfUri.toString());
     jdbc.update("INSERT INTO catalog.source_record(id, source_id, external_id, raw_metadata, retrieved_at, content_hash, raw_sha256, semantic_sha256, raw_locator, small_metadata) VALUES (?, ?, ?, ?::jsonb, clock_timestamp(), ?, ?, ?, ?::jsonb, ?::jsonb) ON CONFLICT DO NOTHING", sourceRecordId, sourceId, id, metadata.toString(), snapshot.sha256(), snapshot.sha256(), requestHash, mapper.createObjectNode().put("bucket", snapshot.objectKey()).toString(), "{}");
+    sourceRecordId = jdbc.queryForObject("SELECT id FROM catalog.source_record WHERE source_id=? AND external_id=? ORDER BY created_at DESC LIMIT 1", UUID.class, sourceId, id);
     var bookId = UUID.fromString(String.valueOf(result.get("bookId")));
     var editionId = UUID.fromString(String.valueOf(result.get("editionId")));
+    for (var subject : record.subjects()) {
+      subjects.assign(bookId, "GUTENBERG", subject, "GUTENBERG", sourceRecordId, null, "SOURCE_METADATA");
+    }
     boolean processAssets = mapper.readTree(String.valueOf(task.get("parameters"))).path("processAssets").asBoolean(false);
     if (processAssets && record.epubUrl() != null && !record.epubUrl().isBlank()) {
       var epub = staging.resolve("gutenberg-" + id + ".epub");

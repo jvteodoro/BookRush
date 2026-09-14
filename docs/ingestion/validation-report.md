@@ -43,3 +43,32 @@
 O teste controlado alterou deliberadamente o banco persistente de desenvolvimento
 no servidor para registrar Gutenberg 1342. Nenhum segredo foi versionado; os
 tokens internos usados pelos containers permanecem somente no `.env` local.
+
+## Baseline da fase analytics — 2026-09-13
+
+Antes das alterações desta fase foram executados os harnesses existentes:
+
+- `bash scripts/test-database.sh`: passou em PostgreSQL descartável; Flyway
+  aplicou V1–V13 do zero, os testes de schema/JPA e upgrade executaram sem
+  falhas (40 testes de integração, 6 testes explicitamente ignorados).
+- `bash scripts/test-portal.sh`: validação de entidades/relações, contratos,
+  template, TechDocs, TypeScript, lint e teste do app passaram; a imagem local
+  também foi construída.
+- `bash scripts/test-storage.sh`: os testes de catálogo/storage passaram, mas a
+  etapa posterior de prova de persistência do SeaweedFS terminou com `curl: 56
+  Recv failure: Connection reset by peer`. Isso é uma falha do harness de
+  persistência a investigar; não é declarado como validação concluída.
+
+Nenhuma migration existente foi modificada durante o baseline. Os comandos e
+as limitações ficam registrados para que a fase analytics possa ser repetida
+sem confundir uma falha operacional com uma regressão funcional.
+
+## Bibliographic enrichment E2E (offline)
+
+O comando `scripts/test-bibliographic-e2e.sh` compõe as fixtures locais de
+ingestão e o harness PostgreSQL do catálogo. Em 2026-09-14 foi executado com
+sucesso: 26 testes do `book-ingestion-service`, 43 testes do catálogo, 0
+falhas, 6 skips e Flyway fresh/upgrade até V14. O conjunto comprova replay do
+staging Open Library, matching determinístico, subjects com `NOOP` na segunda
+atribuição, provenance canônica sem duplicação e snapshot Wikidata com
+checksum. Nenhuma fonte externa foi acessada.

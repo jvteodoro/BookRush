@@ -3,6 +3,7 @@ set -Eeuo pipefail
 : "${BACKEND_IMAGE:?Imagem backend ausente}"
 : "${FRONTEND_IMAGE:?Imagem frontend ausente}"
 : "${INGESTION_IMAGE:?Imagem ingestion ausente}"
+: "${ANALYTICS_IMAGE:?Imagem analytics ausente}"
 compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml --env-file /run/bookrush.env --profile auth)
 storage_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' bookrush-seaweedfs-1 2>/dev/null || true)"
 if [[ "$storage_health" != healthy ]]; then
@@ -12,9 +13,10 @@ fi
 old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1)"
 old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1)"
 old_ingestion="$(docker inspect --format '{{.Config.Image}}' bookrush-book-ingestion-service-1 2>/dev/null || true)"
+old_analytics="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analytics-service-1 2>/dev/null || true)"
 old_keycloak="$(docker inspect --format '{{.Config.Image}}' bookrush-keycloak-1 2>/dev/null || true)"
 diagnose() {
-  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-frontend-1; do
+  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-frontend-1; do
     echo "--- diagnóstico $service ---" >&2
     docker inspect --format 'state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} image={{.Config.Image}}' "$service" >&2 || true
     docker logs --tail=120 --timestamps "$service" >&2 || true
@@ -22,16 +24,16 @@ diagnose() {
 }
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
-  if [[ -n "$old_ingestion" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 keycloak reverse-proxy catalog-service frontend book-ingestion-service
+  if [[ -n "$old_ingestion" && -n "$old_analytics" ]]; then
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 keycloak reverse-proxy catalog-service frontend book-ingestion-service book-analytics-service
   else
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 keycloak reverse-proxy catalog-service frontend
   fi
 }
 
-deploy_services=(keycloak reverse-proxy catalog-service book-ingestion-service frontend)
+deploy_services=(keycloak reverse-proxy catalog-service book-ingestion-service book-analytics-service frontend)
 echo "Iniciando deploy das imagens:" >&2
-printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${FRONTEND_IMAGE}" >&2
+printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_IMAGE}" "${FRONTEND_IMAGE}" >&2
 
 # Não usar somente trap ERR: docker compose pode falhar durante --wait e o
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.

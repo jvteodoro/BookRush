@@ -12,3 +12,12 @@ Git é a fonte canônica. Backstage é o portal oficial de descoberta e consulta
 
 O catálogo do portal registra separadamente os serviços e suas APIs; este handbook
 preserva a documentação transversal já existente, sem copiar seu conteúdo.
+
+## Analytics de conteúdo
+
+A fundação do `book-analytics-service` usa o schema `analytics` e referencia a
+versão textual exata do catálogo. Ela inclui jobs persistentes/idempotentes,
+excerpts paginados, features determinísticas, ranker explicável, embeddings e
+LLM desabilitados por padrão, métricas e benchmark offline. Consulte a página
+do serviço no catálogo Backstage; a propriedade e os limites estão em
+[ADR-004](adr/ADR-004-analytics-ownership.md).

@@ -42,6 +42,29 @@ public class ProcessingController {
     return Map.of("id", id, "status", "SUCCEEDED");
   }
 
+  @GetMapping("/text-versions/{versionId}")
+  @Operation(summary = "Consultar versão textual", description = "Retorna hash, objeto físico e capítulos históricos da versão exata; somente leitura para workers de analytics.")
+  public Map<String,Object> textVersion(@PathVariable UUID versionId) {
+    var version = jdbc.queryForMap("""
+        SELECT v.id, v.book_asset_id AS asset_id, v.bucket, v.object_key,
+               v.content_type, v.size_bytes, v.sha256, v.status,
+               a.book_id, a.edition_id, a.asset_type, a.asset_role
+          FROM catalog.book_asset_version v
+          JOIN catalog.book_asset a ON a.id = v.book_asset_id
+         WHERE v.id = ?
+        """, versionId);
+    var chapters = jdbc.queryForList("""
+        SELECT id, chapter_key, parent_chapter_id, position, title,
+               start_offset, end_offset, confidence
+          FROM catalog.book_chapter
+         WHERE text_asset_version_id = ? ORDER BY position, start_offset
+        """, versionId);
+    var result = new LinkedHashMap<String,Object>();
+    result.put("version", version);
+    result.put("chapters", chapters);
+    return result;
+  }
+
   @PostMapping("/chapters")
   @Transactional
   @Operation(summary = "Projetar capítulos", description = "Materializa chapters.json no PostgreSQL de forma idempotente para a versão de texto informada.")

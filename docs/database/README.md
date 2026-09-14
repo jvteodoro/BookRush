@@ -69,3 +69,10 @@ usa ../../docs/database/queries.sql. A fixture está em src/test/resources e
 é revertida após cada teste; nunca é migration de produção.
 
 - [Relatório de entrega do épico](report.md)
+
+## Analytics
+
+O schema `analytics` é de propriedade do `book-analytics-service` e não é
+migrado pelo catalog-service. Sua migration inicial referencia por FK a versão
+exata em `catalog.book_asset_version`; consulte o [ADR-004](../adr/ADR-004-analytics-ownership.md)
+e a documentação do serviço para o modelo de excerpts/features/embeddings.

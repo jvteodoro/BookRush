@@ -37,6 +37,15 @@ http:
         - ingestion-strip
       service: ingestion
 
+    analytics:
+      rule: PathPrefix(`/analytics`)
+      entryPoints:
+        - web
+      priority: 100
+      middlewares:
+        - analytics-strip
+      service: analytics
+
     frontend:
       rule: PathPrefix(`/`)
       entryPoints:
@@ -49,6 +58,10 @@ http:
       stripPrefix:
         prefixes:
           - /ingestion
+    analytics-strip:
+      stripPrefix:
+        prefixes:
+          - /analytics
 
   services:
     catalog:
@@ -59,6 +72,10 @@ http:
       loadBalancer:
         servers:
           - url: http://book-ingestion-service:8090
+    analytics:
+      loadBalancer:
+        servers:
+          - url: http://book-analytics-service:8091
     frontend:
       loadBalancer:
         servers:

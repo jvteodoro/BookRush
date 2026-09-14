@@ -21,6 +21,9 @@ COPY services/catalog-service/api /repo/services/catalog-service/api
 COPY services/book-ingestion-service/catalog-info.yaml services/book-ingestion-service/mkdocs.yml /repo/services/book-ingestion-service/
 COPY services/book-ingestion-service/docs /repo/services/book-ingestion-service/docs
 COPY services/book-ingestion-service/api /repo/services/book-ingestion-service/api
+COPY services/book-analytics-service/catalog-info.yaml services/book-analytics-service/mkdocs.yml /repo/services/book-analytics-service/
+COPY services/book-analytics-service/docs /repo/services/book-analytics-service/docs
+COPY services/book-analytics-service/api /repo/services/book-analytics-service/api
 COPY frontend/catalog-info.yaml frontend/mkdocs.yml /repo/frontend/
 COPY frontend/docs /repo/frontend/docs
 FROM source AS validation

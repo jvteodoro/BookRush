@@ -11,3 +11,10 @@ evidência suficiente e nenhuma contradição. Score >= .80 vai para
 `REVIEW_REQUIRED`; o restante é `NO_MATCH`. ISBN e presença de catálogo não são
 prova de equivalência editorial. Decisões humanas persistem ator, motivo,
 evidências e versão esperada.
+
+`OpenLibraryMatchingService` é a borda entre staging e essa regra: não escreve
+no catálogo nem faz chamadas HTTP. Recebe um registro staged e candidatos
+previamente bloqueados, aplica o `MatchingEngine` e devolve namespace, ID
+externo, revisão e SHA-256 da evidência junto da decisão. Assim uma decisão
+`REVIEW_REQUIRED` pode ser persistida e reprocessada sem perder a revisão do
+dump que a originou.
