@@ -47,6 +47,19 @@ pipeline {
       }
     }
 
+    stage('Contratos de infraestrutura') {
+      steps {
+        sh '''
+          set -euo pipefail
+          bash -n infrastructure/bootstrap/*.sh infrastructure/keycloak/*.sh infrastructure/jenkins/*.sh scripts/*.sh
+          docker compose --project-name bookrush-contracts --file infrastructure/compose.yaml --env-file .env.example config >/dev/null
+          bash scripts/validate-pipelines.sh
+          bash scripts/test-keycloak-realms.sh
+          bash scripts/test-keycloak-reconcile.sh
+        '''
+      }
+    }
+
     stage('Imagens') {
       steps {
         script {
@@ -57,11 +70,11 @@ pipeline {
           env.INGESTION_IMAGE = "${registry}/bookrush/book-ingestion-service:${env.IMAGE_TAG}"
           env.ANALYTICS_IMAGE = "${registry}/bookrush/book-analytics-service:${env.IMAGE_TAG}"
         }
-        sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" services/catalog-service'
+        sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" -f services/catalog-service/Dockerfile .'
         sh 'docker run --rm "bookrush/catalog-test:$BUILD_NUMBER" mvn -B verify'
-        sh 'docker build -t "$BACKEND_IMAGE" services/catalog-service'
+        sh 'docker build -t "$BACKEND_IMAGE" -f services/catalog-service/Dockerfile .'
         sh 'docker build -t "$FRONTEND_IMAGE" frontend'
-        sh 'docker build -t "$INGESTION_IMAGE" services/book-ingestion-service'
+        sh 'docker build -t "$INGESTION_IMAGE" -f services/book-ingestion-service/Dockerfile .'
         sh 'docker build -t "$ANALYTICS_IMAGE" services/book-analytics-service'
       }
     }

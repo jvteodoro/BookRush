@@ -47,6 +47,36 @@ services:
       retries: 30
     networks: [bookrush]
 
+  seaweedfs-oidc:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.8.1
+    profiles: [auth]
+    command:
+      - --provider=keycloak-oidc
+      - --oidc-issuer-url=${SEAWEEDFS_OIDC_ISSUER_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      - --client-id=${SEAWEEDFS_OIDC_CLIENT_ID:-bookrush-seaweedfs}
+      - --client-secret=${SEAWEEDFS_OIDC_CLIENT_SECRET:?Set SEAWEEDFS_OIDC_CLIENT_SECRET in .env}
+      - --redirect-url=${SEAWEEDFS_OIDC_REDIRECT_URL:-https://seaweedfs-bookrush.jteodoro.tec.br/oauth2/callback}
+      - --cookie-secret=${SEAWEEDFS_OAUTH2_COOKIE_SECRET:?Set SEAWEEDFS_OAUTH2_COOKIE_SECRET in .env}
+      - --cookie-secure=true
+      - --cookie-samesite=lax
+      - --email-domain=*
+      - --scope=openid profile email
+      - --allowed-group=operators
+      - --allowed-group=platform-admins
+      - --http-address=0.0.0.0:4180
+      - --upstream=http://seaweedfs:8888
+      - --reverse-proxy=true
+      - --set-xauthrequest=true
+      - --pass-access-token=false
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    networks: [bookrush]
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -93,6 +123,7 @@ services:
       # This path is resolved by the Docker daemon, not by the Jenkins
       # container that invokes Compose through the Docker socket.
       - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
+      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-platform-realm.json:/opt/keycloak/data/import/bookrush-platform-realm.json:ro
     ports:
       - "127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}:8080"
     healthcheck:
@@ -100,6 +131,26 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
+    networks: [bookrush]
+
+  keycloak-config-cli:
+    image: adorsys/keycloak-config-cli:6.3.0-18.0.2
+    profiles: [iam-reconcile]
+    # The reconcile script sets this to the invoking user so the temporary
+    # rendered directory can remain mode 0700/0600 instead of being world-readable.
+    user: ${KEYCLOAK_CONFIG_CLI_USER:-}
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_USER: ${KEYCLOAK_CONFIG_CLI_ADMIN_USER:-admin}
+      KEYCLOAK_PASSWORD: ${KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD:-}
+      KEYCLOAK_AVAILABILITYCHECK_ENABLED: "true"
+      IMPORT_FILES_LOCATIONS: /config/*.json
+      IMPORT_VARSUBSTITUTION_ENABLED: "true"
+    volumes:
+      - ${KEYCLOAK_CONFIG_DIR:-${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak}:/config:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
     networks: [bookrush]
 
   pgadmin:
@@ -120,7 +171,8 @@ services:
   catalog-service:
     image: ${BACKEND_IMAGE:-bookrush/catalog-service:local}
     build:
-      context: ../services/catalog-service
+      context: ..
+      dockerfile: services/catalog-service/Dockerfile
     environment:
       SPRING_PROFILES_ACTIVE: docker
       BOOKRUSH_PUBLIC_URL: ${BOOKRUSH_PUBLIC_URL:-https://bookrush.jteodoro.tec.br}
@@ -144,6 +196,11 @@ services:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       ASSET_ADMIN_TOKEN: ${ASSET_ADMIN_TOKEN:?Set ASSET_ADMIN_TOKEN in .env}
+      CATALOG_OIDC_ENABLED: ${CATALOG_OIDC_ENABLED:-true}
+      CATALOG_OIDC_ISSUER: ${CATALOG_OIDC_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      CATALOG_OIDC_JWK_SET_URI: ${CATALOG_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
+      CATALOG_OIDC_AUDIENCE: ${CATALOG_OIDC_AUDIENCE:-bookrush-catalog-admin}
+      CATALOG_SECURITY_LEGACY_STATIC_ENABLED: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:-false}
       CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
       STORAGE_BUCKET_SOURCE: ${STORAGE_BUCKET_SOURCE:-books-source}
       STORAGE_BUCKET_PUBLIC: ${STORAGE_BUCKET_PUBLIC:-books-public}
@@ -168,7 +225,8 @@ services:
   book-ingestion-service:
     image: ${INGESTION_IMAGE:-bookrush/book-ingestion-service:local}
     build:
-      context: ../services/book-ingestion-service
+      context: ..
+      dockerfile: services/book-ingestion-service/Dockerfile
     environment:
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
@@ -183,10 +241,19 @@ services:
       CATALOG_SERVICE_URL: ${CATALOG_SERVICE_URL:-http://catalog-service:8080}
       CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
       INGESTION_ASSET_TOKEN: ${INGESTION_ASSET_TOKEN:-}
+      INGESTION_OIDC_S2S_ENABLED: ${INGESTION_OIDC_S2S_ENABLED:-false}
+      INGESTION_LEGACY_STATIC_TOKENS_ENABLED: ${INGESTION_LEGACY_STATIC_TOKENS_ENABLED:-false}
+      INGESTION_OIDC_TOKEN_URI: ${INGESTION_OIDC_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+      INGESTION_CANONICAL_CLIENT_ID: ${INGESTION_CANONICAL_CLIENT_ID:-}
+      INGESTION_CANONICAL_CLIENT_SECRET: ${INGESTION_CANONICAL_CLIENT_SECRET:-}
+      INGESTION_CANONICAL_SCOPE: ${INGESTION_CANONICAL_SCOPE:-bookrush.catalog.write}
+      INGESTION_ASSET_CLIENT_ID: ${INGESTION_ASSET_CLIENT_ID:-}
+      INGESTION_ASSET_CLIENT_SECRET: ${INGESTION_ASSET_CLIENT_SECRET:-}
+      INGESTION_ASSET_SCOPE: ${INGESTION_ASSET_SCOPE:-bookrush.assets.write}
       INGESTION_SECURITY_ENABLED: ${INGESTION_SECURITY_ENABLED:-true}
-      INGESTION_OIDC_ISSUER: ${INGESTION_OIDC_ISSUER:-http://keycloak:8080/realms/bookrush}
+      INGESTION_OIDC_ISSUER: ${INGESTION_OIDC_ISSUER:-http://keycloak:8080/realms/bookrush-platform}
       INGESTION_OIDC_AUDIENCE: ${INGESTION_OIDC_AUDIENCE:-bookrush-ingestion}
-      INGESTION_OIDC_JWK_SET_URI: ${INGESTION_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      INGESTION_OIDC_JWK_SET_URI: ${INGESTION_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       INGESTION_SECURITY_LOCAL_FIXTURE_MODE: ${INGESTION_SECURITY_LOCAL_FIXTURE_MODE:-false}
       INGESTION_SECURITY_LOCAL_FIXTURE_TOKEN: ${INGESTION_SECURITY_LOCAL_FIXTURE_TOKEN:-}
       INGESTION_PUBLIC_URL: ${INGESTION_PUBLIC_URL:-https://bookrush.jteodoro.tec.br/ingestion}
@@ -267,7 +334,15 @@ services:
       - ./jenkins/bookrush.Jenkinsfile:/opt/bookrush/bookrush.Jenkinsfile:ro
       - ./jenkins/backstage.Jenkinsfile:/opt/bookrush/backstage.Jenkinsfile:ro
       - ./jenkins/deploy-compose.sh:/opt/bookrush/deploy-compose.sh:ro
+      - ./jenkins/casc/jenkins-oidc.yaml:/opt/bookrush/casc/jenkins-oidc.yaml:ro
       - ./jenkins/init.groovy.d/bookrush.groovy:/var/jenkins_home/init.groovy.d/bookrush.groovy:ro
+    environment:
+      CASC_JENKINS_CONFIG: ${CASC_JENKINS_CONFIG:-}
+      # OIDC is opt-in via CASC_JENKINS_CONFIG. Values come from the protected
+      # host .env and are never written to the JCasC file in Git.
+      JENKINS_OIDC_CLIENT_ID: ${JENKINS_OIDC_CLIENT_ID:-bookrush-jenkins}
+      JENKINS_OIDC_CLIENT_SECRET: ${JENKINS_OIDC_CLIENT_SECRET:-}
+      JENKINS_OIDC_WELL_KNOWN_URL: ${JENKINS_OIDC_WELL_KNOWN_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/.well-known/openid-configuration}
     group_add:
       - "${DOCKER_GID:-999}"
     healthcheck:

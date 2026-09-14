@@ -1,0 +1,44 @@
+# Opt-in JCasC profile for the administrative Keycloak realm.
+# Enable only after creating the client secret outside Git:
+#   CASC_JENKINS_CONFIG=/opt/bookrush/casc/jenkins-oidc.yaml
+jenkins:
+  securityRealm:
+    oic:
+      clientId: "${JENKINS_OIDC_CLIENT_ID}"
+      clientSecret: "${JENKINS_OIDC_CLIENT_SECRET}"
+      userNameField: "preferred_username"
+      groupsFieldName: "groups"
+      fullNameFieldName: "name"
+      emailFieldName: "email"
+      serverConfiguration:
+        wellKnown:
+          wellKnownOpenIDConfigurationUrl: "${JENKINS_OIDC_WELL_KNOWN_URL}"
+          scopesOverride: "openid"
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+          - name: "platform-admin"
+            description: "Explicit Jenkins administrators"
+            permissions:
+              - "Overall/Administer"
+            entries:
+              - group: "platform-admins"
+          - name: "platform-operator"
+            description: "Operators may inspect and run approved jobs"
+            permissions:
+              - "Overall/Read"
+              - "Job/Read"
+              - "Job/Build"
+              - "Job/Cancel"
+              - "Run/Replay"
+            entries:
+              - group: "platform-operators"
+          - name: "platform-developer"
+            description: "Developers may inspect jobs and build when granted"
+            permissions:
+              - "Overall/Read"
+              - "Job/Read"
+              - "Job/Build"
+            entries:
+              - group: "platform-developers"

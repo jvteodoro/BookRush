@@ -10,7 +10,7 @@ test -f infrastructure/jenkins/bookrush.Jenkinsfile || fail 'cópia do Jenkinsfi
 cmp -s Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile || fail 'Jenkinsfiles principais divergem'
 test -f infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline dedicada do Backstage ausente'
 
-for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh infrastructure/jenkins/deploy-compose.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
+for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh infrastructure/jenkins/deploy-compose.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
   test -f "$file" || fail "script referenciado não existe: $file"
   bash -n "$file" || fail "sintaxe inválida: $file"
 done
@@ -19,4 +19,5 @@ grep -Fq 'bash scripts/validate-change.sh --ci' Jenkinsfile || fail 'Jenkinsfile
 grep -Fq 'bash scripts/validate-change.sh --ci' infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline Backstage sem change gate'
 grep -Fq 'bash scripts/test-portal.sh' infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline Backstage sem validação do portal'
 grep -Fq 'scripts/test-storage.sh' Jenkinsfile || fail 'pipeline principal sem validação de storage'
+grep -Fq 'bash scripts/test-keycloak-reconcile.sh' Jenkinsfile || fail 'pipeline principal sem validação de reconcile Keycloak'
 echo 'Pipeline contracts: OK'

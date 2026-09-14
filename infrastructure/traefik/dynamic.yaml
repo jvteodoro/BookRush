@@ -14,6 +14,20 @@ http:
       priority: 200
       service: keycloak
 
+    seaweedfs-oauth:
+      rule: Host(`seaweedfs-bookrush.jteodoro.tec.br`) && PathPrefix(`/oauth2`)
+      entryPoints:
+        - web
+      priority: 400
+      service: seaweedfs-oauth
+
+    seaweedfs:
+      rule: Host(`seaweedfs-bookrush.jteodoro.tec.br`)
+      entryPoints:
+        - web
+      priority: 300
+      service: seaweedfs-oauth
+
     catalog-docs:
       rule: PathPrefix(`/swagger-ui`) || PathPrefix(`/v3/api-docs`)
       entryPoints:
@@ -63,6 +77,7 @@ http:
         prefixes:
           - /analytics
 
+
   services:
     catalog:
       loadBalancer:
@@ -84,3 +99,7 @@ http:
       loadBalancer:
         servers:
           - url: http://keycloak:8080
+    seaweedfs-oauth:
+      loadBalancer:
+        servers:
+          - url: http://seaweedfs-oidc:4180

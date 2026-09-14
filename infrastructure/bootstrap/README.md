@@ -46,6 +46,11 @@ volumes Docker nomeados `postgres_data`, `seaweedfs_data`, `redis_data`,
 `backstage_techdocs`. Não use `docker compose down --volumes` em uma instalação
 que contenha dados.
 
+Quando o host usar SOPS+age em vez de um `.env` protegido, instale versões
+fixadas de `sops` e `age` conforme a política da equipe e execute
+`scripts/secrets.sh`; a chave privada permanece fora do clone. O instalador
+Ubuntu não gera nem registra essa chave.
+
 O ciclo de vida também possui comandos dedicados:
 
 ```bash
@@ -83,3 +88,21 @@ sudo certbot --nginx --redirect \
 
 DNS e certificados continuam sendo responsabilidade do operador; remova os
 domínios que não apontarem para o host.
+## Lifecycle
+
+`start-environment.sh` executa bootstrap completo e pode ser usado antes do
+Jenkins. `reconcile-environment.sh` reaplica configuração alterada sem derrubar
+o projeto nem tocar volumes; ambos validam Compose e aguardam healthchecks com
+timeout. `start-jenkins.sh` é o lifecycle isolado do Jenkins.
+
+```bash
+bash infrastructure/bootstrap/start-environment.sh --env-file .env
+bash infrastructure/bootstrap/reconcile-environment.sh --env-file .env
+bash infrastructure/bootstrap/start-jenkins.sh --env-file .env --no-build
+```
+
+Alterações de Keycloak/JCasC devem chamar o reconciliador correspondente quando
+ele estiver provisionado. `docker compose restart` não aplica arquivos de
+configuração e não substitui reconcile. Nenhum script remove volumes ou restaura
+dados; rebuild e restore são procedimentos distintos documentados em
+`docs/platform/lifecycle.md`.

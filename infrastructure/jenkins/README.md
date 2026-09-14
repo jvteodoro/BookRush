@@ -30,6 +30,34 @@ Crie o administrador e mantenha a URL Jenkins como
 `https://jenkins-bookrush.jteodoro.tec.br/`. Os plugins necessários já vêm
 instalados na imagem.
 
+### OIDC administrativo (opt-in)
+
+O plugin OIDC, JCasC e Role Strategy são incluídos com versões fixadas, mas a
+autenticação OIDC não é ativada automaticamente para não bloquear uma instância
+existente. Depois de criar o client `bookrush-jenkins` no realm
+`bookrush-platform`, forneça os valores somente no ambiente protegido:
+
+```dotenv
+CASC_JENKINS_CONFIG=/opt/bookrush/casc/jenkins-oidc.yaml
+JENKINS_OIDC_CLIENT_ID=bookrush-jenkins
+JENKINS_OIDC_CLIENT_SECRET=<segredo-do-client>
+JENKINS_OIDC_WELL_KNOWN_URL=https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/.well-known/openid-configuration
+```
+
+Recrie o container Jenkins em uma janela controlada e mantenha uma sessão
+administrativa de recuperação. O arquivo JCasC é somente leitura e não contém
+segredo. Os grupos `platform-admins`, `platform-operators` e
+`platform-developers` são concedidos no Keycloak; desenvolvimento não concede
+administração. Valide primeiro em um projeto Compose descartável e confirme
+que jobs, credenciais e histórico continuam no volume `jenkins_home`.
+
+O client usa os mappers explícitos `preferred_username` e `groups` declarados
+em `infrastructure/keycloak/bookrush-platform-realm.json`; o JCasC seleciona
+`preferred_username` como nome da conta e solicita somente `openid`. O
+procedimento completo, incluindo o diagnóstico de `invalid_code` e usuário
+vazio quando um callback é repetido, está em
+[`docs/auth/jenkins-oidc.md`](../../docs/auth/jenkins-oidc.md).
+
 ## Build e deploy pelo navegador
 
 1. Abra **bookrush-deploy → Build with Parameters**.

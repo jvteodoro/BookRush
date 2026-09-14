@@ -27,7 +27,8 @@ services:
       retries: 60
   tests:
     build:
-      context: ../services/catalog-service
+      context: ..
+      dockerfile: services/catalog-service/Dockerfile
       target: build
     environment:
       DB_HOST: postgres
@@ -41,6 +42,8 @@ services:
       STORAGE_ACCESS_KEY: storage-test
       STORAGE_SECRET_KEY: storage-test-secret
       ASSET_ADMIN_TOKEN: test-admin-token-at-least-thirty-two-characters
+      CATALOG_OIDC_ENABLED: "false"
+      CATALOG_SECURITY_LEGACY_STATIC_ENABLED: "true"
     depends_on:
       postgres:
         condition: service_healthy
