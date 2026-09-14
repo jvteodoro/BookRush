@@ -26,6 +26,13 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
+        <groupId>com.bookrush</groupId>
+        <artifactId>bookrush-bom</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
         <version>${aws.version}</version>
@@ -43,6 +50,10 @@
   </dependencyManagement>
 
   <dependencies>
+    <dependency><groupId>com.bookrush</groupId><artifactId>bookrush-common-core</artifactId></dependency>
+    <dependency><groupId>com.bookrush</groupId><artifactId>bookrush-common-web</artifactId></dependency>
+    <dependency><groupId>com.bookrush</groupId><artifactId>bookrush-security-spring-boot-starter</artifactId></dependency>
+    <dependency><groupId>com.bookrush</groupId><artifactId>bookrush-observability-spring-boot-starter</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
     <dependency><groupId>org.springdoc</groupId><artifactId>springdoc-openapi-starter-webmvc-ui</artifactId><version>2.6.0</version></dependency>

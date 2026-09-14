@@ -1,0 +1,9 @@
+site_name: BookRush Java Platform
+docs_dir: docs
+nav:
+  - Overview: index.md
+theme:
+  name: material
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences

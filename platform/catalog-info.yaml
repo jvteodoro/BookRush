@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bookrush-java-platform
+  description: Bibliotecas Java técnicas e alinhamento Maven compartilhados.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: library
+  lifecycle: production
+  owner: group:default/platform-engineering
+  system: platform-infrastructure
+  dependsOn:
+    - resource:default/books-postgres

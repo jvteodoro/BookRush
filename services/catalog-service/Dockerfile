@@ -1,8 +1,10 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
-COPY pom.xml .
+COPY platform platform
+RUN mvn -q -f platform/pom.xml install -DskipTests
+COPY services/catalog-service/pom.xml pom.xml
 RUN mvn -q -DskipTests dependency:go-offline
-COPY src src
+COPY services/catalog-service/src src
 RUN mvn -q package
 
 FROM eclipse-temurin:21-jre-alpine
