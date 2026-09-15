@@ -23,6 +23,7 @@ O log não deve mostrar um loop de `GET /api/auth/guest/refresh` em um host
 público. Se o DNS público não resolver durante um teste local, valide pela
 porta loopback ou pelo hostname configurado no arquivo hosts.
 
-O plugin de documentação de APIs é registrado explicitamente no app. Isso mantém
-as extensões de documentação e autenticação no mesmo grafo de features e evita
-falha de inicialização do frontend.
+O plugin de documentação de APIs é registrado explicitamente no app e usa sua
+fábrica oficial de widgets. A autenticação do portal ocorre no nível das APIs
+Backstage; não se deve substituir essa fábrica por um objeto manual, pois isso
+causa `api is undefined` durante a inicialização do frontend.

@@ -15,11 +15,6 @@ import {
   ApiBlueprint,
   createFrontendModule,
 } from '@backstage/frontend-plugin-api';
-import {
-  OpenApiDefinitionWidget,
-  defaultDefinitionWidgets,
-} from '@backstage/plugin-api-docs';
-import apiDocsPlugin from '@backstage/plugin-api-docs/alpha';
 import { SignInPageBlueprint } from '@backstage/plugin-app-react';
 
 export const oidcApiRef = createApiRef<
@@ -50,51 +45,6 @@ export const authModule = createFrontendModule({
               environment: configApi.getOptionalString('auth.environment'),
             }),
         }),
-    }),
-    apiDocsPlugin.getExtension('api:api-docs/config').override({
-      factory: (_originalFactory, { apis }) => {
-        const authApi = apis.get(oidcApiRef);
-        const widgets = defaultDefinitionWidgets().map(widget => {
-          if (widget.type !== 'openapi') return widget;
-          return {
-            ...widget,
-            component: (definition: string) => (
-              <OpenApiDefinitionWidget
-                definition={definition}
-                requestInterceptor={async request => {
-                  const target = new URL(request.url, window.location.origin);
-                  const allowedHosts = new Set([
-                    window.location.hostname,
-                    'bookrush.jteodoro.tec.br',
-                    'localhost',
-                    '127.0.0.1',
-                  ]);
-                  if (!allowedHosts.has(target.hostname)) return request;
-                  const token = await authApi?.getAccessToken();
-                  if (!token) return request;
-                  if (request.headers?.set) {
-                    request.headers.set('Authorization', `Bearer ${token}`);
-                  } else {
-                    request.headers = {
-                      ...(request.headers ?? {}),
-                      Authorization: `Bearer ${token}`,
-                    };
-                  }
-                  return request;
-                }}
-              />
-            ),
-          };
-        });
-        return [
-          ApiBlueprint.dataRefs.factory(
-            ({
-              getApiDefinitionWidget: (apiEntity: any) =>
-                widgets.find(widget => widget.type === apiEntity.spec.type),
-            } as unknown) as never,
-          ),
-        ];
-      },
     }),
     SignInPageBlueprint.make({
       params: {
