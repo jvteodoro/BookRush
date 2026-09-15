@@ -106,5 +106,8 @@ if ((${#errors[@]})); then
   echo 'Atualize a documentação/contrato correspondente no mesmo commit.' >&2
   exit 1
 fi
+if has_prefix services/book-analytics-service/config/ || has_prefix services/book-analytics-service/src/ || has_path scripts/validate-analytics-specs.py; then
+  python3 scripts/validate-analytics-specs.py
+fi
 if [[ "$mode" == ci || "$mode" == push ]]; then bash scripts/validate-pipelines.sh; fi
 echo "Change gate: OK (${#changed[@]} arquivos analisados)"

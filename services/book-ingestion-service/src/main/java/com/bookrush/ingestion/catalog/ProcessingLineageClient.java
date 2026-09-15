@@ -21,11 +21,15 @@ public final class ProcessingLineageClient {
     String token = tokens.token(OidcServiceTokenProvider.Kind.CANONICAL);
     var request = client.post().uri("/api/internal/v1/catalog/processings").header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
     if (properties.legacyStaticEnabled()) request.header("X-Canonical-Service-Token", token);
-    request
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(Map.of("inputVersionId", input, "outputVersionIds", outputs, "processingType", type,
-            "processor", "bookrush-text-processing", "processorVersion", "1", "metadata", metadata))
-        .retrieve().toBodilessEntity();
+    try {
+      request.contentType(MediaType.APPLICATION_JSON)
+          .body(Map.of("inputVersionId", input, "outputVersionIds", outputs, "processingType", type,
+              "processor", "bookrush-text-processing", "processorVersion", "1", "metadata", metadata))
+          .retrieve().toBodilessEntity();
+    } catch (org.springframework.web.client.RestClientResponseException e) {
+      throw new IllegalStateException("catalog processing lineage request failed: " + e.getStatusCode(), e);
+    }
+
   }
 
   public void projectChapters(UUID bookId, UUID editionId, UUID textVersionId, byte[] chaptersJson) throws Exception {
@@ -45,9 +49,12 @@ public final class ProcessingLineageClient {
     }
     var request = client.post().uri("/api/internal/v1/catalog/processings/chapters").header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
     if (properties.legacyStaticEnabled()) request.header("X-Canonical-Service-Token", token);
-    request
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(Map.of("bookId", bookId, "editionId", editionId, "textAssetVersionId", textVersionId, "chapters", chapters))
-        .retrieve().toBodilessEntity();
+    try {
+      request.contentType(MediaType.APPLICATION_JSON)
+          .body(Map.of("bookId", bookId, "editionId", editionId, "textAssetVersionId", textVersionId, "chapters", chapters))
+          .retrieve().toBodilessEntity();
+    } catch (org.springframework.web.client.RestClientResponseException e) {
+      throw new IllegalStateException("catalog chapter projection request failed: " + e.getStatusCode(), e);
+    }
   }
 }

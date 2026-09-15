@@ -91,7 +91,7 @@ ingestion:
     oidc-token-uri: ${INGESTION_OIDC_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
     canonical-client-id: ${INGESTION_CANONICAL_CLIENT_ID:}
     canonical-client-secret: ${INGESTION_CANONICAL_CLIENT_SECRET:}
-    canonical-scope: ${INGESTION_CANONICAL_SCOPE:bookrush.catalog.write}
+    canonical-scope: ${INGESTION_CANONICAL_SCOPE:}
     asset-client-id: ${INGESTION_ASSET_CLIENT_ID:}
     asset-client-secret: ${INGESTION_ASSET_CLIENT_SECRET:}
-    asset-scope: ${INGESTION_ASSET_SCOPE:bookrush.assets.write}
+    asset-scope: ${INGESTION_ASSET_SCOPE:}

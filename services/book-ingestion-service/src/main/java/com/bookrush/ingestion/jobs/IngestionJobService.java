@@ -67,7 +67,17 @@ public class IngestionJobService {
   public List<Map<String, Object>> getItems(UUID jobId, int page, int size) {
     if (page < 0 || size < 1 || size > 500) throw new IllegalArgumentException("invalid page or size");
     getJob(jobId);
-    return jdbc.queryForList("SELECT i.id, i.external_identifier, i.status, i.attempt_number, i.book_id, i.edition_id, i.error_code, i.error_message, i.started_at, i.finished_at, t.status AS task_status, t.attempt_count, t.next_attempt_at, t.reason_code FROM catalog.ingestion_item i LEFT JOIN catalog.ingestion_task t ON t.ingestion_item_id=i.id WHERE i.ingestion_job_id=? ORDER BY i.created_at, i.id LIMIT ? OFFSET ?", jobId, size, page * size);
+    return jdbc.queryForList("""
+        SELECT i.id, i.external_identifier, i.status, i.attempt_number, i.book_id, i.edition_id,
+               v.id AS asset_version_id, v.version_number AS asset_version_number,
+               i.error_code, i.error_message, i.started_at, i.finished_at,
+               t.status AS task_status, t.attempt_count, t.next_attempt_at, t.reason_code
+          FROM catalog.ingestion_item i
+          LEFT JOIN catalog.ingestion_task t ON t.ingestion_item_id=i.id
+          LEFT JOIN LATERAL (SELECT v.id, v.version_number FROM catalog.book_asset_version v
+                              WHERE v.ingestion_item_id=i.id ORDER BY v.version_number DESC LIMIT 1) v ON TRUE
+         WHERE i.ingestion_job_id=? ORDER BY i.created_at, i.id LIMIT ? OFFSET ?
+        """, jobId, size, page * size);
   }
 
   @Transactional

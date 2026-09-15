@@ -90,8 +90,20 @@ public class AssetSecurity {
             .map(String.class::cast).map(role -> new SimpleGrantedAuthority("ROLE_" + role))
             .forEach(authorities::add);
       }
-      var scopes = new JwtGrantedAuthoritiesConverter().convert(jwt);
-      if (scopes != null) authorities.addAll(scopes);
+      Object scopeClaim = jwt.getClaims().get("scope");
+      if (scopeClaim instanceof String scope) {
+        for (String value : scope.split("\\s+")) {
+          if (!value.isBlank()) authorities.add(new SimpleGrantedAuthority("SCOPE_" + value));
+        }
+      } else if (scopeClaim instanceof java.util.Collection<?> values) {
+        values.forEach(value -> authorities.add(new SimpleGrantedAuthority("SCOPE_" + value)));
+      }
+      // The decoder already enforces the configured audience. Map that
+      // validated technical audience to the explicit internal authority so
+      // client-credentials tokens remain stable across scope claim formats.
+      if (jwt.getAudience() != null && jwt.getAudience().contains("bookrush-catalog-admin")) {
+        authorities.add(new SimpleGrantedAuthority("ROLE_CATALOG_SERVICE"));
+      }
       return new JwtAuthenticationToken(jwt, authorities, jwt.getSubject());
     };
   }

@@ -29,3 +29,5 @@ excerpts paginados, features determinísticas, ranker explicável, embeddings e
 LLM desabilitados por padrão, métricas e benchmark offline. Consulte a página
 do serviço no catálogo Backstage; a propriedade e os limites estão em
 [ADR-004](adr/ADR-004-analytics-ownership.md).
+Consulte também o [contrato Analytics V1](analytics-v1.md) e o
+[procedimento de preparação de modelos](analytics-models.md).

@@ -42,9 +42,15 @@ public final class CatalogAssetClient {
           .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).retrieve().body(java.util.List.class);
       for (Object value : existing == null ? java.util.List.of() : existing) {
         if (!(value instanceof Map<?, ?> item) || !"SOURCE".equals(String.valueOf(item.get("role"))) || !"EPUB".equals(String.valueOf(item.get("type")))) continue;
-        return client.post().uri("/api/admin/books/{bookId}/assets/{assetId}/versions", bookId, item.get("id"))
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .contentType(MediaType.MULTIPART_FORM_DATA).body(form).retrieve().body(Map.class);
+        // An old partial import may have created an asset for another edition.
+        // Never append a version to that asset: the catalog validates the
+        // edition/source lineage on every version request.
+        if (!editionId.toString().equals(String.valueOf(item.get("editionId")))) continue;
+        // SOURCE assets are immutable: the catalog deliberately rejects
+        // appending versions. Reuse the latest physical version on replay.
+        var versions = client.get().uri("/api/admin/books/{bookId}/assets/{assetId}/versions", bookId, item.get("id"))
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).retrieve().body(java.util.List.class);
+        if (versions != null && !versions.isEmpty()) return Map.of("asset", item, "version", versions.getFirst());
       }
       return client.post().uri("/api/admin/books/{bookId}/assets", bookId)
           .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)

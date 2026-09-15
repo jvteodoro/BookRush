@@ -28,7 +28,7 @@ public final class HttpCanonicalCatalogAdapter implements CanonicalCatalogPort {
           .body(command).retrieve().body(Map.class);
     } catch (RestClientResponseException e) {
       if (e.getStatusCode().value() == 409) throw new CanonicalConflict(e.getResponseBodyAsString());
-      throw e;
+      throw new IllegalStateException("canonical catalog request failed: " + e.getStatusCode(), e);
     }
   }
 

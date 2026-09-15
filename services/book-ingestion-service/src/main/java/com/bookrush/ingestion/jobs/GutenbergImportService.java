@@ -64,7 +64,9 @@ public class GutenbergImportService {
     var bookId = UUID.fromString(String.valueOf(result.get("bookId")));
     var editionId = UUID.fromString(String.valueOf(result.get("editionId")));
     for (var subject : record.subjects()) {
-      subjects.assign(bookId, "GUTENBERG", subject, "GUTENBERG", sourceRecordId, null, "SOURCE_METADATA");
+      // The catalog constraint uses the stable assignment vocabulary. Source
+      // metadata provenance is represented by sourceCode/sourceRecordId.
+      subjects.assign(bookId, "GUTENBERG", subject, "GUTENBERG", sourceRecordId, null, "SOURCE");
     }
     boolean processAssets = mapper.readTree(String.valueOf(task.get("parameters"))).path("processAssets").asBoolean(false);
     if (processAssets && record.epubUrl() != null && !record.epubUrl().isBlank()) {

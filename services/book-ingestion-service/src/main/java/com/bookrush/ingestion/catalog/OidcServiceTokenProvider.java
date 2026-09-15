@@ -37,9 +37,19 @@ public final class OidcServiceTokenProvider {
       }
       var form = new LinkedMultiValueMap<String, String>();
       form.add("grant_type", "client_credentials"); form.add("client_id", clientId);
-      form.add("client_secret", secret); form.add("scope", scope);
-      Map<?, ?> response = client.post().uri(properties.oidcTokenUri()).contentType(MediaType.APPLICATION_FORM_URLENCODED)
-          .body(form).retrieve().body(Map.class);
+      form.add("client_secret", secret);
+      // Keycloak client scopes are granted by the client configuration. Only
+      // send an explicit scope when one is configured; sending an empty or
+      // undeclared scope makes Keycloak reject an otherwise valid grant.
+      if (scope != null && !scope.isBlank()) form.add("scope", scope);
+      Map<?, ?> response;
+      try {
+        response = client.post().uri(properties.oidcTokenUri()).contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .body(form).retrieve().body(Map.class);
+      } catch (org.springframework.web.client.RestClientResponseException e) {
+        throw new IllegalStateException("OIDC token request failed for " + kind + " at "
+            + properties.oidcTokenUri() + ": " + e.getStatusCode(), e);
+      }
       if (response == null || response.get("access_token") == null) throw new IllegalStateException("OIDC token response did not contain access_token");
       long expires = response.get("expires_in") instanceof Number n ? n.longValue() : 300;
       Cached next = new Cached(String.valueOf(response.get("access_token")), Instant.now().plusSeconds(Math.max(30, expires)));

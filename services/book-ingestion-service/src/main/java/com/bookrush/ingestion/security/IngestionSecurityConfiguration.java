@@ -65,11 +65,17 @@ public class IngestionSecurityConfiguration {
     return jwt -> {
       List<GrantedAuthority> result = new ArrayList<>();
       Object roles = jwt.getClaims().get("roles");
-      if (roles instanceof List<?> values) values.forEach(value -> result.add(new SimpleGrantedAuthority("ROLE_" + value)));
+      if (roles instanceof List<?> values) values.forEach(value -> addRole(result, String.valueOf(value)));
       Object realm = jwt.getClaims().get("realm_access");
-      if (realm instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> values) values.forEach(value -> result.add(new SimpleGrantedAuthority("ROLE_" + value)));
+      if (realm instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> values) values.forEach(value -> addRole(result, String.valueOf(value)));
       var identity = new TechnicalIdentity(jwt.getIssuer().toString(), jwt.getSubject());
       return new JwtAuthenticationToken(jwt, result, identity.toString());
     };
+  }
+
+  /** Platform realm uses namespaced roles; keep the API matrix compatible during migration. */
+  private void addRole(List<GrantedAuthority> result, String role) {
+    result.add(new SimpleGrantedAuthority("ROLE_" + role));
+    if (role.equals("platform-operator")) result.add(new SimpleGrantedAuthority("ROLE_OPERATOR"));
   }
 }

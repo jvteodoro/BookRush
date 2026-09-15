@@ -10,10 +10,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Explicit dispatcher: manual jobs are awakened after commit even when periodic scheduling is disabled. */
 @Service
 public class IngestionDispatcher {
+  private static final Logger log = LoggerFactory.getLogger(IngestionDispatcher.class);
   private final JdbcTemplate jdbc;
   private final LeaseCoordinator leases;
   private final GutenbergImportService gutenberg;
@@ -57,8 +60,9 @@ public class IngestionDispatcher {
       try {
         gutenberg.process(lease.get());
         leases.complete(lease.get(), "SUCCEEDED", "IMPORTED");
-        jdbc.update("UPDATE catalog.ingestion_job SET items_processed=items_processed+1, items_succeeded=items_succeeded+1, updated_at=clock_timestamp() WHERE id=?", jobId);
+        updateCounters(jobId);
       } catch (Exception failure) {
+        log.warn("Ingestion task {} failed: {}", lease.get().taskId(), failureDetail(failure));
         var failureClass = FailureClassifier.exception(failure);
         boolean retry = false;
         try { retry = leases.retry(lease.get(), failureClass, String.valueOf(failure.getMessage())); } catch (RuntimeException ignored) { }
@@ -67,11 +71,33 @@ public class IngestionDispatcher {
           continue;
         }
         try { leases.complete(lease.get(), "FAILED", failureClass.name()); } catch (RuntimeException ignored) { }
-        jdbc.update("UPDATE catalog.ingestion_item SET status='FAILED', error_code=?, error_message=?, started_at=COALESCE(started_at, clock_timestamp()), finished_at=clock_timestamp(), updated_at=clock_timestamp() WHERE id=(SELECT ingestion_item_id FROM catalog.ingestion_task WHERE id=?)", failure.getClass().getSimpleName(), String.valueOf(failure.getMessage()), lease.get().taskId());
-        jdbc.update("UPDATE catalog.ingestion_job SET items_processed=items_processed+1, items_failed=items_failed+1, updated_at=clock_timestamp() WHERE id=?", jobId);
+        String detail = failureDetail(failure);
+        jdbc.update("UPDATE catalog.ingestion_item SET status='FAILED', error_code=?, error_message=?, started_at=COALESCE(started_at, clock_timestamp()), finished_at=clock_timestamp(), updated_at=clock_timestamp() WHERE id=(SELECT ingestion_item_id FROM catalog.ingestion_task WHERE id=?)", failure.getClass().getSimpleName(), detail, lease.get().taskId());
+        updateCounters(jobId);
       }
     }
     jdbc.update("UPDATE catalog.ingestion_job SET status=CASE WHEN EXISTS (SELECT 1 FROM catalog.ingestion_task WHERE ingestion_job_id=? AND status='RETRY_WAIT') THEN 'PAUSED' WHEN items_failed=0 THEN 'COMPLETED' ELSE 'COMPLETED_WITH_ERRORS' END, finished_at=CASE WHEN EXISTS (SELECT 1 FROM catalog.ingestion_task WHERE ingestion_job_id=? AND status='RETRY_WAIT') THEN NULL ELSE clock_timestamp() END, updated_at=clock_timestamp() WHERE id=? AND status='RUNNING'", jobId, jobId, jobId);
+  }
+
+  /** Counters describe logical items, never retry attempts. */
+  private void updateCounters(UUID jobId) {
+    jdbc.update("""
+      UPDATE catalog.ingestion_job j SET
+        items_processed=(SELECT count(*) FROM catalog.ingestion_item i WHERE i.ingestion_job_id=j.id AND i.status IN ('SUCCEEDED','FAILED','CANCELLED')),
+        items_succeeded=(SELECT count(*) FROM catalog.ingestion_item i WHERE i.ingestion_job_id=j.id AND i.status='SUCCEEDED'),
+        items_failed=(SELECT count(*) FROM catalog.ingestion_item i WHERE i.ingestion_job_id=j.id AND i.status='FAILED'),
+        updated_at=clock_timestamp() WHERE j.id=?
+      """, jobId);
+  }
+
+  private static String failureDetail(Throwable failure) {
+    String message = failure.getMessage();
+    if (message == null || message.isBlank()) {
+      Throwable root = failure;
+      while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+      message = root.getMessage() == null ? root.getClass().getSimpleName() : root.getMessage();
+    }
+    return (failure.getClass().getSimpleName() + ": " + message).substring(0, Math.min(1000, failure.getClass().getSimpleName().length() + 2 + message.length()));
   }
 }
 

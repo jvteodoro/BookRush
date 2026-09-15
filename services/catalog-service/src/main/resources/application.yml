@@ -20,6 +20,14 @@ bookrush:
     jwk-set-uri: ${CATALOG_OIDC_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
     audience: ${CATALOG_OIDC_AUDIENCE:bookrush-catalog-admin}
 spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Keep decoder configuration under Spring's canonical namespace;
+          # catalog.security.oidc remains the authorization policy metadata.
+          issuer-uri: ${CATALOG_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+          jwk-set-uri: ${CATALOG_OIDC_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
   servlet:
     multipart:
       max-file-size: 100MB

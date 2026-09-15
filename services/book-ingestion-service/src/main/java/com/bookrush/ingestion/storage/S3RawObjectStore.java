@@ -31,9 +31,14 @@ public final class S3RawObjectStore implements RawObjectStore {
       throw new IllegalStateException("cannot read raw object", e);
     }
     if (bytes.size() != contentLength) throw new IllegalStateException("raw object length changed while uploading");
-    client.putObject(PutObjectRequest.builder().bucket(properties.rawBucket()).key(objectKey)
-        .contentType("application/octet-stream").metadata(java.util.Map.of("sha256", sha256))
-        .build(), RequestBody.fromBytes(bytes.toByteArray()));
+    try {
+      client.putObject(PutObjectRequest.builder().bucket(properties.rawBucket()).key(objectKey)
+          .contentType("application/octet-stream").metadata(java.util.Map.of("sha256", sha256))
+          .build(), RequestBody.fromBytes(bytes.toByteArray()));
+    } catch (RuntimeException e) {
+      throw new IllegalStateException("raw storage PUT failed for bucket=" + properties.rawBucket()
+          + " key=" + objectKey + ": " + e.getClass().getSimpleName() + " " + e.getMessage(), e);
+    }
   }
 
   @Override
