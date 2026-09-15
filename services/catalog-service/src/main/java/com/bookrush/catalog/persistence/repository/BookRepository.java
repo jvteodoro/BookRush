@@ -3,11 +3,14 @@ package com.bookrush.catalog.persistence.repository;
 import com.bookrush.catalog.persistence.model.Book;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface BookRepository extends JpaRepository<Book, UUID> {
+  Page<Book> findByCanonicalTitleContainingIgnoreCase(String title, Pageable pageable);
   /** Resolves work-level identifiers and edition-level identifiers to their owning work. */
   @Query(value = """
       SELECT b.* FROM catalog.external_identifier i

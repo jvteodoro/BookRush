@@ -64,7 +64,8 @@ public class AssetSecurity {
           .requestMatchers("/api/admin/**","/actuator/metrics","/actuator/metrics/**")
             .hasAnyAuthority("ROLE_ASSET_ADMIN", "SCOPE_bookrush.assets.write")
           .requestMatchers("/api/internal/v1/catalog/**")
-            .hasAnyAuthority("ROLE_CATALOG_SERVICE", "SCOPE_bookrush.catalog.write")
+            .hasAnyAuthority("ROLE_CATALOG_SERVICE", "SCOPE_bookrush.catalog.write",
+                "SCOPE_bookrush.catalog.read")
           .requestMatchers(HttpMethod.GET,"/api","/api/","/api/status","/actuator/health","/actuator/health/**","/api/books/*/assets/*/download-url","/swagger-ui.html","/swagger-ui/**","/v3/api-docs/**").permitAll()
           .anyRequest().denyAll())
         .exceptionHandling(e->e.authenticationEntryPoint((req,res,error)->res.sendError(401))

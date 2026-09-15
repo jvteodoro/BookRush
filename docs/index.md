@@ -15,6 +15,7 @@ Git é a fonte canônica. Backstage é o portal oficial de descoberta e consulta
 - [Matriz de migração de realms](auth/realm-migration.md)
 - [Ciclo de acesso administrativo](auth/access-lifecycle.md)
 - [Inventário de interfaces](auth/interface-inventory.md)
+- [Consulta do catálogo por serviços](catalog-consumption.md)
 - [Lifecycle e IaC das aplicações](platform/lifecycle.md)
 - [Beads](beads.md)
 
