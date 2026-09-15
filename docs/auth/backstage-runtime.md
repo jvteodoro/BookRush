@@ -44,3 +44,19 @@ O catálogo permite somente a origem configurada em
 interna de consulta. O cliente Keycloak `bookrush-backstage` recebe somente o
 escopo de leitura `bookrush.catalog.read` e a audiência
 `bookrush-catalog-admin`; ele não recebe escopo de escrita.
+
+O portal também define `backend.csp.connect-src` no overlay Docker. A diretiva
+mantém a política CSP padrão e permite conexões somente com a própria origem e
+com `https://bookrush.jteodoro.tec.br`, que é a origem pública das APIs usadas
+pela documentação OpenAPI. Sem essa exceção, o navegador bloqueia a requisição
+antes mesmo de CORS ou autenticação serem avaliados e apresenta `NetworkError`.
+
+O Backstage exige a API de Signals para o armazenamento do frontend, embora
+esta instalação não tenha um transporte de eventos publicado. O módulo local
+fornece uma implementação explícita sem eventos: ela preserva o contrato de
+armazenamento, sem iniciar conexões WebSocket de reconexão para `/api/signals`.
+Quando a plataforma adotar um barramento de sinais real, esse módulo deve ser
+substituído pelo plugin oficial de Signals e pelo backend correspondente.
+
+O bloqueio do script de métricas injetado pela Cloudflare continua intencional:
+ele não é necessário ao Backstage nem às chamadas Swagger.

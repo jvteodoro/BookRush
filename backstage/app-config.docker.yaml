@@ -9,6 +9,10 @@ backend:
     port: 7007
   cors:
     origin: ${BACKSTAGE_PUBLIC_URL}
+  # Swagger UI calls this separate public API origin. Keep the default CSP
+  # directives and extend only browser connection targets required by the UI.
+  csp:
+    connect-src: ["'self'", 'https://bookrush.jteodoro.tec.br']
   database:
     client: pg
     connection:
