@@ -104,7 +104,13 @@ export const authModule = createFrontendModule({
             <SignInPage
               {...props}
               providers={
-                config.getOptionalString('auth.environment') === 'production'
+                // The static frontend is built from the base config, while
+                // production OIDC is supplied by the runtime overlay. Public
+                // deployments therefore also use the non-local hostname as
+                // an explicit production signal; this prevents a stale
+                // guest provider from looping against /api/auth/guest.
+                (config.getOptionalString('auth.environment') === 'production'
+                  || !['localhost', '127.0.0.1'].includes(window.location.hostname))
                   ? [
                       {
                         id: 'oidc',

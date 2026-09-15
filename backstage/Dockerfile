@@ -40,7 +40,9 @@ RUN node scripts/prepare-local.mjs
 RUN node .yarn/releases/yarn-4.13.0.cjs build:all && tar -xzf packages/backend/dist/bundle.tar.gz -C /repo/backstage
 FROM build AS runtime
 # The runtime includes MkDocs for isolated local builds; production uses external publishing.
-ENV NODE_ENV=development
+# The deployed image always runs with the production frontend/auth profile.
+# Local development uses `yarn dev` outside this runtime image.
+ENV NODE_ENV=production
 RUN chmod 0755 entrypoint.sh && mkdir -p /app/techdocs && chown -R node:node /app /repo/backstage
 USER node
 WORKDIR /repo/backstage/packages/backend

@@ -7,6 +7,7 @@ services:
       dockerfile: backstage/Dockerfile
       target: runtime
     environment:
+      NODE_ENV: ${BACKSTAGE_NODE_ENV:-production}
       POSTGRES_PASSWORD: ${BACKSTAGE_POSTGRES_PASSWORD:?Set BACKSTAGE_POSTGRES_PASSWORD}
       BACKSTAGE_PUBLIC_URL: ${BACKSTAGE_PUBLIC_URL:-http://localhost:17007}
       BACKSTAGE_OIDC_ENABLED: ${BACKSTAGE_OIDC_ENABLED:-false}
