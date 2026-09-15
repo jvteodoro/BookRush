@@ -22,3 +22,7 @@ docker logs --tail 100 bookrush-portal-backstage-1
 O log não deve mostrar um loop de `GET /api/auth/guest/refresh` em um host
 público. Se o DNS público não resolver durante um teste local, valide pela
 porta loopback ou pelo hostname configurado no arquivo hosts.
+
+O plugin de documentação de APIs é registrado explicitamente no app. Isso mantém
+as extensões de documentação e autenticação no mesmo grafo de features e evita
+falha de inicialização do frontend.
