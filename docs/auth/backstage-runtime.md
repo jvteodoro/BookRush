@@ -36,3 +36,11 @@ módulo `app`, registrar outro `ApiBlueprint` ou criar outra fábrica para
 `apiDocsConfigRef`. Dois fornecedores da API `plugin.api-docs.config` impedem o
 frontend de iniciar com `API_FACTORY_CONFLICT`; uma fábrica manual também pode
 deixar `api` indefinida durante a inicialização.
+
+As chamadas **Try it out** que usam `Authorization` fazem preflight para a API.
+O catálogo permite somente a origem configurada em
+`CATALOG_CORS_ALLOWED_ORIGINS` (por padrão,
+`https://docs-bookrush.jteodoro.tec.br`) e apenas `GET`/`OPTIONS` na rota
+interna de consulta. O cliente Keycloak `bookrush-backstage` recebe somente o
+escopo de leitura `bookrush.catalog.read` e a audiência
+`bookrush-catalog-admin`; ele não recebe escopo de escrita.

@@ -91,3 +91,5 @@ catalog:
       issuer: ${CATALOG_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       audience: ${CATALOG_OIDC_AUDIENCE:bookrush-catalog-admin}
       legacy-static-enabled: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:false}
+    cors:
+      allowed-origins: ${CATALOG_CORS_ALLOWED_ORIGINS:https://docs-bookrush.jteodoro.tec.br}

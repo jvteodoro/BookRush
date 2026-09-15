@@ -200,6 +200,7 @@ services:
       CATALOG_OIDC_ISSUER: ${CATALOG_OIDC_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       CATALOG_OIDC_JWK_SET_URI: ${CATALOG_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       CATALOG_OIDC_AUDIENCE: ${CATALOG_OIDC_AUDIENCE:-bookrush-catalog-admin}
+      CATALOG_CORS_ALLOWED_ORIGINS: ${CATALOG_CORS_ALLOWED_ORIGINS:-https://docs-bookrush.jteodoro.tec.br}
       CATALOG_SECURITY_LEGACY_STATIC_ENABLED: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:-false}
       CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
       STORAGE_BUCKET_SOURCE: ${STORAGE_BUCKET_SOURCE:-books-source}

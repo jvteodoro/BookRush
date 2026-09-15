@@ -13,6 +13,7 @@ import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,10 +28,13 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @Import(StorageConfiguration.class)
-@EnableConfigurationProperties({CanonicalServiceProperties.class, CatalogOidcProperties.class})
+@EnableConfigurationProperties({CanonicalServiceProperties.class, CatalogOidcProperties.class, CatalogCorsProperties.class})
 public class AssetSecurity {
   @Bean org.springframework.security.core.userdetails.UserDetailsService noPasswordUsers() {
     return new org.springframework.security.provisioning.InMemoryUserDetailsManager();
@@ -58,7 +62,7 @@ public class AssetSecurity {
       }
     };
     // Only explicit bearer headers authenticate; no cookie/session/Basic authentication.
-    http.csrf(c->c.disable()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+    http.csrf(c->c.disable()).cors(Customizer.withDefaults()).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .requestCache(c->c.disable()).addFilterBefore(filter,AnonymousAuthenticationFilter.class)
         .authorizeHttpRequests(a->a
           .requestMatchers("/api/admin/**","/actuator/metrics","/actuator/metrics/**")
@@ -74,6 +78,21 @@ public class AssetSecurity {
       http.oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(catalogRolesConverter())));
     }
     return http.build();
+  }
+
+  // Spring Security resolves the explicit source by this conventional name
+  // before it evaluates authorization rules for a browser preflight.
+  @Bean(name = "corsConfigurationSource")
+  CorsConfigurationSource catalogCorsConfigurationSource(CatalogCorsProperties properties) {
+    var configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(properties.allowedOrigins());
+    configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.OPTIONS.name()));
+    configuration.setAllowedHeaders(List.of("Authorization", "Accept", "Content-Type"));
+    configuration.setAllowCredentials(false);
+    configuration.setMaxAge(3600L);
+    var source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/api/internal/v1/catalog/**", configuration);
+    return source;
   }
 
   private Converter<Jwt, ? extends AbstractAuthenticationToken> catalogRolesConverter() {

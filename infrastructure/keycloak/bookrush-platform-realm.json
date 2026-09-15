@@ -107,7 +107,8 @@
       ],
       "defaultClientScopes": [
         "profile",
-        "email"
+        "email",
+        "bookrush.catalog.read"
       ],
       "optionalClientScopes": [
         "profile",
@@ -163,6 +164,17 @@
             "id.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "backstage-catalog-read-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-catalog-admin",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
           }
         }
       ]
@@ -322,6 +334,14 @@
     },
     {
       "name": "email",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "bookrush.catalog.read",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "true",
