@@ -26,5 +26,11 @@ porta loopback ou pelo hostname configurado no arquivo hosts.
 O plugin de documentação de APIs é registrado explicitamente no app e usa sua
 fábrica oficial de widgets. Para o botão **Try it out**, o widget OpenAPI usa um
 interceptor que obtém o access token OIDC em memória e o envia apenas para
-hosts BookRush permitidos. Não se deve substituir essa fábrica por um objeto
-manual, pois isso causa `api is undefined` durante a inicialização do frontend.
+hosts BookRush permitidos.
+
+O interceptor é instalado por um *override* da extensão existente
+`api:api-docs/config`. Ele deve produzir a fábrica original com as dependências
+adicionais, nunca registrar outro `ApiBlueprint` ou outra fábrica para
+`apiDocsConfigRef`. Dois fornecedores da API `plugin.api-docs.config` impedem o
+frontend de iniciar com `API_FACTORY_CONFLICT`; uma fábrica manual também pode
+deixar `api` indefinida durante a inicialização.

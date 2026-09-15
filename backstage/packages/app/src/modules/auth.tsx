@@ -53,50 +53,61 @@ export const authModule = createFrontendModule({
         }),
     }),
     apiDocsPlugin.getExtension('api:api-docs/config').override({
-      factory: (_originalFactory, { apis }) => {
-        const widgets = defaultDefinitionWidgets().map(widget => {
-          if (widget.type !== 'openapi') return widget;
-          return {
-            ...widget,
-            component: (definition: string) => (
-              <OpenApiDefinitionWidget
-                definition={definition}
-                requestInterceptor={async request => {
-                  const target = new URL(request.url, window.location.origin);
-                  const allowedHosts = new Set([
-                    window.location.hostname,
-                    'bookrush.jteodoro.tec.br',
-                    'localhost',
-                    '127.0.0.1',
-                  ]);
-                  if (!allowedHosts.has(target.hostname)) return request;
-                  const authApi = apis.get(oidcApiRef);
-                  const token = authApi ? await authApi.getAccessToken() : undefined;
-                  if (!token) return request;
-                  if (request.headers?.set) {
-                    request.headers.set('Authorization', `Bearer ${token}`);
-                  } else {
-                    request.headers = {
-                      ...(request.headers ?? {}),
-                      Authorization: `Bearer ${token}`,
-                    };
-                  }
-                  return request;
-                }}
-              />
-            ),
-          };
-        });
-        return [
-          ApiBlueprint.dataRefs.factory({
-            api: apiDocsConfigRef,
-            deps: {},
-            factory: () => ({
-              getApiDefinitionWidget: (apiEntity: any) =>
-                widgets.find(widget => widget.type === apiEntity.spec.type),
+      // This replaces the API Docs factory. Registering another ApiBlueprint
+      // from the app creates a second provider for plugin.api-docs.config.
+      *factory(originalFactory) {
+        yield* originalFactory({
+          params: define =>
+            define({
+              api: apiDocsConfigRef,
+              deps: { authApi: oidcApiRef },
+              factory: ({ authApi }) => {
+                const widgets = defaultDefinitionWidgets().map(widget => {
+                  if (widget.type !== 'openapi') return widget;
+                  return {
+                    ...widget,
+                    component: (definition: string) => (
+                      <OpenApiDefinitionWidget
+                        definition={definition}
+                        requestInterceptor={async request => {
+                          const target = new URL(
+                            request.url,
+                            window.location.origin,
+                          );
+                          const allowedHosts = new Set([
+                            window.location.hostname,
+                            'bookrush.jteodoro.tec.br',
+                            'localhost',
+                            '127.0.0.1',
+                          ]);
+                          if (!allowedHosts.has(target.hostname))
+                            return request;
+                          const token = await authApi.getAccessToken();
+                          if (!token) return request;
+                          if (request.headers?.set) {
+                            request.headers.set(
+                              'Authorization',
+                              `Bearer ${token}`,
+                            );
+                          } else {
+                            request.headers = {
+                              ...(request.headers ?? {}),
+                              Authorization: `Bearer ${token}`,
+                            };
+                          }
+                          return request;
+                        }}
+                      />
+                    ),
+                  };
+                });
+                return {
+                  getApiDefinitionWidget: (apiEntity: any) =>
+                    widgets.find(widget => widget.type === apiEntity.spec.type),
+                };
+              },
             }),
-          }),
-        ];
+        });
       },
     }),
     SignInPageBlueprint.make({
@@ -112,8 +123,8 @@ export const authModule = createFrontendModule({
                 // deployments therefore also use the non-local hostname as
                 // an explicit production signal; this prevents a stale
                 // guest provider from looping against /api/auth/guest.
-                (config.getOptionalString('auth.environment') === 'production'
-                  || !['localhost', '127.0.0.1'].includes(window.location.hostname))
+                config.getOptionalString('auth.environment') === 'production' ||
+                !['localhost', '127.0.0.1'].includes(window.location.hostname)
                   ? [
                       {
                         id: 'oidc',
