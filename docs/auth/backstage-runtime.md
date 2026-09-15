@@ -24,6 +24,7 @@ público. Se o DNS público não resolver durante um teste local, valide pela
 porta loopback ou pelo hostname configurado no arquivo hosts.
 
 O plugin de documentação de APIs é registrado explicitamente no app e usa sua
-fábrica oficial de widgets. A autenticação do portal ocorre no nível das APIs
-Backstage; não se deve substituir essa fábrica por um objeto manual, pois isso
-causa `api is undefined` durante a inicialização do frontend.
+fábrica oficial de widgets. Para o botão **Try it out**, o widget OpenAPI usa um
+interceptor que obtém o access token OIDC em memória e o envia apenas para
+hosts BookRush permitidos. Não se deve substituir essa fábrica por um objeto
+manual, pois isso causa `api is undefined` durante a inicialização do frontend.

@@ -16,6 +16,12 @@ import {
   createFrontendModule,
 } from '@backstage/frontend-plugin-api';
 import { SignInPageBlueprint } from '@backstage/plugin-app-react';
+import {
+  OpenApiDefinitionWidget,
+  apiDocsConfigRef,
+  defaultDefinitionWidgets,
+} from '@backstage/plugin-api-docs';
+import apiDocsPlugin from '@backstage/plugin-api-docs/alpha';
 
 export const oidcApiRef = createApiRef<
   BackstageIdentityApi & ProfileInfoApi & SessionApi & OAuthApi
@@ -45,6 +51,53 @@ export const authModule = createFrontendModule({
               environment: configApi.getOptionalString('auth.environment'),
             }),
         }),
+    }),
+    apiDocsPlugin.getExtension('api:api-docs/config').override({
+      factory: (_originalFactory, { apis }) => {
+        const widgets = defaultDefinitionWidgets().map(widget => {
+          if (widget.type !== 'openapi') return widget;
+          return {
+            ...widget,
+            component: (definition: string) => (
+              <OpenApiDefinitionWidget
+                definition={definition}
+                requestInterceptor={async request => {
+                  const target = new URL(request.url, window.location.origin);
+                  const allowedHosts = new Set([
+                    window.location.hostname,
+                    'bookrush.jteodoro.tec.br',
+                    'localhost',
+                    '127.0.0.1',
+                  ]);
+                  if (!allowedHosts.has(target.hostname)) return request;
+                  const authApi = apis.get(oidcApiRef);
+                  const token = authApi ? await authApi.getAccessToken() : undefined;
+                  if (!token) return request;
+                  if (request.headers?.set) {
+                    request.headers.set('Authorization', `Bearer ${token}`);
+                  } else {
+                    request.headers = {
+                      ...(request.headers ?? {}),
+                      Authorization: `Bearer ${token}`,
+                    };
+                  }
+                  return request;
+                }}
+              />
+            ),
+          };
+        });
+        return [
+          ApiBlueprint.dataRefs.factory({
+            api: apiDocsConfigRef,
+            deps: {},
+            factory: () => ({
+              getApiDefinitionWidget: (apiEntity: any) =>
+                widgets.find(widget => widget.type === apiEntity.spec.type),
+            }),
+          }),
+        ];
+      },
     }),
     SignInPageBlueprint.make({
       params: {
