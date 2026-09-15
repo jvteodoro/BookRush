@@ -23,5 +23,15 @@ public final class StatisticalFeatureCalculator {
         "lexical_complexity", words.stream().mapToInt(String::length).average().orElse(0),
         "readability_flesch_estimate", resultReadability);
   }
+  /** Language-aware V1 facade; unsupported languages retain only structural-independent lexical metrics. */
+  public static Map<String, Double> calculate(String text, String language, Set<String> stopwords) {
+    if (text == null || text.isBlank()) return Map.of();
+    var base = new LinkedHashMap<>(calculate(text, stopwords));
+    var lexical = LexicalDiversityCalculator.calculate(text).values();
+    base.putAll(lexical);
+    var readability = ReadabilityCalculator.calculate(text, language);
+    base.putAll(readability.values());
+    return Map.copyOf(base);
+  }
   private static int syllables(String word) { int n=0; boolean vowel=false; for (int i=0;i<word.length();i++) { boolean now="aeiouyáéíóúâêôãõàëïöü".indexOf(word.charAt(i))>=0; if(now&&!vowel)n++; vowel=now; } return Math.max(1,n); }
 }

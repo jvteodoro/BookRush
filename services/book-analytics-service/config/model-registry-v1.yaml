@@ -1,0 +1,51 @@
+registry_version: "1.0.0"
+models:
+  - id: fasttext-lid176-v1
+    purpose: LANGUAGE_VALIDATION
+    framework: fasttext
+    artifact: lid.176.bin
+    upstream: "https://fasttext.cc/docs/en/language-identification.html"
+    license: CC-BY-SA-3.0
+    expected_size: "~126 MB"
+    revision_policy: "Persist artifact SHA256."
+  - id: spacy-en-core-web-sm-v1
+    purpose: LINGUISTIC_NLP_EN
+    framework: spacy
+    package: en_core_web_sm
+    version: "3.8.0"
+    license: MIT
+    language: en
+  - id: spacy-pt-core-news-sm-v1
+    purpose: LINGUISTIC_NLP_PT
+    framework: spacy
+    package: pt_core_news_sm
+    version_policy: "Pin repository-compatible 3.8.x release and SHA256 during implementation."
+    language: pt
+  - id: bge-m3-dense-v1
+    purpose: SEMANTIC_EMBEDDING
+    framework: huggingface
+    repo: BAAI/bge-m3
+    license: MIT
+    revision_policy: "Pin immutable HF commit before production calculation."
+    dimension: 1024
+    max_sequence_length: 8192
+    mode: dense
+    output_dtype: float32
+    persisted_normalization: l2
+    sparse: false
+    colbert: false
+  - id: mdeberta-nli-v1
+    purpose: NARRATIVE_AND_EMOTION_NLI
+    framework: huggingface
+    repo: MoritzLaurer/mDeBERTa-v3-base-mnli-xnli
+    license: MIT
+    revision_policy: "Pin immutable HF commit before production calculation."
+    output_labels: [entailment, neutral, contradiction]
+    derived:
+      support: "entailment/(entailment+contradiction)"
+      confidence: "1-neutral"
+derived_artifacts:
+  - {id: corpus-frequency-v1, type: CORPUS_MODEL, per_language: true}
+  - {id: style-normalization-v1, type: CORPUS_MODEL, per_language: true}
+  - {id: semantic-prototype-set-v1, type: PROTOTYPE_MODEL, source: semantic-prototypes-v1.yaml, embedding_model: bge-m3-dense-v1}
+  - {id: book-topic-classifier-v1, type: SUPERVISED_CLASSIFIER, input: semantic.bge_m3.document_v1, algorithm: "OneVsRest LogisticRegression", promotion: "Requires documented holdout acceptance."}

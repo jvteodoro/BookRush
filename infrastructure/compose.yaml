@@ -286,11 +286,15 @@ services:
       SERVER_PORT: 8091
       BOOKRUSH_PUBLIC_URL: ${BOOKRUSH_PUBLIC_URL:-https://bookrush.jteodoro.tec.br}
       ANALYTICS_WORKER_ENABLED: ${ANALYTICS_WORKER_ENABLED:-true}
+      ANALYTICS_OFFLINE: ${ANALYTICS_OFFLINE:-true}
+      ANALYTICS_MODEL_CACHE_DIR: ${ANALYTICS_MODEL_CACHE_DIR:-/var/lib/bookrush/models}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
       STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_PATH_STYLE: ${STORAGE_PATH_STYLE:-true}
+    volumes:
+      - analytics_models:/var/lib/bookrush/models:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -363,6 +367,7 @@ volumes:
   seaweedfs_data:
   postgres_data:
   redis_data:
+  analytics_models:
   pgadmin_data:
   jenkins_home:
   keycloak_data:

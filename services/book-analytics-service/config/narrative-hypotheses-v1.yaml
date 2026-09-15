@@ -1,0 +1,60 @@
+spec_version: "1.0.0"
+model: mdeberta-nli-v1
+scoring:
+  persist_raw_labels: true
+  support: "entailment/(entailment+contradiction)"
+  confidence: "1-neutral"
+narrative:
+  conflict:
+    en: "This passage contains an active conflict between characters, groups, goals, or opposing forces."
+    pt: "Este trecho contém um conflito ativo entre personagens, grupos, objetivos ou forças opostas."
+  suspense:
+    en: "This passage creates uncertainty about an important upcoming outcome."
+    pt: "Este trecho cria incerteza sobre um resultado importante que ainda está por acontecer."
+  introspection:
+    en: "This passage focuses on a character's thoughts, emotions, self-reflection, or inner conflict."
+    pt: "Este trecho se concentra nos pensamentos, emoções, autorreflexão ou conflito interno de um personagem."
+  self_containment:
+    en: "This passage can be understood on its own without needing important information from the surrounding text."
+    pt: "Este trecho pode ser compreendido por si só sem precisar de informações importantes do texto ao redor."
+  curiosity_gap:
+    en: "This passage leaves an important unresolved question or missing piece of information that encourages continued reading."
+    pt: "Este trecho deixa uma pergunta importante sem resposta ou uma informação relevante faltando que incentiva a continuar lendo."
+  cliffhanger:
+    en: "The ending of this passage deliberately leaves an event or outcome unresolved."
+    pt: "O final deste trecho deixa deliberadamente um acontecimento ou resultado sem resolução."
+  revelation:
+    en: "This passage reveals important information that was previously hidden, unknown, or misunderstood."
+    pt: "Este trecho revela uma informação importante que antes estava escondida, desconhecida ou mal compreendida."
+  resolution:
+    en: "This passage resolves an important conflict, uncertainty, or narrative question."
+    pt: "Este trecho resolve um conflito, uma incerteza ou uma questão narrativa importante."
+  quotability:
+    en: "This passage contains a memorable statement that is meaningful and understandable when quoted on its own."
+    pt: "Este trecho contém uma afirmação memorável que mantém sentido e pode ser compreendida quando citada isoladamente."
+emotions:
+  joy:
+    en: "This passage expresses or depicts joy, happiness, delight, or celebration."
+    pt: "Este trecho expressa ou retrata alegria, felicidade, prazer ou celebração."
+  sadness:
+    en: "This passage expresses or depicts sadness, sorrow, grief, or emotional loss."
+    pt: "Este trecho expressa ou retrata tristeza, pesar, luto ou perda emocional."
+  fear:
+    en: "This passage expresses or depicts fear, dread, anxiety, or threat."
+    pt: "Este trecho expressa ou retrata medo, pavor, ansiedade ou ameaça."
+  anger:
+    en: "This passage expresses or depicts anger, rage, resentment, or hostility."
+    pt: "Este trecho expressa ou retrata raiva, fúria, ressentimento ou hostilidade."
+  surprise:
+    en: "This passage expresses or depicts surprise, shock, or an unexpected development."
+    pt: "Este trecho expressa ou retrata surpresa, choque ou um acontecimento inesperado."
+  disgust:
+    en: "This passage expresses or depicts disgust, revulsion, or strong aversion."
+    pt: "Este trecho expressa ou retrata nojo, repulsa ou forte aversão."
+  affection:
+    en: "This passage expresses or depicts affection, tenderness, love, or emotional closeness."
+    pt: "Este trecho expressa ou retrata afeto, ternura, amor ou proximidade emocional."
+validation:
+  sample_en: 50
+  sample_pt: 50
+  compare_hypothesis_language_for_pt: true

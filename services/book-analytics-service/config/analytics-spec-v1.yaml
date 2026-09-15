@@ -1,0 +1,82 @@
+spec_version: "1.0.0"
+name: "BookRush Content Analytics V1"
+canonical_offset_unit: unicode_code_point
+canonical_interval: half_open
+full_linguistic_languages: [en, pt]
+value_status: [VALID, UNSUPPORTED, INVALID_INPUT, INSUFFICIENT_SAMPLE, MODEL_UNAVAILABLE, ERROR]
+scopes: [DOCUMENT, CHAPTER, EXCERPT]
+
+features:
+  - {code: struct.word_count, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: INTEGER, analyzer: structural-v1}
+  - {code: struct.character_count, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: INTEGER, unit: unicode_code_point, analyzer: structural-v1}
+  - {code: struct.sentence_count, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: INTEGER, analyzer: structural-v1}
+  - {code: struct.paragraph_count, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: INTEGER, analyzer: structural-v1}
+  - {code: struct.avg_word_chars, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: structural-v1, formula: "sum(word_codepoints)/word_count"}
+  - {code: struct.avg_sentence_words, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: structural-v1, formula: "word_count/sentence_count"}
+  - {code: struct.avg_paragraph_words, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: structural-v1, formula: "word_count/paragraph_count"}
+  - {code: struct.question_count, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: INTEGER, analyzer: structural-v1}
+  - {code: struct.question_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: structural-v1, range: [0.0, 1.0]}
+  - {code: struct.exclamation_count, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: INTEGER, analyzer: structural-v1}
+  - {code: struct.exclamation_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: structural-v1, range: [0.0, 1.0]}
+  - {code: struct.dialogue_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: dialogue-detector-v1, range: [0.0, 1.0]}
+  - {code: struct.punctuation_density, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: structural-v1}
+  - {code: struct.estimated_read_seconds_220wpm, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, unit: second, analyzer: structural-v1, formula: "word_count/220*60"}
+  - {code: struct.relative_document_position, category: MEASUREMENT, scopes: [CHAPTER, EXCERPT], value_type: FLOAT, analyzer: position-v1, range: [0.0, 1.0]}
+  - {code: struct.relative_chapter_position, category: MEASUREMENT, scopes: [EXCERPT], value_type: FLOAT, analyzer: position-v1, range: [0.0, 1.0]}
+
+  - {code: lex.ttr, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: lexical-diversity-v1, formula: "V/N"}
+  - {code: lex.herdan_c, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: lexical-diversity-v1, formula: "ln(V)/ln(N)"}
+  - {code: lex.yule_k, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: lexical-diversity-v1, formula: "10000*(M2-N)/(N*N), M2=sum(i^2*V_i)"}
+  - {code: lex.hapax_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: lexical-diversity-v1}
+  - {code: lex.lemma_type_count, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: INTEGER, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: lex.mean_unigram_surprisal, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: corpus-frequency-v1, dependency: corpus_frequency_model}
+  - {code: lex.median_unigram_surprisal, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: corpus-frequency-v1, dependency: corpus_frequency_model}
+  - {code: lex.p90_unigram_surprisal, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: corpus-frequency-v1, dependency: corpus_frequency_model}
+
+  - {code: readability.avg_syllables_per_word, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: syllable-counter-v1, languages: [en, pt]}
+  - {code: readability.avg_words_per_sentence, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: structural-v1, languages: [en, pt]}
+  - {code: readability.flesch_en, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: flesch-en-v1, languages: [en], formula: "206.835-1.015*(words/sentences)-84.6*(syllables/words)"}
+  - {code: readability.flesch_ptbr, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: flesch-ptbr-v1, languages: [pt], formula: "248.835-1.015*(words/sentences)-84.6*(syllables/words)"}
+
+  - {code: syntax.noun_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.verb_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.adjective_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.adverb_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.pronoun_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.proper_noun_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.entity_density_per_100_words, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.person_entity_density_per_100_words, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.dependency_depth_mean, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.dependency_depth_p90, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+  - {code: syntax.subordinate_clause_ratio, category: MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: FLOAT, analyzer: spacy-linguistic-v1, languages: [en, pt]}
+
+  - {code: style.vector_v1, category: DERIVED_MEASUREMENT, scopes: [DOCUMENT, CHAPTER, EXCERPT], value_type: VECTOR, analyzer: style-vector-v1, dependency: style_normalization_model}
+
+  - {code: semantic.bge_m3.excerpt_v1, category: MODEL_REPRESENTATION, scopes: [EXCERPT], value_type: VECTOR, dimensions: 1024, analyzer: bge-m3-dense-v1}
+  - {code: semantic.bge_m3.chapter_v1, category: MODEL_REPRESENTATION, scopes: [CHAPTER], value_type: VECTOR, dimensions: 1024, analyzer: bge-m3-dense-v1, aggregation: token_weighted_mean_then_l2}
+  - {code: semantic.bge_m3.document_v1, category: MODEL_REPRESENTATION, scopes: [DOCUMENT], value_type: VECTOR, dimensions: 1024, analyzer: bge-m3-dense-v1, aggregation: chapter_weighted_mean_then_l2}
+
+  - {code: emotion.peak_support, category: DERIVED_MODEL_SCORE, scopes: [EXCERPT], value_type: FLOAT, analyzer: emotion-nli-v1, range: [0.0, 1.0]}
+  - {code: emotion.mean_support, category: DERIVED_MODEL_SCORE, scopes: [EXCERPT], value_type: FLOAT, analyzer: emotion-nli-v1, range: [0.0, 1.0]}
+
+dynamic_feature_families:
+  semantic_prototypes:
+    source: semantic-prototypes-v1.yaml
+    code_template: "semantic.prototype.{concept}.raw_cosine"
+    category: MODEL_SCORE
+    scopes: [DOCUMENT, CHAPTER, EXCERPT]
+    range: [-1.0, 1.0]
+  narrative_nli:
+    source: narrative-hypotheses-v1.yaml
+    concepts: [conflict, suspense, introspection, self_containment, curiosity_gap, cliffhanger, revelation, resolution, quotability]
+    components: [entailment, neutral, contradiction, support, confidence]
+    code_template: "narrative.{concept}.{component}"
+    category: MODEL_SCORE
+    scopes: [EXCERPT]
+  emotion_nli:
+    source: narrative-hypotheses-v1.yaml
+    concepts: [joy, sadness, fear, anger, surprise, disgust, affection]
+    components: [entailment, neutral, contradiction, support, confidence]
+    code_template: "emotion.{concept}.{component}"
+    category: MODEL_SCORE
+    scopes: [EXCERPT]

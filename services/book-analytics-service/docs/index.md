@@ -4,9 +4,13 @@ O `book-analytics-service` owns o schema PostgreSQL `analytics`. Ele lê o
 catálogo canônico, mas não copia nem modifica `catalog`. Cada execução e cada
 observação mantém a versão física textual que produziu o resultado.
 
-A primeira entrega cria o contrato relacional para jobs, features, excerpts e
-embeddings. A geração de features e modelos locais será adicionada em etapas
-posteriores, sempre com analyzer e versão registrados.
+A versão V1 mantém esse contrato e adiciona lineage de artefatos, status explícito
+de valor, modelos de corpus/estilo/protótipos/tópicos, embeddings tipados e
+ranking explicável por migration aditiva. Os contratos machine-readable ficam em
+`config/` e são validados no CI por `scripts/validate-analytics-specs.py`.
+
+O handbook raiz contém a visão consolidada em `docs/analytics-v1.md`; os arquivos
+machine-readable permanecem em `../config/` no repositório.
 
 ## Features baseline
 
@@ -47,3 +51,6 @@ a persistência deve usar a chave composta da migration para evitar duplicação
 O ranker baseline usa pesos versionados e devolve contribuições por feature para
 explicação. O resultado é um `candidate_score` limitado a `[0,1]`, não uma
 probabilidade de engajamento nem uma decisão jurídica/editorial.
+
+Consulte o [dicionário de features](feature-dictionary.md) para distinguir
+medições, scores de modelo e sinais de seleção de produto.

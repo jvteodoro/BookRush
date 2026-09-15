@@ -1,0 +1,42 @@
+spec_version: "1.0.0"
+embedding_model: bge-m3-dense-v1
+centroid_formula: "normalize(mean(normalize(embed(example_i))))"
+score_formula: "cos(entity_embedding,prototype_vector)"
+warning: "Raw cosine is similarity, not probability."
+concepts:
+  philosophy:
+    en: ["Reflection on existence, meaning, knowledge, truth, morality, consciousness, or reality.", "A character questions ethical principles, free will, responsibility, or the meaning of life.", "Abstract reasoning about human nature, values, justice, knowledge, or metaphysics."]
+    pt: ["Reflexão sobre existência, sentido, conhecimento, verdade, moralidade, consciência ou realidade.", "Um personagem questiona princípios éticos, livre-arbítrio, responsabilidade ou o sentido da vida.", "Raciocínio abstrato sobre natureza humana, valores, justiça, conhecimento ou metafísica."]
+  romance:
+    en: ["Romantic attraction, courtship, desire, intimacy, or a developing love relationship.", "Characters reflect on love, romantic commitment, jealousy, or obstacles to a relationship.", "A scene centered on romantic affection."]
+    pt: ["Atração romântica, corte, desejo, intimidade ou desenvolvimento de relacionamento amoroso.", "Personagens refletem sobre amor, compromisso, ciúme ou obstáculos a um relacionamento.", "Uma cena centrada no afeto romântico."]
+  politics:
+    en: ["Government, political power, ideology, public institutions, rulers, policy, or political authority.", "Discussion of how society should be governed or power distributed.", "Conflict involving the state, public authority, movements, or political institutions."]
+    pt: ["Governo, poder político, ideologia, instituições públicas, governantes, políticas ou autoridade política.", "Discussão sobre como a sociedade deve ser governada ou o poder distribuído.", "Conflito envolvendo Estado, autoridade pública, movimentos ou instituições políticas."]
+  mystery:
+    en: ["An unexplained event, hidden cause, secret, crime, clue, investigation, or unanswered question.", "Characters seek evidence to discover what happened or who is responsible.", "The text withholds key information and invites investigation."]
+    pt: ["Acontecimento inexplicado, causa oculta, segredo, crime, pista, investigação ou pergunta sem resposta.", "Personagens buscam evidências para descobrir o que aconteceu ou quem é responsável.", "O texto oculta informação importante e convida à investigação."]
+  conflict:
+    en: ["Opposing characters, groups, goals, values, or forces are in active tension.", "A confrontation, disagreement, struggle, battle, or incompatible objective drives the scene.", "Obstacles and opposition prevent a desired outcome."]
+    pt: ["Personagens, grupos, objetivos, valores ou forças opostas estão em tensão ativa.", "Confronto, desacordo, luta, batalha ou objetivo incompatível conduz a cena.", "Obstáculos e oposição impedem um resultado desejado."]
+  introspection:
+    en: ["A character examines thoughts, motives, emotions, memories, or identity.", "The passage is dominated by internal reflection rather than external action.", "The narrator explores an inner dilemma, guilt, desire, or self-understanding."]
+    pt: ["Um personagem examina pensamentos, motivos, emoções, memórias ou identidade.", "O trecho é dominado por reflexão interna, não ação externa.", "O narrador explora dilema interno, culpa, desejo ou autocompreensão."]
+  religion:
+    en: ["Religious belief, worship, prayer, faith, doctrine, God, sacred practice, or spiritual commitment.", "Reflection on divine authority, salvation, sin, duty, or spiritual experience.", "Organized religion, sacred texts, ritual, or theological ideas."]
+    pt: ["Crença religiosa, culto, oração, fé, doutrina, Deus, prática sagrada ou compromisso espiritual.", "Reflexão sobre autoridade divina, salvação, pecado, dever ou experiência espiritual.", "Religião organizada, textos sagrados, ritual ou ideias teológicas."]
+  war:
+    en: ["Military conflict, armed forces, battle, soldiers, strategy, invasion, or consequences of war.", "People experience combat, mobilization, occupation, or wartime destruction.", "Organized armed conflict between groups or states."]
+    pt: ["Conflito militar, forças armadas, batalha, soldados, estratégia, invasão ou consequências da guerra.", "Pessoas vivenciam combate, mobilização, ocupação ou destruição da guerra.", "Conflito armado organizado entre grupos ou Estados."]
+  family:
+    en: ["Family relationships, parenthood, siblings, children, marriage as family structure, or obligations among relatives.", "Tensions, care, affection, inheritance, or responsibilities inside a family.", "Events understood through roles as parents, children, siblings, spouses, or relatives."]
+    pt: ["Relações familiares, parentalidade, irmãos, filhos, casamento como estrutura familiar ou obrigações entre parentes.", "Tensões, cuidado, afeto, herança ou responsabilidades dentro de uma família.", "Eventos compreendidos por papéis de pais, filhos, irmãos, cônjuges ou parentes."]
+  friendship:
+    en: ["Friendship, companionship, loyalty, trust, support, or conflict between friends.", "A relationship between friends is central.", "Characters act from friendship rather than romance or family obligation."]
+    pt: ["Amizade, companheirismo, lealdade, confiança, apoio ou conflito entre amigos.", "Uma relação entre amigos é central.", "Personagens agem por amizade, não romance ou obrigação familiar."]
+  grief:
+    en: ["Grief, mourning, bereavement, emotional loss, death, or separation.", "A character experiences sorrow connected to a significant loss.", "Reflection on absence, mourning, death, or consequences of losing someone or something."]
+    pt: ["Luto, pesar, perda emocional, morte ou separação.", "Um personagem vivencia tristeza ligada a uma perda significativa.", "Reflexão sobre ausência, luto, morte ou consequências de perder alguém ou algo."]
+  identity:
+    en: ["A character questions or defines who they are, their role, belonging, or personal identity.", "Tension between self-image and how society or others define a person.", "Reflection on identity, belonging, transformation, or becoming."]
+    pt: ["Um personagem questiona ou define quem é, seu papel, pertencimento ou identidade.", "Tensão entre autoimagem e como sociedade ou outros definem alguém.", "Reflexão sobre identidade, pertencimento, transformação ou tornar-se."]

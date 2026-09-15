@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BookRush Analytics Spec V1",
+  "type": "object",
+  "required": [
+    "spec_version",
+    "name",
+    "features"
+  ],
+  "properties": {
+    "spec_version": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "canonical_offset_unit": {
+      "const": "unicode_code_point"
+    },
+    "canonical_interval": {
+      "const": "half_open"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "category",
+          "scopes",
+          "value_type",
+          "analyzer"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.]+$"
+          },
+          "category": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "DOCUMENT",
+                "CHAPTER",
+                "EXCERPT"
+              ]
+            }
+          },
+          "value_type": {
+            "type": "string"
+          },
+          "analyzer": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

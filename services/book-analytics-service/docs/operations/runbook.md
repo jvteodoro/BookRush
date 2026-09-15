@@ -57,3 +57,11 @@ em 2026-09-14 nesta máquina, com 1.000 livros: `12.000` excerpts, `0,014 s`,
 `72.785,88 livros/s`, `873.430,59 excerpts/s`, `3.079.000` bytes UTF-8 e
 `9.608 KiB` de RSS. É baseline de harness, não SLA de produção; repita após
 alterar o algoritmo ou o hardware.
+
+## Preparação explícita de modelos
+
+Antes de habilitar embeddings/NLI, prepare o cache com `make analytics-models-fetch`
+e valide os SHA-256. O serviço não baixa modelos no startup. Em modo offline,
+`ANALYTICS_OFFLINE=true`, artefato ausente resulta em `MODEL_UNAVAILABLE` para o
+estágio dependente. Nenhum bulk é iniciado automaticamente; siga os gates do
+`VALIDATION_PLAN_V1.md`.

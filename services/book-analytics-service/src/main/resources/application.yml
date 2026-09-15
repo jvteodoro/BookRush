@@ -26,6 +26,9 @@ bookrush:
   openapi.server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}/analytics
   security.enabled: ${ANALYTICS_SECURITY_ENABLED:false}
 analytics:
+  models:
+    cache-dir: ${ANALYTICS_MODEL_CACHE_DIR:/var/lib/bookrush/models}
+    offline: ${ANALYTICS_OFFLINE:true}
   worker:
     enabled: ${ANALYTICS_WORKER_ENABLED:false}
     poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}

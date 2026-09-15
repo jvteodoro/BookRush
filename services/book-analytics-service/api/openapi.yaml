@@ -3,6 +3,12 @@ info:
   title: BookRush Analytics API
   version: 1.0.0
   description: APIs internas para consultar analytics versionado de conteúdo.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
 servers:
   - url: https://bookrush.jteodoro.tec.br/analytics
 paths:
@@ -76,3 +82,38 @@ paths:
       responses:
         '202': {description: Job recolocado na fila}
         '404': {description: Job inexistente ou não retomável}
+  /api/admin/v1/content-analytics/jobs:
+    post:
+      summary: Criar job de Content Analytics V1
+      security: [{bearerAuth: []}]
+      responses: {'202': {description: Job criado ou recuperado}, '409': {description: Conflito de idempotência}}
+  /api/admin/v1/content-analytics/jobs/{jobId}:
+    get:
+      summary: Consultar job de Content Analytics V1
+      security: [{bearerAuth: []}]
+      parameters: [{name: jobId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'200': {description: Estado persistido}, '404': {description: Job inexistente}}
+  /api/admin/v1/content-analytics/jobs/{jobId}/cancel:
+    post:
+      summary: Cancelar job cooperativamente
+      security: [{bearerAuth: []}]
+      parameters: [{name: jobId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'202': {description: Cancelamento solicitado}}
+  /api/internal/v1/content-analytics/asset-versions/{assetVersionId}:
+    get:
+      summary: Analytics de uma versão textual exata
+      security: [{bearerAuth: []}]
+      parameters: [{name: assetVersionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'200': {description: Excerpts e linhagem da versão}, '404': {description: Versão inexistente}}
+  /api/internal/v1/content-analytics/asset-versions/{assetVersionId}/excerpts:
+    get:
+      summary: Excerpts de uma versão textual
+      security: [{bearerAuth: []}]
+      parameters: [{name: assetVersionId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'200': {description: Excerpts com offsets codepoint}}
+  /api/internal/v1/content-analytics/excerpts/{excerptId}:
+    get:
+      summary: Consultar excerpt e hash de origem
+      security: [{bearerAuth: []}]
+      parameters: [{name: excerptId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses: {'200': {description: Excerpt versionado}, '404': {description: Excerpt inexistente}}
