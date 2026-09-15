@@ -26,35 +26,12 @@ import apiDocsPlugin from '@backstage/plugin-api-docs/alpha';
 export const oidcApiRef = createApiRef<
   BackstageIdentityApi & ProfileInfoApi & SessionApi & OAuthApi
 >({ id: 'auth.bookrush-oidc' });
-export const authModule = createFrontendModule({
-  pluginId: 'app',
+
+export const apiDocsWithOidcPlugin = apiDocsPlugin.withOverrides({
   extensions: [
-    ApiBlueprint.make({
-      name: 'bookrush-oidc',
-      params: define =>
-        define({
-          api: oidcApiRef,
-          deps: {
-            discoveryApi: discoveryApiRef,
-            oauthRequestApi: oauthRequestApiRef,
-            configApi: configApiRef,
-          },
-          factory: ({ discoveryApi, oauthRequestApi, configApi }) =>
-            OAuth2.create({
-              discoveryApi,
-              oauthRequestApi,
-              configApi,
-              provider: { id: 'oidc', title: 'Keycloak', icon: () => null },
-              // The backend requests profile/email as additional OIDC scopes;
-              // keep the browser request minimal and rely on the realm mappers.
-              defaultScopes: ['openid'],
-              environment: configApi.getOptionalString('auth.environment'),
-            }),
-        }),
-    }),
     apiDocsPlugin.getExtension('api:api-docs/config').override({
-      // This replaces the API Docs factory. Registering another ApiBlueprint
-      // from the app creates a second provider for plugin.api-docs.config.
+      // This is an override owned by api-docs. Adding it to the app module
+      // would create a second provider for plugin.api-docs.config.
       *factory(originalFactory) {
         yield* originalFactory({
           params: define =>
@@ -80,8 +57,9 @@ export const authModule = createFrontendModule({
                             'localhost',
                             '127.0.0.1',
                           ]);
-                          if (!allowedHosts.has(target.hostname))
+                          if (!allowedHosts.has(target.hostname)) {
                             return request;
+                          }
                           const token = await authApi.getAccessToken();
                           if (!token) return request;
                           if (request.headers?.set) {
@@ -109,6 +87,35 @@ export const authModule = createFrontendModule({
             }),
         });
       },
+    }),
+  ],
+});
+
+export const authModule = createFrontendModule({
+  pluginId: 'app',
+  extensions: [
+    ApiBlueprint.make({
+      name: 'bookrush-oidc',
+      params: define =>
+        define({
+          api: oidcApiRef,
+          deps: {
+            discoveryApi: discoveryApiRef,
+            oauthRequestApi: oauthRequestApiRef,
+            configApi: configApiRef,
+          },
+          factory: ({ discoveryApi, oauthRequestApi, configApi }) =>
+            OAuth2.create({
+              discoveryApi,
+              oauthRequestApi,
+              configApi,
+              provider: { id: 'oidc', title: 'Keycloak', icon: () => null },
+              // The backend requests profile/email as additional OIDC scopes;
+              // keep the browser request minimal and rely on the realm mappers.
+              defaultScopes: ['openid'],
+              environment: configApi.getOptionalString('auth.environment'),
+            }),
+        }),
     }),
     SignInPageBlueprint.make({
       params: {

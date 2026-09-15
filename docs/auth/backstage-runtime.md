@@ -29,8 +29,10 @@ interceptor que obtém o access token OIDC em memória e o envia apenas para
 hosts BookRush permitidos.
 
 O interceptor é instalado por um *override* da extensão existente
-`api:api-docs/config`. Ele deve produzir a fábrica original com as dependências
-adicionais, nunca registrar outro `ApiBlueprint` ou outra fábrica para
+`api:api-docs/config`, aplicado com `apiDocsPlugin.withOverrides(...)`. O
+`App` carrega essa variante do plugin. O override deve produzir a fábrica
+original com as dependências adicionais, nunca entrar na lista de extensões do
+módulo `app`, registrar outro `ApiBlueprint` ou criar outra fábrica para
 `apiDocsConfigRef`. Dois fornecedores da API `plugin.api-docs.config` impedem o
 frontend de iniciar com `API_FACTORY_CONFLICT`; uma fábrica manual também pode
 deixar `api` indefinida durante a inicialização.
