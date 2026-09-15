@@ -85,6 +85,13 @@ documentação possa ser verificada sem reconstruir os microserviços. Por padr�
 ela faz checkout, executa `scripts/test-portal.sh` e cria uma imagem local;
 `PUBLISH` e `DEPLOY` são opt-ins.
 
+O Jenkinsfile inclui polling SCM a cada cinco minutos como fallback para
+ambientes sem webhook. Assim, alterações em `catalog-info.yaml`, `api/`,
+`docs/` ou no próprio portal regeneram o catálogo e o TechDocs. Em instalações
+com webhook GitHub, prefira o webhook e mantenha o polling desativado no job
+para evitar builds duplicados. O job só publica ou implanta quando os
+parâmetros `PUBLISH`/`DEPLOY` estiverem habilitados.
+
 Para publicar, informe `REGISTRY`, habilite `PUBLISH` e configure a credential
 `REGISTRY_CREDENTIAL_ID`. Para atualizar o Compose do portal, habilite `DEPLOY`.
 Por padrão o job usa `/run/bookrush.env`, que é montado no container Jenkins

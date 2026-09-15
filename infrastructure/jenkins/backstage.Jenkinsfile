@@ -19,6 +19,13 @@ pipeline {
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
 
+  // The portal must be rebuilt when service catalog entries, contracts or
+  // TechDocs change. Configure this job as Pipeline from SCM; polling is a
+  // safe fallback when GitHub webhooks are not available.
+  triggers {
+    pollSCM('H/5 * * * *')
+  }
+
   stages {
     stage('Checkout da branch') {
       steps {
