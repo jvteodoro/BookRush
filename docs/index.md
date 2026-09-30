@@ -32,3 +32,5 @@ do serviço no catálogo Backstage; a propriedade e os limites estão em
 [ADR-004](adr/ADR-004-analytics-ownership.md).
 Consulte também o [contrato Analytics V1](analytics-v1.md) e o
 [procedimento de preparação de modelos](analytics-models.md).
+O [relatório operacional e de schema](analytics/report.md) consolida a execução
+validada, o modelo relacional e as limitações atuais.
