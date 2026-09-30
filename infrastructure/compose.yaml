@@ -90,6 +90,10 @@ services:
       retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Deliberately reachable only by local processes. Remote database tools must
+    # use an SSH tunnel to this host; PostgreSQL is never exposed directly.
+    ports:
+      - "127.0.0.1:${BOOKRUSH_POSTGRES_PORT:-15432}:5432"
     networks: [bookrush]
 
   redis:

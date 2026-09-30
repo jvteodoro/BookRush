@@ -77,3 +77,7 @@ migrado pelo catalog-service. Sua migration inicial referencia por FK a versão
 exata em `catalog.book_asset_version`; consulte o [ADR-004](../adr/ADR-004-analytics-ownership.md)
 e o [relatório de analytics](../analytics/report.md) para o modelo de
 excerpts/features/embeddings e seu estado operacional.
+
+Para acessar dados pelo DBeaver sem publicar PostgreSQL na internet, siga o
+[guia de acesso remoto por SSH](dbeaver-access.md). Use sempre a credencial
+somente leitura dedicada, e nunca o usuário proprietário da aplicação.
