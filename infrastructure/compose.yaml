@@ -496,6 +496,12 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_ADMIN_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_ADMIN_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_ADMIN_SECURITY_AUDIENCE:-bookrush-ingestion}
+      PUBLISHER_STORAGE_ENABLED: ${PUBLISHER_STORAGE_ENABLED:-true}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}
     depends_on:
       postgres:
         condition: service_healthy
