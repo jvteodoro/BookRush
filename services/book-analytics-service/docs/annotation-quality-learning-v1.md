@@ -19,6 +19,12 @@ Previsões do modelo, scores NLI, protótipos e rank heurístico não devem ser
 enviados pelo endpoint cego. O endpoint de contexto só responde depois de
 `primary_locked_at` existir.
 
+Após o lock, a resposta de contexto também inclui `modelFeatures` (features
+estruturais, semânticas e NLI persistidas para o excerpt) e `rankers` (scores
+heurísticos versionados, quando disponíveis). Esses valores são observações
+dos modelos para comparação; não são exibidos no endpoint cego e não alteram
+os labels humanos.
+
 ## Teste de integração do fluxo de lock
 
 O build da aplicação e um `PREPARE` SQL não são suficientes para validar este

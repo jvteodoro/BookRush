@@ -22,6 +22,7 @@ paths:
   /api/admin/v1/annotation/items/{itemId}/context:
     get:
       summary: Reveal context after primary lock
+      description: Returns the excerpt context plus model feature observations and ranker results. Model scores are unavailable before primary_locked_at and never alter the human labels.
       security: [{ bearerAuth: [bookrush.analytics] }]
 components:
   securitySchemes:
