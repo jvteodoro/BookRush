@@ -67,6 +67,9 @@ de staging e então reconcilie o container publisher.
 O formulário web executa esse fluxo completo para EPUB/PDF: cria o rascunho,
 envia o arquivo diretamente pela URL assinada, calcula SHA-256 no navegador,
 finaliza o upload e só então solicita a transição para revisão.
+Quando a submissão possui `catalogBookId`, a aba de estatísticas consulta os
+agregados reais do behavior-service por publicação. Uma submissão sem vínculo
+canônico aparece como `NOT_LINKED`, sem números inventados.
 
 As ações sociais usam os payloads do contrato vigente: comentários enviam
 `{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de

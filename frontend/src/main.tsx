@@ -169,6 +169,11 @@ function App() {
             if (!response.ok) throw new Error('Não foi possível enviar a publicação para revisão.');
             return response.json();
           },
+          publisherMetrics: async (id: string) => {
+            const response = await authClient.fetch(`/api/v1/publisher/submissions/${encodeURIComponent(id)}/metrics`);
+            if (!response.ok) throw new Error('Não foi possível carregar as métricas.');
+            return response.json();
+          },
           uploadSubmissionFile: async (submissionId: string, file: File) => {
             const request = await authClient.fetch(`/api/v1/publisher/submissions/${encodeURIComponent(submissionId)}/upload`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },

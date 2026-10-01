@@ -12,6 +12,7 @@ spring:
 management:
   endpoints.web.exposure.include: health,info,metrics
 publisher:
+  behavior-url: ${PUBLISHER_BEHAVIOR_URL:http://behavior-service:8097}
   storage:
     enabled: ${PUBLISHER_STORAGE_ENABLED:false}
     endpoint: ${STORAGE_ENDPOINT:http://seaweedfs:8333}

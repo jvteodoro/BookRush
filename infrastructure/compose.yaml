@@ -502,6 +502,7 @@ services:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}
+      PUBLISHER_BEHAVIOR_URL: ${PUBLISHER_BEHAVIOR_URL:-http://behavior-service:8097}
     depends_on:
       postgres:
         condition: service_healthy

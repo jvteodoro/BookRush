@@ -18,3 +18,8 @@ continuam dependentes dos contratos de storage/behavior ainda em execução.
 O staging permanece opt-in: habilite `PUBLISHER_STORAGE_ENABLED=true` somente quando `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` e o bucket configurado estiverem disponíveis. Sem essas variáveis o serviço continua operacional para metadata, mas não registra intenções de upload.
 O cliente S3 usa acesso path-style para SeaweedFS; isso evita resolução virtual-host
 de `bucket.seaweedfs` dentro da rede Compose.
+
+Uma submissão pode receber `catalogBookId` quando a canonização confirmar o
+livro. `GET /api/v1/publisher/submissions/{id}/metrics` então consulta os
+agregados diários do behavior-service e devolve apenas dados do livro ligado à
+submissão; enquanto não houver vínculo retorna `NOT_LINKED`.

@@ -91,6 +91,10 @@ public class BehaviorController {
         FROM behavior.daily_book ORDER BY day DESC LIMIT 500
         """);
   }
+  @GetMapping("/aggregates/books/{bookId}")
+  public Object bookAggregates(@PathVariable UUID bookId) {
+    return jdbc.queryForList("SELECT day, book_id, impressions, opens, likes, reads FROM behavior.daily_book WHERE book_id=? ORDER BY day DESC LIMIT 365", bookId);
+  }
 
   @GetMapping("/aggregates/me")
   public Object myAggregates(Principal principal) {
