@@ -48,6 +48,9 @@ O primeiro-screen retorna o texto e seu hash, mas não retorna rank, NLI,
 protótipos ou embeddings; esses dados continuam ocultos até o lock.
 Após `claim-next`, o admin consulta o item reservado para carregar esse texto
 cego antes de renderizar os controles de rating.
+O Studio usa controles 1–5 estilizados por dimensão. Cada dimensão apresenta
+uma explicação operacional e os extremos `Baixo`/`Alto`, reduzindo ambiguidades
+sem revelar previsões automáticas.
 
 ## Piloto
 
