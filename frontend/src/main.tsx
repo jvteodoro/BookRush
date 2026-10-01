@@ -12,7 +12,9 @@ type PageLoopBook = {
 };
 
 async function loadCatalog(): Promise<CatalogBook[]> {
-  const response = await authClient.fetch('/api/internal/v1/catalog/books?page=0&size=50');
+  // O catálogo de leitura possui uma rota pública própria; a rota internal é
+  // reservada para operadores e devolve 401 ao leitor autenticado.
+  const response = await authClient.fetch('/api/v1/books?page=0&size=50');
   if (!response.ok) throw new Error(response.status === 401 ? 'Sua sessão expirou. Entre novamente.' : `Catálogo indisponível (HTTP ${response.status}).`);
   const page = await response.json() as { items: CatalogBook[] };
   return page.items;
