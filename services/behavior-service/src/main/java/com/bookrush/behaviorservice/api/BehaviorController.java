@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -21,12 +22,16 @@ public class BehaviorController {
       String subject, UUID bookId, @NotNull Instant occurredAt, JsonNode payload) {}
   public record Batch(@Valid List<Event> events) {}
   @PostMapping("/events")
-  public ResponseEntity<Map<String,Object>> ingest(@Valid @RequestBody Batch batch) {
+  public ResponseEntity<Map<String,Object>> ingest(@Valid @RequestBody Batch batch, Principal principal) {
     int accepted=0, duplicate=0;
-    if (batch.events()!=null) for (Event e: batch.events()) {
-      if (e.eventType().length()>80 || e.eventKey().length()>200 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",e.payload()==null?"{}":e.payload().toString()); duplicate++; continue; }
+    if (batch.events()==null || batch.events().size()>100) return ResponseEntity.badRequest().body(Map.of("error","batch must contain between 1 and 100 events"));
+    String subject = principal == null ? null : principal.getName();
+    if (subject == null || subject.isBlank()) return ResponseEntity.status(401).body(Map.of("error","authentication required"));
+    for (Event e: batch.events()) {
+      String payload = e.payload()==null?"{}":e.payload().toString();
+      if (e.eventType().length()>80 || e.eventKey().length()>200 || payload.length()>16_384 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",payload); duplicate++; continue; }
       int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
-        UUID.randomUUID(),e.eventKey(),e.eventType(),e.issuer(),e.subject(),e.bookId(),e.payload()==null?"{}":e.payload().toString(),e.occurredAt());
+        UUID.randomUUID(),e.eventKey(),e.eventType(),null,subject,e.bookId(),payload,e.occurredAt());
       if(n==1) accepted++; else duplicate++;
     }
     return ResponseEntity.accepted().body(Map.of("accepted",accepted,"duplicates",duplicate));
