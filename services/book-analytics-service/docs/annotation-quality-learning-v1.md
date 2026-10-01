@@ -19,6 +19,28 @@ Previsões do modelo, scores NLI, protótipos e rank heurístico não devem ser
 enviados pelo endpoint cego. O endpoint de contexto só responde depois de
 `primary_locked_at` existir.
 
+## Teste de integração do fluxo de lock
+
+O build da aplicação e um `PREPARE` SQL não são suficientes para validar este
+fluxo. O smoke test real em
+`infrastructure/tests/annotation-lock-smoke.sh` chama a mesma rota HTTP usada
+pela interface, confirma as seis linhas persistidas no PostgreSQL e verifica
+que uma segunda tentativa retorna `409 PRIMARY_ALREADY_LOCKED`.
+
+Execute contra um item reservado para testes, com um bearer de curta duração
+obtido no Keycloak (não grave o token em arquivos):
+
+```bash
+ANALYTICS_TEST_BEARER='...' \
+ANNOTATION_ITEM_ID='...' \
+ANALYTICS_BASE_URL='http://127.0.0.1:18091' \
+bash infrastructure/tests/annotation-lock-smoke.sh
+```
+
+O item é mutado pelo teste e, por isso, não deve ser apontado para uma
+campanha de produção ativa. O teste exige `jq`, `curl`, Docker e PostgreSQL do
+Compose disponíveis.
+
 O lock persiste cada dimensão usando a chave composta
 `(annotation_id, dimension_code, stage)` de `annotation_dimension_value`. Isso
 permite repetir a requisição com segurança enquanto a anotação ainda não foi
