@@ -41,3 +41,8 @@ O protótipo PageLoop foi usado apenas para hierarquia visual e fluxos de descob
 ## Fidelidade ao modelo PageLoop
 
 A experiência autenticada usa os mesmos blocos do modelo fornecido: shell, busca, catálogo, biblioteca e leitor. O runtime React consulta o catálogo e o estado do leitor pelas APIs autenticadas; não carrega mais `public/pageloop.js` nem datasets mockados/localStorage como fonte de verdade. O aplicativo mobile mantém o feed vertical escuro e consulta catálogo/biblioteca/eventos por HTTP autenticado.
+
+O SDK `frontend/src/telemetry.ts` mantém uma fila em memória, envia lotes ao
+behavior-service com retry limitado e suporta impressão por
+`IntersectionObserver` e dwell. Payloads são reduzidos por allowlist
+estrutural, sem texto livre, tokens ou identificadores pessoais.
