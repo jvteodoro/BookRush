@@ -90,6 +90,32 @@ function App() {
             if (!response.ok) throw new Error('Não foi possível atualizar sua biblioteca.');
             enabled ? saved.add(id) : saved.delete(id);
           },
+          like: async (id: string, enabled: boolean) => {
+            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/like`, { method: enabled ? 'PUT' : 'DELETE' });
+            if (!response.ok) throw new Error('Não foi possível atualizar a curtida.');
+          },
+          share: async (id: string) => {
+            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/share`, { method: 'POST' });
+            if (!response.ok) throw new Error('Não foi possível registrar o compartilhamento.');
+          },
+          comments: async (id: string) => {
+            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/comments`);
+            return response.ok ? response.json() : [];
+          },
+          comment: async (id: string, text: string) => {
+            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+            if (!response.ok) throw new Error('Não foi possível publicar o comentário.');
+          },
+          profile: async () => {
+            const response = await authClient.fetch('/api/v1/profile');
+            return response.ok ? response.json() : null;
+          },
+          progress: async (id: string, percent: number, positionCodepoint: number) => {
+            await authClient.fetch(`/api/v1/reader/books/${encodeURIComponent(id)}/progress`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ percent, positionCodepoint }) });
+          },
+          bookmark: async (id: string, positionCodepoint: number) => {
+            await authClient.fetch(`/api/v1/reader/books/${encodeURIComponent(id)}/bookmarks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ positionCodepoint }) });
+          },
           open: async (id: string) => {
             await authClient.fetch(`/api/v1/reader/books/${encodeURIComponent(id)}/opened`, { method: 'POST' });
             await authClient.fetch('/api/v1/behavior/events', {

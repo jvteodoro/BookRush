@@ -35,6 +35,9 @@ interface permanece em memória e dados de produto ficam no backend.
 O feed usa `GET /api/v1/reader/feed` e registra viewability em
 `POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
 livro.
+Curtidas, comentários, compartilhamentos, progresso e bookmarks usam os
+endpoints dos bounded contexts `social` e `reader-state`; falhas são exibidas
+ao usuário e não são mascaradas como sucesso local.
 O Nginx do container envia `Cache-Control: no-store` para que uma publicação
 não mantenha o bundle anterior no navegador.
 Os assets do shell também recebem uma versão explícita na URL para invalidar

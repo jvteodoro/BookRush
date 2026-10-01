@@ -216,8 +216,8 @@
       <div class="reader-progress"><div class="reader-progress-top"><span>Página ${Math.round(state.readerPage/100*b.pages)} de ${b.pages}</span><span>${state.readerPage}%</span></div><input class="reader-slider" id="readerSlider" type="range" min="1" max="100" value="${state.readerPage}" /></div>
     </div>`;
     shell(content,b.title);
-    document.getElementById('readerSlider').oninput=e=>{state.readerPage=+e.target.value;save();document.querySelector('.reader-progress-top').innerHTML=`<span>Página ${Math.round(state.readerPage/100*b.pages)} de ${b.pages}</span><span>${state.readerPage}%</span>`};
-    document.getElementById('bookmarkBtn')?.addEventListener('click',()=>{save();toast(`Página marcada em ${state.readerPage}%`)});
+    document.getElementById('readerSlider').oninput=async e=>{state.readerPage=+e.target.value;await window.__BOOKRUSH_API__?.progress?.(state.readerBook,state.readerPage,Math.round(state.readerPage));save();document.querySelector('.reader-progress-top').innerHTML=`<span>Página ${Math.round(state.readerPage/100*b.pages)} de ${b.pages}</span><span>${state.readerPage}%</span>`};
+    document.getElementById('bookmarkBtn')?.addEventListener('click',async()=>{await window.__BOOKRUSH_API__?.bookmark?.(state.readerBook,Math.round(state.readerPage));save();toast(`Página marcada em ${state.readerPage}%`)});
     document.getElementById('nightBtn')?.addEventListener('click',()=>{state.readerNight=!state.readerNight;save();renderReader()});
     document.getElementById('fontDown')?.addEventListener('click',()=>{state.readerSize=Math.max(16,state.readerSize-1);save();renderReader()});
     document.getElementById('fontUp')?.addEventListener('click',()=>{state.readerSize=Math.min(27,state.readerSize+1);save();renderReader()});
@@ -343,22 +343,24 @@
   }
   function bindModalClose(){document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=()=>document.querySelector('.modal-wrap')?.remove())}
 
-  function openComments(id){
-    const b=book(id); const overlay=document.createElement('div');overlay.className='overlay';overlay.innerHTML=`<aside class="drawer"><div class="drawer-head"><div><h3>Comentários</h3><span class="muted tiny">${b.title}</span></div><button class="icon-btn" data-close-drawer>${icon('close')}</button></div><div class="drawer-body">${COMMENTS.map(c=>`<div class="comment"><div class="avatar">${c.initials}</div><div><strong>${c.name}</strong> <span>${c.time}</span><p>${c.text}</p></div></div>`).join('')}</div><div class="comment-compose"><input id="commentInput" placeholder="Escreva um comentário..."/><button class="primary-btn" id="commentSend">Enviar</button></div></aside>`;document.body.appendChild(overlay);
-    overlay.querySelector('[data-close-drawer]').onclick=()=>overlay.remove(); overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()}); overlay.querySelector('#commentSend').onclick=()=>{const i=overlay.querySelector('#commentInput');if(!i.value.trim())return;toast('Comentário publicado no mock');i.value=''};
+  async function openComments(id){
+    const b=book(id); let comments=[]; try{comments=await (window.__BOOKRUSH_API__?.comments?.(id)||[])}catch(e){toast(e.message||'Não foi possível carregar comentários')}
+    const rows=Array.isArray(comments)?comments:[];
+    const overlay=document.createElement('div');overlay.className='overlay';overlay.innerHTML=`<aside class="drawer"><div class="drawer-head"><div><h3>Comentários</h3><span class="muted tiny">${esc(b.title)}</span></div><button class="icon-btn" data-close-drawer>${icon('close')}</button></div><div class="drawer-body">${rows.map(c=>`<div class="comment"><div class="avatar">${esc(c.authorInitials||'•')}</div><div><strong>${esc(c.authorName||'Leitor')}</strong><p>${esc(c.text||'')}</p></div></div>`).join('')||'<p class="muted">Ainda não há comentários.</p>'}</div><div class="comment-compose"><input id="commentInput" placeholder="Escreva um comentário..."/><button class="primary-btn" id="commentSend">Enviar</button></div></aside>`;document.body.appendChild(overlay);
+    overlay.querySelector('[data-close-drawer]').onclick=()=>overlay.remove(); overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()}); overlay.querySelector('#commentSend').onclick=async()=>{const i=overlay.querySelector('#commentInput');if(!i.value.trim())return;try{await window.__BOOKRUSH_API__?.comment?.(id,i.value.trim());toast('Comentário publicado');overlay.remove();openComments(id)}catch(e){toast(e.message||'Não foi possível publicar o comentário')}};
   }
 
   function openShare(id){
     const label=id==='profile'?'este perfil':`“${book(id).title}”`;
-    modal(`<div class="eyebrow">COMPARTILHAR</div><h2>Envie ${label}</h2><p>As opções abaixo apenas simulam o comportamento de compartilhamento.</p><div class="share-grid"><button class="share-choice" data-share-choice><strong>↗</strong>Mensagem</button><button class="share-choice" data-share-choice><strong>◎</strong>Stories</button><button class="share-choice" data-share-choice><strong>◫</strong>Copiar link</button><button class="share-choice" data-share-choice><strong>•••</strong>Mais</button></div>`,`<button class="secondary-btn" data-close-modal>Cancelar</button>`);
-    document.querySelectorAll('[data-share-choice]').forEach(b=>b.onclick=()=>{document.querySelector('.modal-wrap')?.remove();toast('Ação de compartilhamento simulada')});
+    modal(`<div class="eyebrow">COMPARTILHAR</div><h2>Envie ${label}</h2><p>Escolha uma opção para compartilhar.</p><div class="share-grid"><button class="share-choice" data-share-choice><strong>↗</strong>Copiar link</button><button class="share-choice" data-share-choice><strong>•••</strong>Mais</button></div>`,`<button class="secondary-btn" data-close-modal>Cancelar</button>`);
+    document.querySelectorAll('[data-share-choice]').forEach(b=>b.onclick=async()=>{try{await window.__BOOKRUSH_API__?.share?.(id);await navigator.clipboard?.writeText(`${window.location.origin}/book/${id}`);toast('Compartilhamento registrado')}catch(e){toast(e.message||'Não foi possível compartilhar')}document.querySelector('.modal-wrap')?.remove()});
   }
 
   function addMobileReaderTools(){
     if(mode!=='app'||state.route!=='reader')return;
     const main=document.querySelector('.reader-shell'); if(!main)return;
     const bar=document.createElement('div');bar.className='mobile-reader-tools';bar.innerHTML=`<button id="mobileBack">${icon('chevron','icon-sm')}</button><button id="mobileBookmark">${icon('bookmark','icon-sm')}</button><button id="mobileTheme">${icon('sun','icon-sm')}</button><button id="mobileFont">${icon('type','icon-sm')} A+</button>`;main.appendChild(bar);
-    bar.querySelector('#mobileBack').onclick=()=>go('library');bar.querySelector('#mobileBookmark').onclick=()=>{save();toast(`Página marcada em ${state.readerPage}%`)};bar.querySelector('#mobileTheme').onclick=()=>{state.readerNight=!state.readerNight;save();renderReader();addMobileReaderTools()};bar.querySelector('#mobileFont').onclick=()=>{state.readerSize=state.readerSize>=24?18:state.readerSize+2;save();renderReader();addMobileReaderTools()};
+    bar.querySelector('#mobileBack').onclick=()=>go('library');bar.querySelector('#mobileBookmark').onclick=async()=>{await window.__BOOKRUSH_API__?.bookmark?.(state.readerBook,Math.round(state.readerPage));save();toast(`Página marcada em ${state.readerPage}%`)};bar.querySelector('#mobileTheme').onclick=()=>{state.readerNight=!state.readerNight;save();renderReader();addMobileReaderTools()};bar.querySelector('#mobileFont').onclick=()=>{state.readerSize=state.readerSize>=24?18:state.readerSize+2;save();renderReader();addMobileReaderTools()};
   }
 
   const originalRenderReader=renderReader;
