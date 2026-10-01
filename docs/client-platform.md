@@ -36,3 +36,8 @@ npx eas build --platform android --profile preview
 A entidade `bookrush-mobile` está no Location raiz do Backstage e possui TechDocs. Alterações no client Keycloak devem ser reconciliadas pelo procedimento existente antes de distribuir uma nova versão do aplicativo. O cliente web é reconstruído pela imagem `frontend`; o mobile é publicado separadamente como APK/AAB e não é iniciado pelo Compose do servidor.
 
 O protótipo PageLoop foi usado apenas para hierarquia visual e fluxos de descoberta. Feed social, comentários, recomendações e progresso dependem de APIs de produto ainda não existentes e não são simulados como dados reais.
+
+
+## Fidelidade ao modelo PageLoop
+
+A experiência autenticada usa os mesmos blocos do modelo fornecido: shell com navegação lateral, feed vertical de trechos, trilho de ações (curtir, comentar, salvar e compartilhar), recomendações, busca, biblioteca, leitor, perfil, privacidade, planta/streak e áreas administrativas/publicador. O `public/pageloop.js` e `public/pageloop.css` são a adaptação versionada do protótipo para o runtime React; os livros mockados são substituídos pelo catálogo Java no carregamento. O aplicativo mobile mantém o feed vertical escuro, ações e navegação inferior do modelo.
