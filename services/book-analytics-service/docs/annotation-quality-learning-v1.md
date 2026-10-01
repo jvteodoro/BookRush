@@ -19,6 +19,12 @@ Previsões do modelo, scores NLI, protótipos e rank heurístico não devem ser
 enviados pelo endpoint cego. O endpoint de contexto só responde depois de
 `primary_locked_at` existir.
 
+O lock persiste cada dimensão usando a chave composta
+`(annotation_id, dimension_code, stage)` de `annotation_dimension_value`. Isso
+permite repetir a requisição com segurança enquanto a anotação ainda não foi
+bloqueada; depois de `primary_locked_at` preenchido, uma nova tentativa retorna
+`409 PRIMARY_ALREADY_LOCKED` e não altera os labels primários.
+
 ## API
 
 Principais rotas autenticadas:
