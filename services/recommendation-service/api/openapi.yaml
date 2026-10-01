@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info:
+  title: BookRush Recommendation API
+  version: 1.0.0
+paths:
+  /api/v1/recommendations/feed:
+    get:
+      summary: Generate an authenticated heuristic feed
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        '200': {description: Feed with request and impression lineage}
+        '401': {description: Authentication required}
+  /api/v1/recommendations/impressions/{impressionId}/viewable:
+    post:
+      summary: Mark an owned impression as viewable
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: impressionId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Impression marked viewable}
+        '401': {description: Authentication required}
+        '404': {description: Impression is not owned by the caller}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
