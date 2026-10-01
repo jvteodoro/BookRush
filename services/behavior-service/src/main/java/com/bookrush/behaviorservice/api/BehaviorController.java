@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.time.Instant;
 import java.security.Principal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -17,7 +17,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/behavior")
 public class BehaviorController {
   private final JdbcTemplate jdbc;
-  public BehaviorController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+  public BehaviorController(JdbcTemplate jdbc) {
+    this.jdbc = jdbc;
+  }
   public record Event(@NotBlank String eventKey, @NotBlank String eventType, String issuer,
       String subject, UUID bookId, @NotNull Instant occurredAt, JsonNode payload) {}
   public record Batch(@Valid List<Event> events) {}
@@ -36,8 +38,66 @@ public class BehaviorController {
     }
     return ResponseEntity.accepted().body(Map.of("accepted",accepted,"duplicates",duplicate));
   }
-  @PostMapping("/aggregates/rebuild") public Map<String,Object> rebuild(){jdbc.update("insert into behavior.daily_book(day,book_id,impressions,opens,likes,reads) select occurred_at::date,book_id,count(*) filter(where event_type='EXCERPT_IMPRESSION'),count(*) filter(where event_type='BOOK_OPEN'),count(*) filter(where event_type='BOOK_LIKE'),count(*) filter(where event_type in ('READ_PROGRESS','BOOK_COMPLETE')) from behavior.events where book_id is not null group by occurred_at::date,book_id on conflict(day,book_id) do update set impressions=excluded.impressions,opens=excluded.opens,likes=excluded.likes,reads=excluded.reads");return Map.of("rebuilt",true);}
- @GetMapping("/aggregates") public Object aggregates(){return jdbc.queryForList("select day,book_id,impressions,opens,likes,reads from behavior.daily_book order by day desc limit 500");}
+  @PostMapping("/aggregates/rebuild")
+  public Map<String, Object> rebuild() {
+    jdbc.update("""
+        INSERT INTO behavior.daily_book(day, book_id, impressions, opens, likes, reads)
+        SELECT occurred_at::date, book_id,
+          count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
+          count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
+          count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
+          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE'))
+        FROM behavior.events
+        WHERE book_id IS NOT NULL
+        GROUP BY occurred_at::date, book_id
+        ON CONFLICT (day, book_id) DO UPDATE SET
+          impressions = excluded.impressions, opens = excluded.opens,
+          likes = excluded.likes, reads = excluded.reads
+        """);
+    jdbc.update("""
+        INSERT INTO behavior.daily_user_book
+          (day, identity_subject, book_id, impressions, opens, likes, reads, active_seconds)
+        SELECT occurred_at::date, identity_subject, book_id,
+          count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
+          count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
+          count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
+          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE')),
+          coalesce(sum(CASE
+            WHEN event_type = 'READ_SESSION'
+              AND payload->>'activeSeconds' ~ '^[0-9]+$'
+            THEN (payload->>'activeSeconds')::bigint ELSE 0 END), 0)
+        FROM behavior.events
+        WHERE book_id IS NOT NULL AND identity_subject IS NOT NULL
+        GROUP BY occurred_at::date, identity_subject, book_id
+        ON CONFLICT (day, identity_subject, book_id) DO UPDATE SET
+          impressions = excluded.impressions, opens = excluded.opens,
+          likes = excluded.likes, reads = excluded.reads,
+          active_seconds = excluded.active_seconds
+        """);
+    return Map.of("rebuilt", true);
+  }
+
+  @GetMapping("/aggregates")
+  public Object aggregates() {
+    return jdbc.queryForList("""
+        SELECT day, book_id, impressions, opens, likes, reads
+        FROM behavior.daily_book ORDER BY day DESC LIMIT 500
+        """);
+  }
+
+  @GetMapping("/aggregates/me")
+  public Object myAggregates(Principal principal) {
+    if (principal == null) {
+      return ResponseEntity.status(401).body(Map.of("error", "authentication required"));
+    }
+    return jdbc.queryForList("""
+        SELECT day, book_id, impressions, opens, likes, reads, active_seconds
+        FROM behavior.daily_user_book
+        WHERE identity_subject = ? ORDER BY day DESC LIMIT 500
+        """, principal.getName());
+  }
  @GetMapping("/events/count")
-  public Map<String,Object> count(){return Map.of("events",jdbc.queryForObject("select count(*) from behavior.events",Long.class));}
+  public Map<String, Object> count() {
+    return Map.of("events", jdbc.queryForObject("select count(*) from behavior.events", Long.class));
+  }
 }

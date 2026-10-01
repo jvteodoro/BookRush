@@ -14,6 +14,14 @@ operacional com credenciais fornecidas em runtime.
 
 V4 adiciona registry de schemas e rejects observáveis para eventos inválidos; rejeições não entram no log canônico.
 
+V5 adiciona `behavior.daily_user_book`, um agregado diário por identidade técnica
+e livro. O endpoint autenticado `GET /api/v1/behavior/aggregates/me` retorna apenas
+as linhas do `iss/sub` resolvido pelo token atual. A reconstrução em
+`POST /api/v1/behavior/aggregates/rebuild` atualiza os agregados globais e por
+usuário; `active_seconds` só soma valores inteiros não negativos do evento
+`READ_SESSION`, ignorando payloads malformados. Esses dados são métricas de uso,
+não uma tabela de perfil ou de biblioteca do usuário.
+
 The ingestion endpoint derives `identity_subject` from the authenticated
 principal and ignores identity fields supplied in the event body. Batches are
 limited to 100 events and payloads to 16 KiB; retries remain idempotent through
