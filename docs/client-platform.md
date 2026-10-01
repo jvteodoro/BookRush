@@ -71,6 +71,11 @@ Quando a submissão possui `catalogBookId`, a aba de estatísticas consulta os
 agregados reais do behavior-service por publicação. Uma submissão sem vínculo
 canônico aparece como `NOT_LINKED`, sem números inventados.
 
+Para associar uma submissão a uma execução, inclua `publisherSubmissionId` nos
+parâmetros do comando de ingestão. Após a canonização, o ingestion-service chama
+o callback interno do publisher e preenche automaticamente `catalogBookId`; o
+vínculo é idempotente e não permite substituir uma referência já confirmada.
+
 As ações sociais usam os payloads do contrato vigente: comentários enviam
 `{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de
 seguir usa `PUT`/`DELETE /api/v1/social/users/{subject}/follow`. O frontend não

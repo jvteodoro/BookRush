@@ -96,3 +96,6 @@ ingestion:
     asset-client-id: ${INGESTION_ASSET_CLIENT_ID:}
     asset-client-secret: ${INGESTION_ASSET_CLIENT_SECRET:}
     asset-scope: ${INGESTION_ASSET_SCOPE:}
+  publisher-callback:
+    url: ${INGESTION_PUBLISHER_CALLBACK_URL:http://publisher-service:8099}
+    token: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:}

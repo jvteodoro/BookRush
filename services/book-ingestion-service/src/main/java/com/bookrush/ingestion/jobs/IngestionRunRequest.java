@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Min;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /** Parameters accepted by the administrative Gutenberg import command. */
 public record IngestionRunRequest(
@@ -41,7 +42,8 @@ public record IngestionRunRequest(
                 "Quando true, continua para descoberta/download e normalização de assets; quando"
                     + " false, processa somente metadata.",
             example = "false")
-        boolean processAssets) {
+        boolean processAssets,
+        UUID publisherSubmissionId) {
   public IngestionRunRequest {
     source =
         source == null || source.isBlank() ? "GUTENBERG" : source.trim().toUpperCase(Locale.ROOT);
@@ -56,6 +58,17 @@ public record IngestionRunRequest(
         && externalIds.stream().anyMatch(id -> !id.matches("[1-9][0-9]*"))) {
       throw new IllegalArgumentException("GUTENBERG externalIds must be numeric identifiers");
     }
+  }
+
+  /** Compatibility constructor for callers that do not associate a publisher submission. */
+  public IngestionRunRequest(
+      String source,
+      List<String> externalIds,
+      List<String> languages,
+      Integer maxItems,
+      boolean dryRun,
+      boolean processAssets) {
+    this(source, externalIds, languages, maxItems, dryRun, processAssets, null);
   }
 
   private static List<String> normalize(List<String> values, boolean language) {

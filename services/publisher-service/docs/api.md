@@ -23,3 +23,14 @@ Uma submissão pode receber `catalogBookId` quando a canonização confirmar o
 livro. `GET /api/v1/publisher/submissions/{id}/metrics` então consulta os
 agregados diários do behavior-service e devolve apenas dados do livro ligado à
 submissão; enquanto não houver vínculo retorna `NOT_LINKED`.
+
+## Vínculo automático após ingestão
+
+O endpoint interno `POST /api/internal/v1/publisher/submissions/{id}/catalog-link`
+é chamado pelo `book-ingestion-service` depois que o comando canônico retorna o
+`bookId`. Ele exige `X-BookRush-Ingestion-Token`, configurado somente nos
+containers por `PUBLISHER_INGESTION_CALLBACK_TOKEN`, e é idempotente: repetir o
+mesmo vínculo preserva o estado; tentar trocar o livro retorna conflito.
+Uma execução de ingestão pode carregar `publisherSubmissionId` nos parâmetros
+do comando. A submissão passa a `PROCESSING` e as consultas expõem também
+`ingestion_job_id` e `linked_at`.

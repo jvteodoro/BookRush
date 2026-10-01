@@ -3,6 +3,7 @@ package com.bookrush.ingestion.jobs;
 import com.bookrush.ingestion.catalog.CanonicalCatalogPort;
 import com.bookrush.ingestion.catalog.CatalogAssetClient;
 import com.bookrush.ingestion.catalog.ProcessingLineageClient;
+import com.bookrush.ingestion.catalog.PublisherSubmissionLinkClient;
 import com.bookrush.ingestion.catalog.SubjectCatalogClient;
 import com.bookrush.ingestion.processing.EpubTextExtractor;
 import com.bookrush.ingestion.processing.TextProcessingService;
@@ -34,6 +35,7 @@ public class GutenbergImportService {
   private final ProcessingLineageClient lineage;
   private final SubjectCatalogClient subjects;
   private final GutenbergProperties gutenberg;
+  private final PublisherSubmissionLinkClient publisherLinks;
   private final Path staging = Path.of(System.getProperty("java.io.tmpdir"), "bookrush-ingestion");
   private final GutenbergRdfParser parser = new GutenbergRdfParser();
 
@@ -47,7 +49,8 @@ public class GutenbergImportService {
       TextProcessingService processing,
       ProcessingLineageClient lineage,
       SubjectCatalogClient subjects,
-      GutenbergProperties gutenberg) {
+      GutenbergProperties gutenberg,
+      PublisherSubmissionLinkClient publisherLinks) {
     this.jdbc = jdbc;
     this.downloader = downloader;
     this.raw = raw;
@@ -58,6 +61,7 @@ public class GutenbergImportService {
     this.lineage = lineage;
     this.subjects = subjects;
     this.gutenberg = gutenberg;
+    this.publisherLinks = publisherLinks;
   }
 
   public void process(LeaseCoordinator.Lease lease) throws Exception {
@@ -139,6 +143,15 @@ public class GutenbergImportService {
             id);
     var bookId = UUID.fromString(String.valueOf(result.get("bookId")));
     var editionId = UUID.fromString(String.valueOf(result.get("editionId")));
+    var publisherSubmissionId = publisherSubmissionId(task.get("parameters"));
+    if (publisherSubmissionId != null) {
+      publisherLinks.link(
+          publisherSubmissionId,
+          bookId,
+          UUID.fromString(String.valueOf(task.get("ingestion_job_id"))),
+          "GUTENBERG",
+          id);
+    }
     for (var subject : record.subjects()) {
       // The catalog constraint uses the stable assignment vocabulary. Source
       // metadata provenance is represented by sourceCode/sourceRecordId.
@@ -212,6 +225,15 @@ public class GutenbergImportService {
         bookId,
         editionId,
         task.get("ingestion_item_id"));
+  }
+
+  private UUID publisherSubmissionId(Object parameters) {
+    try {
+      var node = mapper.readTree(String.valueOf(parameters)).path("publisherSubmissionId");
+      return node.isTextual() && !node.asText().isBlank() ? UUID.fromString(node.asText()) : null;
+    } catch (Exception e) {
+      throw new IllegalStateException("invalid publisher submission correlation", e);
+    }
   }
 
   private String sha256(String value) {

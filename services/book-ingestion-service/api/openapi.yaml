@@ -324,6 +324,11 @@ components:
           description: Quando true, continua para descoberta/download e normalização
             de assets; quando false, processa somente metadata.
           example: false
+        publisherSubmissionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Submissão do publisher a vincular após a canonização.
   securitySchemes:
     keycloak:
       type: oauth2

@@ -2,4 +2,33 @@ openapi: 3.0.3
 info:
   title: publisher-service
   version: 0.1.0
-paths: {}
+paths:
+  /api/internal/v1/publisher/submissions/{submissionId}/catalog-link:
+    post:
+      summary: Link a submission after canonical ingestion
+      description: Internal idempotent callback; protected by the ingestion callback credential.
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+        - name: X-BookRush-Ingestion-Token
+          in: header
+          required: true
+          schema: {type: string, format: password}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [catalogBookId]
+              properties:
+                catalogBookId: {type: string, format: uuid}
+                ingestionJobId: {type: string, format: uuid}
+                sourceCode: {type: string}
+                sourceExternalId: {type: string}
+      responses:
+        '200': {description: Link applied}
+        '401': {description: Invalid callback credential}
+        '409': {description: Conflicting existing link}

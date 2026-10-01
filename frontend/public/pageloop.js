@@ -326,7 +326,7 @@
 
   function publisherAnalytics(){
     const rows=window.__BOOKRUSH_PUBLISHER_SUBMISSIONS__||[];
-    const content=rows.length ? rows.map(b=>'<div class="analytics-book-row"><div><strong>'+esc(b.title||'Sem título')+'</strong><span>'+esc(b.status||'UNKNOWN')+'</span></div><div class="analytics-number">—<small>visualizações</small></div><div class="analytics-number">—<small>leituras</small></div><div class="analytics-number"><button class="mini-btn" data-metrics-id="'+esc(b.id||'')+'">Métricas</button> <button class="mini-btn" data-submit-id="'+esc(b.id||'')+'">'+(b.status==='SUBMITTED'?'Enviado':'Enviar para revisão')+'</button></div></div>').join('') : '<p class="muted">Nenhuma publicação encontrada para este usuário.</p>';
+    const content=rows.length ? rows.map(b=>'<div class="analytics-book-row"><div><strong>'+esc(b.title||'Sem título')+'</strong><span>'+esc(b.status||'UNKNOWN')+(b.catalog_book_id?' · catálogo ligado':' · aguardando canonização')+'</span></div><div class="analytics-number">—<small>visualizações</small></div><div class="analytics-number">—<small>leituras</small></div><div class="analytics-number"><button class="mini-btn" data-metrics-id="'+esc(b.id||'')+'">Métricas</button> <button class="mini-btn" data-submit-id="'+esc(b.id||'')+'">'+(b.status==='SUBMITTED'?'Enviado':'Enviar para revisão')+'</button></div></div>').join('') : '<p class="muted">Nenhuma publicação encontrada para este usuário.</p>';
     return `<section class="panel-card"><div class="section-row" style="margin:0"><h2>Publicações</h2><span class="muted tiny">Dados do publisher-service</span></div><div class="analytics-list">${content}</div></section>`;
   }
 

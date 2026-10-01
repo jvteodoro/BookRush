@@ -291,6 +291,7 @@ SELECT i.id, i.external_identifier, i.status, i.attempt_number, i.book_id, i.edi
     values.put("maxItems", request.maxItems());
     values.put("dryRun", request.dryRun());
     values.put("processAssets", request.processAssets());
+    values.put("publisherSubmissionId", request.publisherSubmissionId());
     try {
       return mapper.writeValueAsString(values);
     } catch (JsonProcessingException e) {
