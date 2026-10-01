@@ -11,10 +11,12 @@ public final class OpenLibrarySubjectExtractor {
     var subjects = payload.path("subjects");
     if (!subjects.isArray()) return List.of();
     var values = new java.util.ArrayList<String>();
-    subjects.forEach(node -> {
-      var value = node.isTextual() ? node.asText() : node.path("name").asText(null);
-      if (value != null && !value.isBlank() && !values.contains(value.trim())) values.add(value.trim());
-    });
+    subjects.forEach(
+        node -> {
+          var value = node.isTextual() ? node.asText() : node.path("name").asText(null);
+          if (value != null && !value.isBlank() && !values.contains(value.trim()))
+            values.add(value.trim());
+        });
     return List.copyOf(values);
   }
 }

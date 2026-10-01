@@ -9,7 +9,10 @@ import org.junit.jupiter.api.Test;
 class TextFeatureCalculatorV2Test {
   @Test
   void calculatesDeterministicRhythmAndPositionMeasurements() {
-    String text = "Curta.\n\nUma frase com exatamente nove palavras aqui agora. Uau!\n\nUma frase muito muito muito longa para mudar o ritmo.";
+    String text =
+        "Curta.\n\n"
+            + "Uma frase com exatamente nove palavras aqui agora. Uau!\n\n"
+            + "Uma frase muito muito muito longa para mudar o ritmo.";
     Map<String, Double> features = TextFeatureCalculator.calculate(text, 10, 100, 5, 50);
 
     assertEquals(3d, features.get("paragraph_count"));

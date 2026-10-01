@@ -23,8 +23,11 @@ class TechnicalPrimitivesTest {
   @Test
   void sha256IsDeterministicAndBounded() throws Exception {
     var input = new ByteArrayInputStream("BookRush".getBytes(StandardCharsets.UTF_8));
-    assertEquals("2f4912aee74c910f8b401e2ca92f97c1aca154ed4f638455a419f3eff6f26c7a", Sha256.digest(input, 64));
-    assertThrows(java.io.IOException.class, () -> Sha256.digest(
-        new ByteArrayInputStream(new byte[] {1, 2, 3}), 2));
+    assertEquals(
+        "2f4912aee74c910f8b401e2ca92f97c1aca154ed4f638455a419f3eff6f26c7a",
+        Sha256.digest(input, 64));
+    assertThrows(
+        java.io.IOException.class,
+        () -> Sha256.digest(new ByteArrayInputStream(new byte[] {1, 2, 3}), 2));
   }
 }

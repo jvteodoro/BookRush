@@ -55,27 +55,88 @@ public class ExternalIdentifier {
 
   public ExternalIdentifier() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public UUID getSourceId() { return sourceId; }
-  public void setSourceId(UUID value) { this.sourceId = value; }
-  public Source getSource() { return source; }
-  public UUID getBookId() { return bookId; }
-  public void setBookId(UUID value) { this.bookId = value; }
-  public Book getBook() { return book; }
-  public UUID getEditionId() { return editionId; }
-  public void setEditionId(UUID value) { this.editionId = value; }
-  public Edition getEdition() { return edition; }
-  public UUID getAuthorId() { return authorId; }
-  public void setAuthorId(UUID value) { this.authorId = value; }
-  public Author getAuthor() { return author; }
-  public ExternalIdentifierIdentifierType getIdentifierType() { return identifierType; }
-  public void setIdentifierType(ExternalIdentifierIdentifierType value) { this.identifierType = value; }
-  public String getIdentifierValue() { return identifierValue; }
-  public void setIdentifierValue(String value) { this.identifierValue = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public UUID getSourceId() {
+    return sourceId;
+  }
+
+  public void setSourceId(UUID value) {
+    this.sourceId = value;
+  }
+
+  public Source getSource() {
+    return source;
+  }
+
+  public UUID getBookId() {
+    return bookId;
+  }
+
+  public void setBookId(UUID value) {
+    this.bookId = value;
+  }
+
+  public Book getBook() {
+    return book;
+  }
+
+  public UUID getEditionId() {
+    return editionId;
+  }
+
+  public void setEditionId(UUID value) {
+    this.editionId = value;
+  }
+
+  public Edition getEdition() {
+    return edition;
+  }
+
+  public UUID getAuthorId() {
+    return authorId;
+  }
+
+  public void setAuthorId(UUID value) {
+    this.authorId = value;
+  }
+
+  public Author getAuthor() {
+    return author;
+  }
+
+  public ExternalIdentifierIdentifierType getIdentifierType() {
+    return identifierType;
+  }
+
+  public void setIdentifierType(ExternalIdentifierIdentifierType value) {
+    this.identifierType = value;
+  }
+
+  public String getIdentifierValue() {
+    return identifierValue;
+  }
+
+  public void setIdentifierValue(String value) {
+    this.identifierValue = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

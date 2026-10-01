@@ -15,12 +15,14 @@ public final class CorrelationIdFilter extends OncePerRequestFilter {
   public static final String MDC_KEY = "correlationId";
 
   @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+  protected void doFilterInternal(
+      HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
     String candidate = request.getHeader(HEADER);
     String value;
     try {
-      value = candidate == null ? UUID.randomUUID().toString() : new CorrelationId(candidate).value();
+      value =
+          candidate == null ? UUID.randomUUID().toString() : new CorrelationId(candidate).value();
     } catch (IllegalArgumentException invalid) {
       value = UUID.randomUUID().toString();
     }

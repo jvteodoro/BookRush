@@ -60,29 +60,96 @@ public class BookAsset {
 
   public BookAsset() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public UUID getBookId() { return bookId; }
-  public void setBookId(UUID value) { this.bookId = value; }
-  public Book getBook() { return book; }
-  public UUID getEditionId() { return editionId; }
-  public void setEditionId(UUID value) { this.editionId = value; }
-  public Edition getEdition() { return edition; }
-  public BookAssetAssetType getAssetType() { return assetType; }
-  public void setAssetType(BookAssetAssetType value) { this.assetType = value; }
-  public BookAssetAssetRole getAssetRole() { return assetRole; }
-  public void setAssetRole(BookAssetAssetRole value) { this.assetRole = value; }
-  public UUID getSourceId() { return sourceId; }
-  public void setSourceId(UUID value) { this.sourceId = value; }
-  public Source getSource() { return source; }
-  public UUID getLicenseId() { return licenseId; }
-  public void setLicenseId(UUID value) { this.licenseId = value; }
-  public License getLicense() { return license; }
-  public BookAssetStatus getStatus() { return status; }
-  public void setStatus(BookAssetStatus value) { this.status = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public UUID getBookId() {
+    return bookId;
+  }
+
+  public void setBookId(UUID value) {
+    this.bookId = value;
+  }
+
+  public Book getBook() {
+    return book;
+  }
+
+  public UUID getEditionId() {
+    return editionId;
+  }
+
+  public void setEditionId(UUID value) {
+    this.editionId = value;
+  }
+
+  public Edition getEdition() {
+    return edition;
+  }
+
+  public BookAssetAssetType getAssetType() {
+    return assetType;
+  }
+
+  public void setAssetType(BookAssetAssetType value) {
+    this.assetType = value;
+  }
+
+  public BookAssetAssetRole getAssetRole() {
+    return assetRole;
+  }
+
+  public void setAssetRole(BookAssetAssetRole value) {
+    this.assetRole = value;
+  }
+
+  public UUID getSourceId() {
+    return sourceId;
+  }
+
+  public void setSourceId(UUID value) {
+    this.sourceId = value;
+  }
+
+  public Source getSource() {
+    return source;
+  }
+
+  public UUID getLicenseId() {
+    return licenseId;
+  }
+
+  public void setLicenseId(UUID value) {
+    this.licenseId = value;
+  }
+
+  public License getLicense() {
+    return license;
+  }
+
+  public BookAssetStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(BookAssetStatus value) {
+    this.status = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

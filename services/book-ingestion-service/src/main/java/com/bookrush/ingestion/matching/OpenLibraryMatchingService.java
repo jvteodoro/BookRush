@@ -18,24 +18,34 @@ public final class OpenLibraryMatchingService {
     this.engine = engine;
   }
 
-  public AuditedDecision decide(OpenLibraryDumpParser.DumpRecord record,
-      MatchingEngine.Input input, List<MatchingEngine.Candidate> candidates) {
-    if (record == null || input == null) throw new IllegalArgumentException("record and input are required");
+  public AuditedDecision decide(
+      OpenLibraryDumpParser.DumpRecord record,
+      MatchingEngine.Input input,
+      List<MatchingEngine.Candidate> candidates) {
+    if (record == null || input == null)
+      throw new IllegalArgumentException("record and input are required");
     if (candidates == null) throw new IllegalArgumentException("candidates are required");
     var decision = engine.decide(input, candidates);
-    var evidence = record.namespace() + "|" + record.key() + "|" + record.revision() + "|" + record.payload();
-    return new AuditedDecision(record.namespace(), record.key(), record.revision(), sha256(evidence), decision);
+    var evidence =
+        record.namespace() + "|" + record.key() + "|" + record.revision() + "|" + record.payload();
+    return new AuditedDecision(
+        record.namespace(), record.key(), record.revision(), sha256(evidence), decision);
   }
 
   private static String sha256(String value) {
     try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-          .digest(value.getBytes(StandardCharsets.UTF_8)));
+      return HexFormat.of()
+          .formatHex(
+              MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
     } catch (java.security.NoSuchAlgorithmException e) {
       throw new IllegalStateException("SHA-256 unavailable", e);
     }
   }
 
-  public record AuditedDecision(String namespace, String externalId, String revision,
-      String evidenceSha256, MatchingEngine.Decision decision) {}
+  public record AuditedDecision(
+      String namespace,
+      String externalId,
+      String revision,
+      String evidenceSha256,
+      MatchingEngine.Decision decision) {}
 }

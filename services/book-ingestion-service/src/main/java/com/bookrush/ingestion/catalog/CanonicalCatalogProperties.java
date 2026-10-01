@@ -8,11 +8,20 @@ import org.springframework.validation.annotation.Validated;
 
 @Validated
 @ConfigurationProperties(prefix = "ingestion.catalog")
-public record CanonicalCatalogProperties(@NotNull URI baseUrl, String serviceToken,
-    String assetToken, @NotNull Duration requestTimeout, boolean oidcEnabled,
-    boolean legacyStaticEnabled, URI oidcTokenUri,
-    String canonicalClientId, String canonicalClientSecret, String canonicalScope,
-    String assetClientId, String assetClientSecret, String assetScope) {
+public record CanonicalCatalogProperties(
+    @NotNull URI baseUrl,
+    String serviceToken,
+    String assetToken,
+    @NotNull Duration requestTimeout,
+    boolean oidcEnabled,
+    boolean legacyStaticEnabled,
+    URI oidcTokenUri,
+    String canonicalClientId,
+    String canonicalClientSecret,
+    String canonicalScope,
+    String assetClientId,
+    String assetClientSecret,
+    String assetScope) {
   public CanonicalCatalogProperties {
     serviceToken = serviceToken == null ? "" : serviceToken;
     assetToken = assetToken == null ? "" : assetToken;

@@ -1,11 +1,11 @@
 package com.bookrush.ingestion.jobs;
 
+import com.bookrush.ingestion.retry.FailureClass;
+import com.bookrush.ingestion.retry.RetryPolicy;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
-import com.bookrush.ingestion.retry.FailureClass;
-import com.bookrush.ingestion.retry.RetryPolicy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -31,57 +31,101 @@ public final class LeaseCoordinator {
   }
 
   public Optional<Lease> claim(String workerId, Duration leaseDuration, UUID jobId) {
-    if (workerId == null || workerId.isBlank() || leaseDuration.isNegative() || leaseDuration.isZero()) {
+    if (workerId == null
+        || workerId.isBlank()
+        || leaseDuration.isNegative()
+        || leaseDuration.isZero()) {
       throw new IllegalArgumentException("worker and positive lease are required");
     }
-    var rows = jdbc.query("""
-        WITH candidate AS (
-          SELECT id FROM catalog.ingestion_task
-          WHERE status IN ('PENDING','RETRY_WAIT')
-            AND next_attempt_at <= clock_timestamp()
-            AND (lease_until IS NULL OR lease_until <= clock_timestamp())
-            AND (?::uuid IS NULL OR ingestion_job_id = ?::uuid)
-          ORDER BY next_attempt_at, created_at, id
-          FOR UPDATE SKIP LOCKED LIMIT 1
-        )
-        UPDATE catalog.ingestion_task t
-        SET status='RUNNING', claimed_by=?, lease_until=clock_timestamp() + (? * interval '1 second'),
-            heartbeat_at=clock_timestamp(), fence_token=t.fence_token+1,
-            attempt_count=t.attempt_count+1, started_at=COALESCE(t.started_at, clock_timestamp()),
-            updated_at=clock_timestamp()
-        FROM candidate c WHERE t.id=c.id
-        RETURNING t.id, t.fence_token, t.lease_until
-        """, (rs, rowNum) -> new Lease(rs.getObject("id", UUID.class), rs.getLong("fence_token"), rs.getTimestamp("lease_until").toInstant(), workerId),
-        jobId, jobId, workerId, leaseDuration.toSeconds());
+    var rows =
+        jdbc.query(
+            """
+WITH candidate AS (
+  SELECT id FROM catalog.ingestion_task
+  WHERE status IN ('PENDING','RETRY_WAIT')
+    AND next_attempt_at <= clock_timestamp()
+    AND (lease_until IS NULL OR lease_until <= clock_timestamp())
+    AND (?::uuid IS NULL OR ingestion_job_id = ?::uuid)
+  ORDER BY next_attempt_at, created_at, id
+  FOR UPDATE SKIP LOCKED LIMIT 1
+)
+UPDATE catalog.ingestion_task t
+SET status='RUNNING', claimed_by=?, lease_until=clock_timestamp() + (? * interval '1 second'),
+    heartbeat_at=clock_timestamp(), fence_token=t.fence_token+1,
+    attempt_count=t.attempt_count+1, started_at=COALESCE(t.started_at, clock_timestamp()),
+    updated_at=clock_timestamp()
+FROM candidate c WHERE t.id=c.id
+RETURNING t.id, t.fence_token, t.lease_until
+""",
+            (rs, rowNum) ->
+                new Lease(
+                    rs.getObject("id", UUID.class),
+                    rs.getLong("fence_token"),
+                    rs.getTimestamp("lease_until").toInstant(),
+                    workerId),
+            jobId,
+            jobId,
+            workerId,
+            leaseDuration.toSeconds());
     return rows.stream().findFirst();
   }
 
   public void heartbeat(Lease lease, Duration leaseDuration) {
-    var count = jdbc.update("""
-        UPDATE catalog.ingestion_task
-        SET lease_until=clock_timestamp() + (? * interval '1 second'), heartbeat_at=clock_timestamp(), updated_at=clock_timestamp()
-        WHERE id=? AND status='RUNNING' AND claimed_by=? AND fence_token=? AND lease_until > clock_timestamp()
-        """, leaseDuration.toSeconds(), lease.taskId(), lease.workerId(), lease.fenceToken());
+    var count =
+        jdbc.update(
+            """
+UPDATE catalog.ingestion_task
+SET lease_until=clock_timestamp() + (? * interval '1 second'), heartbeat_at=clock_timestamp(), updated_at=clock_timestamp()
+WHERE id=? AND status='RUNNING' AND claimed_by=? AND fence_token=? AND lease_until > clock_timestamp()
+""",
+            leaseDuration.toSeconds(),
+            lease.taskId(),
+            lease.workerId(),
+            lease.fenceToken());
     if (count != 1) throw new StaleLeaseException(lease.taskId());
   }
 
   public void complete(Lease lease, String status, String reason) {
-    if (!java.util.Set.of("SUCCEEDED", "NOOP", "SKIPPED", "QUARANTINED", "FAILED", "CANCELLED").contains(status)) {
+    if (!java.util.Set.of("SUCCEEDED", "NOOP", "SKIPPED", "QUARANTINED", "FAILED", "CANCELLED")
+        .contains(status)) {
       throw new IllegalArgumentException("invalid terminal task status");
     }
-    var count = jdbc.update("""
-        UPDATE catalog.ingestion_task
-        SET status=?, reason_code=?, finished_at=clock_timestamp(), lease_until=NULL, updated_at=clock_timestamp()
-        WHERE id=? AND status='RUNNING' AND claimed_by=? AND fence_token=? AND lease_until > clock_timestamp()
-        """, status, reason, lease.taskId(), lease.workerId(), lease.fenceToken());
+    var count =
+        jdbc.update(
+            """
+UPDATE catalog.ingestion_task
+SET status=?, reason_code=?, finished_at=clock_timestamp(), lease_until=NULL, updated_at=clock_timestamp()
+WHERE id=? AND status='RUNNING' AND claimed_by=? AND fence_token=? AND lease_until > clock_timestamp()
+""",
+            status,
+            reason,
+            lease.taskId(),
+            lease.workerId(),
+            lease.fenceToken());
     if (count != 1) throw new StaleLeaseException(lease.taskId());
   }
 
   public boolean retry(Lease lease, FailureClass failure, String message) {
-    var attempt = jdbc.queryForObject("SELECT attempt_count FROM catalog.ingestion_task WHERE id=?", Integer.class, lease.taskId());
-    var decision = new RetryPolicy(java.util.random.RandomGenerator.getDefault()).next(failure, attempt == null ? 1 : attempt, clock.instant(), null);
+    var attempt =
+        jdbc.queryForObject(
+            "SELECT attempt_count FROM catalog.ingestion_task WHERE id=?",
+            Integer.class,
+            lease.taskId());
+    var decision =
+        new RetryPolicy(java.util.random.RandomGenerator.getDefault())
+            .next(failure, attempt == null ? 1 : attempt, clock.instant(), null);
     if (!decision.retry()) return false;
-    var updated = jdbc.update("UPDATE catalog.ingestion_task SET status='RETRY_WAIT', reason_code=?, next_attempt_at=?, lease_until=NULL, claimed_by=NULL, updated_at=clock_timestamp() WHERE id=? AND status='RUNNING' AND claimed_by=? AND fence_token=?", decision.reason(), decision.nextAttemptAt(), lease.taskId(), lease.workerId(), lease.fenceToken());
+    var updated =
+        jdbc.update(
+            "UPDATE catalog.ingestion_task SET status='RETRY_WAIT', reason_code=?,"
+                + " next_attempt_at=?, lease_until=NULL, claimed_by=NULL,"
+                + " updated_at=clock_timestamp() WHERE id=? AND status='RUNNING' AND claimed_by=?"
+                + " AND fence_token=?",
+            decision.reason(),
+            decision.nextAttemptAt(),
+            lease.taskId(),
+            lease.workerId(),
+            lease.fenceToken());
     return updated == 1;
   }
 
@@ -92,6 +136,8 @@ public final class LeaseCoordinator {
   }
 
   public static final class StaleLeaseException extends RuntimeException {
-    public StaleLeaseException(UUID taskId) { super("lease is stale or no longer owned: " + taskId); }
+    public StaleLeaseException(UUID taskId) {
+      super("lease is stale or no longer owned: " + taskId);
+    }
   }
 }

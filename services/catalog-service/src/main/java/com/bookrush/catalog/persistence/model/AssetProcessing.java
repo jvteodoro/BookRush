@@ -2,8 +2,8 @@ package com.bookrush.catalog.persistence.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
-import java.util.UUID;
 import java.util.Map;
+import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -63,33 +63,112 @@ public class AssetProcessing {
 
   public AssetProcessing() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public UUID getInputAssetVersionId() { return inputAssetVersionId; }
-  public void setInputAssetVersionId(UUID value) { this.inputAssetVersionId = value; }
-  public BookAssetVersion getInputAssetVersion() { return inputAssetVersion; }
-  public UUID getOutputAssetVersionId() { return outputAssetVersionId; }
-  public void setOutputAssetVersionId(UUID value) { this.outputAssetVersionId = value; }
-  public BookAssetVersion getOutputAssetVersion() { return outputAssetVersion; }
-  public String getProcessingType() { return processingType; }
-  public void setProcessingType(String value) { this.processingType = value; }
-  public String getProcessor() { return processor; }
-  public void setProcessor(String value) { this.processor = value; }
-  public String getProcessorVersion() { return processorVersion; }
-  public void setProcessorVersion(String value) { this.processorVersion = value; }
-  public AssetProcessingStatus getStatus() { return status; }
-  public void setStatus(AssetProcessingStatus value) { this.status = value; }
-  public Instant getStartedAt() { return startedAt; }
-  public void setStartedAt(Instant value) { this.startedAt = value; }
-  public Instant getFinishedAt() { return finishedAt; }
-  public void setFinishedAt(Instant value) { this.finishedAt = value; }
-  public Map<String, Object> getMetadata() { return metadata; }
-  public void setMetadata(Map<String, Object> value) { this.metadata = value; }
-  public String getErrorMessage() { return errorMessage; }
-  public void setErrorMessage(String value) { this.errorMessage = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public UUID getInputAssetVersionId() {
+    return inputAssetVersionId;
+  }
+
+  public void setInputAssetVersionId(UUID value) {
+    this.inputAssetVersionId = value;
+  }
+
+  public BookAssetVersion getInputAssetVersion() {
+    return inputAssetVersion;
+  }
+
+  public UUID getOutputAssetVersionId() {
+    return outputAssetVersionId;
+  }
+
+  public void setOutputAssetVersionId(UUID value) {
+    this.outputAssetVersionId = value;
+  }
+
+  public BookAssetVersion getOutputAssetVersion() {
+    return outputAssetVersion;
+  }
+
+  public String getProcessingType() {
+    return processingType;
+  }
+
+  public void setProcessingType(String value) {
+    this.processingType = value;
+  }
+
+  public String getProcessor() {
+    return processor;
+  }
+
+  public void setProcessor(String value) {
+    this.processor = value;
+  }
+
+  public String getProcessorVersion() {
+    return processorVersion;
+  }
+
+  public void setProcessorVersion(String value) {
+    this.processorVersion = value;
+  }
+
+  public AssetProcessingStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(AssetProcessingStatus value) {
+    this.status = value;
+  }
+
+  public Instant getStartedAt() {
+    return startedAt;
+  }
+
+  public void setStartedAt(Instant value) {
+    this.startedAt = value;
+  }
+
+  public Instant getFinishedAt() {
+    return finishedAt;
+  }
+
+  public void setFinishedAt(Instant value) {
+    this.finishedAt = value;
+  }
+
+  public Map<String, Object> getMetadata() {
+    return metadata;
+  }
+
+  public void setMetadata(Map<String, Object> value) {
+    this.metadata = value;
+  }
+
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public void setErrorMessage(String value) {
+    this.errorMessage = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

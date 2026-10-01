@@ -15,6 +15,8 @@ class TechnicalErrorsTest {
 
   @Test
   void rejectsHeaderInjection() {
-    assertThrows(IllegalArgumentException.class, () -> new TechnicalErrorResponse("X", "safe", "bad\nheader"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new TechnicalErrorResponse("X", "safe", "bad\nheader"));
   }
 }

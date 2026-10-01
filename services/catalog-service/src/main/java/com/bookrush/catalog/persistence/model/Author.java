@@ -32,19 +32,56 @@ public class Author {
 
   public Author() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public String getName() { return name; }
-  public void setName(String value) { this.name = value; }
-  public String getNormalizedName() { return normalizedName; }
-  public void setNormalizedName(String value) { this.normalizedName = value; }
-  public Short getBirthYear() { return birthYear; }
-  public void setBirthYear(Short value) { this.birthYear = value; }
-  public Short getDeathYear() { return deathYear; }
-  public void setDeathYear(Short value) { this.deathYear = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String value) {
+    this.name = value;
+  }
+
+  public String getNormalizedName() {
+    return normalizedName;
+  }
+
+  public void setNormalizedName(String value) {
+    this.normalizedName = value;
+  }
+
+  public Short getBirthYear() {
+    return birthYear;
+  }
+
+  public void setBirthYear(Short value) {
+    this.birthYear = value;
+  }
+
+  public Short getDeathYear() {
+    return deathYear;
+  }
+
+  public void setDeathYear(Short value) {
+    this.deathYear = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

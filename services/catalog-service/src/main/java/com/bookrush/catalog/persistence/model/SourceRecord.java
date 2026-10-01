@@ -2,8 +2,8 @@ package com.bookrush.catalog.persistence.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
-import java.util.UUID;
 import java.util.Map;
+import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -40,18 +40,59 @@ public class SourceRecord {
 
   public SourceRecord() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public UUID getSourceId() { return sourceId; }
-  public void setSourceId(UUID value) { this.sourceId = value; }
-  public Source getSource() { return source; }
-  public String getExternalId() { return externalId; }
-  public void setExternalId(String value) { this.externalId = value; }
-  public Map<String, Object> getRawMetadata() { return rawMetadata; }
-  public void setRawMetadata(Map<String, Object> value) { this.rawMetadata = value; }
-  public Instant getRetrievedAt() { return retrievedAt; }
-  public void setRetrievedAt(Instant value) { this.retrievedAt = value; }
-  public String getContentHash() { return contentHash; }
-  public void setContentHash(String value) { this.contentHash = value; }
-  public Instant getCreatedAt() { return createdAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public UUID getSourceId() {
+    return sourceId;
+  }
+
+  public void setSourceId(UUID value) {
+    this.sourceId = value;
+  }
+
+  public Source getSource() {
+    return source;
+  }
+
+  public String getExternalId() {
+    return externalId;
+  }
+
+  public void setExternalId(String value) {
+    this.externalId = value;
+  }
+
+  public Map<String, Object> getRawMetadata() {
+    return rawMetadata;
+  }
+
+  public void setRawMetadata(Map<String, Object> value) {
+    this.rawMetadata = value;
+  }
+
+  public Instant getRetrievedAt() {
+    return retrievedAt;
+  }
+
+  public void setRetrievedAt(Instant value) {
+    this.retrievedAt = value;
+  }
+
+  public String getContentHash() {
+    return contentHash;
+  }
+
+  public void setContentHash(String value) {
+    this.contentHash = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
 }

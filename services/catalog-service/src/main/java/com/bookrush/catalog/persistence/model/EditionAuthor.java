@@ -33,27 +33,65 @@ public class EditionAuthor {
 
   public EditionAuthor() {}
 
-  public UUID getEditionId() { return editionId; }
-  public void setEditionId(UUID value) { this.editionId = value; }
-  public Edition getEdition() { return edition; }
-  public UUID getAuthorId() { return authorId; }
-  public void setAuthorId(UUID value) { this.authorId = value; }
-  public Author getAuthor() { return author; }
-  public EditionAuthorRole getRole() { return role; }
-  public void setRole(EditionAuthorRole value) { this.role = value; }
-  public Integer getPosition() { return position; }
-  public void setPosition(Integer value) { this.position = value; }
+  public UUID getEditionId() {
+    return editionId;
+  }
+
+  public void setEditionId(UUID value) {
+    this.editionId = value;
+  }
+
+  public Edition getEdition() {
+    return edition;
+  }
+
+  public UUID getAuthorId() {
+    return authorId;
+  }
+
+  public void setAuthorId(UUID value) {
+    this.authorId = value;
+  }
+
+  public Author getAuthor() {
+    return author;
+  }
+
+  public EditionAuthorRole getRole() {
+    return role;
+  }
+
+  public void setRole(EditionAuthorRole value) {
+    this.role = value;
+  }
+
+  public Integer getPosition() {
+    return position;
+  }
+
+  public void setPosition(Integer value) {
+    this.position = value;
+  }
 
   public static class Key implements java.io.Serializable {
     public UUID editionId;
     public UUID authorId;
     public EditionAuthorRole role;
+
     public Key() {}
-    @Override public boolean equals(Object other) {
+
+    @Override
+    public boolean equals(Object other) {
       if (this == other) return true;
       if (!(other instanceof Key k)) return false;
-      return java.util.Objects.equals(editionId, k.editionId) && java.util.Objects.equals(authorId, k.authorId) && java.util.Objects.equals(role, k.role);
+      return java.util.Objects.equals(editionId, k.editionId)
+          && java.util.Objects.equals(authorId, k.authorId)
+          && java.util.Objects.equals(role, k.role);
     }
-    @Override public int hashCode() { return java.util.Objects.hash(editionId, authorId, role); }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hash(editionId, authorId, role);
+    }
   }
 }

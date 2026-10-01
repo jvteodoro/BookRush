@@ -26,8 +26,9 @@ public final class SnapshotDownloader {
     this.maxBytes = maxBytes;
   }
 
-  public SnapshotResult download(URI requested, Path target, String objectKey,
-      String expectedSha256, RawObjectStore raw) throws Exception {
+  public SnapshotResult download(
+      URI requested, Path target, String objectKey, String expectedSha256, RawObjectStore raw)
+      throws Exception {
     urlPolicy.validate(requested, 0);
     Files.createDirectories(target.toAbsolutePath().normalize().getParent());
     Path part = target.resolveSibling(target.getFileName() + ".part");
@@ -37,11 +38,16 @@ public final class SnapshotDownloader {
     int redirects = 0;
     while (true) {
       urlPolicy.validate(effective, redirects);
-      HttpRequest.Builder builder = HttpRequest.newBuilder(effective).timeout(Duration.ofMinutes(2)).GET();
+      HttpRequest.Builder builder =
+          HttpRequest.newBuilder(effective).timeout(Duration.ofMinutes(2)).GET();
       if (offset > 0) builder.header("Range", "bytes=" + offset + "-");
       response = client.send(builder.build(), HttpResponse.BodyHandlers.ofInputStream());
       if (response.statusCode() / 100 != 3) break;
-      var location = response.headers().firstValue("Location").orElseThrow(() -> new IllegalStateException("redirect without Location"));
+      var location =
+          response
+              .headers()
+              .firstValue("Location")
+              .orElseThrow(() -> new IllegalStateException("redirect without Location"));
       response.body().close();
       effective = effective.resolve(location);
       redirects++;
@@ -54,40 +60,70 @@ public final class SnapshotDownloader {
       throw new IllegalStateException("snapshot HTTP status " + response.statusCode());
     }
     boolean append = offset > 0 && response.statusCode() == 206;
-    if (!append) { Files.deleteIfExists(part); offset = 0; }
+    if (!append) {
+      Files.deleteIfExists(part);
+      offset = 0;
+    }
     long total = offset;
-    try (InputStream input = response.body(); var output = Files.newOutputStream(part,
-        append ? new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.APPEND}
-            : new StandardOpenOption[]{StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING})) {
+    try (InputStream input = response.body();
+        var output =
+            Files.newOutputStream(
+                part,
+                append
+                    ? new StandardOpenOption[] {
+                      StandardOpenOption.CREATE, StandardOpenOption.APPEND
+                    }
+                    : new StandardOpenOption[] {
+                      StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING
+                    })) {
       var buffer = new byte[8192];
       int read;
       while ((read = input.read(buffer)) >= 0) {
         total += read;
-        if (total > maxBytes) throw new IllegalStateException("snapshot exceeds configured dataset budget");
+        if (total > maxBytes)
+          throw new IllegalStateException("snapshot exceeds configured dataset budget");
         output.write(buffer, 0, read);
       }
       output.flush();
     }
     var hash = sha256(part);
-    if (expectedSha256 != null && !expectedSha256.equals(hash)) throw new IllegalStateException("snapshot checksum mismatch");
-    try { Files.move(part, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
-    catch (java.nio.file.AtomicMoveNotSupportedException e) { Files.move(part, target, StandardCopyOption.REPLACE_EXISTING); }
+    if (expectedSha256 != null && !expectedSha256.equals(hash))
+      throw new IllegalStateException("snapshot checksum mismatch");
+    try {
+      Files.move(part, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+      Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
+    }
     long persistedLength = Files.size(target);
     if (raw != null) {
-      try (InputStream content = Files.newInputStream(target)) { raw.put(objectKey, content, persistedLength, hash); }
+      try (InputStream content = Files.newInputStream(target)) {
+        raw.put(objectKey, content, persistedLength, hash);
+      }
     }
-    return new SnapshotResult(effective, target, objectKey, persistedLength, hash, response.headers().firstValue("ETag").orElse(null));
+    return new SnapshotResult(
+        effective,
+        target,
+        objectKey,
+        persistedLength,
+        hash,
+        response.headers().firstValue("ETag").orElse(null));
   }
 
   private static String sha256(Path file) throws Exception {
     var digest = MessageDigest.getInstance("SHA-256");
     try (InputStream input = Files.newInputStream(file)) {
-      var buffer = new byte[8192]; int read;
+      var buffer = new byte[8192];
+      int read;
       while ((read = input.read(buffer)) >= 0) digest.update(buffer, 0, read);
     }
     return HexFormat.of().formatHex(digest.digest());
   }
 
-  public record SnapshotResult(URI requestedUrl, Path localFile, String objectKey,
-      long sizeBytes, String sha256, String etag) {}
+  public record SnapshotResult(
+      URI requestedUrl,
+      Path localFile,
+      String objectKey,
+      long sizeBytes,
+      String sha256,
+      String etag) {}
 }

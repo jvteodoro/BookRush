@@ -63,35 +63,120 @@ public class BookAssetVersion {
 
   public BookAssetVersion() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public UUID getBookAssetId() { return bookAssetId; }
-  public void setBookAssetId(UUID value) { this.bookAssetId = value; }
-  public BookAsset getBookAsset() { return bookAsset; }
-  public Integer getVersionNumber() { return versionNumber; }
-  public void setVersionNumber(Integer value) { this.versionNumber = value; }
-  public StorageProvider getStorageProvider() { return storageProvider; }
-  public void setStorageProvider(StorageProvider value) { this.storageProvider = value; }
-  public String getBucket() { return bucket; }
-  public void setBucket(String value) { this.bucket = value; }
-  public String getObjectKey() { return objectKey; }
-  public void setObjectKey(String value) { this.objectKey = value; }
-  public String getOriginalFilename() { return originalFilename; }
-  public void setOriginalFilename(String value) { this.originalFilename = value; }
-  public String getContentType() { return contentType; }
-  public void setContentType(String value) { this.contentType = value; }
-  public Long getSizeBytes() { return sizeBytes; }
-  public void setSizeBytes(Long value) { this.sizeBytes = value; }
-  public String getSha256() { return sha256; }
-  public void setSha256(String value) { this.sha256 = value; }
-  public BookAssetVersionStatus getStatus() { return status; }
-  public void setStatus(BookAssetVersionStatus value) { this.status = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
-  public UUID getIngestionItemId() { return ingestionItemId; }
-  public void setIngestionItemId(UUID value) { this.ingestionItemId = value; }
-  public IngestionItem getIngestionItem() { return ingestionItem; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public UUID getBookAssetId() {
+    return bookAssetId;
+  }
+
+  public void setBookAssetId(UUID value) {
+    this.bookAssetId = value;
+  }
+
+  public BookAsset getBookAsset() {
+    return bookAsset;
+  }
+
+  public Integer getVersionNumber() {
+    return versionNumber;
+  }
+
+  public void setVersionNumber(Integer value) {
+    this.versionNumber = value;
+  }
+
+  public StorageProvider getStorageProvider() {
+    return storageProvider;
+  }
+
+  public void setStorageProvider(StorageProvider value) {
+    this.storageProvider = value;
+  }
+
+  public String getBucket() {
+    return bucket;
+  }
+
+  public void setBucket(String value) {
+    this.bucket = value;
+  }
+
+  public String getObjectKey() {
+    return objectKey;
+  }
+
+  public void setObjectKey(String value) {
+    this.objectKey = value;
+  }
+
+  public String getOriginalFilename() {
+    return originalFilename;
+  }
+
+  public void setOriginalFilename(String value) {
+    this.originalFilename = value;
+  }
+
+  public String getContentType() {
+    return contentType;
+  }
+
+  public void setContentType(String value) {
+    this.contentType = value;
+  }
+
+  public Long getSizeBytes() {
+    return sizeBytes;
+  }
+
+  public void setSizeBytes(Long value) {
+    this.sizeBytes = value;
+  }
+
+  public String getSha256() {
+    return sha256;
+  }
+
+  public void setSha256(String value) {
+    this.sha256 = value;
+  }
+
+  public BookAssetVersionStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(BookAssetVersionStatus value) {
+    this.status = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
+  public UUID getIngestionItemId() {
+    return ingestionItemId;
+  }
+
+  public void setIngestionItemId(UUID value) {
+    this.ingestionItemId = value;
+  }
+
+  public IngestionItem getIngestionItem() {
+    return ingestionItem;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

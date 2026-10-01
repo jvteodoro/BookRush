@@ -13,18 +13,20 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * Sentence-aligned candidate generation with canonical Unicode code-point
- * offsets. The V1 method remains stable for historical replay; V2 adds
- * configurable multi-size windows and optional chapter boundaries.
+ * Sentence-aligned candidate generation with canonical Unicode code-point offsets. The V1 method
+ * remains stable for historical replay; V2 adds configurable multi-size windows and optional
+ * chapter boundaries.
  */
 public final class ExcerptCandidateGenerator {
   private static final Pattern SENTENCE = Pattern.compile("[^.!?…。！？]+[.!?…。！？]?");
-  private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+", Pattern.UNICODE_CHARACTER_CLASS);
+  private static final Pattern WORD =
+      Pattern.compile("[\\p{L}\\p{N}]+", Pattern.UNICODE_CHARACTER_CLASS);
 
   private ExcerptCandidateGenerator() {}
 
   /** Historical V1 generator. Do not change its semantics or version identity. */
-  public static List<Candidate> generate(String text, int targetWords, int strideSentences, String version) {
+  public static List<Candidate> generate(
+      String text, int targetWords, int strideSentences, String version) {
     if (text == null || text.isBlank()) return List.of();
     var sentences = sentences(text, 0, codePointLength(text));
     var result = new ArrayList<Candidate>();
@@ -41,18 +43,26 @@ public final class ExcerptCandidateGenerator {
       var last = sentences.get(end - 1);
       String value = slice(text, first.startCodepoint(), last.endCodepoint());
       if (isBoilerplate(value)) continue;
-      result.add(new Candidate(first.startCodepoint(), last.endCodepoint(), value, words, end - i, hash(value), version));
+      result.add(
+          new Candidate(
+              first.startCodepoint(),
+              last.endCodepoint(),
+              value,
+              words,
+              end - i,
+              hash(value),
+              version));
     }
     return result.stream().distinct().toList();
   }
 
   /**
-   * Generates V2 candidates independently inside each chapter unless the
-   * configuration explicitly permits cross-chapter windows. Repeating this
-   * method with the same normalized text and configuration returns candidates
-   * in the same order and with the same hashes/offsets.
+   * Generates V2 candidates independently inside each chapter unless the configuration explicitly
+   * permits cross-chapter windows. Repeating this method with the same normalized text and
+   * configuration returns candidates in the same order and with the same hashes/offsets.
    */
-  public static List<V2Candidate> generateV2(String text, List<ChapterBoundary> chapters, V2Config config) {
+  public static List<V2Candidate> generateV2(
+      String text, List<ChapterBoundary> chapters, V2Config config) {
     Objects.requireNonNull(config, "config is required");
     if (text == null || text.isBlank()) return List.of();
 
@@ -66,9 +76,10 @@ public final class ExcerptCandidateGenerator {
       }
     }
 
-    candidates.sort(Comparator.comparingInt(V2Candidate::startCodepoint)
-        .thenComparingInt(V2Candidate::endCodepoint)
-        .thenComparing(c -> c.chapterId(), Comparator.nullsFirst(Comparator.naturalOrder())));
+    candidates.sort(
+        Comparator.comparingInt(V2Candidate::startCodepoint)
+            .thenComparingInt(V2Candidate::endCodepoint)
+            .thenComparing(c -> c.chapterId(), Comparator.nullsFirst(Comparator.naturalOrder())));
 
     var seenIntervals = new HashSet<String>();
     var seenTexts = new HashSet<String>();
@@ -82,7 +93,11 @@ public final class ExcerptCandidateGenerator {
   }
 
   private static List<V2Candidate> windows(
-      String text, List<Sentence> sentences, UUID chapterId, WindowProfile profile, V2Config config) {
+      String text,
+      List<Sentence> sentences,
+      UUID chapterId,
+      WindowProfile profile,
+      V2Config config) {
     var result = new ArrayList<V2Candidate>();
     for (int start = 0; start < sentences.size(); start += profile.sentenceStride()) {
       int words = 0;
@@ -96,24 +111,37 @@ public final class ExcerptCandidateGenerator {
       var last = sentences.get(end - 1);
       String value = slice(text, first.startCodepoint(), last.endCodepoint());
       if (isBoilerplate(value) || !containsLexicalContent(value)) continue;
-      result.add(new V2Candidate(chapterId, first.startCodepoint(), last.endCodepoint(), value,
-          words, end - start, hash(value), config.version()));
+      result.add(
+          new V2Candidate(
+              chapterId,
+              first.startCodepoint(),
+              last.endCodepoint(),
+              value,
+              words,
+              end - start,
+              hash(value),
+              config.version()));
     }
     return result;
   }
 
-  private static List<Section> sections(List<ChapterBoundary> chapters, int textLength, boolean crossChapter) {
-    if (crossChapter || chapters == null || chapters.isEmpty()) return List.of(new Section(null, 0, textLength));
+  private static List<Section> sections(
+      List<ChapterBoundary> chapters, int textLength, boolean crossChapter) {
+    if (crossChapter || chapters == null || chapters.isEmpty())
+      return List.of(new Section(null, 0, textLength));
     var ordered = new ArrayList<>(chapters);
     ordered.sort(Comparator.comparingInt(ChapterBoundary::startCodepoint));
     int previousEnd = 0;
     for (var chapter : ordered) {
       if (chapter.startCodepoint() < previousEnd || chapter.endCodepoint() > textLength) {
-        throw new IllegalArgumentException("chapters must be ordered, non-overlapping and inside the text");
+        throw new IllegalArgumentException(
+            "chapters must be ordered, non-overlapping and inside the text");
       }
       previousEnd = chapter.endCodepoint();
     }
-    return ordered.stream().map(c -> new Section(c.chapterId(), c.startCodepoint(), c.endCodepoint())).toList();
+    return ordered.stream()
+        .map(c -> new Section(c.chapterId(), c.startCodepoint(), c.endCodepoint()))
+        .toList();
   }
 
   private static List<Sentence> sentences(String text, int startCodepoint, int endCodepoint) {
@@ -127,7 +155,8 @@ public final class ExcerptCandidateGenerator {
       int leadingUtf16 = leadingUtf16(raw);
       int trailingUtf16 = trailingUtf16(raw);
       if (leadingUtf16 == trailingUtf16) continue;
-      int sentenceStart = startCodepoint + section.codePointCount(0, matcher.start() + leadingUtf16);
+      int sentenceStart =
+          startCodepoint + section.codePointCount(0, matcher.start() + leadingUtf16);
       int sentenceEnd = startCodepoint + section.codePointCount(0, matcher.start() + trailingUtf16);
       String value = slice(text, sentenceStart, sentenceEnd);
       result.add(new Sentence(sentenceStart, sentenceEnd, words(value)));
@@ -168,7 +197,8 @@ public final class ExcerptCandidateGenerator {
 
   private static boolean isBoilerplate(String value) {
     var normalized = value.strip().toLowerCase(Locale.ROOT);
-    return normalized.matches("(?s)^(contents|table of contents|index)\\b.*") || normalized.length() < 20;
+    return normalized.matches("(?s)^(contents|table of contents|index)\\b.*")
+        || normalized.length() < 20;
   }
 
   private static String normalize(String value) {
@@ -189,17 +219,26 @@ public final class ExcerptCandidateGenerator {
 
   private static String hash(String value) {
     try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+      return HexFormat.of()
+          .formatHex(
+              MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
     } catch (Exception e) {
       throw new IllegalStateException(e);
     }
   }
 
   private record Sentence(int startCodepoint, int endCodepoint, int words) {}
+
   private record Section(UUID chapterId, int startCodepoint, int endCodepoint) {}
 
-  public record Candidate(int startCodepoint, int endCodepoint, String text, int wordCount,
-                          int sentenceCount, String textSha256, String generatorVersion) {}
+  public record Candidate(
+      int startCodepoint,
+      int endCodepoint,
+      String text,
+      int wordCount,
+      int sentenceCount,
+      String textSha256,
+      String generatorVersion) {}
 
   public record ChapterBoundary(UUID chapterId, int startCodepoint, int endCodepoint) {
     public ChapterBoundary {
@@ -218,29 +257,49 @@ public final class ExcerptCandidateGenerator {
     }
   }
 
-  public record V2Config(int minWords, List<WindowProfile> windowProfiles, int maxWords,
-                         boolean crossChapter, String version) {
+  public record V2Config(
+      int minWords,
+      List<WindowProfile> windowProfiles,
+      int maxWords,
+      boolean crossChapter,
+      String version) {
     public V2Config {
-      if (minWords < 1 || maxWords < minWords) throw new IllegalArgumentException("invalid V2 word bounds");
-      windowProfiles = List.copyOf(Objects.requireNonNull(windowProfiles, "windowProfiles is required"));
-      if (windowProfiles.isEmpty()) throw new IllegalArgumentException("at least one V2 window profile is required");
+      if (minWords < 1 || maxWords < minWords)
+        throw new IllegalArgumentException("invalid V2 word bounds");
+      windowProfiles =
+          List.copyOf(Objects.requireNonNull(windowProfiles, "windowProfiles is required"));
+      if (windowProfiles.isEmpty())
+        throw new IllegalArgumentException("at least one V2 window profile is required");
       if (windowProfiles.stream().anyMatch(profile -> profile.targetWords() > maxWords)) {
         throw new IllegalArgumentException("targetWords must not exceed maxWords");
       }
-      if (version == null || version.isBlank()) throw new IllegalArgumentException("version is required");
+      if (version == null || version.isBlank())
+        throw new IllegalArgumentException("version is required");
     }
 
     public static V2Config pilotDefaults(String version) {
-      return new V2Config(60, List.of(new WindowProfile(90, 1), new WindowProfile(140, 2),
-          new WindowProfile(200, 3)), 250, false, version);
+      return new V2Config(
+          60,
+          List.of(new WindowProfile(90, 1), new WindowProfile(140, 2), new WindowProfile(200, 3)),
+          250,
+          false,
+          version);
     }
   }
 
-  public record V2Candidate(UUID chapterId, int startCodepoint, int endCodepoint, String text,
-                            int wordCount, int sentenceCount, String textSha256, String generatorVersion) {
+  public record V2Candidate(
+      UUID chapterId,
+      int startCodepoint,
+      int endCodepoint,
+      String text,
+      int wordCount,
+      int sentenceCount,
+      String textSha256,
+      String generatorVersion) {
     public V2Candidate {
       if (startCodepoint < 0 || endCodepoint <= startCodepoint || text == null || text.isBlank()) {
-        throw new IllegalArgumentException("candidate must contain a non-empty half-open interval and text");
+        throw new IllegalArgumentException(
+            "candidate must contain a non-empty half-open interval and text");
       }
     }
   }

@@ -13,9 +13,17 @@ import org.springframework.stereotype.Service;
 public final class TextProcessingService {
   private final PlainTextNormalizer normalizer = new PlainTextNormalizer();
   private final ChapterStructureWriter chapters;
-  public TextProcessingService(ObjectMapper mapper) { this.chapters = new ChapterStructureWriter(mapper); }
 
-  public ProcessedText process(UUID editionId, UUID sourceVersionId, String input, List<ChapterStructureWriter.Chapter> structure) throws Exception {
+  public TextProcessingService(ObjectMapper mapper) {
+    this.chapters = new ChapterStructureWriter(mapper);
+  }
+
+  public ProcessedText process(
+      UUID editionId,
+      UUID sourceVersionId,
+      String input,
+      List<ChapterStructureWriter.Chapter> structure)
+      throws Exception {
     String normalized = normalizer.removeKnownGutenbergDelimiters(normalizer.normalize(input));
     String hash = sha256(normalized);
     byte[] chapterJson = chapters.write(editionId, sourceVersionId, normalized, hash, structure);
@@ -23,7 +31,10 @@ public final class TextProcessingService {
   }
 
   private static String sha256(String value) throws Exception {
-    return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+    return HexFormat.of()
+        .formatHex(
+            MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
   }
+
   public record ProcessedText(byte[] normalizedTxt, byte[] chaptersJson, String sha256) {}
 }

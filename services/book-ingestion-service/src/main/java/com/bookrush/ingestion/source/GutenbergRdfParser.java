@@ -15,7 +15,13 @@ public final class GutenbergRdfParser {
     factory.setProperty("javax.xml.stream.isSupportingExternalEntities", false);
     XMLStreamReader reader = factory.createXMLStreamReader(input);
     var records = new ArrayList<GutenbergRecord>();
-    String id = null, title = null, language = null, rights = null, issued = null, creator = null, formatUrl = null;
+    String id = null,
+        title = null,
+        language = null,
+        rights = null,
+        issued = null,
+        creator = null,
+        formatUrl = null;
     String currentFileAbout = null;
     var subjects = new ArrayList<String>();
     String element = null;
@@ -24,7 +30,9 @@ public final class GutenbergRdfParser {
       if (event == XMLStreamConstants.START_ELEMENT) {
         element = reader.getLocalName();
         if ("ebook".equals(element)) {
-          id = reader.getAttributeValue(null, "about"); title = language = rights = issued = creator = formatUrl = null; subjects.clear();
+          id = reader.getAttributeValue(null, "about");
+          title = language = rights = issued = creator = formatUrl = null;
+          subjects.clear();
         } else if ("file".equals(element)) {
           currentFileAbout = reader.getAttributeValue(null, "about");
         }
@@ -33,7 +41,10 @@ public final class GutenbergRdfParser {
         if (!text.isEmpty()) {
           switch (element) {
             case "title" -> title = text;
-            case "value" -> { if (language == null && text.length() <= 3) language = text; else if (!subjects.contains(text)) subjects.add(text); }
+            case "value" -> {
+              if (language == null && text.length() <= 3) language = text;
+              else if (!subjects.contains(text)) subjects.add(text);
+            }
             case "rights" -> rights = text;
             case "issued" -> issued = text;
             case "name" -> creator = text;
@@ -43,13 +54,17 @@ public final class GutenbergRdfParser {
         if ("file".equals(reader.getLocalName())) {
           // Gutenberg representation URLs commonly use suffixes such as
           // .epub.images or .epub.noimages rather than ending in .epub.
-          if (currentFileAbout != null && currentFileAbout.toLowerCase(java.util.Locale.ROOT).contains(".epub")) {
-            if (formatUrl == null || currentFileAbout.toLowerCase(java.util.Locale.ROOT).contains(".epub.noimages"))
+          if (currentFileAbout != null
+              && currentFileAbout.toLowerCase(java.util.Locale.ROOT).contains(".epub")) {
+            if (formatUrl == null
+                || currentFileAbout.toLowerCase(java.util.Locale.ROOT).contains(".epub.noimages"))
               formatUrl = currentFileAbout;
           }
         }
         if ("ebook".equals(reader.getLocalName()) && id != null) {
-          records.add(new GutenbergRecord(id, title, language, creator, rights, issued, formatUrl, List.copyOf(subjects)));
+          records.add(
+              new GutenbergRecord(
+                  id, title, language, creator, rights, issued, formatUrl, List.copyOf(subjects)));
         }
         element = null;
       }
@@ -58,6 +73,13 @@ public final class GutenbergRdfParser {
     return List.copyOf(records);
   }
 
-  public record GutenbergRecord(String externalId, String title, String language, String creator,
-      String rights, String digitalReleaseDate, String epubUrl, List<String> subjects) {}
+  public record GutenbergRecord(
+      String externalId,
+      String title,
+      String language,
+      String creator,
+      String rights,
+      String digitalReleaseDate,
+      String epubUrl,
+      List<String> subjects) {}
 }

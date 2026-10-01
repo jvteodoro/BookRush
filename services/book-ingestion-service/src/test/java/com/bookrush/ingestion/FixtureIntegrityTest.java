@@ -28,7 +28,8 @@ class FixtureIntegrityTest {
   }
 
   private static String sha256(String value) throws Exception {
-    var digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+    var digest =
+        MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
     return java.util.HexFormat.of().formatHex(digest);
   }
 }

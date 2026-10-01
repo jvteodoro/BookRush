@@ -46,26 +46,84 @@ public class Book {
 
   public Book() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public String getCanonicalTitle() { return canonicalTitle; }
-  public void setCanonicalTitle(String value) { this.canonicalTitle = value; }
-  public String getOriginalTitle() { return originalTitle; }
-  public void setOriginalTitle(String value) { this.originalTitle = value; }
-  public String getOriginalLanguage() { return originalLanguage; }
-  public void setOriginalLanguage(String value) { this.originalLanguage = value; }
-  public Short getFirstPublicationYear() { return firstPublicationYear; }
-  public void setFirstPublicationYear(Short value) { this.firstPublicationYear = value; }
-  public String getDescription() { return description; }
-  public void setDescription(String value) { this.description = value; }
-  public BookStatus getStatus() { return status; }
-  public void setStatus(BookStatus value) { this.status = value; }
-  public UUID getMergedIntoId() { return mergedIntoId; }
-  public void setMergedIntoId(UUID value) { this.mergedIntoId = value; }
-  public Book getMergedInto() { return mergedInto; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public String getCanonicalTitle() {
+    return canonicalTitle;
+  }
+
+  public void setCanonicalTitle(String value) {
+    this.canonicalTitle = value;
+  }
+
+  public String getOriginalTitle() {
+    return originalTitle;
+  }
+
+  public void setOriginalTitle(String value) {
+    this.originalTitle = value;
+  }
+
+  public String getOriginalLanguage() {
+    return originalLanguage;
+  }
+
+  public void setOriginalLanguage(String value) {
+    this.originalLanguage = value;
+  }
+
+  public Short getFirstPublicationYear() {
+    return firstPublicationYear;
+  }
+
+  public void setFirstPublicationYear(Short value) {
+    this.firstPublicationYear = value;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String value) {
+    this.description = value;
+  }
+
+  public BookStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(BookStatus value) {
+    this.status = value;
+  }
+
+  public UUID getMergedIntoId() {
+    return mergedIntoId;
+  }
+
+  public void setMergedIntoId(UUID value) {
+    this.mergedIntoId = value;
+  }
+
+  public Book getMergedInto() {
+    return mergedInto;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

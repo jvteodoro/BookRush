@@ -26,13 +26,43 @@ public final class AnalyticsMetrics {
     generatedExcerpts = registry.counter("bookrush.analytics.excerpts", "operation", "generated");
     analyzerDuration = registry.timer("bookrush.analytics.analyzer.duration");
   }
-  public void jobCreated() { jobsCreated.increment(); }
-  public void jobReplayed() { jobsReplayed.increment(); }
-  public void jobConflict() { jobsConflicted.increment(); }
-  public void excerptsListed(int count) { excerptsListed.increment(Math.max(0, count)); }
-  public void analysisFailure() { analysisFailures.increment(); }
-  public void excerptsGenerated(int count) { generatedExcerpts.increment(Math.max(0, count)); }
-  public void jobItemFailed(String code) { analysisFailures.increment(); }
-  public <T> T time(java.util.function.Supplier<T> operation) { return analyzerDuration.record(operation); }
-  public Duration durationEstimate() { return analyzerDuration.mean(java.util.concurrent.TimeUnit.MILLISECONDS) == 0 ? Duration.ZERO : Duration.ofMillis((long) analyzerDuration.mean(java.util.concurrent.TimeUnit.MILLISECONDS)); }
+
+  public void jobCreated() {
+    jobsCreated.increment();
+  }
+
+  public void jobReplayed() {
+    jobsReplayed.increment();
+  }
+
+  public void jobConflict() {
+    jobsConflicted.increment();
+  }
+
+  public void excerptsListed(int count) {
+    excerptsListed.increment(Math.max(0, count));
+  }
+
+  public void analysisFailure() {
+    analysisFailures.increment();
+  }
+
+  public void excerptsGenerated(int count) {
+    generatedExcerpts.increment(Math.max(0, count));
+  }
+
+  public void jobItemFailed(String code) {
+    analysisFailures.increment();
+  }
+
+  public <T> T time(java.util.function.Supplier<T> operation) {
+    return analyzerDuration.record(operation);
+  }
+
+  public Duration durationEstimate() {
+    return analyzerDuration.mean(java.util.concurrent.TimeUnit.MILLISECONDS) == 0
+        ? Duration.ZERO
+        : Duration.ofMillis(
+            (long) analyzerDuration.mean(java.util.concurrent.TimeUnit.MILLISECONDS));
+  }
 }

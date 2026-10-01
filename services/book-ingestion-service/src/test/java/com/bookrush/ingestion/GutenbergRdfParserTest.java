@@ -7,7 +7,8 @@ import java.io.InputStream;
 import org.junit.jupiter.api.Test;
 
 class GutenbergRdfParserTest {
-  @Test void parsesFixtureWithoutResolvingExternalEntities() throws Exception {
+  @Test
+  void parsesFixtureWithoutResolvingExternalEntities() throws Exception {
     try (InputStream input = getClass().getResourceAsStream("/fixtures/gutenberg/catalog.rdf")) {
       var records = new GutenbergRdfParser().parse(input, 10);
       assertEquals(1, records.size());

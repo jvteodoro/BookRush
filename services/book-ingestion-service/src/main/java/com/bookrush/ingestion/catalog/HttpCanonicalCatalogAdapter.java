@@ -14,7 +14,10 @@ public final class HttpCanonicalCatalogAdapter implements CanonicalCatalogPort {
   private final CanonicalCatalogProperties properties;
   private final OidcServiceTokenProvider tokens;
 
-  public HttpCanonicalCatalogAdapter(RestClient.Builder builder, CanonicalCatalogProperties properties, OidcServiceTokenProvider tokens) {
+  public HttpCanonicalCatalogAdapter(
+      RestClient.Builder builder,
+      CanonicalCatalogProperties properties,
+      OidcServiceTokenProvider tokens) {
     this.properties = properties;
     this.tokens = tokens;
     this.client = builder.baseUrl(properties.baseUrl().toString()).build();
@@ -23,16 +26,25 @@ public final class HttpCanonicalCatalogAdapter implements CanonicalCatalogPort {
   @Override
   public Map<String, Object> apply(CanonicalCatalogCommand command) {
     try {
-      return client.post().uri("/api/internal/v1/catalog/commands")
-          .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.token(OidcServiceTokenProvider.Kind.CANONICAL))
-          .body(command).retrieve().body(Map.class);
+      return client
+          .post()
+          .uri("/api/internal/v1/catalog/commands")
+          .header(
+              HttpHeaders.AUTHORIZATION,
+              "Bearer " + tokens.token(OidcServiceTokenProvider.Kind.CANONICAL))
+          .body(command)
+          .retrieve()
+          .body(Map.class);
     } catch (RestClientResponseException e) {
-      if (e.getStatusCode().value() == 409) throw new CanonicalConflict(e.getResponseBodyAsString());
+      if (e.getStatusCode().value() == 409)
+        throw new CanonicalConflict(e.getResponseBodyAsString());
       throw new IllegalStateException("canonical catalog request failed: " + e.getStatusCode(), e);
     }
   }
 
   public static final class CanonicalConflict extends RuntimeException {
-    public CanonicalConflict(String message) { super(message); }
+    public CanonicalConflict(String message) {
+      super(message);
+    }
   }
 }

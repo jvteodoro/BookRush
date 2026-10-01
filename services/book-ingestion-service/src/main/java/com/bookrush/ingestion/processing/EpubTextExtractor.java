@@ -12,10 +12,18 @@ public final class EpubTextExtractor {
   public String extract(Path epub) throws Exception {
     var parts = new ArrayList<String>();
     try (var zip = new ZipFile(epub.toFile())) {
-      var entries = zip.stream().filter(e -> !e.isDirectory() && (e.getName().endsWith(".xhtml") || e.getName().endsWith(".html")))
-          .sorted(java.util.Comparator.comparing(java.util.zip.ZipEntry::getName)).toList();
+      var entries =
+          zip.stream()
+              .filter(
+                  e ->
+                      !e.isDirectory()
+                          && (e.getName().endsWith(".xhtml") || e.getName().endsWith(".html")))
+              .sorted(java.util.Comparator.comparing(java.util.zip.ZipEntry::getName))
+              .toList();
       for (var entry : entries) {
-        try (var input = zip.getInputStream(entry)) { parts.add(html.extract(new String(input.readAllBytes(), StandardCharsets.UTF_8))); }
+        try (var input = zip.getInputStream(entry)) {
+          parts.add(html.extract(new String(input.readAllBytes(), StandardCharsets.UTF_8)));
+        }
       }
     }
     return new PlainTextNormalizer().normalize(String.join("\n", parts));

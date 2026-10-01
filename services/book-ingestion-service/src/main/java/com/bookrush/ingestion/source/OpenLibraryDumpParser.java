@@ -22,7 +22,7 @@ public final class OpenLibraryDumpParser {
 
   public List<DumpRecord> parseGzip(InputStream compressed, int maxRecords) throws Exception {
     try (var gzip = new GZIPInputStream(compressed);
-         var reader = new BufferedReader(new InputStreamReader(gzip, StandardCharsets.UTF_8))) {
+        var reader = new BufferedReader(new InputStreamReader(gzip, StandardCharsets.UTF_8))) {
       return parse(reader, maxRecords);
     }
   }
@@ -33,17 +33,27 @@ public final class OpenLibraryDumpParser {
     long lineNumber = 0;
     while (result.size() < maxRecords && (line = reader.readLine()) != null) {
       lineNumber++;
-      if (line.getBytes(StandardCharsets.UTF_8).length > maxLineBytes) throw new IllegalArgumentException("dump record too large at line " + lineNumber);
+      if (line.getBytes(StandardCharsets.UTF_8).length > maxLineBytes)
+        throw new IllegalArgumentException("dump record too large at line " + lineNumber);
       var fields = line.split("\\t", 5);
-      if (fields.length != 5) throw new IllegalArgumentException("dump record must contain five fields at line " + lineNumber);
+      if (fields.length != 5)
+        throw new IllegalArgumentException(
+            "dump record must contain five fields at line " + lineNumber);
       JsonNode payload = mapper.readTree(fields[4]);
       result.add(new DumpRecord(fields[0], fields[1], fields[2], fields[3], payload, lineNumber));
     }
     return List.copyOf(result);
   }
 
-  public record DumpRecord(String namespace, String key, String revision, String lastModified,
-      JsonNode payload, long sourceLine) {
-    public boolean isDelete() { return payload.path("type").path("key").asText().equals("/type/delete"); }
+  public record DumpRecord(
+      String namespace,
+      String key,
+      String revision,
+      String lastModified,
+      JsonNode payload,
+      long sourceLine) {
+    public boolean isDelete() {
+      return payload.path("type").path("key").asText().equals("/type/delete");
+    }
   }
 }

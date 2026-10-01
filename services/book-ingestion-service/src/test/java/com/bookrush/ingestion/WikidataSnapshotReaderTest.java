@@ -16,12 +16,17 @@ class WikidataSnapshotReaderTest {
   @Test
   void verifiesChecksumAndExtractsOnlyApprovedFields() throws Exception {
     var file = Files.createTempFile("wikidata-", ".jsonl");
-    var line = "{\"qid\":\"Q42\",\"claims\":{\"P569\":{\"value\":\"1952-03-11\"},\"P407\":{\"qid\":\"Q1860\"},\"P31\":{\"value\":\"ignored\"}}}";
+    var line =
+        "{\"qid\":\"Q42\",\"claims\":{\"P569\":{\"value\":\"1952-03-11\"},\"P407\":{\"qid\":\"Q1860\"},\"P31\":{\"value\":\"ignored\"}}}";
     Files.writeString(file, line + "\n", StandardCharsets.UTF_8);
-    var sha = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+    var sha =
+        HexFormat.of()
+            .formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
     var snapshot = new WikidataSnapshotReader(new ObjectMapper()).read(file, sha, 10, 4096);
     var fields = WikidataEnrichment.candidates(snapshot.records().getFirst(), snapshot.sha256());
-    assertThat(fields).extracting(WikidataEnrichment.FieldCandidate::field).containsExactly("birth_date", "original_language_qid");
+    assertThat(fields)
+        .extracting(WikidataEnrichment.FieldCandidate::field)
+        .containsExactly("birth_date", "original_language_qid");
     assertThat(fields.getFirst().evidenceSha256()).isEqualTo(sha);
   }
 
@@ -29,7 +34,9 @@ class WikidataSnapshotReaderTest {
   void rejectsChecksumAndInvalidQid() throws Exception {
     var file = Files.createTempFile("wikidata-", ".jsonl");
     Files.writeString(file, "{\"qid\":\"not-qid\",\"claims\":{}}\n");
-    assertThatThrownBy(() -> new WikidataSnapshotReader(new ObjectMapper()).read(file, "00", 10, 4096))
-        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("checksum");
+    assertThatThrownBy(
+            () -> new WikidataSnapshotReader(new ObjectMapper()).read(file, "00", 10, 4096))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("checksum");
   }
 }

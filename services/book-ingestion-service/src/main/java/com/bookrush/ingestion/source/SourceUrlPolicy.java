@@ -7,21 +7,29 @@ import java.net.URI;
 import java.util.Locale;
 import java.util.Set;
 
-/** Validates every source URL and redirect; it is intentionally separate from the trusted S3 client. */
+/**
+ * Validates every source URL and redirect; it is intentionally separate from the trusted S3 client.
+ */
 public final class SourceUrlPolicy {
   private final Set<String> allowedHosts;
   private final boolean allowPrivateAddresses;
   private final int maxRedirects;
 
-  public SourceUrlPolicy(Set<String> allowedHosts, boolean allowPrivateAddresses, int maxRedirects) {
-    this.allowedHosts = allowedHosts.stream().map(h -> h.toLowerCase(Locale.ROOT)).collect(java.util.stream.Collectors.toUnmodifiableSet());
+  public SourceUrlPolicy(
+      Set<String> allowedHosts, boolean allowPrivateAddresses, int maxRedirects) {
+    this.allowedHosts =
+        allowedHosts.stream()
+            .map(h -> h.toLowerCase(Locale.ROOT))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
     this.allowPrivateAddresses = allowPrivateAddresses;
     this.maxRedirects = maxRedirects;
-    if (maxRedirects < 0 || maxRedirects > 10) throw new IllegalArgumentException("redirect limit must be 0..10");
+    if (maxRedirects < 0 || maxRedirects > 10)
+      throw new IllegalArgumentException("redirect limit must be 0..10");
   }
 
   public URI validate(URI candidate, int redirectCount) {
-    if (candidate == null || candidate.getScheme() == null
+    if (candidate == null
+        || candidate.getScheme() == null
         || !Set.of("https", "http").contains(candidate.getScheme().toLowerCase(Locale.ROOT))) {
       throw new IllegalArgumentException("source URL must use HTTP(S)");
     }
@@ -36,7 +44,8 @@ public final class SourceUrlPolicy {
     if (!allowPrivateAddresses) {
       try {
         for (var address : InetAddress.getAllByName(host)) {
-          if (isPrivate(address)) throw new IllegalArgumentException("private or link-local source address");
+          if (isPrivate(address))
+            throw new IllegalArgumentException("private or link-local source address");
         }
       } catch (java.net.UnknownHostException e) {
         throw new IllegalArgumentException("source host cannot be resolved", e);
@@ -46,8 +55,11 @@ public final class SourceUrlPolicy {
   }
 
   private static boolean isPrivate(InetAddress address) {
-    if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress()
-        || address.isSiteLocalAddress() || address.isMulticastAddress()) return true;
+    if (address.isAnyLocalAddress()
+        || address.isLoopbackAddress()
+        || address.isLinkLocalAddress()
+        || address.isSiteLocalAddress()
+        || address.isMulticastAddress()) return true;
     if (address instanceof Inet4Address v4) {
       int value = java.nio.ByteBuffer.wrap(v4.getAddress()).getInt();
       return (value & 0xff000000) == 0x0a000000
@@ -55,6 +67,7 @@ public final class SourceUrlPolicy {
           || (value & 0xffff0000) == 0xc0a80000
           || (value & 0xffff0000) == 0xa9fe0000;
     }
-    return address instanceof Inet6Address && address.getHostAddress().toLowerCase(Locale.ROOT).startsWith("fc");
+    return address instanceof Inet6Address
+        && address.getHostAddress().toLowerCase(Locale.ROOT).startsWith("fc");
   }
 }

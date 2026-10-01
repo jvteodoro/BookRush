@@ -1,8 +1,7 @@
 package com.bookrush.ingestion.storage;
 
-import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
-import java.time.Duration;
+import java.io.InputStream;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -23,29 +22,48 @@ public final class S3RawObjectStore implements RawObjectStore {
 
   @Override
   public void put(String objectKey, InputStream content, long contentLength, String sha256) {
-    if (contentLength < 0 || contentLength > Integer.MAX_VALUE) throw new IllegalArgumentException("invalid raw object length");
+    if (contentLength < 0 || contentLength > Integer.MAX_VALUE)
+      throw new IllegalArgumentException("invalid raw object length");
     var bytes = new ByteArrayOutputStream((int) contentLength);
     try {
       content.transferTo(bytes);
     } catch (java.io.IOException e) {
       throw new IllegalStateException("cannot read raw object", e);
     }
-    if (bytes.size() != contentLength) throw new IllegalStateException("raw object length changed while uploading");
+    if (bytes.size() != contentLength)
+      throw new IllegalStateException("raw object length changed while uploading");
     try {
-      client.putObject(PutObjectRequest.builder().bucket(properties.rawBucket()).key(objectKey)
-          .contentType("application/octet-stream").metadata(java.util.Map.of("sha256", sha256))
-          .build(), RequestBody.fromBytes(bytes.toByteArray()));
+      client.putObject(
+          PutObjectRequest.builder()
+              .bucket(properties.rawBucket())
+              .key(objectKey)
+              .contentType("application/octet-stream")
+              .metadata(java.util.Map.of("sha256", sha256))
+              .build(),
+          RequestBody.fromBytes(bytes.toByteArray()));
     } catch (RuntimeException e) {
-      throw new IllegalStateException("raw storage PUT failed for bucket=" + properties.rawBucket()
-          + " key=" + objectKey + ": " + e.getClass().getSimpleName() + " " + e.getMessage(), e);
+      throw new IllegalStateException(
+          "raw storage PUT failed for bucket="
+              + properties.rawBucket()
+              + " key="
+              + objectKey
+              + ": "
+              + e.getClass().getSimpleName()
+              + " "
+              + e.getMessage(),
+          e);
     }
   }
 
   @Override
   public Optional<RawObjectMetadata> head(String objectKey) {
     try {
-      var response = client.headObject(HeadObjectRequest.builder().bucket(properties.rawBucket()).key(objectKey).build());
-      return Optional.of(new RawObjectMetadata(properties.rawBucket(), objectKey, response.contentLength(), response.eTag()));
+      var response =
+          client.headObject(
+              HeadObjectRequest.builder().bucket(properties.rawBucket()).key(objectKey).build());
+      return Optional.of(
+          new RawObjectMetadata(
+              properties.rawBucket(), objectKey, response.contentLength(), response.eTag()));
     } catch (NoSuchKeyException e) {
       return Optional.empty();
     }

@@ -1,6 +1,5 @@
 package com.bookrush.ingestion.catalog;
 
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
@@ -23,13 +22,17 @@ public final class CatalogAssetClient {
   private final CanonicalCatalogProperties properties;
   private final OidcServiceTokenProvider tokens;
 
-  public CatalogAssetClient(RestClient.Builder builder, CanonicalCatalogProperties properties, OidcServiceTokenProvider tokens) {
+  public CatalogAssetClient(
+      RestClient.Builder builder,
+      CanonicalCatalogProperties properties,
+      OidcServiceTokenProvider tokens) {
     this.properties = properties;
     this.tokens = tokens;
     this.client = builder.baseUrl(properties.baseUrl().toString()).build();
   }
 
-  public Map<?, ?> uploadSource(UUID bookId, UUID editionId, UUID sourceId, Path file, String filename) {
+  public Map<?, ?> uploadSource(
+      UUID bookId, UUID editionId, UUID sourceId, Path file, String filename) {
     String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
     MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
     form.add("sourceId", sourceId.toString());
@@ -38,38 +41,68 @@ public final class CatalogAssetClient {
     form.add("role", "SOURCE");
     form.add("file", filePart(file, MediaType.parseMediaType("application/epub+zip")));
     try {
-      var existing = client.get().uri("/api/admin/books/{bookId}/assets", bookId)
-          .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).retrieve().body(java.util.List.class);
+      var existing =
+          client
+              .get()
+              .uri("/api/admin/books/{bookId}/assets", bookId)
+              .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+              .retrieve()
+              .body(java.util.List.class);
       for (Object value : existing == null ? java.util.List.of() : existing) {
-        if (!(value instanceof Map<?, ?> item) || !"SOURCE".equals(String.valueOf(item.get("role"))) || !"EPUB".equals(String.valueOf(item.get("type")))) continue;
+        if (!(value instanceof Map<?, ?> item)
+            || !"SOURCE".equals(String.valueOf(item.get("role")))
+            || !"EPUB".equals(String.valueOf(item.get("type")))) continue;
         // An old partial import may have created an asset for another edition.
         // Never append a version to that asset: the catalog validates the
         // edition/source lineage on every version request.
         if (!editionId.toString().equals(String.valueOf(item.get("editionId")))) continue;
         // SOURCE assets are immutable: the catalog deliberately rejects
         // appending versions. Reuse the latest physical version on replay.
-        var versions = client.get().uri("/api/admin/books/{bookId}/assets/{assetId}/versions", bookId, item.get("id"))
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token).retrieve().body(java.util.List.class);
-        if (versions != null && !versions.isEmpty()) return Map.of("asset", item, "version", versions.getFirst());
+        var versions =
+            client
+                .get()
+                .uri("/api/admin/books/{bookId}/assets/{assetId}/versions", bookId, item.get("id"))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .body(java.util.List.class);
+        if (versions != null && !versions.isEmpty())
+          return Map.of("asset", item, "version", versions.getFirst());
       }
-      return client.post().uri("/api/admin/books/{bookId}/assets", bookId)
+      return client
+          .post()
+          .uri("/api/admin/books/{bookId}/assets", bookId)
           .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
           .contentType(MediaType.MULTIPART_FORM_DATA)
-          .body(form).retrieve().body(Map.class);
+          .body(form)
+          .retrieve()
+          .body(Map.class);
     } catch (RestClientResponseException e) {
-      throw new IllegalStateException("catalog source asset upload failed: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+      throw new IllegalStateException(
+          "catalog source asset upload failed: "
+              + e.getStatusCode()
+              + " "
+              + e.getResponseBodyAsString(),
+          e);
     }
   }
 
-  public Map<?, ?> uploadDerived(UUID bookId, UUID editionId, UUID sourceId, Path file, String filename, String type) {
+  public Map<?, ?> uploadDerived(
+      UUID bookId, UUID editionId, UUID sourceId, Path file, String filename, String type) {
     String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
     MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
-    form.add("sourceId", sourceId.toString()); form.add("editionId", editionId.toString());
-    form.add("type", type); form.add("role", "PROCESSING");
+    form.add("sourceId", sourceId.toString());
+    form.add("editionId", editionId.toString());
+    form.add("type", type);
+    form.add("role", "PROCESSING");
     form.add("file", filePart(file, mediaType(type)));
-    return client.post().uri("/api/admin/books/{bookId}/assets", bookId)
+    return client
+        .post()
+        .uri("/api/admin/books/{bookId}/assets", bookId)
         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-        .contentType(MediaType.MULTIPART_FORM_DATA).body(form).retrieve().body(Map.class);
+        .contentType(MediaType.MULTIPART_FORM_DATA)
+        .body(form)
+        .retrieve()
+        .body(Map.class);
   }
 
   private static HttpEntity<FileSystemResource> filePart(Path file, MediaType contentType) {

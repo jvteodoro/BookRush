@@ -7,8 +7,13 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenApiConfiguration {
-  @Bean OpenAPI analyticsOpenApi() {
-    return new OpenAPI().info(new Info().title("BookRush Analytics API")
-        .version("v1").description("Jobs e consultas de analytics ligados à versão textual exata."));
+  @Bean
+  OpenAPI analyticsOpenApi() {
+    return new OpenAPI()
+        .info(
+            new Info()
+                .title("BookRush Analytics API")
+                .version("v1")
+                .description("Jobs e consultas de analytics ligados à versão textual exata."));
   }
 }

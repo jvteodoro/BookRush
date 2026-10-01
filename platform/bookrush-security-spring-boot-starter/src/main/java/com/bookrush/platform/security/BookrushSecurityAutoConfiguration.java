@@ -11,6 +11,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -21,8 +23,6 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @AutoConfiguration
 @ConditionalOnClass(JwtDecoder.class)
@@ -38,19 +38,25 @@ public class BookrushSecurityAutoConfiguration {
     if (properties.getClockSkew() == null || properties.getClockSkew().isNegative()) {
       throw new IllegalStateException("bookrush.security.clock-skew must be non-negative");
     }
-    var decoder = NimbusJwtDecoder.withJwkSetUri(properties.getJwkSetUri())
-        .jwsAlgorithm(SignatureAlgorithm.RS256)
-        .build();
-    OAuth2TokenValidator<Jwt> audience = token -> token.getAudience() != null
-        && token.getAudience().contains(properties.getAudience())
-        ? OAuth2TokenValidatorResult.success()
-        : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "audience mismatch", null));
-    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-        JwtValidators.createDefaultWithIssuer(properties.getIssuer()), audience));
+    var decoder =
+        NimbusJwtDecoder.withJwkSetUri(properties.getJwkSetUri())
+            .jwsAlgorithm(SignatureAlgorithm.RS256)
+            .build();
+    OAuth2TokenValidator<Jwt> audience =
+        token ->
+            token.getAudience() != null && token.getAudience().contains(properties.getAudience())
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(
+                    new OAuth2Error("invalid_token", "audience mismatch", null));
+    decoder.setJwtValidator(
+        new DelegatingOAuth2TokenValidator<>(
+            JwtValidators.createDefaultWithIssuer(properties.getIssuer()), audience));
     return decoder;
   }
 
-  /** Converts only claims from the already validated JWT; it never chooses an issuer or JWKS URL. */
+  /**
+   * Converts only claims from the already validated JWT; it never chooses an issuer or JWKS URL.
+   */
   @Bean
   @ConditionalOnMissingBean(name = "bookrushJwtAuthenticationConverter")
   BookrushJwtAuthenticationConverter bookrushJwtAuthenticationConverter() {
@@ -58,8 +64,8 @@ public class BookrushSecurityAutoConfiguration {
   }
 
   /**
-   * A concrete, parameterized converter prevents Spring MVC from treating the
-   * security converter as an untyped formatting converter during startup.
+   * A concrete, parameterized converter prevents Spring MVC from treating the security converter as
+   * an untyped formatting converter during startup.
    */
   static final class BookrushJwtAuthenticationConverter
       implements Converter<Jwt, AbstractAuthenticationToken> {
@@ -67,7 +73,8 @@ public class BookrushSecurityAutoConfiguration {
     public AbstractAuthenticationToken convert(Jwt jwt) {
       List<GrantedAuthority> authorities = new ArrayList<>();
       Object realmAccess = jwt.getClaims().get("realm_access");
-      if (realmAccess instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> roles) {
+      if (realmAccess instanceof java.util.Map<?, ?> map
+          && map.get("roles") instanceof List<?> roles) {
         roles.forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
       }
       Object scopes = jwt.getClaims().get("scope");
@@ -82,6 +89,7 @@ public class BookrushSecurityAutoConfiguration {
   }
 
   private static void require(String value, String property) {
-    if (value == null || value.isBlank()) throw new IllegalStateException(property + " is required when security is enabled");
+    if (value == null || value.isBlank())
+      throw new IllegalStateException(property + " is required when security is enabled");
   }
 }

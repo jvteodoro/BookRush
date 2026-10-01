@@ -20,11 +20,15 @@ public class AnalyticsStorageConfiguration {
     return S3Client.builder()
         .endpointOverride(p.endpoint())
         .region(Region.of(p.region()))
-        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(p.accessKey(), p.secretKey())))
-        .serviceConfiguration(c -> c.pathStyleAccessEnabled(p.pathStyle()).chunkedEncodingEnabled(false))
-        .httpClientBuilder(UrlConnectionHttpClient.builder()
-            .connectionTimeout(Duration.ofSeconds(Math.max(1, p.timeoutSeconds())))
-            .socketTimeout(Duration.ofSeconds(Math.max(1, p.timeoutSeconds()))))
+        .credentialsProvider(
+            StaticCredentialsProvider.create(
+                AwsBasicCredentials.create(p.accessKey(), p.secretKey())))
+        .serviceConfiguration(
+            c -> c.pathStyleAccessEnabled(p.pathStyle()).chunkedEncodingEnabled(false))
+        .httpClientBuilder(
+            UrlConnectionHttpClient.builder()
+                .connectionTimeout(Duration.ofSeconds(Math.max(1, p.timeoutSeconds())))
+                .socketTimeout(Duration.ofSeconds(Math.max(1, p.timeoutSeconds()))))
         .build();
   }
 }

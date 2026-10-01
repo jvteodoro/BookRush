@@ -77,40 +77,140 @@ public class IngestionItem {
 
   public IngestionItem() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public UUID getIngestionJobId() { return ingestionJobId; }
-  public void setIngestionJobId(UUID value) { this.ingestionJobId = value; }
-  public IngestionJob getIngestionJob() { return ingestionJob; }
-  public UUID getSourceId() { return sourceId; }
-  public void setSourceId(UUID value) { this.sourceId = value; }
-  public Source getSource() { return source; }
-  public String getExternalIdentifier() { return externalIdentifier; }
-  public void setExternalIdentifier(String value) { this.externalIdentifier = value; }
-  public Integer getAttemptNumber() { return attemptNumber; }
-  public void setAttemptNumber(Integer value) { this.attemptNumber = value; }
-  public UUID getSourceRecordId() { return sourceRecordId; }
-  public void setSourceRecordId(UUID value) { this.sourceRecordId = value; }
-  public SourceRecord getSourceRecord() { return sourceRecord; }
-  public UUID getBookId() { return bookId; }
-  public void setBookId(UUID value) { this.bookId = value; }
-  public Book getBook() { return book; }
-  public UUID getEditionId() { return editionId; }
-  public void setEditionId(UUID value) { this.editionId = value; }
-  public Edition getEdition() { return edition; }
-  public IngestionItemStatus getStatus() { return status; }
-  public void setStatus(IngestionItemStatus value) { this.status = value; }
-  public Instant getStartedAt() { return startedAt; }
-  public void setStartedAt(Instant value) { this.startedAt = value; }
-  public Instant getFinishedAt() { return finishedAt; }
-  public void setFinishedAt(Instant value) { this.finishedAt = value; }
-  public String getErrorCode() { return errorCode; }
-  public void setErrorCode(String value) { this.errorCode = value; }
-  public String getErrorMessage() { return errorMessage; }
-  public void setErrorMessage(String value) { this.errorMessage = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public UUID getIngestionJobId() {
+    return ingestionJobId;
+  }
+
+  public void setIngestionJobId(UUID value) {
+    this.ingestionJobId = value;
+  }
+
+  public IngestionJob getIngestionJob() {
+    return ingestionJob;
+  }
+
+  public UUID getSourceId() {
+    return sourceId;
+  }
+
+  public void setSourceId(UUID value) {
+    this.sourceId = value;
+  }
+
+  public Source getSource() {
+    return source;
+  }
+
+  public String getExternalIdentifier() {
+    return externalIdentifier;
+  }
+
+  public void setExternalIdentifier(String value) {
+    this.externalIdentifier = value;
+  }
+
+  public Integer getAttemptNumber() {
+    return attemptNumber;
+  }
+
+  public void setAttemptNumber(Integer value) {
+    this.attemptNumber = value;
+  }
+
+  public UUID getSourceRecordId() {
+    return sourceRecordId;
+  }
+
+  public void setSourceRecordId(UUID value) {
+    this.sourceRecordId = value;
+  }
+
+  public SourceRecord getSourceRecord() {
+    return sourceRecord;
+  }
+
+  public UUID getBookId() {
+    return bookId;
+  }
+
+  public void setBookId(UUID value) {
+    this.bookId = value;
+  }
+
+  public Book getBook() {
+    return book;
+  }
+
+  public UUID getEditionId() {
+    return editionId;
+  }
+
+  public void setEditionId(UUID value) {
+    this.editionId = value;
+  }
+
+  public Edition getEdition() {
+    return edition;
+  }
+
+  public IngestionItemStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(IngestionItemStatus value) {
+    this.status = value;
+  }
+
+  public Instant getStartedAt() {
+    return startedAt;
+  }
+
+  public void setStartedAt(Instant value) {
+    this.startedAt = value;
+  }
+
+  public Instant getFinishedAt() {
+    return finishedAt;
+  }
+
+  public void setFinishedAt(Instant value) {
+    this.finishedAt = value;
+  }
+
+  public String getErrorCode() {
+    return errorCode;
+  }
+
+  public void setErrorCode(String value) {
+    this.errorCode = value;
+  }
+
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public void setErrorMessage(String value) {
+    this.errorMessage = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

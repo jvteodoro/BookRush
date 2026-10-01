@@ -36,21 +36,64 @@ public class Source {
 
   public Source() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public String getCode() { return code; }
-  public void setCode(String value) { this.code = value; }
-  public String getName() { return name; }
-  public void setName(String value) { this.name = value; }
-  public String getBaseUrl() { return baseUrl; }
-  public void setBaseUrl(String value) { this.baseUrl = value; }
-  public SourceSourceType getSourceType() { return sourceType; }
-  public void setSourceType(SourceSourceType value) { this.sourceType = value; }
-  public Boolean getIsActive() { return isActive; }
-  public void setIsActive(Boolean value) { this.isActive = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public String getCode() {
+    return code;
+  }
+
+  public void setCode(String value) {
+    this.code = value;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public void setName(String value) {
+    this.name = value;
+  }
+
+  public String getBaseUrl() {
+    return baseUrl;
+  }
+
+  public void setBaseUrl(String value) {
+    this.baseUrl = value;
+  }
+
+  public SourceSourceType getSourceType() {
+    return sourceType;
+  }
+
+  public void setSourceType(SourceSourceType value) {
+    this.sourceType = value;
+  }
+
+  public Boolean getIsActive() {
+    return isActive;
+  }
+
+  public void setIsActive(Boolean value) {
+    this.isActive = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

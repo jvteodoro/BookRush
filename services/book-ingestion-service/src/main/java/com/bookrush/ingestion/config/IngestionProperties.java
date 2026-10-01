@@ -33,7 +33,8 @@ public record IngestionProperties(
 
   public IngestionProperties {
     if (heartbeatSeconds >= leaseSeconds) {
-      throw new IllegalArgumentException("ingestion.heartbeat-seconds must be less than lease-seconds");
+      throw new IllegalArgumentException(
+          "ingestion.heartbeat-seconds must be less than lease-seconds");
     }
   }
 }

@@ -6,8 +6,19 @@ import java.util.Map;
 public interface CanonicalCatalogPort {
   Map<String, Object> apply(CanonicalCatalogCommand command);
 
-  record CanonicalCatalogCommand(String operationKey, String requestHash, long fenceToken,
-      String sourceCode, String identifierType, String identifierValue, String title,
-      String language, String description, Map<String, Object> metadata,
-      String publisher, Integer publicationYear, String authorName, String authorRole) {}
+  record CanonicalCatalogCommand(
+      String operationKey,
+      String requestHash,
+      long fenceToken,
+      String sourceCode,
+      String identifierType,
+      String identifierValue,
+      String title,
+      String language,
+      String description,
+      Map<String, Object> metadata,
+      String publisher,
+      Integer publicationYear,
+      String authorName,
+      String authorRole) {}
 }

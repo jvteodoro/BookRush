@@ -20,7 +20,9 @@ public final class FailureClassifier {
   public static FailureClass exception(Throwable error) {
     var name = error.getClass().getName().toLowerCase(Locale.ROOT);
     var message = String.valueOf(error.getMessage()).toLowerCase(Locale.ROOT);
-    if (error instanceof IOException || error instanceof ConnectException || name.contains("timeout")) {
+    if (error instanceof IOException
+        || error instanceof ConnectException
+        || name.contains("timeout")) {
       return FailureClass.RETRYABLE_IO;
     }
     if (message.contains("deadlock") || message.contains("serialization")) {

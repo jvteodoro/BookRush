@@ -8,8 +8,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Deterministic Tier 0 text measurements. They describe text structure and
- * rhythm; they do not infer literary quality, engagement, or recommendation.
+ * Deterministic Tier 0 text measurements. They describe text structure and rhythm; they do not
+ * infer literary quality, engagement, or recommendation.
  */
 public final class TextFeatureCalculator {
   /** Versioned threshold used by {@code short_sentence_*} V2 observations. */
@@ -36,7 +36,8 @@ public final class TextFeatureCalculator {
     int questions = countChar(text, '?') + countChar(text, '？');
     int exclamations = countChar(text, '!') + countChar(text, '！');
     int dialogue = countDialogue(text);
-    int punctuation = (int) text.codePoints().filter(codePoint -> PUNCTUATION.indexOf(codePoint) >= 0).count();
+    int punctuation =
+        (int) text.codePoints().filter(codePoint -> PUNCTUATION.indexOf(codePoint) >= 0).count();
     int ellipses = countChar(text, '…') + count(ASCII_ELLIPSIS, text);
     int dashes = countChar(text, '—') + countChar(text, '–');
 
@@ -47,8 +48,13 @@ public final class TextFeatureCalculator {
     double averageParagraphLength = paragraphs == 0 ? 0d : words / (double) paragraphs;
     double sentenceStd = populationStd(sentenceLengths);
     double paragraphStd = populationStd(paragraphLengths);
-    double shortSentenceRatio = sentences == 0 ? 0d : sentenceLengths.stream()
-        .filter(length -> length <= V2_SHORT_SENTENCE_MAX_WORDS).count() / sentenceDenominator;
+    double shortSentenceRatio =
+        sentences == 0
+            ? 0d
+            : sentenceLengths.stream()
+                    .filter(length -> length <= V2_SHORT_SENTENCE_MAX_WORDS)
+                    .count()
+                / sentenceDenominator;
 
     var result = new LinkedHashMap<String, Double>();
     // Stable V1 aliases.
@@ -149,7 +155,7 @@ public final class TextFeatureCalculator {
     boolean openQuote = false;
     boolean lineStart = true;
     boolean dashMode = false;
-    for (int index = 0; index < text.length();) {
+    for (int index = 0; index < text.length(); ) {
       int codePoint = text.codePointAt(index);
       int width = Character.charCount(codePoint);
       if (codePoint == '\n' || codePoint == '\r') {
@@ -158,7 +164,11 @@ public final class TextFeatureCalculator {
         index += width;
         continue;
       }
-      if (codePoint == '"' || codePoint == '“' || codePoint == '”' || codePoint == '«' || codePoint == '»') openQuote = !openQuote;
+      if (codePoint == '"'
+          || codePoint == '“'
+          || codePoint == '”'
+          || codePoint == '«'
+          || codePoint == '»') openQuote = !openQuote;
       if (lineStart && (codePoint == '—' || codePoint == '–' || codePoint == '-')) dashMode = true;
       // Keep the V1 feature's historical UTF-16-width behavior. Existing
       // feature rows are reproducible only if this legacy formula remains
@@ -184,7 +194,8 @@ public final class TextFeatureCalculator {
   private static double meanAdjacentAbsoluteDelta(List<Integer> values) {
     if (values.size() < 2) return 0d;
     double total = 0d;
-    for (int index = 1; index < values.size(); index++) total += Math.abs(values.get(index) - values.get(index - 1));
+    for (int index = 1; index < values.size(); index++)
+      total += Math.abs(values.get(index) - values.get(index - 1));
     return total / (values.size() - 1);
   }
 

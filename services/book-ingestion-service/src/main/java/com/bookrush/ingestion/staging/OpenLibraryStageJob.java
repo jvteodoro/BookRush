@@ -10,8 +10,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 /** Converts one immutable Open Library dump snapshot into a sealed DuckDB generation. */
@@ -24,29 +24,50 @@ public final class OpenLibraryStageJob {
     this.parser = new OpenLibraryDumpParser(mapper, maxLineBytes);
   }
 
-  public DuckDbStagingWriter.Manifest stage(Path snapshot, Path database, String sourceId,
-      String parserVersion, Map<String, String> filters, int maxRecords) throws Exception {
-    if (sourceId == null || sourceId.isBlank()) throw new IllegalArgumentException("sourceId is required");
+  public DuckDbStagingWriter.Manifest stage(
+      Path snapshot,
+      Path database,
+      String sourceId,
+      String parserVersion,
+      Map<String, String> filters,
+      int maxRecords)
+      throws Exception {
+    if (sourceId == null || sourceId.isBlank())
+      throw new IllegalArgumentException("sourceId is required");
     if (maxRecords <= 0) throw new IllegalArgumentException("maxRecords must be positive");
     var effectiveFilters = new LinkedHashMap<String, String>();
     if (filters != null) effectiveFilters.putAll(filters);
     effectiveFilters.put("source_id", sourceId);
     effectiveFilters.put("max_records", Integer.toString(maxRecords));
     effectiveFilters.put("snapshot_sha256", sha256(snapshot));
-    var manifestPath = database.toAbsolutePath().normalize().resolveSibling(database.getFileName() + ".manifest.json");
+    var manifestPath =
+        database
+            .toAbsolutePath()
+            .normalize()
+            .resolveSibling(database.getFileName() + ".manifest.json");
     if (Files.exists(manifestPath) && Files.exists(database)) {
       var existing = mapper.readValue(manifestPath.toFile(), DuckDbStagingWriter.Manifest.class);
-      if ("READY".equals(existing.state()) && existing.filters().equals(effectiveFilters)
+      if ("READY".equals(existing.state())
+          && existing.filters().equals(effectiveFilters)
           && existing.parserVersion().equals(parserVersion)) return existing;
     }
     try (var writer = new DuckDbStagingWriter(database, mapper, parserVersion, effectiveFilters);
-         var input = Files.newInputStream(snapshot);
-         var reader = new BufferedReader(new InputStreamReader(isGzip(snapshot, input), StandardCharsets.UTF_8))) {
+        var input = Files.newInputStream(snapshot);
+        var reader =
+            new BufferedReader(
+                new InputStreamReader(isGzip(snapshot, input), StandardCharsets.UTF_8))) {
       for (var row : parser.parse(reader, maxRecords)) {
         var table = tableFor(row);
-        writer.append(table, new DuckDbStagingWriter.StagingRecord(sourceId, row.key(), row.revision(),
-            snapshot.toAbsolutePath().normalize() + "#" + row.sourceLine(), sha256(row.payload().toString()),
-            Long.toString(row.sourceLine()), row.payload().toString()));
+        writer.append(
+            table,
+            new DuckDbStagingWriter.StagingRecord(
+                sourceId,
+                row.key(),
+                row.revision(),
+                snapshot.toAbsolutePath().normalize() + "#" + row.sourceLine(),
+                sha256(row.payload().toString()),
+                Long.toString(row.sourceLine()),
+                row.payload().toString()));
       }
       return writer.sealReady();
     }
@@ -66,8 +87,9 @@ public final class OpenLibraryStageJob {
   }
 
   private static String sha256(String value) throws Exception {
-    return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-        .digest(value.getBytes(StandardCharsets.UTF_8)));
+    return HexFormat.of()
+        .formatHex(
+            MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
   }
 
   private static String sha256(Path file) throws Exception {

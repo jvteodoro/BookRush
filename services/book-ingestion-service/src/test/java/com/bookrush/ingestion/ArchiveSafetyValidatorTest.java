@@ -9,13 +9,20 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
 
 class ArchiveSafetyValidatorTest {
-  @Test void rejectsZipSlipAndUnsafeHtml() throws Exception {
+  @Test
+  void rejectsZipSlipAndUnsafeHtml() throws Exception {
     var file = Files.createTempFile("zip-slip", ".zip");
     try (var out = new ZipOutputStream(Files.newOutputStream(file))) {
-      out.putNextEntry(new ZipEntry("../outside.txt")); out.write("x".getBytes()); out.closeEntry();
+      out.putNextEntry(new ZipEntry("../outside.txt"));
+      out.write("x".getBytes());
+      out.closeEntry();
     }
-    assertThrows(IllegalArgumentException.class, () -> new ArchiveSafetyValidator(1000, 10, 100).validateZip(file));
-    assertThrows(IllegalArgumentException.class, () -> ArchiveSafetyValidator.validateHtml("<script>x</script>"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new ArchiveSafetyValidator(1000, 10, 100).validateZip(file));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ArchiveSafetyValidator.validateHtml("<script>x</script>"));
     Files.deleteIfExists(file);
   }
 }

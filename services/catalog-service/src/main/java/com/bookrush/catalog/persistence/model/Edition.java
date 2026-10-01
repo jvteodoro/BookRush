@@ -55,31 +55,104 @@ public class Edition {
 
   public Edition() {}
 
-  public UUID getId() { return id; }
-  public void setId(UUID value) { this.id = value; }
-  public UUID getBookId() { return bookId; }
-  public void setBookId(UUID value) { this.bookId = value; }
-  public Book getBook() { return book; }
-  public String getTitle() { return title; }
-  public void setTitle(String value) { this.title = value; }
-  public String getSubtitle() { return subtitle; }
-  public void setSubtitle(String value) { this.subtitle = value; }
-  public String getLanguage() { return language; }
-  public void setLanguage(String value) { this.language = value; }
-  public String getPublisher() { return publisher; }
-  public void setPublisher(String value) { this.publisher = value; }
-  public Short getPublicationYear() { return publicationYear; }
-  public void setPublicationYear(Short value) { this.publicationYear = value; }
-  public String getEditionName() { return editionName; }
-  public void setEditionName(String value) { this.editionName = value; }
-  public String getDescription() { return description; }
-  public void setDescription(String value) { this.description = value; }
-  public Instant getCreatedAt() { return createdAt; }
-  public Instant getUpdatedAt() { return updatedAt; }
-  public UUID getLicenseId() { return licenseId; }
-  public void setLicenseId(UUID value) { this.licenseId = value; }
-  public License getLicense() { return license; }
+  public UUID getId() {
+    return id;
+  }
+
+  public void setId(UUID value) {
+    this.id = value;
+  }
+
+  public UUID getBookId() {
+    return bookId;
+  }
+
+  public void setBookId(UUID value) {
+    this.bookId = value;
+  }
+
+  public Book getBook() {
+    return book;
+  }
+
+  public String getTitle() {
+    return title;
+  }
+
+  public void setTitle(String value) {
+    this.title = value;
+  }
+
+  public String getSubtitle() {
+    return subtitle;
+  }
+
+  public void setSubtitle(String value) {
+    this.subtitle = value;
+  }
+
+  public String getLanguage() {
+    return language;
+  }
+
+  public void setLanguage(String value) {
+    this.language = value;
+  }
+
+  public String getPublisher() {
+    return publisher;
+  }
+
+  public void setPublisher(String value) {
+    this.publisher = value;
+  }
+
+  public Short getPublicationYear() {
+    return publicationYear;
+  }
+
+  public void setPublicationYear(Short value) {
+    this.publicationYear = value;
+  }
+
+  public String getEditionName() {
+    return editionName;
+  }
+
+  public void setEditionName(String value) {
+    this.editionName = value;
+  }
+
+  public String getDescription() {
+    return description;
+  }
+
+  public void setDescription(String value) {
+    this.description = value;
+  }
+
+  public Instant getCreatedAt() {
+    return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
+  public UUID getLicenseId() {
+    return licenseId;
+  }
+
+  public void setLicenseId(UUID value) {
+    this.licenseId = value;
+  }
+
+  public License getLicense() {
+    return license;
+  }
 
   @PreUpdate
-  void touch() { updatedAt = Instant.now(); }
+  void touch() {
+    updatedAt = Instant.now();
+  }
 }

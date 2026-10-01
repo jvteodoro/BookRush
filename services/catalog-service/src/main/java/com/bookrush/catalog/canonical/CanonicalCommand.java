@@ -2,8 +2,8 @@ package com.bookrush.catalog.canonical;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 
 public record CanonicalCommand(
     @NotBlank String operationKey,

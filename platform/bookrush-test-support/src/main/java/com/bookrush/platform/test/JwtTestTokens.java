@@ -9,11 +9,19 @@ public final class JwtTestTokens {
   private JwtTestTokens() {}
 
   public static Jwt productUser(String subject) {
-    return token("https://keycloak.example.test/realms/bookrush", "bookrush-web", subject, List.of("READER"));
+    return token(
+        "https://keycloak.example.test/realms/bookrush",
+        "bookrush-web",
+        subject,
+        List.of("READER"));
   }
 
   public static Jwt platformOperator(String subject) {
-    return token("https://keycloak.example.test/realms/bookrush-platform", "bookrush-ingestion-admin", subject, List.of("platform-operator"));
+    return token(
+        "https://keycloak.example.test/realms/bookrush-platform",
+        "bookrush-ingestion-admin",
+        subject,
+        List.of("platform-operator"));
   }
 
   public static Jwt token(String issuer, String audience, String subject, List<String> roles) {
