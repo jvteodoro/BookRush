@@ -1,6 +1,10 @@
 {
   "realm": "bookrush",
   "enabled": true,
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
   "roles": {
     "realm": [
       {

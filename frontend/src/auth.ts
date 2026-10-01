@@ -40,6 +40,16 @@ let refreshInFlight: Promise<User | null> | null = null;
 export type AuthState = { status: 'anonymous' | 'loading' | 'authenticated' | 'error'; user?: User; error?: string };
 
 export const authClient = {
+  registrationUrl(): string {
+    const url = new URL(`${authority}/protocol/openid-connect/registrations`);
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('response_type', 'code');
+    url.searchParams.set('scope', 'openid');
+    // Registration is a Keycloak-managed flow. After creating the account the
+    // user returns to the public app and can enter through the normal PKCE flow.
+    url.searchParams.set('redirect_uri', origin);
+    return url.toString();
+  },
   async currentUser(): Promise<User | null> {
     return manager.getUser();
   },

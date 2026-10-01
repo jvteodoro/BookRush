@@ -17,7 +17,7 @@ npm run lint
 
 ## Mobile e APK
 
-`mobile/` usa Expo/React Native, o client público `bookrush-mobile` e o mesmo endpoint. O client é provisionado declarativamente em `infrastructure/keycloak/bookrush-realm.json`; a URI `bookrush://callback` deve permanecer registrada no Keycloak. Não há client secret no aplicativo e tokens não são gravados em AsyncStorage ou no bundle.
+`mobile/` usa Expo/React Native, o client público `bookrush-mobile` e o mesmo endpoint. O client é provisionado declarativamente em `infrastructure/keycloak/bookrush-realm.json`; a URI `bookrush://callback` deve permanecer registrada no Keycloak. Não há client secret no aplicativo e tokens não são gravados em AsyncStorage ou no bundle. O realm de produto mantém o auto-registro habilitado e o botão `Cadastre-se` abre a tela nativa de registro do Keycloak; depois do cadastro o usuário retorna ao cliente e entra pelo fluxo PKCE normal.
 
 ```bash
 cd mobile
