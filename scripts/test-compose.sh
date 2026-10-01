@@ -3,8 +3,12 @@ set -Eeuo pipefail
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 run_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-compose-test.XXXXXXXX")"
 project="$(basename "$run_dir" | tr '[:upper:].' '[:lower:]-')"
+export BOOKRUSH_COMPOSE_NAME="$project"
+export BOOKRUSH_NETWORK_NAME="${project}_bookrush"
 export BOOKRUSH_PROXY_PORT=0 BOOKRUSH_S3_PORT=0 BOOKRUSH_FRONTEND_PORT=0 BOOKRUSH_PGADMIN_PORT=0
 export BOOKRUSH_INGESTION_PORT=0 BOOKRUSH_ANALYTICS_PORT=0
+export BOOKRUSH_ADMIN_WEB_PORT=0 BOOKRUSH_KEYCLOAK_PORT=0 BOOKRUSH_POSTGRES_PORT=0
+export BOOKRUSH_JENKINS_PORT=0
 # Compose gives shell variables precedence over --env-file. Pin disposable
 # database credentials so a developer's exported production .env cannot leak
 # into this isolated project or make the application/container disagree.
@@ -12,6 +16,11 @@ export POSTGRES_DB=bookrush POSTGRES_USER=bookrush POSTGRES_PASSWORD=bookrush
 # This smoke intentionally exercises the application stack without the optional
 # Keycloak profile. OIDC is covered by the dedicated Keycloak test profile.
 export CATALOG_OIDC_ENABLED=false INGESTION_SECURITY_ENABLED=false
+# The compose file still interpolates the optional SeaweedFS OIDC sidecar
+# command even when its profile is not started.  Supply a disposable value so
+# this isolated smoke test never reads a developer/production secret.
+export SEAWEEDFS_OIDC_CLIENT_SECRET=compose-test-placeholder
+export SEAWEEDFS_OAUTH2_COOKIE_SECRET=compose-test-cookie-secret
 export BACKEND_IMAGE="$project/api" FRONTEND_IMAGE="$project/frontend"
 compose=(docker compose --project-name "$project" -f "$repo_dir/infrastructure/compose.yaml" --env-file "$repo_dir/.env.example")
 cleanup() {
@@ -20,7 +29,7 @@ cleanup() {
   if ((status != 0)); then
     echo '--- compose test diagnostics ---' >&2
     "${compose[@]}" ps >&2 || true
-    "${compose[@]}" logs --no-color --tail=120 catalog-service book-ingestion-service book-analytics-service >&2 || true
+    "${compose[@]}" logs --no-color --tail=120 catalog-service book-content-service book-ingestion-service book-analytics-service >&2 || true
   fi
   "${compose[@]}" down --volumes --remove-orphans || true
   rmdir "$run_dir"

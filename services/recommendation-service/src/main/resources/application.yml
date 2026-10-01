@@ -20,6 +20,4 @@ management:
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
-
-bookrush:
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}

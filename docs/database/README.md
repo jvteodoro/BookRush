@@ -24,6 +24,12 @@ planejar uma migration/baseline explícita; não aceitar automaticamente.
 
 ## Testes reproduzíveis
 
+The disposable database Compose build uses the repository root as its Docker
+context because the catalog image copies both `platform/` and
+`services/catalog-service/`. This is the same context used by the production
+Dockerfile and prevents a test from passing only because a host Maven cache is
+present.
+
 Da raiz do repositório, com Docker e Compose disponíveis:
 
 ```bash

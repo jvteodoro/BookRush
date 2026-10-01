@@ -1,4 +1,4 @@
-name: bookrush
+name: ${BOOKRUSH_COMPOSE_NAME:-bookrush}
 
 services:
   reverse-proxy:
@@ -607,7 +607,7 @@ services:
 networks:
   bookrush:
     # Keep the service DNS network name stable across deployments.
-    name: bookrush_bookrush
+    name: ${BOOKRUSH_NETWORK_NAME:-bookrush_bookrush}
     driver: bridge
 
 volumes:

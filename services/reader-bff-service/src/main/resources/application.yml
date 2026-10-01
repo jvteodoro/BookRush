@@ -11,4 +11,4 @@ management:
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
-RECOMMENDATION_URL: ${RECOMMENDATION_URL:http://recommendation-service:8098}
+  recommendation-url: ${RECOMMENDATION_URL:http://recommendation-service:8098}

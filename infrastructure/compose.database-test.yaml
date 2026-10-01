@@ -15,7 +15,8 @@ services:
       retries: 30
   tests:
     build:
-      context: ../services/catalog-service
+      context: ..
+      dockerfile: services/catalog-service/Dockerfile
       target: build
     command: [mvn, -B, -Pintegration-tests, verify]
     volumes:
