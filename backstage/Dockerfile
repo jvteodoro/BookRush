@@ -40,10 +40,13 @@ COPY services/recommendation-service/catalog-info.yaml services/recommendation-s
 COPY services/recommendation-service/docs /repo/services/recommendation-service/docs
 COPY services/publisher-service/catalog-info.yaml services/publisher-service/mkdocs.yml /repo/services/publisher-service/
 COPY services/publisher-service/docs /repo/services/publisher-service/docs
+COPY services/publisher-service/api /repo/services/publisher-service/api
 COPY services/admin-service/catalog-info.yaml services/admin-service/mkdocs.yml /repo/services/admin-service/
 COPY services/admin-service/docs /repo/services/admin-service/docs
+COPY services/admin-service/api /repo/services/admin-service/api
 COPY services/reader-bff-service/catalog-info.yaml services/reader-bff-service/mkdocs.yml /repo/services/reader-bff-service/
 COPY services/reader-bff-service/docs /repo/services/reader-bff-service/docs
+COPY services/reader-bff-service/api /repo/services/reader-bff-service/api
 COPY services/book-analytics-service/api /repo/services/book-analytics-service/api
 COPY frontend/catalog-info.yaml frontend/mkdocs.yml /repo/frontend/
 COPY frontend/docs /repo/frontend/docs

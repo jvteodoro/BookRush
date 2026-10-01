@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS admin.audit_log (id UUID PRIMARY KEY, actor_subject TEXT NOT NULL, action TEXT NOT NULL, target TEXT, details JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT now());

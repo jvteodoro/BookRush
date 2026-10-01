@@ -3,11 +3,11 @@ server:
 spring:
   application:
     name: publisher-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:bookrush}
+    username: ${DB_USERNAME:bookrush}
+    password: ${DB_PASSWORD:bookrush}
+  flyway:
+    schemas: publisher
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-bookrush:
-  security:
-    enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
+  endpoints.web.exposure.include: health,info,metrics

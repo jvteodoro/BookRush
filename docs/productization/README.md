@@ -36,3 +36,5 @@ docker compose -f infrastructure/compose.yaml --env-file .env up -d book-content
 ```
 
 Os modelos e o catálogo não são copiados entre schemas. Antes de habilitar o feed em produção, executar os testes de contrato e configurar o cliente Keycloak correspondente; bulk e treinamento continuam desligados por padrão.
+
+Os contratos OpenAPI de admin, publisher e BFF ficam versionados em cada diretório `api/` e são copiados para a imagem do Backstage pelo Dockerfile raiz.

@@ -1,0 +1,3 @@
+package com.bookrush.readerbffservice.api;
+import java.util.Map; import org.springframework.beans.factory.annotation.Value; import org.springframework.web.bind.annotation.*; import org.springframework.web.client.RestClient;
+@RestController @RequestMapping("/api/v1/reader") public class ReaderBffController { private final RestClient rec; public ReaderBffController(@Value("${RECOMMENDATION_URL:http://recommendation-service:8098}") String url){rec=RestClient.builder().baseUrl(url).build();} @GetMapping("/feed") public Map<?,?> feed(@RequestParam(defaultValue="20") int size){return rec.get().uri("/api/v1/recommendations/feed?size="+Math.min(size,100)).retrieve().body(Map.class);} }
