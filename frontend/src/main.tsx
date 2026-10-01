@@ -169,6 +169,23 @@ function App() {
             if (!response.ok) throw new Error('Não foi possível enviar a publicação para revisão.');
             return response.json();
           },
+          uploadSubmissionFile: async (submissionId: string, file: File) => {
+            const request = await authClient.fetch(`/api/v1/publisher/submissions/${encodeURIComponent(submissionId)}/upload`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ filename: file.name, contentType: file.type || 'application/octet-stream' }),
+            });
+            if (!request.ok) throw new Error('Não foi possível reservar o upload.');
+            const reservation = await request.json() as { uploadId: string; url: string };
+            const put = await fetch(reservation.url, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+            if (!put.ok) throw new Error('O storage recusou o upload.');
+            const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+            const sha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+            const complete = await authClient.fetch(`/api/v1/publisher/submissions/${encodeURIComponent(submissionId)}/upload/${encodeURIComponent(reservation.uploadId)}/finalize`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sha256 }),
+            });
+            if (!complete.ok) throw new Error('Não foi possível finalizar o upload.');
+            return complete.json();
+          },
           progress: async (id: string, percent: number, positionCodepoint: number) => {
             await authClient.fetch(`/api/v1/reader/books/${encodeURIComponent(id)}/progress`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ percent, positionCodepoint }) });
           },

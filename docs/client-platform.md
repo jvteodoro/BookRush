@@ -64,6 +64,9 @@ No Compose, o recurso é opt-in (`PUBLISHER_STORAGE_ENABLED=false` por padrão)
 para que um clone sem credenciais S3 não derrube o serviço de metadata. Para
 habilitá-lo, forneça as credenciais do SeaweedFS no `.env`, crie/valide o bucket
 de staging e então reconcilie o container publisher.
+O formulário web executa esse fluxo completo para EPUB/PDF: cria o rascunho,
+envia o arquivo diretamente pela URL assinada, calcula SHA-256 no navegador,
+finaliza o upload e só então solicita a transição para revisão.
 
 As ações sociais usam os payloads do contrato vigente: comentários enviam
 `{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de
