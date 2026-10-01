@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { authClient, type AuthState } from './auth';
 import './styles.css';
+import { createTelemetry } from './telemetry';
 
 type CatalogBook = { id: string; canonicalTitle: string; originalLanguage?: string | null; description?: string | null };
 

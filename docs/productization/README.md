@@ -40,3 +40,5 @@ Os modelos e o catálogo não são copiados entre schemas. Antes de habilitar o 
 Os contratos OpenAPI de admin, publisher e BFF ficam versionados em cada diretório `api/` e são copiados para a imagem do Backstage pelo Dockerfile raiz.
 
 Web e mobile enviam ações de biblioteca e eventos de abertura através de endpoints autenticados; a identidade nunca é derivada de email ou armazenamento local de credenciais.
+
+O SDK web `frontend/src/telemetry.ts` mantém uma fila em memória, envia lotes para o behavior-service e reencaminha eventos quando o envio falha; tokens não entram na fila.

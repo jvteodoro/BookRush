@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS social.reports (id UUID PRIMARY KEY, reporter TEXT NOT NULL, book_id UUID, comment_id UUID, reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN', created_at TIMESTAMPTZ NOT NULL DEFAULT now());
