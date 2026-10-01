@@ -60,3 +60,10 @@ As ações sociais usam os payloads do contrato vigente: comentários enviam
 `{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de
 seguir usa `PUT`/`DELETE /api/v1/social/users/{subject}/follow`. O frontend não
 faz fallback local quando uma dessas operações falha.
+
+Em Compose, `reader-profile-service` e `social-service` validam tokens do
+realm de produto (`bookrush`) e `publisher-service` valida tokens do realm
+administrativo (`bookrush-platform`) com a audiência de ingestão. Os valores
+podem ser sobrescritos por variáveis `BOOKRUSH_*_SECURITY_*` no ambiente; os
+defaults mantêm a separação de confiança e não deixam esses endpoints
+anônimos.
