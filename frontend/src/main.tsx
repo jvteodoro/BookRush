@@ -104,7 +104,7 @@ function App() {
             if (!response.ok) throw new Error('Não foi possível atualizar a curtida.');
           },
           share: async (id: string) => {
-            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/share`, { method: 'POST' });
+            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/share`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel: 'copy-link' }) });
             if (!response.ok) throw new Error('Não foi possível registrar o compartilhamento.');
           },
           comments: async (id: string) => {
@@ -112,12 +112,16 @@ function App() {
             return response.ok ? response.json() : [];
           },
           comment: async (id: string, text: string) => {
-            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+            const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text }) });
             if (!response.ok) throw new Error('Não foi possível publicar o comentário.');
           },
           profile: async () => {
             const response = await authClient.fetch('/api/v1/profile');
             return response.ok ? response.json() : null;
+          },
+          follow: async (subject: string, enabled: boolean) => {
+            const response = await authClient.fetch(`/api/v1/social/users/${encodeURIComponent(subject)}/follow`, { method: enabled ? 'PUT' : 'DELETE' });
+            if (!response.ok) throw new Error('Não foi possível atualizar o acompanhamento.');
           },
           publisherSubmissions: async () => {
             const response = await authClient.fetch('/api/v1/publisher/submissions');

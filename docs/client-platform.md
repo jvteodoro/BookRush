@@ -55,3 +55,8 @@ enviados por `POST /api/v1/publisher/submissions` e
 Traefik diretamente ao serviço de publicações, sem passar pelo catálogo.
 Métricas editoriais ainda dependem do contrato de analytics do publicador e
 não são inventadas pelo frontend.
+
+As ações sociais usam os payloads do contrato vigente: comentários enviam
+`{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de
+seguir usa `PUT`/`DELETE /api/v1/social/users/{subject}/follow`. O frontend não
+faz fallback local quando uma dessas operações falha.
