@@ -16,3 +16,5 @@ ela pertence ao subject autenticado. Upload de arquivo e métricas editoriais
 continuam dependentes dos contratos de storage/behavior ainda em execução.
 
 O staging permanece opt-in: habilite `PUBLISHER_STORAGE_ENABLED=true` somente quando `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` e o bucket configurado estiverem disponíveis. Sem essas variáveis o serviço continua operacional para metadata, mas não registra intenções de upload.
+O cliente S3 usa acesso path-style para SeaweedFS; isso evita resolução virtual-host
+de `bucket.seaweedfs` dentro da rede Compose.
