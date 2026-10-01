@@ -44,3 +44,7 @@ Web e mobile enviam ações de biblioteca e eventos de abertura através de endp
 O SDK web `frontend/src/telemetry.ts` mantém uma fila em memória, envia lotes para o behavior-service e reencaminha eventos quando o envio falha; tokens não entram na fila.
 
 O portal administrativo agora usa `VITE_USE_MOCKS=false` por padrão; dados de catálogo, ingestão e analytics devem vir das APIs autenticadas.
+
+## Pendências
+
+Consulte o [relatório de pendências](remaining-work.md) para o estado atual dos beads, critérios faltantes e ordem recomendada de conclusão.
