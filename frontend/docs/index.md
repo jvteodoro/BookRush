@@ -34,6 +34,8 @@ fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
 O Nginx do container envia `Cache-Control: no-store` para que uma publicação
 não mantenha o bundle anterior no navegador.
+Os assets do shell também recebem uma versão explícita na URL para invalidar
+caches de borda durante uma publicação.
 
 ## Mobile
 
