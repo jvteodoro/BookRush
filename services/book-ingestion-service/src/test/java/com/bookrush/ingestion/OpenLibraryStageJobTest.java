@@ -18,12 +18,12 @@ class OpenLibraryStageJobTest {
     try (var gzip = new GZIPOutputStream(Files.newOutputStream(snapshot))) {
       gzip.write(
           ("/authors/OL1A\t1\t2024\tignored"
-               + "\t{\"type\":{\"key\":\"/type/author\"},\"name\":\"Jane\"}\n"
-               + "/works/OL1W\t2\t2024\tignored"
-               + "\t{\"type\":{\"key\":\"/type/work\"},\"title\":\"Pride\"}\n"
-               + "/books/OL1M\t3\t2024\tignored"
-               + "\t{\"type\":{\"key\":\"/type/edition\"},\"title\":\"Pride\"}\n"
-               + "/works/OL9W\t4\t2024\tignored\t{\"type\":{\"key\":\"/type/delete\"}}\n")
+                  + "\t{\"type\":{\"key\":\"/type/author\"},\"name\":\"Jane\"}\n"
+                  + "/works/OL1W\t2\t2024\tignored"
+                  + "\t{\"type\":{\"key\":\"/type/work\"},\"title\":\"Pride\"}\n"
+                  + "/books/OL1M\t3\t2024\tignored"
+                  + "\t{\"type\":{\"key\":\"/type/edition\"},\"title\":\"Pride\"}\n"
+                  + "/works/OL9W\t4\t2024\tignored\t{\"type\":{\"key\":\"/type/delete\"}}\n")
               .getBytes());
     }
     var database = root.resolve("staging.duckdb");

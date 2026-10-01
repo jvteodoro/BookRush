@@ -1,7 +1,9 @@
 # Java code style
 
-O código Java de produção segue o Google Java Format aplicado pelo build local
-e pelos serviços do monorepo. Classes, métodos, records, construtores e
+Todo arquivo Java do repositório, incluindo serviços, bibliotecas da
+plataforma, exemplos e o skeleton do template, segue o Google Java Format
+aplicado pelo build local e pelos serviços do monorepo. Classes, métodos,
+records, construtores e
 consultas SQL devem usar blocos e quebras de linha legíveis; funções inteiras
 em uma única linha não são aceitas.
 
