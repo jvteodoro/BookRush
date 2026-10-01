@@ -61,9 +61,11 @@ http:
       service: analytics
 
     reader-bff:
-      rule: PathPrefix(`/api/v1/reader`)
+      # O BFF expõe somente o feed. As rotas de biblioteca, progresso e
+      # bookmarks pertencem ao reader-state-service.
+      rule: Path(`/api/v1/reader/feed`)
       entryPoints: [web]
-      priority: 130
+      priority: 140
       service: reader-bff
     reader-state:
       rule: PathPrefix(`/api/v1/library`) || PathPrefix(`/api/v1/reader`)
