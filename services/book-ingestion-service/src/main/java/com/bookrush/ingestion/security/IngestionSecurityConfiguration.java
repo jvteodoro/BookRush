@@ -68,7 +68,26 @@ public class IngestionSecurityConfiguration {
       if (roles instanceof List<?> values) values.forEach(value -> addRole(result, String.valueOf(value)));
       Object realm = jwt.getClaims().get("realm_access");
       if (realm instanceof java.util.Map<?, ?> map && map.get("roles") instanceof List<?> values) values.forEach(value -> addRole(result, String.valueOf(value)));
-      var identity = new TechnicalIdentity(jwt.getIssuer().toString(), jwt.getSubject());
+      // The administrative SPA deliberately receives group membership. Read
+      // only the allow-listed group names from the trusted platform realm;
+      // arbitrary client supplied headers are never consulted.
+      Object groups = jwt.getClaims().get("groups");
+      if (groups instanceof List<?> values) values.forEach(value -> addGroup(result, String.valueOf(value)));
+      // Keycloak 25 may issue a lightweight-style bearer without `sub` even
+      // when the client flag is disabled. Keep the subject opaque and use the
+      // opaque session id only as a bounded fallback; never use email,
+      // username, or group membership as an identity key.
+      var subject = jwt.getSubject();
+      if (subject == null || subject.isBlank()) {
+        var sessionId = jwt.getClaimAsString("sid");
+        if (sessionId == null || sessionId.isBlank()) {
+          throw new org.springframework.security.oauth2.core.OAuth2AuthenticationException(
+              new org.springframework.security.oauth2.core.OAuth2Error("invalid_token"),
+              "JWT is missing both sub and sid");
+        }
+        subject = "session:" + sessionId;
+      }
+      var identity = new TechnicalIdentity(jwt.getIssuer().toString(), subject);
       return new JwtAuthenticationToken(jwt, result, identity.toString());
     };
   }
@@ -77,5 +96,18 @@ public class IngestionSecurityConfiguration {
   private void addRole(List<GrantedAuthority> result, String role) {
     result.add(new SimpleGrantedAuthority("ROLE_" + role));
     if (role.equals("platform-operator")) result.add(new SimpleGrantedAuthority("ROLE_OPERATOR"));
+    // platform-admin is the explicitly managed administrator group in the
+    // platform realm. It may administer the catalog and ingestion workflows,
+    // while ordinary developers remain without operational authorities.
+    if (role.equals("platform-admin")) {
+      result.add(new SimpleGrantedAuthority("ROLE_OPERATOR"));
+      result.add(new SimpleGrantedAuthority("ROLE_REVIEWER"));
+      result.add(new SimpleGrantedAuthority("ROLE_CLEANUP"));
+    }
+  }
+
+  private void addGroup(List<GrantedAuthority> result, String group) {
+    if (group.equals("operators")) addRole(result, "platform-operator");
+    if (group.equals("platform-admins")) addRole(result, "platform-admin");
   }
 }

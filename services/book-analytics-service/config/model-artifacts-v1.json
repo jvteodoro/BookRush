@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "bookrush.analytics.model-artifacts.v1",
+  "cacheLayout": "<cache>/<model-id>/<relative-path>",
+  "artifacts": [
+    {
+      "id": "fasttext-lid176-v1",
+      "license": "CC-BY-SA-3.0",
+      "source": {"type": "url", "url": "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin"},
+      "files": [{"path": "lid.176.bin", "sha256": "7e69ec5451bc261cc7844e49e4792a85d7f09c06789ec800fc4a44aec362764e"}]
+    },
+    {
+      "id": "spacy-en-core-web-sm-v1",
+      "license": "MIT",
+      "source": {"type": "url", "version": "3.8.0", "url": "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"},
+      "files": [{"path": "en_core_web_sm-3.8.0-py3-none-any.whl", "sha256": "1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85"}]
+    },
+    {
+      "id": "spacy-pt-core-news-sm-v1",
+      "license": "MIT",
+      "source": {"type": "url", "version": "3.8.0", "url": "https://github.com/explosion/spacy-models/releases/download/pt_core_news_sm-3.8.0/pt_core_news_sm-3.8.0-py3-none-any.whl"},
+      "files": [{"path": "pt_core_news_sm-3.8.0-py3-none-any.whl", "sha256": "c304fa04db3af73cd08a250feacf560506e15a2ec2469bd1b09f06847f6b455c"}]
+    },
+    {
+      "id": "bge-m3-dense-v1",
+      "license": "MIT",
+      "source": {"type": "huggingface", "repo": "BAAI/bge-m3", "revision": "5617a9f61b028005a4858fdac845db406aefb181"},
+      "files": [
+        {"path": "1_Pooling/config.json", "sha256": "e54c164a07274f2eb45bb724f54a79d1efcc90c41573887cd9a29aeee0597352"},
+        {"path": "config.json", "sha256": "26159e7ad065073448460117eb24b7a4572f6f4e78eadff65dc0a11c052449fa"},
+        {"path": "config_sentence_transformers.json", "sha256": "1eef72430e7194a1e59680e635aed81ffa083f05668dbc5bb1c56c04c0999c38"},
+        {"path": "modules.json", "sha256": "84e40c8e006c9b1d6c122e02cba9b02458120b5fb0c87b746c41e0207cf642cf"},
+        {"path": "pytorch_model.bin", "sha256": "b5e0ce3470abf5ef3831aa1bd5553b486803e83251590ab7ff35a117cf6aad38"},
+        {"path": "sentence_bert_config.json", "sha256": "eb9b44b13c0f52a3b3685c3b1cbdea1ba8b04bea123b98f61610048940776eb1"},
+        {"path": "sentencepiece.bpe.model", "sha256": "cfc8146abe2a0488e9e2a0c56de7952f7c11ab059eca145a0a727afce0db2865"},
+        {"path": "special_tokens_map.json", "sha256": "8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835"},
+        {"path": "tokenizer.json", "sha256": "21106b6d7dab2952c1d496fb21d5dc9db75c28ed361a05f5020bbba27810dd08"},
+        {"path": "tokenizer_config.json", "sha256": "a62b2b6784f990259fddef5f16388693a8043be4f69179e6a5257eeb3f9abac4"}
+      ]
+    },
+    {
+      "id": "mdeberta-nli-v1",
+      "license": "MIT",
+      "source": {"type": "huggingface", "repo": "MoritzLaurer/mDeBERTa-v3-base-mnli-xnli", "revision": "8adb042d524ecd5c26d3e3ba0e3fbcf7e2d0864c"},
+      "files": [
+        {"path": "added_tokens.json", "sha256": "fb697283833d25e2c711f1bc37730ecd8b20f4bd5f015db1d84aefe0adc9155a"},
+        {"path": "config.json", "sha256": "4e4430c95100d613df80fa01276f231931e1b535557cf62fbb3cc50323e50cca"},
+        {"path": "model.safetensors", "sha256": "65af59b1ff4450b09ecbf13ca35c840dbf038b26ff8e10e5ea89ca724828ed1e"},
+        {"path": "special_tokens_map.json", "sha256": "9463f61e1b109a8eb4688b829260d7c6b1e6dff04c98ff7269bb89e2b92369b9"},
+        {"path": "spm.model", "sha256": "13c8d666d62a7bc4ac8f040aab68e942c861f93303156cc28f5c7e885d86d6e3"},
+        {"path": "tokenizer.json", "sha256": "3aca3ce69a0a35aeb144a52c4f1d41c4246b8785f8f398315cc8fb6b24057810"},
+        {"path": "tokenizer_config.json", "sha256": "df9fd3a4482cc4a866788244824573fab8e74dadd1609d4f0e5997f9e96921dc"}
+      ]
+    }
+  ]
+}

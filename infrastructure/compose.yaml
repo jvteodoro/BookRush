@@ -290,9 +290,18 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
       SERVER_PORT: 8091
       BOOKRUSH_PUBLIC_URL: ${BOOKRUSH_PUBLIC_URL:-https://bookrush.jteodoro.tec.br}
+      ANALYTICS_SECURITY_ENABLED: ${ANALYTICS_SECURITY_ENABLED:-true}
+      ANALYTICS_OIDC_ISSUER: ${ANALYTICS_OIDC_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      ANALYTICS_OIDC_AUDIENCE: ${ANALYTICS_OIDC_AUDIENCE:-bookrush-analytics}
+      ANALYTICS_SCOPE_EMBEDDINGS_ENABLED: ${ANALYTICS_SCOPE_EMBEDDINGS_ENABLED:-true}
+      ANALYTICS_NLI_ENABLED: ${ANALYTICS_NLI_ENABLED:-false}
+      ANALYTICS_NLI_MAX_EXCERPTS: ${ANALYTICS_NLI_MAX_EXCERPTS:-50}
       ANALYTICS_WORKER_ENABLED: ${ANALYTICS_WORKER_ENABLED:-true}
       ANALYTICS_OFFLINE: ${ANALYTICS_OFFLINE:-true}
       ANALYTICS_MODEL_CACHE_DIR: ${ANALYTICS_MODEL_CACHE_DIR:-/var/lib/bookrush/models}
+      ANALYTICS_RUNTIME_TIMEOUT_SECONDS: ${ANALYTICS_RUNTIME_TIMEOUT_SECONDS:-60}
+      ANALYTICS_MAX_EXCERPTS_PER_ITEM: ${ANALYTICS_MAX_EXCERPTS_PER_ITEM:-0}
+      ANALYTICS_V2_GENERATOR_VERSION: ${ANALYTICS_V2_GENERATOR_VERSION:-sentence-window-v2}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
       STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
@@ -315,6 +324,23 @@ services:
       - "127.0.0.1:${BOOKRUSH_ANALYTICS_PORT:-18091}:8091"
     networks: [bookrush]
 
+  book-analytics-runtime:
+    image: ${ANALYTICS_RUNTIME_IMAGE:-bookrush/book-analytics-runtime:local}
+    build:
+      context: ../services/book-analytics-runtime
+    environment:
+      ANALYTICS_OFFLINE: ${ANALYTICS_OFFLINE:-true}
+      ANALYTICS_MODEL_CACHE_DIR: /var/lib/bookrush/models
+      ANALYTICS_RUNTIME_MAX_CHARS: ${ANALYTICS_RUNTIME_MAX_CHARS:-100000}
+    volumes:
+      - analytics_models:/var/lib/bookrush/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
   frontend:
     image: ${FRONTEND_IMAGE:-bookrush/frontend:local}
     build:
@@ -324,6 +350,29 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${BOOKRUSH_FRONTEND_PORT:-18080}:8080"
+    networks: [bookrush]
+
+  admin-web:
+    image: ${ADMIN_WEB_IMAGE:-bookrush/admin-web:local}
+    build:
+      context: ../admin-web
+      args:
+        VITE_USE_MOCKS: ${ADMIN_WEB_USE_MOCKS:-false}
+        VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-https://keycloak-bookrush.jteodoro.tec.br}
+        VITE_KEYCLOAK_REALM: ${ADMIN_WEB_KEYCLOAK_REALM:-bookrush-platform}
+        VITE_KEYCLOAK_CLIENT_ID: ${ADMIN_WEB_KEYCLOAK_CLIENT_ID:-labsoft-admin-web}
+        VITE_CATALOG_API_URL: ${ADMIN_WEB_CATALOG_API_URL:-/api}
+        VITE_INGESTION_API_URL: ${ADMIN_WEB_INGESTION_API_URL:-/ingestion}
+        VITE_ANALYTICS_API_URL: ${ADMIN_WEB_ANALYTICS_API_URL:-/analytics}
+        VITE_FEED_API_URL: ${ADMIN_WEB_FEED_API_URL:-/feed}
+        VITE_BASE_PATH: ${ADMIN_WEB_BASE_PATH:-/admin/}
+    ports:
+      - "127.0.0.1:${BOOKRUSH_ADMIN_WEB_PORT:-18084}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
     networks: [bookrush]
 
   jenkins:
@@ -342,6 +391,7 @@ services:
       - ./compose.yaml:/opt/bookrush/compose.yaml:ro
       - ./jenkins/bookrush.Jenkinsfile:/opt/bookrush/bookrush.Jenkinsfile:ro
       - ./jenkins/backstage.Jenkinsfile:/opt/bookrush/backstage.Jenkinsfile:ro
+      - ./jenkins/admin-web.Jenkinsfile:/opt/bookrush/admin-web.Jenkinsfile:ro
       - ./jenkins/deploy-compose.sh:/opt/bookrush/deploy-compose.sh:ro
       - ./jenkins/casc/jenkins-oidc.yaml:/opt/bookrush/casc/jenkins-oidc.yaml:ro
       - ./jenkins/init.groovy.d/bookrush.groovy:/var/jenkins_home/init.groovy.d/bookrush.groovy:ro

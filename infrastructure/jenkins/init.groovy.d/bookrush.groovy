@@ -17,6 +17,17 @@ def backstageJob = instance.getItem('bookrush-backstage')
 if (backstageJob == null) {
     backstageJob = instance.createProject(WorkflowJob, 'bookrush-backstage')
 }
+
+def adminWebPipelineFile = new File('/opt/bookrush/admin-web.Jenkinsfile')
+def adminWebJob = instance.getItem('bookrush-admin-web')
+if (adminWebJob == null) {
+    adminWebJob = instance.createProject(WorkflowJob, 'bookrush-admin-web')
+}
+def adminWebScript = adminWebPipelineFile.text
+if (!(adminWebJob.getDefinition() instanceof CpsFlowDefinition) || adminWebJob.getDefinition().getScript() != adminWebScript) {
+    adminWebJob.setDefinition(new CpsFlowDefinition(adminWebScript, true))
+    adminWebJob.save()
+}
 def backstageScript = backstagePipelineFile.text
 if (!(backstageJob.getDefinition() instanceof CpsFlowDefinition) || backstageJob.getDefinition().getScript() != backstageScript) {
     backstageJob.setDefinition(new CpsFlowDefinition(backstageScript, true))

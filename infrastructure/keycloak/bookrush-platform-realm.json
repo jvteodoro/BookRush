@@ -93,6 +93,55 @@
       "optionalClientScopes": []
     },
     {
+      "clientId": "labsoft-admin-web",
+      "enabled": true,
+      "publicClient": true,
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "https://bookrush.jteodoro.tec.br/admin/*"
+      ],
+      "webOrigins": [
+        "https://bookrush.jteodoro.tec.br"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://bookrush.jteodoro.tec.br/*",
+        "use.lightweight.access.token.enabled": "false"
+      },
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "bookrush.analytics"
+      ],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "admin-web-groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "false",
+            "claim.name": "groups",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "admin-web-ingestion-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-ingestion",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "bookrush-backstage",
       "enabled": true,
       "publicClient": false,
@@ -363,6 +412,27 @@
         "include.in.token.scope": "true",
         "display.on.consent.screen": "false"
       }
+    },
+    {
+      "name": "bookrush.analytics",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "analytics-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-analytics",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     }
   ]
 }

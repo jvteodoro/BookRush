@@ -1,0 +1,18 @@
+version: pilot-v1
+status: PREPARED_NOT_STARTED
+target:
+  languages: [en, pt]
+  items_per_language: 50
+  annotations_per_item: 3
+dimensions: [HOOK, CLARITY, AUTHENTICITY, IMPACT, PACING, SELF_CONTAINMENT]
+sampling:
+  seed: 1337
+  strata: [language, dialogue, position, subject]
+  split_key: work_id
+adjudication:
+  enabled: true
+  disagreement_threshold: 2
+  queue: deterministic
+policy:
+  reveal_context_after: LOCK_PRIMARY_ANNOTATION
+  expose_model_predictions_before_lock: false

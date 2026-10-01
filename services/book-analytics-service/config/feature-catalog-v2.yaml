@@ -1,0 +1,60 @@
+version: analytics-feature-catalog-v2.0.0
+principle: "measurement != model_inference != product_score != recommendation"
+features:
+  - {code: word_count, layer: MEASUREMENT, family: structural, tier: 0, value: number, unit: tokens, languages: [all], status: implemented_v1}
+  - {code: sentence_count, layer: MEASUREMENT, family: structural, tier: 0, value: number, unit: sentences, languages: [all], status: implemented_v1}
+  - {code: question_ratio, layer: MEASUREMENT, family: structural, tier: 0, value: number, range: [0,1], languages: [all], status: implemented_v1}
+  - {code: dialogue_ratio, layer: MEASUREMENT, family: structural, tier: 0, value: number, range: [0,1], languages: [pt,en], status: implemented_v1}
+  - {code: estimated_read_time, layer: MEASUREMENT, family: structural, tier: 0, value: number, unit: minutes, languages: [all], status: implemented_v1}
+  - {code: paragraph_count, layer: MEASUREMENT, family: structural, tier: 0, value: number, unit: paragraphs, languages: [all]}
+  - {code: avg_sentence_length, layer: MEASUREMENT, family: rhythm, tier: 0, value: number, unit: words_per_sentence, languages: [all]}
+  - {code: sentence_length_std, layer: MEASUREMENT, family: rhythm, tier: 0, value: number, languages: [all]}
+  - {code: sentence_length_cv, layer: MEASUREMENT, family: rhythm, tier: 0, value: number, languages: [all]}
+  - {code: sentence_length_delta_mean, layer: MEASUREMENT, family: rhythm, tier: 0, value: number, languages: [all]}
+  - {code: short_sentence_ratio, layer: MEASUREMENT, family: rhythm, tier: 0, value: number, range: [0,1], languages: [all]}
+  - {code: short_sentence_burst, layer: MEASUREMENT, family: rhythm, tier: 0, value: number, languages: [all]}
+  - {code: paragraph_length_cv, layer: MEASUREMENT, family: rhythm, tier: 0, value: number, languages: [all]}
+  - {code: exclamation_ratio, layer: MEASUREMENT, family: structural, tier: 0, value: number, range: [0,1], languages: [all]}
+  - {code: punctuation_density, layer: MEASUREMENT, family: structural, tier: 0, value: number, languages: [all]}
+  - {code: ellipsis_density, layer: MEASUREMENT, family: structural, tier: 0, value: number, languages: [all]}
+  - {code: dash_density, layer: MEASUREMENT, family: structural, tier: 0, value: number, languages: [pt,en]}
+  - {code: unique_lemma_ratio, layer: MEASUREMENT, family: lexical, tier: 1, value: number, range: [0,1], languages: [pt,en], dependency: spacy}
+  - {code: mattr, layer: MEASUREMENT, family: lexical, tier: 1, value: number, range: [0,1], languages: [pt,en], dependency: spacy}
+  - {code: mtld, layer: MEASUREMENT, family: lexical, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: lexical_frequency_mean, layer: MEASUREMENT, family: lexical, tier: 1, value: number, languages: [pt,en], dependency: corpus_frequency_model}
+  - {code: lexical_rarity_p90, layer: MEASUREMENT, family: lexical, tier: 1, value: number, languages: [pt,en], dependency: corpus_frequency_model}
+  - {code: rare_word_ratio, layer: MEASUREMENT, family: lexical, tier: 1, value: number, range: [0,1], languages: [pt,en], dependency: corpus_frequency_model}
+  - {code: oov_ratio, layer: MEASUREMENT, family: lexical, tier: 1, value: number, range: [0,1], languages: [pt,en], dependency: corpus_frequency_model}
+  - {code: noun_ratio, layer: MEASUREMENT, family: morphosyntactic, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: verb_ratio, layer: MEASUREMENT, family: morphosyntactic, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: adjective_ratio, layer: MEASUREMENT, family: morphosyntactic, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: adverb_ratio, layer: MEASUREMENT, family: morphosyntactic, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: pronoun_ratio, layer: MEASUREMENT, family: referential, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: finite_verb_density, layer: MEASUREMENT, family: morphosyntactic, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: dependency_depth_mean, layer: MEASUREMENT, family: syntactic, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: dependency_distance_mean, layer: MEASUREMENT, family: syntactic, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: entity_count, layer: MEASUREMENT, family: entity, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: unique_entity_count, layer: MEASUREMENT, family: entity, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: opening_pronoun_ratio, layer: MEASUREMENT, family: referential, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: unresolved_reference_proxy, layer: MEASUREMENT, family: referential, tier: 1, value: number, languages: [pt,en], dependency: spacy}
+  - {code: book_relative_position, layer: MEASUREMENT, family: position, tier: 0, value: number, range: [0,1], languages: [all]}
+  - {code: chapter_relative_position, layer: MEASUREMENT, family: position, tier: 0, value: number, range: [0,1], languages: [all]}
+  - {code: previous_context_similarity, layer: MODEL_INFERENCE, family: semantic, tier: 2, value: number, dependency: bge_m3}
+  - {code: next_context_similarity, layer: MODEL_INFERENCE, family: semantic, tier: 2, value: number, dependency: bge_m3}
+  - {code: chapter_similarity, layer: MODEL_INFERENCE, family: semantic, tier: 2, value: number, dependency: bge_m3}
+  - {code: document_similarity, layer: MODEL_INFERENCE, family: semantic, tier: 2, value: number, dependency: bge_m3}
+  - {code: semantic_shift_in, layer: MODEL_INFERENCE, family: semantic, tier: 2, value: number, dependency: bge_m3}
+  - {code: semantic_shift_out, layer: MODEL_INFERENCE, family: semantic, tier: 2, value: number, dependency: bge_m3}
+  - {code: action_similarity, layer: MODEL_INFERENCE, family: prototype, tier: 2, value: number, dependency: prototype_set}
+  - {code: dialogue_similarity, layer: MODEL_INFERENCE, family: prototype, tier: 2, value: number, dependency: prototype_set}
+  - {code: description_similarity, layer: MODEL_INFERENCE, family: prototype, tier: 2, value: number, dependency: prototype_set}
+  - {code: reflection_similarity, layer: MODEL_INFERENCE, family: prototype, tier: 2, value: number, dependency: prototype_set}
+  - {code: conflict_similarity, layer: MODEL_INFERENCE, family: prototype, tier: 2, value: number, dependency: prototype_set}
+  - {code: mystery_similarity, layer: MODEL_INFERENCE, family: prototype, tier: 2, value: number, dependency: prototype_set}
+  - {code: emotional_intensity, layer: MODEL_INFERENCE, family: narrative, tier: 3, value: number, validation_required: true}
+  - {code: suspense, layer: MODEL_INFERENCE, family: narrative, tier: 3, value: number, validation_required: true}
+  - {code: curiosity, layer: MODEL_INFERENCE, family: narrative, tier: 3, value: number, validation_required: true}
+  - {code: surprise, layer: MODEL_INFERENCE, family: narrative, tier: 3, value: number, validation_required: true}
+  - {code: self_containedness, layer: MODEL_INFERENCE, family: narrative, tier: 3, value: number, validation_required: true}
+  - {code: open_loop, layer: MODEL_INFERENCE, family: narrative, tier: 3, value: number, validation_required: true}
+  - {code: closure, layer: MODEL_INFERENCE, family: narrative, tier: 3, value: number, validation_required: true}

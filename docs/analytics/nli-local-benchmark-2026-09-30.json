@@ -1,0 +1,60 @@
+{
+  "endpoint": "http://127.0.0.1:8092/v1/nli",
+  "hourly_cost": 1.0,
+  "nli_calls_per_excerpt": 16,
+  "repetitions": 3,
+  "sizes": [
+    {
+      "cost_per_1000_calls": 0.042241824537793744,
+      "cost_per_100_excerpts": 0.06758691926046999,
+      "mean_seconds": 0.15207056833605748,
+      "minutes_per_100_excerpts": 4.0552151556282,
+      "p50_seconds": 0.1421210760017857,
+      "p95_seconds": 0.17365670800063526,
+      "seconds_per_1000_calls": 152.07056833605748,
+      "seconds_per_excerpt": 2.4331290933769196,
+      "statuses": [
+        "VALID"
+      ],
+      "throughput_calls_per_second": 6.575894408378362,
+      "valid_samples": 3,
+      "words": 120
+    },
+    {
+      "cost_per_1000_calls": 0.10736808814760512,
+      "cost_per_100_excerpts": 0.17178894103616818,
+      "mean_seconds": 0.38652511733137845,
+      "minutes_per_100_excerpts": 10.307336462170092,
+      "p50_seconds": 0.37783292299718596,
+      "p95_seconds": 0.42900637999991886,
+      "seconds_per_1000_calls": 386.52511733137845,
+      "seconds_per_excerpt": 6.184401877302055,
+      "statuses": [
+        "VALID"
+      ],
+      "throughput_calls_per_second": 2.587153991192435,
+      "valid_samples": 3,
+      "words": 300
+    },
+    {
+      "cost_per_1000_calls": 0.6330349021300208,
+      "cost_per_100_excerpts": 1.0128558434080333,
+      "mean_seconds": 2.278925647668075,
+      "minutes_per_100_excerpts": 60.771350604481995,
+      "p50_seconds": 2.2661611319999793,
+      "p95_seconds": 2.405369165004231,
+      "seconds_per_1000_calls": 2278.925647668075,
+      "seconds_per_excerpt": 36.4628103626892,
+      "statuses": [
+        "VALID"
+      ],
+      "throughput_calls_per_second": 0.4388032584666623,
+      "valid_samples": 3,
+      "words": 800
+    }
+  ],
+  "warmup_seconds": [
+    0.2547
+  ],
+  "warmups": 1
+}

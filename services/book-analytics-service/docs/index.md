@@ -12,6 +12,18 @@ ranking explicável por migration aditiva. Os contratos machine-readable ficam e
 O handbook raiz contém a visão consolidada em `docs/analytics-v1.md`; os arquivos
 machine-readable permanecem em `../config/` no repositório.
 
+A [auditoria do baseline para V2](analytics-v2-audit.md) registra o que já é
+executável, as lacunas confirmadas e a ordem dos beads que evoluem candidates,
+features, modelos e seleção sem reinterpretar a V1.
+
+A [implementação e operação V2](analytics-v2-implementation.md) documenta o
+runtime Python local, preparação explícita de modelos, gates, scorer experimental
+e os limites para iniciar um piloto de corpus.
+
+O [relatório de estado de 2026-10-01](analytics-status-2026-10-01.md) consolida
+as evidências reais, comandos de reprodução e pendências que ainda exigem dados
+rotulados ou aprovação antes do processamento em massa.
+
 ## Features baseline
 
 `TextFeatureCalculator` é determinístico e versionado (`deterministic-text-v1`).
@@ -54,3 +66,21 @@ probabilidade de engajamento nem uma decisão jurídica/editorial.
 
 Consulte o [dicionário de features](feature-dictionary.md) para distinguir
 medições, scores de modelo e sinais de seleção de produto.
+
+## Fases 1–8
+
+As fases iniciais estão implementadas de forma incremental: segurança OIDC
+com audience/scope próprios, features estruturais e PT/EN, corpus-frequency e
+normalização de estilo versionáveis, embeddings BGE-M3 de excerpt/capítulo/
+documento, protótipos semânticos, NLI narrativo/emocional opcional e ranker
+heurístico explicável. O classificador supervisionado é treinado somente por
+comando explícito com `scripts/train-topic-classifier.py`; o artefato permanece
+`EXPERIMENTAL` até avaliação por work-level split. As fases 9–10 (piloto/bulk e
+avaliação científica/GO) continuam deliberadamente separadas e não são
+iniciadas pelo worker.
+
+O benchmark de latência e projeção de custo do NLI local está em
+[`docs/analytics/nli-local-benchmark.md`](../../../docs/analytics/nli-local-benchmark.md).
+
+A milestone [Excerpt Quality Learning V1](annotation-quality-learning-v1.md)
+adiciona campanhas, anotação cega, leases, métricas QA e datasets imutáveis.

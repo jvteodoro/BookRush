@@ -1,0 +1,32 @@
+openapi: 3.0.3
+info:
+  title: BookRush Excerpt Quality Annotation API
+  version: annotation-v1
+  description: Human ground truth with blind primary lock and immutable datasets.
+paths:
+  /api/admin/v1/annotation/campaigns:
+    post:
+      summary: Create campaign
+      security: [{ bearerAuth: [bookrush.analytics] }]
+    get:
+      summary: List campaigns
+      security: [{ bearerAuth: [bookrush.analytics] }]
+  /api/admin/v1/annotation/campaigns/{id}/claim-next:
+    post:
+      summary: Claim item with TTL lease
+      security: [{ bearerAuth: [bookrush.analytics] }]
+  /api/admin/v1/annotation/items/{itemId}/lock:
+    post:
+      summary: Lock primary annotation before context reveal
+      security: [{ bearerAuth: [bookrush.analytics] }]
+  /api/admin/v1/annotation/items/{itemId}/context:
+    get:
+      summary: Reveal context after primary lock
+      security: [{ bearerAuth: [bookrush.analytics] }]
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      flows: {}

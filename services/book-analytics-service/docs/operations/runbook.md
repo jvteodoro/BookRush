@@ -65,3 +65,37 @@ e valide os SHA-256. O serviço não baixa modelos no startup. Em modo offline,
 `ANALYTICS_OFFLINE=true`, artefato ausente resulta em `MODEL_UNAVAILABLE` para o
 estágio dependente. Nenhum bulk é iniciado automaticamente; siga os gates do
 `VALIDATION_PLAN_V1.md`.
+
+## Fases 1–8 habilitadas
+
+O serviço exige bearer OIDC do realm administrativo quando
+`ANALYTICS_SECURITY_ENABLED=true`. O token deve conter a audience
+`bookrush-analytics` e o scope `bookrush.analytics`; a configuração declarativa
+do scope fica em `infrastructure/keycloak/bookrush-platform-realm.json` e é
+aplicada por `infrastructure/keycloak/reconcile.sh`. Tokens de produto ou de
+outro client não autorizam a API.
+
+`ANALYTICS_SCOPE_EMBEDDINGS_ENABLED=true` gera embeddings BGE-M3 de excerpts,
+capítulos e documentos. Capítulos e documentos são divididos em chunks de
+codepoints e agregados por média ponderada L2, preservando o texto completo e a
+versão física de entrada. Os vetores são objetos privados em `books-ml`, com
+metadados e hashes nas tabelas `chapter_embedding` e `document_embedding`.
+
+`ANALYTICS_NLI_ENABLED=false` mantém NLI desligado por padrão. Ao habilitar,
+até `ANALYTICS_NLI_MAX_EXCERPTS` candidatos por execução recebem as hipóteses
+versionadas de narrativa e emoção. Cada observação grava entailment, neutral,
+contradiction, support e confidence como scores de modelo; nenhum deles é uma
+probabilidade comportamental. A migration V11 cria as definições tipadas.
+
+O runtime também expõe `/v1/language`, usando o artefato fastText `lid.176.bin`
+somente do cache local. O worker aceita o idioma detectado apenas para `en` ou
+`pt` com confiança mínima de 0,60; caso contrário mantém o idioma canônico ou
+marca a análise como não suportada. O timeout HTTP é configurado por
+`ANALYTICS_RUNTIME_TIMEOUT_SECONDS` (60 segundos por padrão), podendo ser
+aumentado para o embedding completo de documentos em CPU.
+
+O comando `scripts/publish-corpus-artifact.py` gera o artifact de frequência,
+calcula SHA-256, publica no bucket privado `books-ml` e imprime os metadados para
+registro em `analytics.corpus_frequency_model`. A normalização de estilo é
+registrada com ordem de features, médias, desvios padrão e checksum; os valores
+ausentes continuam sendo `UNSUPPORTED`, nunca zero.

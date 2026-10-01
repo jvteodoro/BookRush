@@ -80,6 +80,26 @@ public class IngestionJobService {
         """, jobId, size, page * size);
   }
 
+  public Map<String, Map<String, Object>> getExternalStatuses(List<String> externalIds) {
+    if (externalIds == null || externalIds.isEmpty()) return Map.of();
+    var ids = externalIds.stream().filter(id -> id != null && !id.isBlank()).distinct().toList();
+    if (ids.isEmpty()) return Map.of();
+    var placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    var args = new Object[ids.size() + 1];
+    args[0] = "GUTENBERG";
+    for (int i = 0; i < ids.size(); i++) args[i + 1] = ids.get(i);
+    var sql = "SELECT DISTINCT ON (i.external_identifier) "
+        + "i.external_identifier, i.status, i.book_id, i.edition_id, "
+        + "i.error_code, i.error_message, i.finished_at, i.updated_at "
+        + "FROM catalog.ingestion_item i JOIN catalog.source s ON s.id=i.source_id "
+        + "WHERE s.code=? AND i.external_identifier IN (" + placeholders + ") "
+        + "ORDER BY i.external_identifier, i.updated_at DESC, i.attempt_number DESC";
+    var rows = jdbc.queryForList(sql, args);
+    var result = new LinkedHashMap<String, Map<String, Object>>();
+    for (var row : rows) result.put(String.valueOf(row.get("external_identifier")), row);
+    return result;
+  }
+
   @Transactional
   public Map<String, Object> cancel(UUID id, String principal) {
     getJob(id);

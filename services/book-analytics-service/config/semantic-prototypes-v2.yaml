@@ -1,0 +1,24 @@
+version: semantic-prototype-set-v2.0.0
+embedding_model: bge-m3-dense-v1
+centroid_formula: normalize(mean(normalize(embed(example_i))))
+score_semantics: raw_cosine_similarity
+validated: false
+concepts:
+  action:
+    en: ["The passage is driven by physical action, movement, or an external event."]
+    pt: ["O trecho é conduzido por ação física, movimento ou acontecimento externo."]
+  dialogue:
+    en: ["Characters communicate directly in spoken dialogue."]
+    pt: ["Personagens se comunicam diretamente em diálogo falado."]
+  description:
+    en: ["The passage describes setting, objects, people, or sensory details."]
+    pt: ["O trecho descreve cenário, objetos, pessoas ou detalhes sensoriais."]
+  reflection:
+    en: ["The passage focuses on thoughts, motives, memories, or inner reflection."]
+    pt: ["O trecho se concentra em pensamentos, motivos, memórias ou reflexão interior."]
+  conflict:
+    en: ["Opposing goals or forces are in active tension."]
+    pt: ["Objetivos ou forças opostas estão em tensão ativa."]
+  mystery:
+    en: ["The passage withholds information and invites investigation."]
+    pt: ["O trecho retém informação e convida à investigação."]

@@ -1,0 +1,15 @@
+site_name: LabSoft Admin Web
+docs_dir: docs
+nav:
+  - Overview: index.md
+  - API contracts: api-contracts.md
+  - Security: security.md
+  - Operations: operations.md
+theme:
+  name: material
+  features:
+    - navigation.sections
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true

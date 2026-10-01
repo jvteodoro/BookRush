@@ -25,13 +25,30 @@ springdoc:
 bookrush:
   openapi.server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}/analytics
   security.enabled: ${ANALYTICS_SECURITY_ENABLED:false}
+  security.issuer: ${ANALYTICS_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+  security.audience: ${ANALYTICS_OIDC_AUDIENCE:bookrush-analytics}
 analytics:
   models:
     cache-dir: ${ANALYTICS_MODEL_CACHE_DIR:/var/lib/bookrush/models}
     offline: ${ANALYTICS_OFFLINE:true}
+  runtime:
+    url: ${ANALYTICS_RUNTIME_URL:http://book-analytics-runtime:8092}
+    timeout-seconds: ${ANALYTICS_RUNTIME_TIMEOUT_SECONDS:10}
   worker:
     enabled: ${ANALYTICS_WORKER_ENABLED:false}
     poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}
+    v2:
+      version: ${ANALYTICS_V2_GENERATOR_VERSION:sentence-window-v2}
+      min-words: ${ANALYTICS_V2_MIN_WORDS:60}
+      max-words: ${ANALYTICS_V2_MAX_WORDS:250}
+      cross-chapter: ${ANALYTICS_V2_CROSS_CHAPTER:false}
+      windows:
+        - target-words: ${ANALYTICS_V2_WINDOW_1_TARGET_WORDS:90}
+          sentence-stride: ${ANALYTICS_V2_WINDOW_1_SENTENCE_STRIDE:1}
+        - target-words: ${ANALYTICS_V2_WINDOW_2_TARGET_WORDS:140}
+          sentence-stride: ${ANALYTICS_V2_WINDOW_2_SENTENCE_STRIDE:2}
+        - target-words: ${ANALYTICS_V2_WINDOW_3_TARGET_WORDS:200}
+          sentence-stride: ${ANALYTICS_V2_WINDOW_3_SENTENCE_STRIDE:3}
   storage:
     endpoint: ${STORAGE_ENDPOINT:http://seaweedfs:8333}
     region: ${STORAGE_REGION:us-east-1}

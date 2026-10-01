@@ -4,6 +4,9 @@ nav:
   - Visão geral: index.md
   - Arquitetura: architecture/overview.md
   - Analytics V1: analytics-v1.md
+  - Auditoria V2: analytics-v2-audit.md
+  - Implementação V2: analytics-v2-implementation.md
+  - Relatório de estado: analytics-status-2026-10-01.md
   - Desenvolvimento: development/local-development.md
   - Operação: operations/runbook.md
   - ADRs: adr/README.md

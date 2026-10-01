@@ -50,6 +50,7 @@ ingestion:
     server-url: ${INGESTION_PUBLIC_URL:https://bookrush.jteodoro.tec.br/ingestion}
   gutenberg:
     base-url: ${INGESTION_GUTENBERG_BASE_URL:https://www.gutenberg.org}
+    catalog-url: ${INGESTION_GUTENBERG_CATALOG_URL:https://gutendex.com/books/}
     allow-private-addresses: ${INGESTION_GUTENBERG_ALLOW_PRIVATE_ADDRESSES:false}
   role: ${INGESTION_ROLE:ALL}
   scheduler-enabled: ${INGESTION_SCHEDULER_ENABLED:false}

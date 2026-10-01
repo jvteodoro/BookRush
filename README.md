@@ -7,6 +7,7 @@ localmente com Docker Compose quanto em Kubernetes.
 
 - `services/`: microsserviços Java independentes.
 - `frontend/`: aplicação React entregue pelo Nginx.
+- `admin-web/`: console administrativa React para catálogo, ingestão, analytics e Feed Lab.
 - `infrastructure/compose.yaml`: ambiente local completo (PostgreSQL, Redis,
   backend, frontend e Jenkins).
 - `infrastructure/kubernetes/`: manifests Kubernetes gerenciados por Kustomize.
@@ -162,3 +163,12 @@ ASSET_ADMIN_TOKEN do .env.example e suba o Compose normalmente. Veja
 O [Backstage](backstage/README.md) é o portal oficial de consulta de serviços, APIs,
 ADRs e TechDocs. Git continua sendo a fonte canônica; a
 [política de documentação](docs/documentation-policy.md) define o fluxo de revisão.
+
+## Console administrativa
+
+O job Jenkins `bookrush-admin-web` valida e empacota a console em uma imagem
+independente. Para desenvolvimento local, execute `npm ci && npm run dev` em
+`admin-web/`; para o Compose, configure o client público
+`labsoft-admin-web` no realm `bookrush-platform` e suba `admin-web`. O gateway
+publica a console em `https://bookrush.jteodoro.tec.br/admin/` e a porta
+loopback 18084 permanece restrita ao host.

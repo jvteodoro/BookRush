@@ -1,0 +1,18 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: labsoft-admin-web
+  title: LabSoft Admin Web
+  description: Console administrativa para catálogo, ingestão, analytics e calibração do feed.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: website
+  lifecycle: experimental
+  owner: group:default/platform-engineering
+  system: book-catalog
+  dependsOn:
+    - component:default/keycloak
+    - component:default/catalog-service
+    - component:default/book-ingestion-service
+    - component:default/book-analytics-service

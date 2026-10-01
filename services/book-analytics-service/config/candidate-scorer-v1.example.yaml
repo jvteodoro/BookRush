@@ -1,0 +1,17 @@
+code: EXCERPT_SUPERVISED_SCORER_V1
+version: 1.0.0
+status: EXPERIMENTAL
+validated: false
+warning: "Plumbing artifact only; promotion requires reviewed labels and evaluation."
+split: work_id
+seed: 42
+features:
+  - narrative.hook
+  - narrative.curiosity
+  - narrative.autonomy
+  - narrative.intensity
+  - narrative.presentation_quality
+diversity:
+  method: MMR
+  lambda: 0.75
+  embedding_model: bge-m3-dense-v1

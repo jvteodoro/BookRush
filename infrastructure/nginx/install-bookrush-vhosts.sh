@@ -72,6 +72,7 @@ targets = {
     "keycloak-bookrush.jteodoro.tec.br",
     "docs-bookrush.jteodoro.tec.br",
     "seaweedfs-bookrush.jteodoro.tec.br",
+    "admin-web-bookrush.jteodoro.tec.br",
 }
 blocks = []
 cursor = 0

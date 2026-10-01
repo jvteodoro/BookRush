@@ -67,6 +67,13 @@ http:
       priority: 1
       service: frontend
 
+    admin-web:
+      rule: Host(`bookrush.jteodoro.tec.br`) && PathPrefix(`/admin`)
+      entryPoints:
+        - web
+      priority: 150
+      service: admin-web
+
   middlewares:
     ingestion-strip:
       stripPrefix:
@@ -95,6 +102,10 @@ http:
       loadBalancer:
         servers:
           - url: http://frontend:8080
+    admin-web:
+      loadBalancer:
+        servers:
+          - url: http://admin-web:80
     keycloak:
       loadBalancer:
         servers:
