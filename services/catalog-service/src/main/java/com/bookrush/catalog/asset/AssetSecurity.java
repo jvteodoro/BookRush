@@ -109,6 +109,8 @@ public class AssetSecurity {
                         "SCOPE_bookrush.catalog.read")
                     .requestMatchers(
                         HttpMethod.GET,
+                        "/api/v1/books",
+                        "/api/v1/books/**",
                         "/api",
                         "/api/",
                         "/api/status",

@@ -5,7 +5,7 @@ O cliente web do BookRush é uma SPA React responsiva inspirada na linguagem vis
 ## Capacidades atuais
 
 - login OIDC com Keycloak no realm `bookrush`, usando Authorization Code + PKCE;
-- catálogo paginado em `GET /api/internal/v1/catalog/books`;
+- catálogo paginado em `GET /api/v1/books`;
 - busca por título;
 - detalhes de um livro;
 - estante local para salvar livros neste dispositivo;

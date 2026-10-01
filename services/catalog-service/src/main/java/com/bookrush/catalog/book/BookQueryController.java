@@ -18,7 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /** Read-only HTTP boundary for ingestion and analytics consumers. */
 @RestController
-@RequestMapping("/api/internal/v1/catalog/books")
+@RequestMapping({"/api/internal/v1/catalog/books", "/api/v1/books"})
 public class BookQueryController {
   private static final int MAX_PAGE_SIZE = 100;
   private final BookRepository books;

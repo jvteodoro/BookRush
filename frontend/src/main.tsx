@@ -6,7 +6,7 @@ import './styles.css';
 type CatalogBook = { id: string; canonicalTitle: string; originalLanguage?: string | null; description?: string | null };
 
 async function loadCatalog(): Promise<CatalogBook[]> {
-  const response = await authClient.fetch('/api/internal/v1/catalog/books?page=0&size=50');
+  const response = await fetch('/api/v1/books?page=0&size=50', { headers: { Accept: 'application/json' }, cache: 'no-store' });
   if (!response.ok) throw new Error(response.status === 401 ? 'Sua sessão expirou. Entre novamente.' : `Catálogo indisponível (HTTP ${response.status}).`);
   const page = await response.json() as { items: CatalogBook[] };
   return page.items;
