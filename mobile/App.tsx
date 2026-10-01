@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Linking, Pressable, SafeAreaView, StyleShe
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { StatusBar } from 'expo-status-bar';
-import { Book, listBooks, trackEvent, updateLibrary } from './src/api';
+import { Book, listBooks, listLibrary, trackEvent, updateLibrary } from './src/api';
 
 WebBrowser.maybeCompleteAuthSession();
 const authority = process.env.EXPO_PUBLIC_OIDC_AUTHORITY ?? 'https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush';
@@ -23,6 +23,7 @@ export default function App() {
   const [selected, setSelected] = useState<Book>();
 
   useEffect(() => { if (response?.type === 'success' && response.params.code) void exchangeCode(response.params.code); }, [response]);
+  useEffect(() => { if (token) void listLibrary(token).then(setSaved).catch(cause => setError(cause instanceof Error ? cause.message : 'Falha ao carregar biblioteca')); }, [token]);
   async function exchangeCode(code: string) { setBusy(true); setError(''); try { const result = await AuthSession.exchangeCodeAsync({ clientId, code, redirectUri, extraParams: { code_verifier: request?.codeVerifier ?? '' } }, discovery); setToken(result.accessToken); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível concluir o login.'); } finally { setBusy(false); } }
   async function loadBooks() { if (!token) return; setBusy(true); setError(''); try { setBooks((await listBooks(token, query)).items); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o catálogo.'); } finally { setBusy(false); } }
   const shown = useMemo(() => books, [books]);

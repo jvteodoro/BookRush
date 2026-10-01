@@ -40,4 +40,4 @@ O protótipo PageLoop foi usado apenas para hierarquia visual e fluxos de descob
 
 ## Fidelidade ao modelo PageLoop
 
-A experiência autenticada usa os mesmos blocos do modelo fornecido: shell com navegação lateral, feed vertical de trechos, trilho de ações (curtir, comentar, salvar e compartilhar), recomendações, busca, biblioteca, leitor, perfil, privacidade, planta/streak e áreas administrativas/publicador. O `public/pageloop.js` e `public/pageloop.css` são a adaptação versionada do protótipo para o runtime React; os livros mockados são substituídos pelo catálogo Java no carregamento. O aplicativo mobile mantém o feed vertical escuro, ações e navegação inferior do modelo.
+A experiência autenticada usa os mesmos blocos do modelo fornecido: shell, busca, catálogo, biblioteca e leitor. O runtime React consulta o catálogo e o estado do leitor pelas APIs autenticadas; não carrega mais `public/pageloop.js` nem datasets mockados/localStorage como fonte de verdade. O aplicativo mobile mantém o feed vertical escuro e consulta catálogo/biblioteca/eventos por HTTP autenticado.
