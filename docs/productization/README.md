@@ -50,3 +50,5 @@ O portal administrativo agora usa `VITE_USE_MOCKS=false` por padrão; dados de c
 Consulte o [relatório de pendências](remaining-work.md) para o estado atual dos beads, critérios faltantes e ordem recomendada de conclusão.
 
 O ledger de recomendação persiste request/impression no próprio schema `recommendation`; o behavior-service mantém rejects separados e não mistura content analytics com comportamento.
+
+Conteúdo aprovado pode ser descoberto pelo endpoint reader-assets do catálogo; somente URLs temporárias são retornadas e o binário permanece no storage privado.
