@@ -59,6 +59,14 @@ public class AssetSecurity {
             // Internal service calls may use a dedicated header so a gateway cannot
             // accidentally reinterpret the service credential as a user bearer token.
             String serviceToken = request.getHeader("X-Canonical-Service-Token");
+            String readerToken = request.getHeader("X-Content-Service-Token");
+            if (!oidc.readerInternalToken().isBlank()
+                && readerToken != null
+                && MessageDigest.isEqual(readerToken.getBytes(StandardCharsets.UTF_8), oidc.readerInternalToken().getBytes(StandardCharsets.UTF_8))) {
+              SecurityContextHolder.getContext().setAuthentication(
+                  new UsernamePasswordAuthenticationToken("book-content-service", null,
+                      List.of(new SimpleGrantedAuthority("ROLE_CATALOG_SERVICE"))));
+            }
             if (oidc.legacyStaticEnabled()
                 && props.enabled()
                 && auth != null
@@ -102,6 +110,8 @@ public class AssetSecurity {
             a ->
                 a.requestMatchers("/api/admin/**", "/actuator/metrics", "/actuator/metrics/**")
                     .hasAnyAuthority("ROLE_ASSET_ADMIN", "SCOPE_bookrush.assets.write")
+                    .requestMatchers("/api/v1/books/*/reader-assets/text-versions/**")
+                    .hasAnyAuthority("ROLE_CATALOG_SERVICE", "SCOPE_bookrush.catalog.read")
                     .requestMatchers("/api/internal/v1/catalog/**")
                     .hasAnyAuthority(
                         "ROLE_CATALOG_SERVICE",

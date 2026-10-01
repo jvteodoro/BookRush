@@ -96,8 +96,11 @@ essa permissão, em vez de preencher dados fictícios.
 Ao abrir um livro, o cliente consulta `/api/v1/content/books/{id}/chapters`.
 O índice lateral usa a projeção de capítulos persistida e sua versão textual;
 quando a obra ainda não tem projeção, a interface informa essa condição em
-vez de fabricar capítulos. O texto reader-ready completo e a navegação Readium
-continuam dependentes da publicação de um artifact autorizado.
+vez de fabricar capítulos. O `book-content-service` agora expõe um Web
+Publication Manifest por capítulos e recursos HTML derivados da versão textual
+normalizada; o frontend monta o `WebPubNavigator` do Readium. Obras sem
+projeção textual disponível permanecem indisponíveis até a ingestão concluir o
+artifact autorizado.
 
 O perfil autenticado é carregado de `GET /api/v1/profile`; nome, bio e estado
 público deixam de depender da lista de usuários do protótipo. A tela de

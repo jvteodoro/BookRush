@@ -460,6 +460,22 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
         });
   }
 
+  /** Signs the exact version requested by a reader projection; never substitutes the latest version. */
+  public DownloadLink linkVersion(UUID book, UUID versionId) {
+    return tx.execute(s -> {
+      BookAssetVersion version = em.find(BookAssetVersion.class, versionId);
+      if (version == null) throw missing();
+      BookAsset asset = asset(book, version.getBookAssetId());
+      if (asset.getStatus() == BookAssetStatus.DELETED
+          || version.getStatus() != BookAssetVersionStatus.AVAILABLE) throw missing();
+      var location = location(version);
+      if (storage.head(location).isEmpty())
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Object missing; reconciliation required");
+      Duration ttl = Duration.ofSeconds(props.urlTtlSeconds());
+      return new DownloadLink(storage.downloadUrl(location, version.getOriginalFilename(), ttl), Instant.now().plus(ttl));
+    });
+  }
+
   public void delete(UUID book, UUID id) {
     List<VersionView> versions =
         tx.execute(

@@ -12,13 +12,24 @@ Reader clients use `/api/v1/content/books/{bookId}/assets` and the
 short-lived URL generation to catalog-service, so it never exposes permanent
 object-store URLs or copies catalog tables.
 
-`GET /api/v1/content/books/{bookId}/publication.json` emits a minimal Readium
-Web Publication Manifest when an approved public EPUB exists. The manifest
-contains only a short-lived download capability; it is not a permanent object
-storage URL. Full chapter navigation still depends on the EPUB artifact and a
-Readium navigator in the client.
+`GET /api/v1/content/books/{bookId}/publication.json` emits a Readium Web
+Publication Manifest whose reading order is the persisted chapter projection.
+Each chapter is served as HTML by
+`/api/v1/content/books/{bookId}/chapters/{chapterId}/content`; the service
+resolves the exact normalized text version and slices Unicode code-point
+offsets. Storage URLs remain short-lived capabilities and are never returned
+as permanent links.
+
+The web client mounts Readium's `WebPubNavigator`. Books without a projected
+text version return an empty reading order and the UI reports that reader-ready
+content is unavailable; it never substitutes sample paragraphs.
 
 `GET /api/v1/content/books/{bookId}/chapters` exposes the persisted chapter
 projection (code-point offsets, hierarchy and text-version lineage) from the
 catalog owner. It does not expose database credentials or bypass asset
 authorization.
+
+The chapter proxy calls catalog with `X-Content-Service-Token`. Configure
+`CATALOG_READER_INTERNAL_TOKEN` and `CATALOG_SERVICE_TOKEN` from the same
+protected environment secret. The catalog validates this token before issuing
+a URL for a processing text asset; the browser cannot call that route directly.

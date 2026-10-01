@@ -1,7 +1,42 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { authClient, type AuthState } from './auth';
+import { Manifest, Publication } from '@readium/shared';
+import { WebPubNavigator } from '@readium/navigator';
 import './styles.css';
+
+type ReadiumBridge = {
+  mount: (bookId: string, container: HTMLElement, onLocatorChanged?: (progression: number) => void) => Promise<void>;
+  unmount: () => Promise<void>;
+};
+
+let readiumNavigator: any;
+const readiumBridge: ReadiumBridge = {
+  async mount(bookId, container, onLocatorChanged) {
+    await this.unmount();
+    const response = await authClient.fetch(`/api/v1/content/books/${encodeURIComponent(bookId)}/publication.json`);
+    if (!response.ok) throw new Error(`Publicação indisponível (HTTP ${response.status}).`);
+    const raw = await response.json();
+    const manifest = Manifest.deserialize(raw);
+    if (!manifest || !manifest.readingOrder?.items?.length) throw new Error('Este livro ainda não possui conteúdo reader-ready.');
+    const publication = new Publication({ manifest });
+    readiumNavigator = new WebPubNavigator(container, publication, {
+      frameLoaded: () => undefined,
+      positionChanged: (locator: any) => onLocatorChanged?.(locator.locations?.totalProgression ?? locator.locations?.progression ?? 0),
+      timelineItemChanged: () => undefined,
+      tap: () => false, click: () => false, zoom: () => undefined, scroll: () => undefined,
+      customEvent: () => undefined, handleLocator: () => false, textSelected: () => undefined,
+      contentProtection: () => undefined, contextMenu: () => undefined, peripheral: () => undefined,
+    } as any);
+    await readiumNavigator.load();
+  },
+  async unmount() {
+    if (readiumNavigator) {
+      await readiumNavigator.destroy();
+      readiumNavigator = undefined;
+    }
+  },
+};
 
 type CatalogBook = { id: string; canonicalTitle: string; originalLanguage?: string | null; description?: string | null };
 
@@ -90,6 +125,7 @@ function App() {
           // an empty state instead of preventing the reader feed from loading.
         }
         (window as Window & { __BOOKRUSH_BOOKS__?: PageLoopBook[]; __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_BOOKS__ = books;
+        (window as Window & { __BOOKRUSH_READIUM__?: ReadiumBridge }).__BOOKRUSH_READIUM__ = readiumBridge;
         (window as Window & { __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[] }).__BOOKRUSH_PUBLISHER_SUBMISSIONS__ = submissions;
         try {
           const profileResponse = await authClient.fetch('/api/v1/profile');

@@ -12,3 +12,4 @@ bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
+  catalog-service-token: ${CATALOG_SERVICE_TOKEN:}

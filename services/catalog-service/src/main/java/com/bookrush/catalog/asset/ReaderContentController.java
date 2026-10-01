@@ -8,6 +8,8 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 @ConditionalOnProperty(name="storage.enabled", havingValue="true")
@@ -25,5 +27,22 @@ public class ReaderContentController {
   @Operation(summary="Listar capítulos reader-ready")
   public List<?> chapters(@PathVariable UUID bookId){
     return jdbc.queryForList("SELECT id, edition_id, text_asset_version_id, chapter_key, parent_chapter_id, position, title, start_offset, end_offset, confidence FROM catalog.book_chapter WHERE book_id=? ORDER BY position, start_offset", bookId);
+  }
+
+  /**
+   * Resolves the signed URL for the exact normalized text version used by a
+   * chapter. This is an internal service boundary; the content service proxies
+   * the bytes and never exposes storage credentials or permanent object URLs.
+   */
+  @GetMapping("/text-versions/{versionId}/download-url")
+  @Operation(summary="Gerar URL interna da versão textual exata")
+  public ResponseEntity<AssetService.DownloadLink> textVersionLink(
+      @PathVariable UUID bookId, @PathVariable UUID versionId) {
+    UUID assetId = jdbc.queryForObject(
+        "SELECT v.book_asset_id FROM catalog.book_asset_version v "
+            + "JOIN catalog.book_asset a ON a.id=v.book_asset_id "
+            + "WHERE v.id=? AND a.book_id=? AND a.asset_type='TXT'",
+        UUID.class, versionId, bookId);
+    return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.linkVersion(bookId, versionId));
   }
 }
