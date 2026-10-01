@@ -115,7 +115,7 @@ export const services = {
   async annotationQueue(id:string) { const { data } = await analyticsHttp.get(`/api/admin/v1/annotation/campaigns/${id}/adjudication-queue`); return data; },
   async publishAnnotationDataset(id:string) { const { data } = await analyticsHttp.post(`/api/admin/v1/annotation/campaigns/${id}/datasets`); return data; },
   async exportAnnotationDataset(id:string,version:number) { const { data } = await analyticsHttp.get(`/api/admin/v1/annotation/campaigns/${id}/datasets/${version}/export`); return data; },
-  async claimAnnotationItem(id:string) { const { data } = await analyticsHttp.post(`/api/admin/v1/annotation/campaigns/${id}/claim-next`); return data; },
+  async claimAnnotationItem(id:string) { const { data } = await analyticsHttp.post(`/api/admin/v1/annotation/campaigns/${id}/claim-next`); if (!data?.campaignItemId) return data; const item = await analyticsHttp.get(`/api/admin/v1/annotation/items/${data.campaignItemId}`); return { ...data, ...item.data }; },
   async rateFirstScreen(itemId:string,hook:number) { const { data } = await analyticsHttp.post(`/api/admin/v1/annotation/items/${itemId}/first-screen`,{hook}); return data; },
   async lockAnnotation(itemId:string,dimensions:Record<string,number>,confidence:number) { const { data } = await analyticsHttp.post(`/api/admin/v1/annotation/items/${itemId}/lock`,{dimensions,confidence,failureTags:[]}); return data; },
   async revealAnnotationContext(itemId:string) { const { data } = await analyticsHttp.get(`/api/admin/v1/annotation/items/${itemId}/context`); return data; },

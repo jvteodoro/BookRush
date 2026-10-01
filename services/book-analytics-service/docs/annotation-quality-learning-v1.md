@@ -46,6 +46,8 @@ grupos Keycloak `excerpt-annotators`, `excerpt-reviewers`, `operators`,
 `platform-admins` são convertidos em authorities específicas do serviço.
 O primeiro-screen retorna o texto e seu hash, mas não retorna rank, NLI,
 protótipos ou embeddings; esses dados continuam ocultos até o lock.
+Após `claim-next`, o admin consulta o item reservado para carregar esse texto
+cego antes de renderizar os controles de rating.
 
 ## Piloto
 
