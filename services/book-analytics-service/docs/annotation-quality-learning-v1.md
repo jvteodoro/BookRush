@@ -15,6 +15,11 @@ usa o admin web existente em `/admin/training`.
 7. O diagnóstico de contexto e o submit são armazenados separadamente.
 8. Discordâncias podem gerar adjudicação; adjudicação nunca altera labels brutos.
 
+`claim-next` não devolve novamente itens que já possuem anotação bloqueada ou
+submetida pelo mesmo subject. Depois do lock, o Studio oferece **Próximo
+excerpt**, que limpa o estado da avaliação atual e solicita outro item da
+campanha.
+
 Previsões do modelo, scores NLI, protótipos e rank heurístico não devem ser
 enviados pelo endpoint cego. O endpoint de contexto só responde depois de
 `primary_locked_at` existir.
