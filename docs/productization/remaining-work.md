@@ -23,7 +23,7 @@ Atualizado em 2026-10-01. O épico `bookrush-slos` permanece aberto. Este relat�
 
 | Bead | Situação | O que falta para fechar |
 |---|---|---|
-| `bookrush-01se` | Parcial | Ler artefatos normalizados reais, capítulos, offsets, reader-ready e URLs temporárias S3. |
+| `bookrush-01se` | Parcial | Manifesto Readium e capítulos HTML já usam a versão normalizada exata e URL temporária; falta fechar o artefato reader-ready persistido em S3 e a validação E2E com EPUB real. |
 | `bookrush-tdn2` | Parcial | Bookmarks completos, recentes, sessões, streak, plant projection e testes de concorrência. |
 | `bookrush-7vbg` | Parcial | Moderação completa, shares, consulta de follows, autorização por recurso e eventos de domínio. |
 | `bookrush-5kch` | Parcial | Schema registry, rejects, outbox/polling, retenção, métricas e particionamento operacional. |
