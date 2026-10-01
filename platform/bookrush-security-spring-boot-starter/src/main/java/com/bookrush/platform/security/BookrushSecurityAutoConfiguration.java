@@ -83,6 +83,12 @@ public class BookrushSecurityAutoConfiguration {
           if (!scope.isBlank()) authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope));
         }
       }
+      Object groups = jwt.getClaims().get("groups");
+      if (groups instanceof List<?> values) {
+        values.stream().filter(String.class::isInstance).map(String.class::cast)
+            .filter(value -> !value.isBlank())
+            .forEach(value -> authorities.add(new SimpleGrantedAuthority("ROLE_" + value)));
+      }
       var identity = new TechnicalIdentity(jwt.getIssuer().toString(), jwt.getSubject());
       return new JwtAuthenticationToken(jwt, authorities, identity.toString());
     }
