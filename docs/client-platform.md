@@ -60,6 +60,10 @@ O upload do publicador segue duas fases: solicitar a URL PUT temporária e
 finalizar informando o SHA-256. O binário não passa pelo frontend BookRush nem
 é salvo no PostgreSQL; somente a intenção, objeto, tamanho e hash são
 persistidos pelo publisher-service.
+No Compose, o recurso é opt-in (`PUBLISHER_STORAGE_ENABLED=false` por padrão)
+para que um clone sem credenciais S3 não derrube o serviço de metadata. Para
+habilitá-lo, forneça as credenciais do SeaweedFS no `.env`, crie/valide o bucket
+de staging e então reconcilie o container publisher.
 
 As ações sociais usam os payloads do contrato vigente: comentários enviam
 `{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de
