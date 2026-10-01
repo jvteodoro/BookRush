@@ -68,4 +68,7 @@ comparar humano × modelo e revisar o dataset antes de qualquer treinamento.
 
 A migration é aditiva (`V13__excerpt_quality_learning_v1.sql`). Não edite
 migrations anteriores. O admin pode criar e iniciar uma campanha explicitamente;
-o pipeline não habilita bulk nem chama LLM comercial.
+o pipeline não habilita bulk nem chama LLM comercial. As ações do admin exibem
+erros de API ao operador; o sampling usa conflito idempotente por
+`(campaign_id, excerpt_id)` e as métricas qualificam `created_at` pela anotação
+para evitar falhas quando os joins possuem timestamps homônimos.
