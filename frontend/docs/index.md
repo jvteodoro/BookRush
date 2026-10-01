@@ -1,6 +1,6 @@
 # Cliente BookRush
 
-O cliente web do BookRush é uma SPA React responsiva que carrega o shell original do protótipo PageLoop depois de autenticar. Assim, sidebar, feed, recomendações, busca, biblioteca, leitor, perfil e navegação mobile mantêm a experiência de referência, enquanto livros e ações de biblioteca usam as APIs reais do BookRush.
+O cliente web do BookRush é uma SPA React responsiva que carrega o shell original do protótipo PageLoop depois de autenticar. Assim, sidebar, feed, recomendações, busca, biblioteca, leitor, perfil e navegação mobile mantêm a experiência de referência, enquanto livros, feed, impressões e ações de biblioteca usam as APIs reais do BookRush.
 
 ## Capacidades atuais
 
@@ -32,6 +32,9 @@ por `GET /api/v1/books` sem Bearer (leitura pública), carrega a biblioteca em
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
 fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
+O feed usa `GET /api/v1/reader/feed` e registra viewability em
+`POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
+livro.
 O Nginx do container envia `Cache-Control: no-store` para que uma publicação
 não mantenha o bundle anterior no navegador.
 Os assets do shell também recebem uma versão explícita na URL para invalidar

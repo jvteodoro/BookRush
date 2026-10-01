@@ -11,6 +11,14 @@ type PageLoopBook = {
   shares: number; pages: number; progress: number;
 };
 
+type RecommendationItem = {
+  book?: CatalogBook;
+  impressionId?: string;
+  recommendationRequestId?: string;
+  modelVersion?: string;
+  rank?: number;
+};
+
 async function loadCatalog(): Promise<CatalogBook[]> {
   // O catálogo de leitura possui uma rota pública própria; a rota internal é
   // reservada para operadores e devolve 401 ao leitor autenticado.
@@ -27,6 +35,13 @@ async function loadLibrary(): Promise<string[]> {
   if (!response.ok) return [];
   const rows = await response.json() as Array<{ book_id?: string; bookId?: string }>;
   return rows.map(row => row.book_id ?? row.bookId).filter((id): id is string => Boolean(id));
+}
+
+async function loadRecommendationFeed(): Promise<RecommendationItem[]> {
+  const response = await authClient.fetch('/api/v1/reader/feed?size=50');
+  if (!response.ok) return [];
+  const payload = await response.json() as { items?: RecommendationItem[] };
+  return payload.items ?? [];
 }
 
 function App() {
@@ -56,9 +71,13 @@ function App() {
     async function startPrototype() {
       try {
         const catalog = await loadCatalog();
+        const recommendations = await loadRecommendationFeed();
         if (!active) return;
+        const byId = new Map(catalog.map(book => [book.id, book]));
+        const ordered = recommendations.map(item => item.book).filter((book): book is CatalogBook => Boolean(book && byId.has(book.id)));
+        const source = ordered.length ? ordered : catalog;
         const palettes = [['#82d4a4', '#213e35'], ['#74b9ff', '#202b52'], ['#f0a8bd', '#5a2337'], ['#c7d87a', '#26311f'], ['#d2aa6d', '#4a2e1f']];
-        const books: PageLoopBook[] = catalog.map((book, index) => ({
+        const books: PageLoopBook[] = source.map((book, index) => ({
           id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0,
         }));
         const saved = new Set(await loadLibrary());
@@ -77,6 +96,10 @@ function App() {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ events: [{ eventKey: `BOOK_OPEN:${id}:${Date.now()}`, eventType: 'BOOK_OPEN', bookId: id, occurredAt: new Date().toISOString(), payload: {} }] }),
             });
+          },
+          viewable: async (id: string) => {
+            const item = recommendations.find(candidate => candidate.book?.id === id);
+            if (item?.impressionId) await authClient.fetch(`/api/v1/recommendations/impressions/${item.impressionId}/viewable`, { method: 'POST' });
           },
         };
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';

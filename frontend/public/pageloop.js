@@ -143,8 +143,8 @@
       <aside class="feed-side">
         <div class="side-card"><div class="streak-row"><div class="streak-flame">🔥</div><div><h3>${state.streak} dias de sequência</h3><p>Mais 16 min hoje para manter seu ritmo.</p></div></div><div class="progress-track"><div class="progress-fill" style="width:68%"></div></div></div>
         <div class="side-card"><h3>Seu radar de leitura</h3><p>O feed está priorizando temas que você costuma abrir e concluir.</p><div class="taste-row"><span class="taste">Clássicos 84%</span><span class="taste">Sci-fi 79%</span><span class="taste">Gótico 66%</span><span class="taste">Ensaios 54%</span></div></div>
-        <div class="side-card"><h3>Leitores para seguir</h3>${USERS.map(u=>`<div class="quick-user"><button class="avatar avatar-button" data-user-profile="${u.id}">${u.initials}</button><div class="quick-user-info"><button class="user-link" data-user-profile="${u.id}"><strong>${u.name}</strong><span>${u.handle}</span></button></div><button class="follow-mini" data-follow="${u.id}">${state.followed[u.id]?'Seguindo':'Seguir'}</button></div>`).join('')}</div>
-        <div class="side-card"><h3>Como usar o protótipo</h3><p>Role verticalmente como em um feed de vídeos. Curtidas, salvos e marcações permanecem após atualizar a página.</p></div>
+        <div class="side-card"><h3>Seu catálogo</h3><p>Este feed é composto pelo recommendation-service e registra request, impressão, modelo e posição para cada item.</p><div class="taste-row"><span class="taste">Dados reais</span><span class="taste">heuristic-v1</span></div></div>
+        <div class="side-card"><h3>Leitura</h3><p>Abra um livro para registrar a abertura e continue pelo conteúdo reader-ready quando estiver disponível.</p></div>
       </aside></div>`;
     shell(main,'Para você'); bindFeed();
   }
@@ -197,7 +197,7 @@
     document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];save();renderSearch()});
   }
 
-  async function openBook(id){state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.open?.(id)}catch(e){toast(e.message||'Não foi possível abrir o livro')} state.readerPage=book(id).progress||state.readerPage;state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);save();render();}
+  async function openBook(id){state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id)}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.readerPage=book(id).progress||state.readerPage;state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);save();render();}
 
   const PARAS = [
     'A manhã entrou pela janela com a delicadeza de quem não queria interromper nada. Havia um silêncio incomum no jardim, interrompido apenas pelas folhas que se tocavam com o vento.',
