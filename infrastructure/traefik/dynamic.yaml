@@ -92,6 +92,11 @@ http:
       entryPoints: [web]
       priority: 130
       service: profile
+    admin-api:
+      rule: Host(`bookrush.jteodoro.tec.br`) && PathPrefix(`/api/v1/admin`)
+      entryPoints: [web]
+      priority: 135
+      service: admin-api
     content:
       rule: PathPrefix(`/api/v1/content`)
       entryPoints: [web]
@@ -153,6 +158,9 @@ http:
     profile:
       loadBalancer:
         servers: [{url: http://reader-profile-service:8095}]
+    admin-api:
+      loadBalancer:
+        servers: [{url: http://admin-service:8100}]
     content:
       loadBalancer:
         servers: [{url: http://book-content-service:8093}]

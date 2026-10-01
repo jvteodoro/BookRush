@@ -292,7 +292,8 @@
   }
 
   function adminUserRows(q=''){
-    const list=[...USERS,{id:'u4',name:'Maya Luz',handle:'@mayaluz',initials:'ML',books:'42',followers:'1,9 mil'},{id:'u5',name:'Davi Alves',handle:'@davilê',initials:'DA',books:'73',followers:'5,2 mil'}].filter(u=>(u.name+' '+u.handle).toLowerCase().includes(q.toLowerCase()));
+    const remote=window.__BOOKRUSH_ADMIN_USERS__||[];
+    const list=(remote.length?remote.map(u=>({id:u.subject_key,name:u.display_name||u.subject_key,handle:u.subject_key,initials:(u.display_name||u.subject_key||'?').slice(0,2).toUpperCase(),books:'—',followers:'—'})):[...USERS]).filter(u=>(u.name+' '+u.handle).toLowerCase().includes(q.toLowerCase()));
     return list.map((u,i)=>`<tr><td><div class="row-user"><div class="avatar">${u.initials}</div><div><strong>${u.name}</strong><div class="muted tiny">${u.handle}</div></div></div></td><td><span class="status ${state.blocked[u.id]?'bad':'ok'}">${state.blocked[u.id]?'Bloqueado':'Ativo'}</span></td><td>${u.books||57}</td><td>${u.followers||'—'}</td><td>${['Agora','12 min','1 h','Ontem','3 dias'][i%5]}</td><td><div class="table-actions"><button class="mini-btn" data-inspect-user="${u.id}">Detalhes</button><button class="mini-btn" data-block-user="${u.id}">${state.blocked[u.id]?'Desbloquear':'Bloquear'}</button></div></td></tr>`).join('');
   }
 
@@ -303,7 +304,8 @@
   }
 
   function moderationCards(){
-    const reports=[['r1','Comentário ofensivo','Comentário em “Frankenstein”','“Isso é ridículo, quem gosta disso...”','Linguagem inadequada'],['r2','Spam','Perfil @clubedolivro24','“Clique no link do meu perfil para ganhar...”','Conteúdo promocional repetitivo'],['r3','Trecho incorreto','A Máquina do Tempo','“Texto reportado como atribuído ao capítulo errado.”','Informação incorreta']];
+    const remote=window.__BOOKRUSH_ADMIN_REPORTS__||[];
+    const reports=remote.length?remote.map(r=>[r.id,'Denúncia',r.book_id||'Livro',r.comment_id||'Comentário reportado',r.reason||'Motivo não informado']):[];
     const visible=reports.filter(r=>!state.removedReports[r[0]]); if(!visible.length)return `<div class="empty-state"><div class="lock-orb">✓</div><h2>Fila limpa</h2><p>Não há denúncias pendentes neste mock.</p></div>`;
     return visible.map(r=>`<article class="report-card"><div class="report-head"><div><strong>${r[1]}</strong><span>${r[2]}</span></div><span>há ${r[0]==='r1'?'8 min':r[0]==='r2'?'31 min':'2 h'}</span></div><div class="report-quote">${r[3]}</div><div class="report-reason">Motivo informado: ${r[4]}</div><div class="report-actions"><button class="danger-btn" data-report-action="remove:${r[0]}">Remover conteúdo</button><button class="secondary-btn" data-report-action="archive:${r[0]}">Manter e arquivar</button></div></article>`).join('');
   }

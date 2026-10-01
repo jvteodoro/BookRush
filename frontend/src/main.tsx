@@ -91,6 +91,16 @@ function App() {
         }
         (window as Window & { __BOOKRUSH_BOOKS__?: PageLoopBook[]; __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_BOOKS__ = books;
         (window as Window & { __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[] }).__BOOKRUSH_PUBLISHER_SUBMISSIONS__ = submissions;
+        try {
+          const [usersResponse, reportsResponse] = await Promise.all([
+            authClient.fetch('/api/v1/admin/users'), authClient.fetch('/api/v1/admin/reports'),
+          ]);
+          (window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }).__BOOKRUSH_ADMIN_USERS__ = usersResponse.ok ? await usersResponse.json() as unknown[] : [];
+          (window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }).__BOOKRUSH_ADMIN_REPORTS__ = reportsResponse.ok ? await reportsResponse.json() as unknown[] : [];
+        } catch {
+          (window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }).__BOOKRUSH_ADMIN_USERS__ = [];
+          (window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }).__BOOKRUSH_ADMIN_REPORTS__ = [];
+        }
         (window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_API__ = {
           ...(window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_API__,
           saved,
@@ -122,6 +132,16 @@ function App() {
           follow: async (subject: string, enabled: boolean) => {
             const response = await authClient.fetch(`/api/v1/social/users/${encodeURIComponent(subject)}/follow`, { method: enabled ? 'PUT' : 'DELETE' });
             if (!response.ok) throw new Error('Não foi possível atualizar o acompanhamento.');
+          },
+          adminUsers: async () => {
+            const response = await authClient.fetch('/api/v1/admin/users');
+            if (!response.ok) throw new Error('Não foi possível carregar os usuários.');
+            return response.json();
+          },
+          adminReports: async () => {
+            const response = await authClient.fetch('/api/v1/admin/reports');
+            if (!response.ok) throw new Error('Não foi possível carregar as denúncias.');
+            return response.json();
           },
           publisherSubmissions: async () => {
             const response = await authClient.fetch('/api/v1/publisher/submissions');

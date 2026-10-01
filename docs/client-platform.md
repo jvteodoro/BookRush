@@ -67,3 +67,8 @@ administrativo (`bookrush-platform`) com a audiência de ingestão. Os valores
 podem ser sobrescritos por variáveis `BOOKRUSH_*_SECURITY_*` no ambiente; os
 defaults mantêm a separação de confiança e não deixam esses endpoints
 anônimos.
+
+O portal administrativo consulta `/api/v1/admin/users` e
+`/api/v1/admin/reports` pela facade `admin-service`. Sem token administrativo a
+resposta é `401/403`; o frontend mantém a fila vazia quando a conta não tem
+essa permissão, em vez de preencher dados fictícios.

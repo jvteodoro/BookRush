@@ -66,6 +66,22 @@ public class AdminController {
         + "FROM admin.moderation ORDER BY created_at DESC LIMIT 100");
   }
 
+  @GetMapping("/reports")
+  public Object reports(Principal principal, Authentication authentication) {
+    requireOperator(authentication);
+    actor(principal);
+    return jdbc.queryForList("SELECT id, reporter, book_id, comment_id, reason, created_at "
+        + "FROM social.reports ORDER BY created_at DESC LIMIT 100");
+  }
+
+  @GetMapping("/users")
+  public Object users(Principal principal, Authentication authentication) {
+    requireOperator(authentication);
+    actor(principal);
+    return jdbc.queryForList("SELECT subject_key, display_name, bio, is_public, updated_at "
+        + "FROM reader_profile.profile ORDER BY updated_at DESC LIMIT 100");
+  }
+
   @GetMapping("/audit")
   public Object list(Principal principal, Authentication authentication) {
     requireOperator(authentication);
