@@ -1,6 +1,6 @@
 export const config = {
   basePath: import.meta.env.BASE_URL ?? '/',
-  useMocks: (import.meta.env.VITE_USE_MOCKS ?? 'true') === 'true',
+  useMocks: (import.meta.env.VITE_USE_MOCKS ?? 'false') === 'true',
   keycloak: {
     url: import.meta.env.VITE_KEYCLOAK_URL ?? 'https://keycloak-bookrush.jteodoro.tec.br',
     realm: import.meta.env.VITE_KEYCLOAK_REALM ?? 'bookrush-platform',

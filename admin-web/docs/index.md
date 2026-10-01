@@ -32,3 +32,5 @@ docker compose -f ../infrastructure/compose.yaml --env-file ../.env up -d admin-
 Em `VITE_USE_MOCKS=true` os adapters são determinísticos e não fazem rede,
 permitindo desenvolvimento offline. Em produção, use os caminhos do gateway
 (`/api`, `/ingestion`, `/analytics` e `/feed`) e OIDC real.
+
+Em produção `VITE_USE_MOCKS=false` é obrigatório; os dados são consultados pelas APIs autenticadas. Mocks só podem ser habilitados explicitamente em desenvolvimento local.
