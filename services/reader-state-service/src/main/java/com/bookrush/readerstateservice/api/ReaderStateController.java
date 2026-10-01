@@ -12,9 +12,15 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/reader")
 public class ReaderStateController {
  private final JdbcTemplate jdbc; public ReaderStateController(JdbcTemplate jdbc){this.jdbc=jdbc;}
- private String subject(Principal p){return p==null?"anonymous":p.getName();}
+ private String subject(Principal p){
+  if (p == null || p.getName() == null || p.getName().isBlank()) {
+   throw new org.springframework.web.server.ResponseStatusException(
+     org.springframework.http.HttpStatus.UNAUTHORIZED, "authentication required");
+  }
+  return p.getName();
+ }
  public record Progress(@NotNull Long positionCodepoint, @NotNull Double percent){}
- @PostMapping("/books/{bookId}/opened") public Map<String,Object> opened(@PathVariable UUID bookId,Principal p){jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?,) on conflict(subject_key,book_id) do update set last_opened_at=now()",subject(p),bookId);return Map.of("bookId",bookId,"recorded",true);}
+ @PostMapping("/books/{bookId}/opened") public Map<String,Object> opened(@PathVariable UUID bookId,Principal p){jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?) on conflict(subject_key,book_id) do update set last_opened_at=now()",subject(p),bookId);return Map.of("bookId",bookId,"recorded",true);}
  @GetMapping("/recent") public Object recent(Principal p){return jdbc.queryForList("select book_id,last_opened_at from reader_state.recent where subject_key=? order by last_opened_at desc limit 50",subject(p));}
  @PostMapping("/sessions") public Object start(Principal p){UUID id=UUID.randomUUID();jdbc.update("insert into reader_state.session(id,subject_key,started_at) values(?,?,now())",id,subject(p));return Map.of("id",id,"startedAt",java.time.Instant.now());}
  @PostMapping("/sessions/{id}/end") public Object end(@PathVariable UUID id,@RequestBody Map<String,Object> body,Principal p){int seconds=((Number)body.getOrDefault("activeSeconds",0)).intValue();jdbc.update("update reader_state.session set ended_at=now(),active_seconds=? where id=? and subject_key=?",seconds,id,subject(p));return Map.of("id",id,"activeSeconds",seconds);}
