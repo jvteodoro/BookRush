@@ -11,3 +11,9 @@ Reader clients use `/api/v1/content/books/{bookId}/assets` and the
 `download-url` child endpoint. The service delegates asset authorization and
 short-lived URL generation to catalog-service, so it never exposes permanent
 object-store URLs or copies catalog tables.
+
+`GET /api/v1/content/books/{bookId}/publication.json` emits a minimal Readium
+Web Publication Manifest when an approved public EPUB exists. The manifest
+contains only a short-lived download capability; it is not a permanent object
+storage URL. Full chapter navigation still depends on the EPUB artifact and a
+Readium navigator in the client.

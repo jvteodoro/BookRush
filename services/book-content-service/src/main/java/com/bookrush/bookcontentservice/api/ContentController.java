@@ -26,4 +26,23 @@ public class ContentController {
   public Object downloadUrl(@PathVariable UUID bookId, @PathVariable UUID assetId) {
     return catalog.get().uri("/api/v1/books/{bookId}/reader-assets/{assetId}/download-url", bookId, assetId).retrieve().body(Object.class);
   }
+
+  /** Minimal Readium Web Publication Manifest bridge for an approved EPUB asset. */
+  @GetMapping("/books/{bookId}/publication.json")
+  public Map<String, Object> publication(@PathVariable UUID bookId) {
+    Object assets = readerAssets(bookId);
+    if (!(assets instanceof List<?> list)) return Map.of("metadata", Map.of("title", bookId.toString()), "readingOrder", List.of());
+    for (Object value : list) {
+      if (!(value instanceof Map<?, ?> asset)) continue;
+      if (!"EPUB".equals(String.valueOf(asset.get("type"))) || !"PUBLIC".equals(String.valueOf(asset.get("role")))) continue;
+      Object id = asset.get("id");
+      if (id == null) continue;
+      Object link = downloadUrl(bookId, UUID.fromString(String.valueOf(id)));
+      if (link instanceof Map<?, ?> download && download.get("url") != null) {
+        return Map.of("@context", "http://readium.org/webpub-manifest/context.json", "metadata", Map.of("title", bookId.toString()),
+            "readingOrder", List.of(Map.of("href", download.get("url"), "type", "application/epub+zip")));
+      }
+    }
+    return Map.of("metadata", Map.of("title", bookId.toString()), "readingOrder", List.of());
+  }
 }
