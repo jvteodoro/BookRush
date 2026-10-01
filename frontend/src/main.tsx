@@ -173,6 +173,10 @@ function App() {
               body: JSON.stringify({ events: [{ eventKey: `BOOK_OPEN:${id}:${Date.now()}`, eventType: 'BOOK_OPEN', bookId: id, occurredAt: new Date().toISOString(), payload: {} }] }),
             });
           },
+          chapters: async (id: string) => {
+            const response = await authClient.fetch(`/api/v1/content/books/${encodeURIComponent(id)}/chapters`);
+            return response.ok ? response.json() : [];
+          },
           viewable: async (id: string) => {
             const item = recommendations.find(candidate => candidate.book?.id === id);
             if (item?.impressionId) await authClient.fetch(`/api/v1/recommendations/impressions/${item.impressionId}/viewable`, { method: 'POST' });

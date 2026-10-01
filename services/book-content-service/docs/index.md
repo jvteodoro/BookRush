@@ -17,3 +17,8 @@ Web Publication Manifest when an approved public EPUB exists. The manifest
 contains only a short-lived download capability; it is not a permanent object
 storage URL. Full chapter navigation still depends on the EPUB artifact and a
 Readium navigator in the client.
+
+`GET /api/v1/content/books/{bookId}/chapters` exposes the persisted chapter
+projection (code-point offsets, hierarchy and text-version lineage) from the
+catalog owner. It does not expose database credentials or bypass asset
+authorization.

@@ -23,3 +23,9 @@ obra ou `404`. Ambos exigem um token de serviço com `bookrush.catalog.read` ou
 
 Essas rotas expõem somente metadados bibliográficos. Assets e conteúdo físico
 continuam sujeitos às rotas de distribuição e às políticas de direitos.
+## Reader chapters
+
+`GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted
+chapter projection for the book, including the exact text asset version,
+Unicode code-point offsets, hierarchy and projection confidence. The endpoint
+is read-only and remains owned by the catalog service.

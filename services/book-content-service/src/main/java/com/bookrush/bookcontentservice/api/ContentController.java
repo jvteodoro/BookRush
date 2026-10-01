@@ -27,6 +27,12 @@ public class ContentController {
     return catalog.get().uri("/api/v1/books/{bookId}/reader-assets/{assetId}/download-url", bookId, assetId).retrieve().body(Object.class);
   }
 
+  @GetMapping("/books/{bookId}/chapters")
+  public Object chapters(@PathVariable UUID bookId) {
+    return catalog.get().uri("/api/v1/books/{id}/reader-assets/chapters", bookId)
+        .retrieve().body(Object.class);
+  }
+
   /** Minimal Readium Web Publication Manifest bridge for an approved EPUB asset. */
   @GetMapping("/books/{bookId}/publication.json")
   public Map<String, Object> publication(@PathVariable UUID bookId) {

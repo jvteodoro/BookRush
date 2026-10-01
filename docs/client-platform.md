@@ -72,3 +72,9 @@ O portal administrativo consulta `/api/v1/admin/users` e
 `/api/v1/admin/reports` pela facade `admin-service`. Sem token administrativo a
 resposta é `401/403`; o frontend mantém a fila vazia quando a conta não tem
 essa permissão, em vez de preencher dados fictícios.
+
+Ao abrir um livro, o cliente consulta `/api/v1/content/books/{id}/chapters`.
+O índice lateral usa a projeção de capítulos persistida e sua versão textual;
+quando a obra ainda não tem projeção, a interface informa essa condição em
+vez de fabricar capítulos. O texto reader-ready completo e a navegação Readium
+continuam dependentes da publicação de um artifact autorizado.
