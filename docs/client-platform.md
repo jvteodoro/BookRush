@@ -103,6 +103,8 @@ projeção textual disponível permanecem indisponíveis até a ingestão conclu
 artifact autorizado.
 
 O perfil autenticado é carregado de `GET /api/v1/profile`; nome, bio e estado
-público deixam de depender da lista de usuários do protótipo. A tela de
-privacidade persiste `isPublic` por `PUT /api/v1/profile`, mantendo as demais
-preferências como próximas extensões do contrato do serviço.
+público deixam de depender da lista de usuários do protótipo. A edição e a
+privacidade persistem por `PUT /api/v1/profile`. A administração exibe somente
+usuários e denúncias retornados pela facade, e decisões são registradas por
+`POST /api/v1/admin/moderation`; não há bloqueios ou métricas simuladas no
+cliente.

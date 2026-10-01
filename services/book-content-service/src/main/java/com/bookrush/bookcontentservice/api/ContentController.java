@@ -7,17 +7,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
+import com.bookrush.bookcontentservice.storage.ReaderArtifactStore;
 
 @RestController
 @RequestMapping("/api/v1/content")
 public class ContentController {
   private final RestClient catalog;
   private final String catalogServiceToken;
+  private final ReaderArtifactStore artifactStore;
   public ContentController(
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
-      @Value("${bookrush.catalog-service-token:}") String catalogServiceToken) {
+      @Value("${bookrush.catalog-service-token:}") String catalogServiceToken,
+      ReaderArtifactStore artifactStore) {
     catalog=RestClient.builder().baseUrl(url).build();
     this.catalogServiceToken = catalogServiceToken;
+    this.artifactStore = artifactStore;
   }
   @GetMapping("/books/{bookId}")
   public Map<String,Object> book(@PathVariable UUID bookId) {
@@ -56,8 +60,14 @@ public class ContentController {
       readingOrder.add(link);
       toc.add(link);
     }
-    return Map.of("@context", "http://readium.org/webpub-manifest/context.json",
-        "metadata", metadata(bookId), "readingOrder", readingOrder, "toc", toc);
+    var manifest = new LinkedHashMap<String, Object>();
+    manifest.put("@context", "http://readium.org/webpub-manifest/context.json");
+    manifest.put("metadata", metadata(bookId));
+    manifest.put("readingOrder", readingOrder);
+    manifest.put("toc", toc);
+    String artifactKey = artifactStore.persist(bookId.toString(), manifest);
+    if (artifactKey != null) manifest.put("bookrushArtifactKey", artifactKey);
+    return manifest;
   }
 
   @GetMapping(value = "/books/{bookId}/chapters/{chapterId}/content", produces = MediaType.TEXT_HTML_VALUE)

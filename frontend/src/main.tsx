@@ -44,6 +44,7 @@ type PageLoopBook = {
   id: string; title: string; author: string; genre: string; keywords: string[];
   match: number; a: string; b: string; quote: string; likes: number; comments: number;
   shares: number; pages: number; progress: number;
+  recommendationRequestId?: string; impressionId?: string; modelVersion?: string; rank?: number;
 };
 
 type RecommendationItem = {
@@ -67,6 +68,13 @@ async function loadCatalog(): Promise<CatalogBook[]> {
 
 async function loadLibrary(): Promise<string[]> {
   const response = await authClient.fetch('/api/v1/reader/library');
+  if (!response.ok) return [];
+  const rows = await response.json() as Array<{ book_id?: string; bookId?: string }>;
+  return rows.map(row => row.book_id ?? row.bookId).filter((id): id is string => Boolean(id));
+}
+
+async function loadRecent(): Promise<string[]> {
+  const response = await authClient.fetch('/api/v1/reader/recent');
   if (!response.ok) return [];
   const rows = await response.json() as Array<{ book_id?: string; bookId?: string }>;
   return rows.map(row => row.book_id ?? row.bookId).filter((id): id is string => Boolean(id));
@@ -112,10 +120,15 @@ function App() {
         const ordered = recommendations.map(item => item.book).filter((book): book is CatalogBook => Boolean(book && byId.has(book.id)));
         const source = ordered.length ? ordered : catalog;
         const palettes = [['#82d4a4', '#213e35'], ['#74b9ff', '#202b52'], ['#f0a8bd', '#5a2337'], ['#c7d87a', '#26311f'], ['#d2aa6d', '#4a2e1f']];
-        const books: PageLoopBook[] = source.map((book, index) => ({
+        const books: PageLoopBook[] = source.map((book, index) => {
+          const recommendation = recommendations.find(item => item.book?.id === book.id);
+          return {
           id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0,
-        }));
+          recommendationRequestId: recommendation?.recommendationRequestId, impressionId: recommendation?.impressionId, modelVersion: recommendation?.modelVersion, rank: recommendation?.rank,
+        };
+        });
         const saved = new Set(await loadLibrary());
+        const recent = await loadRecent();
         let submissions: unknown[] = [];
         try {
           const response = await authClient.fetch('/api/v1/publisher/submissions');
@@ -125,6 +138,7 @@ function App() {
           // an empty state instead of preventing the reader feed from loading.
         }
         (window as Window & { __BOOKRUSH_BOOKS__?: PageLoopBook[]; __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_BOOKS__ = books;
+        (window as Window & { __BOOKRUSH_RECENT__?: string[] }).__BOOKRUSH_RECENT__ = recent;
         (window as Window & { __BOOKRUSH_READIUM__?: ReadiumBridge }).__BOOKRUSH_READIUM__ = readiumBridge;
         (window as Window & { __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[] }).__BOOKRUSH_PUBLISHER_SUBMISSIONS__ = submissions;
         try {
@@ -141,6 +155,10 @@ function App() {
           (window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }).__BOOKRUSH_ADMIN_USERS__ = [];
           (window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }).__BOOKRUSH_ADMIN_REPORTS__ = [];
         }
+        try {
+          const streakResponse = await authClient.fetch('/api/v1/reader/streak');
+          (window as Window & { __BOOKRUSH_STREAK__?: unknown }).__BOOKRUSH_STREAK__ = streakResponse.ok ? await streakResponse.json() : null;
+        } catch { (window as Window & { __BOOKRUSH_STREAK__?: unknown }).__BOOKRUSH_STREAK__ = null; }
         (window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_API__ = {
           ...(window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_API__,
           saved,
@@ -186,6 +204,16 @@ function App() {
           adminReports: async () => {
             const response = await authClient.fetch('/api/v1/admin/reports');
             if (!response.ok) throw new Error('Não foi possível carregar as denúncias.');
+            return response.json();
+          },
+          adminAudit: async (action: string, target: string) => {
+            const response = await authClient.fetch('/api/v1/admin/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, target }) });
+            if (!response.ok) throw new Error('Não foi possível registrar a ação administrativa.');
+            return response.json();
+          },
+          adminModerate: async (target: string, decision: string) => {
+            const response = await authClient.fetch('/api/v1/admin/moderation', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, decision }) });
+            if (!response.ok) throw new Error('Não foi possível registrar a decisão de moderação.');
             return response.json();
           },
           publisherSubmissions: async () => {

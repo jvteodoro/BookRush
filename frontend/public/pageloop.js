@@ -4,25 +4,12 @@
 
   const BOOKS = window.__BOOKRUSH_BOOKS__ || [];
 
-  const USERS = [
-    {id:'u1',name:'Clara Nunes',handle:'@claralê',initials:'CN',bio:'Leio clássicos, ficção científica e qualquer coisa que tenha uma boa primeira frase.',followers:'18,4 mil',following:'524',books:'126',private:false},
-    {id:'u2',name:'Rafael Mori',handle:'@rafamori',initials:'RM',bio:'Fantasia, café e finais ambíguos.',followers:'7,8 mil',following:'302',books:'89',private:false},
-    {id:'u3',name:'Lia Campos',handle:'@liac',initials:'LC',bio:'Clube do livro aos domingos.',followers:'3,1 mil',following:'198',books:'57',private:true}
-  ];
-
-  const COMMENTS = [
-    {name:'Clara Nunes',initials:'CN',time:'2 min',text:'Esse trecho foi exatamente o que me fez abrir o livro. A atmosfera é ótima.'},
-    {name:'Rafael Mori',initials:'RM',time:'18 min',text:'A tradução muda bastante o ritmo, mas a ideia continua muito forte.'},
-    {name:'Maya Luz',initials:'ML',time:'1 h',text:'Salvei para começar no fim de semana 👀'},
-    {name:'Davi A.',initials:'DA',time:'3 h',text:'Alguém mais ficou preso nesse livro por causa de uma única citação?'}
-  ];
-
   const defaultState = {
     route: initialRoute,
     likes:{}, saved:Object.fromEntries(Array.from(window.__BOOKRUSH_API__?.saved || []).map(id=>[id,true])), followed:{}, blocked:{}, removedReports:{},
-    readerBook:'b1', readerPage: 43, readerSize:20, readerNight:false,
-    libraryTab:'saved', search:'', searchFilter:'Todos', streak:12, minutes:184, booksMonth:4,
-    privacy:{activity:true,library:true,streak:true,followers:true}, recent:['b3','b1','b5'], adminTab:'overview', publisherTab:'publish', otherUser:'u2',
+    readerBook:BOOKS[0]?.id||'', readerPage: 0, readerSize:20, readerNight:false,
+    libraryTab:'saved', search:'', searchFilter:'Todos', streak:0, minutes:0, booksMonth:0,
+    privacy:{activity:true,library:true,streak:true,followers:true}, recent:window.__BOOKRUSH_RECENT__||[], adminTab:'overview', publisherTab:'publish', otherUser:'',
     published:[{id:'p1',title:'Cidades de Vidro',author:'Editora Horizonte',views:128400,reads:34200,likes:18400,shares:3910,a:'#7e91ff',b:'#291c54'}]
   };
 
@@ -124,7 +111,7 @@
     return `<article class="feed-card" style="--cover-a:${b.a};--cover-b:${b.b}" data-book="${b.id}">
       <div class="feed-noise"></div>
       <div class="feed-copy">
-        <div class="feed-meta"><span class="genre-chip">${b.genre}</span><span class="match">${b.match}% para você</span><span>•</span><span>${Math.max(2,8-idx)} min de trecho</span></div>
+        <div class="feed-meta"><span class="genre-chip">${b.genre}</span><span class="match">${b.rank ? `posição ${b.rank}` : 'catálogo'}</span><span>•</span><span>${b.modelVersion ? esc(b.modelVersion) : 'conteúdo disponível'}</span></div>
         <div class="quote-mark">“</div><div class="feed-quote">${esc(b.quote)}</div>
         <div class="book-line"><div class="mini-cover"></div><div><strong>${esc(b.title)}</strong><span>${esc(b.author)}</span></div></div>
         <button class="primary-btn open-read" data-open-book="${b.id}">${icon('play','icon-sm')} Ler agora</button>
@@ -139,10 +126,10 @@
   }
 
   function renderFeed(){
+    const streak=Number((window.__BOOKRUSH_STREAK__||{}).currentDays||0);
     const main=`<div class="feed-layout"><section class="feed-stage"><div class="feed-scroll" id="feedScroll">${BOOKS.slice(0,6).map(feedCard).join('')}</div></section>
       <aside class="feed-side">
-        <div class="side-card"><div class="streak-row"><div class="streak-flame">🔥</div><div><h3>${state.streak} dias de sequência</h3><p>Mais 16 min hoje para manter seu ritmo.</p></div></div><div class="progress-track"><div class="progress-fill" style="width:68%"></div></div></div>
-        <div class="side-card"><h3>Seu radar de leitura</h3><p>O feed está priorizando temas que você costuma abrir e concluir.</p><div class="taste-row"><span class="taste">Clássicos 84%</span><span class="taste">Sci-fi 79%</span><span class="taste">Gótico 66%</span><span class="taste">Ensaios 54%</span></div></div>
+        <div class="side-card"><div class="streak-row"><div class="streak-flame">🔥</div><div><h3>${streak} dias de sequência</h3><p>Dados persistidos pelo reader-state-service.</p></div></div></div>
         <div class="side-card"><h3>Seu catálogo</h3><p>Este feed é composto pelo recommendation-service e registra request, impressão, modelo e posição para cada item.</p><div class="taste-row"><span class="taste">Dados reais</span><span class="taste">heuristic-v1</span></div></div>
         <div class="side-card"><h3>Leitura</h3><p>Abra um livro para registrar a abertura e continue pelo conteúdo reader-ready quando estiver disponível.</p></div>
       </aside></div>`;
@@ -160,13 +147,13 @@
     const fs=document.getElementById('feedScroll'); if(fs){document.onkeydown=e=>{if(!['ArrowDown','ArrowUp'].includes(e.key))return;fs.scrollBy({top:(e.key==='ArrowDown'?1:-1)*fs.clientHeight,behavior:'smooth'})}}
   }
 
-  function bookCard(b){return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">PAGELOOP EDITION</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.match}% match</span></div></article>`}
+  function bookCard(b){return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank?`posição ${b.rank}`:'disponível'}</span></div></article>`}
 
   function renderRecommendations(){
-    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">CURADORIA PERSONALIZADA</div><h1>Descubra sua próxima leitura</h1><p>Recomendações mockadas a partir do seu histórico de abertura, leitura e salvamentos.</p></div><button class="primary-btn" id="luckyBtn">${icon('sparkle')} Estou com sorte</button></div>
-      <section class="hero-strip"><div><div class="eyebrow">SEU PERFIL DE LEITURA</div><h2>Você tende a ficar mais tempo em narrativas contemplativas com tensão social.</h2><p>O protótipo usa esse resumo apenas como recurso visual. Num produto real, a recomendação seria explicável por sinais de uso e metadados dos livros.</p><div class="hero-actions"><span class="pill">Clássicos</span><span class="pill">Ficção científica</span><span class="pill">Atmosfera</span><span class="pill">Personagens complexos</span></div></div><div class="taste-orb"><div><div><strong>92</strong><span>afinidade média</span></div></div></div></section>
+    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">CURADORIA PERSONALIZADA</div><h1>Descubra sua próxima leitura</h1><p>Recomendações retornadas pelo recommendation-service e ordenadas pelo modelo ativo.</p></div><button class="primary-btn" id="luckyBtn">${icon('sparkle')} Estou com sorte</button></div>
+      <section class="hero-strip"><div><div class="eyebrow">SEU PERFIL DE LEITURA</div><h2>Descobertas baseadas no seu histórico real.</h2><p>As recomendações são retornadas pelo serviço e carregam a versão do modelo e a posição no ranking.</p><div class="hero-actions"><span class="pill">Catálogo</span><span class="pill">Histórico</span><span class="pill">Modelo ativo</span></div></div><div class="taste-orb"><div><div><strong>${BOOKS.length}</strong><span>itens disponíveis</span></div></div></div></section>
       <div class="section-row"><h2>Escolhidos para você</h2><button class="ghost-btn">Ajustar interesses</button></div><div class="book-grid">${BOOKS.slice(0,5).map(bookCard).join('')}</div>
-      <div class="section-row"><h2>Porque você gostou de Frankenstein</h2><span class="muted tiny">Baseado em temas e comportamento</span></div><div class="book-grid">${[BOOKS[8],BOOKS[4],BOOKS[1],BOOKS[6],BOOKS[2]].map(bookCard).join('')}</div></main>`;
+      <div class="section-row"><h2>Mais recomendações do seu feed</h2><span class="muted tiny">Baseado em temas e comportamento</span></div><div class="book-grid">${BOOKS.slice(5,10).map(bookCard).join('')}</div></main>`;
     shell(content,'Recomendações');
     document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));
     document.getElementById('luckyBtn').onclick=()=>{const b=BOOKS[Math.floor(Math.random()*BOOKS.length)];openLucky(b)};
@@ -197,7 +184,7 @@
     document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];save();renderSearch()});
   }
 
-  async function openBook(id){state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id);window.__BOOKRUSH_CHAPTERS__=await window.__BOOKRUSH_API__?.chapters?.(id)||[]}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.readerPage=book(id).progress||state.readerPage;state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);save();render();}
+  async function openBook(id){state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id);window.__BOOKRUSH_CHAPTERS__=await window.__BOOKRUSH_API__?.chapters?.(id)||[]}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);render();}
 
   function renderReader(){
     const b=book(state.readerBook); const content=`<div class="reader-shell ${state.readerNight?'night':''}" id="readerShell">
@@ -230,77 +217,76 @@
 
   function renderProfile(){
     const remote=window.__BOOKRUSH_PROFILE__||{};
-    const u={...USERS[0],name:remote.display_name||remote.displayName||USERS[0].name,bio:remote.bio||USERS[0].bio,handle:remote.subject_key||USERS[0].handle,private:remote.is_public===false};
-    const content=`<main class="content"><section class="profile-hero"><div class="profile-avatar">${u.initials}</div><div><div class="eyebrow">PERFIL PÚBLICO</div><h1>${u.name}</h1><p>${u.handle} • ${u.bio}</p><div class="profile-stats"><div><strong>${u.followers}</strong><span>seguidores</span></div><div><strong>${u.following}</strong><span>seguindo</span></div><div><strong>${u.books}</strong><span>livros</span></div></div></div><div class="profile-actions"><button class="secondary-btn" data-route="privacy">${icon('settings','icon-sm')} Privacidade</button><button class="secondary-btn" id="shareProfile">${icon('share','icon-sm')}</button></div></section>
-      <div class="section-row"><h2>Atividade compartilhada</h2><span class="muted tiny">Visível conforme preferências de privacidade</span></div><div class="activity-grid"><section class="activity-card"><h3>Atividade recente</h3>${[['Terminou','Orgulho e Preconceito','há 2 dias'],['Salvou','Frankenstein','há 4 dias'],['Curtiu um trecho de','Walden','há 1 semana']].map(a=>`<div class="activity-item"><div class="activity-dot"></div><div><p><strong>${a[0]}</strong> ${a[1]}</p><span>${a[2]}</span></div></div>`).join('')}</section><section class="activity-card"><h3>Gosto de leitura</h3><div class="taste-row"><span class="taste">Clássicos</span><span class="taste">Romance</span><span class="taste">Sci-fi</span><span class="taste">Gótico</span><span class="taste">Ensaios</span></div><div class="section-row" style="margin-top:24px"><h2 style="font-size:14px">Neste mês</h2></div><div class="profile-stats"><div><strong>4</strong><span>concluídos</span></div><div><strong>1.124</strong><span>páginas</span></div><div><strong>9h42</strong><span>leitura</span></div></div></section></div>
-      <div class="section-row"><h2>Livros favoritos</h2></div><div class="book-grid">${[BOOKS[2],BOOKS[4],BOOKS[5],BOOKS[0],BOOKS[8]].map(bookCard).join('')}</div></main>`;
-    shell(content,u.name);
+    const name=remote.display_name||remote.displayName||'Leitor BookRush';
+    const subject=remote.subject_key||remote.subject||'identidade autenticada';
+    const bio=remote.bio||'';
+    const isPublic=remote.is_public!==false && remote.isPublic!==false;
+    const content=`<main class="content"><section class="profile-hero"><div class="profile-avatar">${esc(name.slice(0,2).toUpperCase())}</div><div><div class="eyebrow">PERFIL PÚBLICO</div><h1>${esc(name)}</h1><p>${esc(subject)}</p><p class="muted">${esc(bio||'Adicione uma descrição ao seu perfil.')}</p></div><div class="profile-actions"><button class="secondary-btn" data-route="privacy">${icon('settings','icon-sm')} Privacidade</button><button class="secondary-btn" id="shareProfile">${icon('share','icon-sm')}</button></div></section>
+      <section class="form-card"><h3>Editar perfil</h3><form id="profileForm" class="form-grid"><div class="field full"><label for="profileName">Nome de exibição</label><input id="profileName" maxlength="160" value="${esc(name)}" /></div><div class="field full"><label for="profileBio">Biografia</label><textarea id="profileBio" maxlength="2000" rows="4">${esc(bio)}</textarea></div><div class="field full"><button class="primary-btn" type="submit">Salvar perfil</button><span id="profileStatus" class="muted tiny"></span></div></form></section></main>`;
+    shell(content,name);
     document.getElementById('shareProfile').onclick=()=>openShare('profile');
-    document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));
+    document.getElementById('profileForm').onsubmit=async e=>{e.preventDefault();const status=document.getElementById('profileStatus');try{status.textContent='Salvando…';window.__BOOKRUSH_PROFILE__=await window.__BOOKRUSH_API__?.updateProfile?.({displayName:document.getElementById('profileName').value.trim(),bio:document.getElementById('profileBio').value.trim(),isPublic});status.textContent='Perfil salvo';toast('Perfil atualizado')}catch(err){status.textContent='';toast(err.message||'Não foi possível salvar o perfil')}};
   }
 
   function renderPrivacy(){
-    const rows=[['activity','Atividade recente','Livros abertos, concluídos e interações'],['library','Biblioteca pública','Livros salvos e em andamento'],['streak','Sequência de leitura','Seu streak e minutos lidos'],['followers','Contagem de seguidores','Números de seguidores e seguindo']];
-    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">CONTROLE DE VISIBILIDADE</div><h1>Privacidade do perfil</h1><p>Escolha quais informações outros leitores podem visualizar.</p></div><button class="primary-btn" id="savePrivacy">Salvar alterações</button></div><div class="settings-grid"><section class="setting-card"><h3>Informações compartilhadas</h3>${rows.map(([k,t,d])=>`<div class="setting-row"><div><strong>${t}</strong><span>${d}</span></div><button class="switch ${state.privacy[k]?'on':''}" data-privacy="${k}" aria-label="Alternar ${t}"></button></div>`).join('')}</section><section class="setting-card"><h3>Prévia como visitante</h3><div class="privacy-preview"><strong>Clara Nunes</strong><br><span>@claralê</span><br><br>${state.privacy.activity?'✓ Atividade recente visível':'— Atividade ocultada'}<br>${state.privacy.library?'✓ Biblioteca visível':'— Biblioteca ocultada'}<br>${state.privacy.streak?'✓ Streak visível':'— Streak ocultado'}<br>${state.privacy.followers?'✓ Seguidores visíveis':'— Seguidores ocultados'}</div><div class="setting-row"><div><strong>Perfil privado</strong><span>Novos seguidores precisam de aprovação</span></div><button class="switch"></button></div><div class="setting-row"><div><strong>Permitir comentários</strong><span>Em trechos e atualizações públicas</span></div><button class="switch on"></button></div></section></div></main>`;
+    const current=window.__BOOKRUSH_PROFILE__||{};
+    const publicProfile=current.is_public!==false && current.isPublic!==false;
+    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">CONTROLE DE VISIBILIDADE</div><h1>Privacidade do perfil</h1><p>Esta configuração é persistida pelo reader-profile-service.</p></div><button class="primary-btn" id="savePrivacy">Salvar alterações</button></div><section class="settings-grid"><section class="setting-card"><div class="setting-row"><div><strong>Perfil público</strong><span>Permite que outros leitores encontrem seu perfil quando o contrato público estiver habilitado.</span></div><button class="switch ${publicProfile?'on':''}" id="publicProfile" aria-label="Alternar perfil público"></button></div><p class="muted">Preferências detalhadas de atividade, biblioteca e seguidores serão adicionadas quando os respectivos campos existirem no contrato.</p></section></section></main>`;
     shell(content,'Privacidade');
-    document.querySelectorAll('[data-privacy]').forEach(b=>b.onclick=()=>{state.privacy[b.dataset.privacy]=!state.privacy[b.dataset.privacy];renderPrivacy()});
-    document.getElementById('savePrivacy').onclick=async()=>{try{const current=window.__BOOKRUSH_PROFILE__||{};window.__BOOKRUSH_PROFILE__=await window.__BOOKRUSH_API__?.updateProfile?.({displayName:current.display_name||current.displayName||'',bio:current.bio||'',isPublic:state.privacy.followers});save();toast('Preferências de privacidade salvas')}catch(e){toast(e.message||'Não foi possível salvar as preferências')}};
-    document.querySelectorAll('.setting-card .switch:not([data-privacy])').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+    let enabled=publicProfile;
+    document.getElementById('publicProfile').onclick=()=>{enabled=!enabled;document.getElementById('publicProfile').classList.toggle('on',enabled)};
+    document.getElementById('savePrivacy').onclick=async()=>{try{window.__BOOKRUSH_PROFILE__=await window.__BOOKRUSH_API__?.updateProfile?.({displayName:current.display_name||current.displayName||'',bio:current.bio||'',isPublic:enabled});toast('Privacidade salva')}catch(e){toast(e.message||'Não foi possível salvar a privacidade')}};
   }
 
   function renderPlant(){
-    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">HÁBITO DE LEITURA</div><h1>Sua planta está crescendo</h1><p>Ela evolui com consistência, tempo de leitura e livros concluídos.</p></div></div><div class="plant-layout"><section class="plant-stage" id="plantStage"><div class="plant-title"><div class="eyebrow">NÍVEL 4</div><h2>Jasmim leitor</h2><p>Próxima folha em 26 minutos</p></div><div class="plant-glow"></div><div class="plant-pot"><div class="stem"></div><div class="leaf l1"></div><div class="leaf l2"></div><div class="leaf l3"></div><div class="leaf l4"></div><div class="sprout"></div><div class="pot"></div><span class="droplet" style="left:145px;top:60px"></span><span class="droplet" style="left:162px;top:44px;animation-delay:.12s"></span><span class="droplet" style="left:178px;top:69px;animation-delay:.22s"></span></div><button class="secondary-btn water-btn" id="waterBtn">💧 Regar</button></section><div class="stats-stack"><section class="plant-metric"><div class="eyebrow">SEQUÊNCIA ATUAL</div><div class="metric-number">${state.streak} dias</div><p>Seu melhor streak é de 19 dias.</p><div class="week-bars">${[73,42,90,65,100,48,82].map((h,i)=>`<div class="week-bar ${i<6?'done':''}" style="height:${h}%"></div>`).join('')}</div><div class="week-labels">${['S','T','Q','Q','S','S','D'].map(x=>`<span>${x}</span>`).join('')}</div></section><section class="plant-metric"><div class="eyebrow">ESTE MÊS</div><div class="metric-number">${state.minutes} min</div><p>${state.booksMonth} livros concluídos • 73% da meta mensal</p><div class="progress-track"><div class="progress-fill" style="width:73%"></div></div></section><section class="plant-metric"><div class="eyebrow">PRÓXIMA EVOLUÇÃO</div><div style="display:flex;justify-content:space-between;align-items:end"><div><div class="metric-number">74%</div><p>Continue lendo para desbloquear flores.</p></div><span style="font-size:38px">🌼</span></div></section></div></div></main>`;
+    const remote=window.__BOOKRUSH_STREAK__||{};
+    const days=Number(remote.currentDays||remote.current_days||0);
+    const minutes=Number(remote.minutesToday||remote.minutes_today||0);
+    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">HÁBITO DE LEITURA</div><h1>Sua planta de leitura</h1><p>Esta visão usa o streak persistido no reader-state-service.</p></div></div><section class="plant-metric"><div class="eyebrow">SEQUÊNCIA ATUAL</div><div class="metric-number">${days} dias</div><p>${minutes} minutos registrados hoje.</p><div class="notice">Dados de crescimento visual detalhado ainda dependem do contrato de projeção da planta.</div></section></main>`;
     shell(content,'Minha planta');
-    document.getElementById('waterBtn').onclick=()=>{const p=document.getElementById('plantStage');p.classList.remove('watering');void p.offsetWidth;p.classList.add('watering');toast('Sua planta agradeceu 🌱')};
   }
 
-  function renderOtherProfile(){
-    const u=USERS.find(x=>x.id===state.otherUser)||USERS[1];
-    const restricted=u.private && !state.followed[u.id];
-    const content=`<main class="content"><section class="profile-hero"><div class="profile-avatar">${u.initials}</div><div><div class="eyebrow">${u.private?'PERFIL PRIVADO':'PERFIL DE LEITOR'}</div><h1>${u.name}</h1><p>${u.handle} • ${u.bio}</p><div class="profile-stats"><div><strong>${u.followers}</strong><span>seguidores</span></div><div><strong>${u.following}</strong><span>seguindo</span></div><div><strong>${restricted?'—':u.books}</strong><span>livros</span></div></div></div><div class="profile-actions"><button class="primary-btn" id="otherFollow">${state.followed[u.id]?'Seguindo':u.private?'Solicitar':'Seguir'}</button><button class="secondary-btn" id="otherShare">${icon('share','icon-sm')}</button></div></section>
-      ${restricted?`<section class="locked-profile"><div class="lock-orb">${icon('shield','icon-xl')}</div><h2>Este perfil é privado</h2><p>Siga ${u.name.split(' ')[0]} para visualizar as atividades e a biblioteca compartilhada.</p></section>`:`<div class="section-row"><h2>Atividade compartilhada</h2><span class="muted tiny">Somente informações que ${u.name.split(' ')[0]} tornou públicas</span></div><div class="activity-grid"><section class="activity-card"><h3>Atividade recente</h3>${[['Começou a ler','A Máquina do Tempo','hoje'],['Curtiu um trecho de','Drácula','ontem'],['Terminou','O Jardim Secreto','há 5 dias']].map(a=>`<div class="activity-item"><div class="activity-dot"></div><div><p><strong>${a[0]}</strong> ${a[1]}</p><span>${a[2]}</span></div></div>`).join('')}</section><section class="activity-card"><h3>Interesses públicos</h3><div class="taste-row"><span class="taste">Fantasia</span><span class="taste">Sci-fi</span><span class="taste">Aventura</span></div><div class="profile-stats"><div><strong>7</strong><span>dias de streak</span></div><div><strong>3</strong><span>livros no mês</span></div></div></section></div><div class="section-row"><h2>Favoritos públicos</h2></div><div class="book-grid">${[BOOKS[1],BOOKS[5],BOOKS[8],BOOKS[7],BOOKS[0]].map(bookCard).join('')}</div>`}</main>`;
-    shell(content,u.name);
-    document.getElementById('otherFollow').onclick=async()=>{const enabled=!state.followed[u.id];try{await window.__BOOKRUSH_API__?.follow?.(u.id,enabled);state.followed[u.id]=enabled;renderOtherProfile();toast(enabled?(u.private?'Solicitação enviada':'Agora você segue este leitor'):'Você deixou de seguir este leitor')}catch(e){toast(e.message||'Não foi possível atualizar o acompanhamento')}};
-    document.getElementById('otherShare').onclick=()=>openShare('profile');
-    document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));
+    function renderOtherProfile(){
+    const content=`<main class="content"><section class="locked-profile"><div class="lock-orb">${icon('shield','icon-xl')}</div><h2>Perfil de outro leitor</h2><p>A consulta de perfis públicos será habilitada quando o contrato de descoberta social estiver disponível. Nenhum dado fictício é exibido.</p><button class="secondary-btn" data-route="feed">Voltar ao feed</button></section></main>`;
+    shell(content,'Perfil');
   }
 
-  function renderAdmin(){
+    function renderAdmin(){
+    const users=window.__BOOKRUSH_ADMIN_USERS__||[], reports=window.__BOOKRUSH_ADMIN_REPORTS__||[];
     const tabs=[['overview','Visão geral'],['users','Usuários'],['moderation','Moderação']];
     const tabbar=`<div class="tab-row admin-tabs">${tabs.map(([id,l])=>`<button class="tab-btn ${state.adminTab===id?'active':''}" data-admin-tab="${id}">${l}</button>`).join('')}</div>`;
     let body='';
-    if(state.adminTab==='overview') body=`<div class="dashboard-grid">${[['Usuários ativos','24,8 mil','+8,2%'],['Leituras iniciadas','81,4 mil','+12,6%'],['Comentários','9,2 mil','+4,1%'],['Denúncias abertas','18','−21%']].map(([l,v,c])=>`<article class="metric-card"><div class="metric-label"><span>${l}</span>${icon('chart','icon-sm')}</div><strong>${v}</strong><span class="metric-change">${c} nos últimos 30 dias</span></article>`).join('')}</div>
-      <div class="dashboard-panels"><section class="panel-card"><div class="section-row" style="margin:0"><h2>Atividade da plataforma</h2><span class="muted tiny">Últimos 7 dias</span></div>${chartMarkup()}</section><section class="panel-card"><h3>Distribuição de ações</h3><div class="donut"><div class="donut-center"><div><strong>184k</strong><span>ações</span></div></div></div><div class="legend"><span style="--dot:var(--cyan)">Leituras</span><span style="--dot:var(--violet)">Curtidas</span><span style="--dot:var(--pink)">Salvos</span><span style="--dot:#323640">Outras</span></div></section></div>`;
-    if(state.adminTab==='users') body=`<div class="page-heading compact-heading"><div><h2>Gerenciamento de usuários</h2><p>Visualize status e aplique ações de moderação mockadas.</p></div><div class="search-box mini-search">${icon('search','icon-sm')}<input id="adminUserSearch" placeholder="Buscar usuário..." /></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Usuário</th><th>Status</th><th>Livros</th><th>Seguidores</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody id="adminUsersBody">${adminUserRows()}</tbody></table></div>`;
-    if(state.adminTab==='moderation') body=`<div class="page-heading compact-heading"><div><h2>Fila de moderação</h2><p>Conteúdos denunciados pelos leitores para revisão.</p></div><span class="pill">${3-Object.keys(state.removedReports||{}).length} pendentes</span></div><div class="moderation-list">${moderationCards()}</div>`;
-    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">OPERAÇÃO DA REDE</div><h1>Administração</h1><p>Visão geral da comunidade, usuários e conteúdo denunciado.</p></div><button class="secondary-btn" id="exportAdmin">${icon('share','icon-sm')} Exportar relatório</button></div>${tabbar}${body}</main>`;
+    if(state.adminTab==='overview') body=`<div class="dashboard-grid"><article class="metric-card"><div class="metric-label"><span>Usuários consultáveis</span>${icon('user','icon-sm')}</div><strong>${users.length}</strong><span class="metric-change">retorno atual da facade administrativa</span></article><article class="metric-card"><div class="metric-label"><span>Denúncias abertas</span>${icon('warning','icon-sm')}</div><strong>${reports.length}</strong><span class="metric-change">fila persistida de moderação</span></article></div><section class="panel-card"><h3>Operação</h3><p class="muted">As métricas comportamentais detalhadas são fornecidas pelos serviços de behavior e analytics. Esta tela mostra somente dados retornados pela facade administrativa.</p></section>`;
+    if(state.adminTab==='users') body=`<div class="page-heading compact-heading"><div><h2>Gerenciamento de usuários</h2><p>Identidades e perfis retornados pela API administrativa.</p></div><div class="search-box mini-search">${icon('search','icon-sm')}<input id="adminUserSearch" placeholder="Buscar usuário..." /></div></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Usuário</th><th>Visibilidade</th><th>Atualizado</th><th>Ações</th></tr></thead><tbody id="adminUsersBody">${adminUserRows()}</tbody></table></div>`;
+    if(state.adminTab==='moderation') body=`<div class="page-heading compact-heading"><div><h2>Fila de moderação</h2><p>Decisões são persistidas no admin-service.</p></div><span class="pill">${reports.length} pendentes</span></div><div class="moderation-list">${moderationCards()}</div>`;
+    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">OPERAÇÃO DA REDE</div><h1>Administração</h1><p>Dados carregados do backend, sem valores de demonstração.</p></div></div>${tabbar}${body}</main>`;
     shell(content,'Administração');
     document.querySelectorAll('[data-admin-tab]').forEach(b=>b.onclick=()=>{state.adminTab=b.dataset.adminTab;save();renderAdmin()});
-    document.getElementById('exportAdmin').onclick=()=>toast('Relatório mockado exportado com sucesso');
     const input=document.getElementById('adminUserSearch'); if(input) input.oninput=()=>{document.getElementById('adminUsersBody').innerHTML=adminUserRows(input.value)};
     bindAdminActions();
   }
 
-  function chartMarkup(){
-    return `<div class="chart-area"><svg class="chart-svg" viewBox="0 0 680 240" preserveAspectRatio="none"><defs><linearGradient id="chartGradient" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#25e0d4"/><stop offset="1" stop-color="#8d6cff"/></linearGradient><linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#25e0d4"/><stop offset="1" stop-color="#25e0d4" stop-opacity="0"/></linearGradient></defs>${[40,90,140,190].map(y=>`<line class="chart-gridline" x1="0" y1="${y}" x2="680" y2="${y}"/>`).join('')}<path class="chart-fill" d="M0,185 C80,172 105,115 170,132 S265,78 340,92 S447,48 510,71 S605,46 680,35 L680,240 L0,240 Z"/><path class="chart-line" d="M0,185 C80,172 105,115 170,132 S265,78 340,92 S447,48 510,71 S605,46 680,35"/></svg></div><div class="chart-labels"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div>`;
-  }
-
   function adminUserRows(q=''){
     const remote=window.__BOOKRUSH_ADMIN_USERS__||[];
-    const list=(remote.length?remote.map(u=>({id:u.subject_key,name:u.display_name||u.subject_key,handle:u.subject_key,initials:(u.display_name||u.subject_key||'?').slice(0,2).toUpperCase(),books:'—',followers:'—'})):[...USERS]).filter(u=>(u.name+' '+u.handle).toLowerCase().includes(q.toLowerCase()));
-    return list.map((u,i)=>`<tr><td><div class="row-user"><div class="avatar">${u.initials}</div><div><strong>${u.name}</strong><div class="muted tiny">${u.handle}</div></div></div></td><td><span class="status ${state.blocked[u.id]?'bad':'ok'}">${state.blocked[u.id]?'Bloqueado':'Ativo'}</span></td><td>${u.books||57}</td><td>${u.followers||'—'}</td><td>${['Agora','12 min','1 h','Ontem','3 dias'][i%5]}</td><td><div class="table-actions"><button class="mini-btn" data-inspect-user="${u.id}">Detalhes</button><button class="mini-btn" data-block-user="${u.id}">${state.blocked[u.id]?'Desbloquear':'Bloquear'}</button></div></td></tr>`).join('');
+    return remote.filter(u=>String(u.display_name||u.subject_key||'').toLowerCase().includes(q.toLowerCase())).map(u=>{
+      const id=String(u.subject_key||''); const name=String(u.display_name||id); const initials=name.slice(0,2).toUpperCase();
+      return `<tr><td><div class="row-user"><div class="avatar">${esc(initials)}</div><div><strong>${esc(name)}</strong><div class="muted tiny">${esc(id)}</div></div></div></td><td>${u.is_public===false?'Privado':'Público'}</td><td>${esc(String(u.updated_at||'—'))}</td><td><button class="mini-btn" data-inspect-user="${esc(id)}">Detalhes</button></td></tr>`;
+    }).join('')||'<tr><td colspan="4" class="muted">Nenhum usuário retornado.</td></tr>';
   }
 
   function bindAdminActions(){
-    document.querySelectorAll('[data-block-user]').forEach(b=>b.onclick=()=>{state.blocked[b.dataset.blockUser]=!state.blocked[b.dataset.blockUser];save();renderAdmin();toast(state.blocked[b.dataset.blockUser]?'Usuário bloqueado':'Usuário desbloqueado')});
-    document.querySelectorAll('[data-inspect-user]').forEach(b=>b.onclick=()=>{const u=USERS.find(x=>x.id===b.dataset.inspectUser)||USERS[0];modal(`<div class="eyebrow">DETALHES DO USUÁRIO</div><h2>${u.name}</h2><p>${u.handle} • Conta criada há 11 meses</p><div class="profile-stats"><div><strong>${u.books||57}</strong><span>livros</span></div><div><strong>${u.followers||'—'}</strong><span>seguidores</span></div><div><strong>0</strong><span>strikes</span></div></div>`,`<button class="secondary-btn" data-close-modal>Fechar</button>`); bindModalClose();});
-    document.querySelectorAll('[data-report-action]').forEach(b=>b.onclick=()=>{const [act,id]=b.dataset.reportAction.split(':'); if(act==='remove')state.removedReports[id]=true; save();toast(act==='remove'?'Conteúdo removido':'Denúncia arquivada');renderAdmin();});
+    document.querySelectorAll('[data-inspect-user]').forEach(button=>button.onclick=()=>{
+      const id=button.dataset.inspectUser; const u=(window.__BOOKRUSH_ADMIN_USERS__||[]).find(x=>String(x.subject_key||'')===id);
+      if(!u)return;
+      modal(`<div class="eyebrow">DETALHES DO USUÁRIO</div><h2>${esc(String(u.display_name||id))}</h2><p>${esc(id)}</p><p>${u.is_public===false?'Perfil privado':'Perfil público'}</p>`,`<button class="secondary-btn" data-close-modal>Fechar</button>`); bindModalClose();
+    });
+    document.querySelectorAll('[data-report-action]').forEach(button=>button.onclick=async()=>{const [decision,id]=button.dataset.reportAction.split(':');try{await window.__BOOKRUSH_API__?.adminModerate?.(id,decision==='remove'?'REMOVE':'ARCHIVE');toast('Decisão registrada');const r=await window.__BOOKRUSH_API__?.adminReports?.();window.__BOOKRUSH_ADMIN_REPORTS__=r||[];renderAdmin();}catch(e){toast(e.message||'Não foi possível registrar a decisão')}});
   }
 
   function moderationCards(){
     const remote=window.__BOOKRUSH_ADMIN_REPORTS__||[];
     const reports=remote.length?remote.map(r=>[r.id,'Denúncia',r.book_id||'Livro',r.comment_id||'Comentário reportado',r.reason||'Motivo não informado']):[];
-    const visible=reports.filter(r=>!state.removedReports[r[0]]); if(!visible.length)return `<div class="empty-state"><div class="lock-orb">✓</div><h2>Fila limpa</h2><p>Não há denúncias pendentes neste mock.</p></div>`;
+    const visible=reports.filter(r=>!state.removedReports[r[0]]); if(!visible.length)return `<div class="empty-state"><div class="lock-orb">✓</div><h2>Fila limpa</h2><p>Não há denúncias pendentes.</p></div>`;
     return visible.map(r=>`<article class="report-card"><div class="report-head"><div><strong>${r[1]}</strong><span>${r[2]}</span></div><span>há ${r[0]==='r1'?'8 min':r[0]==='r2'?'31 min':'2 h'}</span></div><div class="report-quote">${r[3]}</div><div class="report-reason">Motivo informado: ${r[4]}</div><div class="report-actions"><button class="danger-btn" data-report-action="remove:${r[0]}">Remover conteúdo</button><button class="secondary-btn" data-report-action="archive:${r[0]}">Manter e arquivar</button></div></article>`).join('');
   }
 

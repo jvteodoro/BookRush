@@ -24,6 +24,13 @@ The web client mounts Readium's `WebPubNavigator`. Books without a projected
 text version return an empty reading order and the UI reports that reader-ready
 content is unavailable; it never substitutes sample paragraphs.
 
+When S3-compatible storage credentials are configured, each manifest snapshot
+is also written to `reader-ready/{bookId}/manifest-{sha256}.json` in the public
+artifact bucket. The key is content-addressed and includes the format metadata,
+so recomputation is idempotent. If storage is unavailable, the API remains
+usable for local development but reports the manifest as an ephemeral response;
+production should configure storage and monitor the persistence failure logs.
+
 `GET /api/v1/content/books/{bookId}/chapters` exposes the persisted chapter
 projection (code-point offsets, hierarchy and text-version lineage) from the
 catalog owner. It does not expose database credentials or bypass asset

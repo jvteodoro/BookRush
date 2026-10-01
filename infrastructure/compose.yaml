@@ -358,6 +358,12 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
       CATALOG_URL: http://catalog-service:8080
       CATALOG_SERVICE_TOKEN: ${CATALOG_READER_INTERNAL_TOKEN:-${CANONICAL_SERVICE_TOKEN:-}}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
+      STORAGE_PATH_STYLE: ${STORAGE_PATH_STYLE:-true}
+      STORAGE_BUCKET_PUBLIC: ${STORAGE_BUCKET_PUBLIC:-books-public}
     depends_on:
       postgres:
         condition: service_healthy

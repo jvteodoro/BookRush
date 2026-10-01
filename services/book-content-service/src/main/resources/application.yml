@@ -13,3 +13,11 @@ bookrush:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
   catalog-service-token: ${CATALOG_SERVICE_TOKEN:}
+
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:}
+    region: ${STORAGE_REGION:us-east-1}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    path-style: ${STORAGE_PATH_STYLE:true}
+    bucket: ${STORAGE_BUCKET_PUBLIC:books-public}
