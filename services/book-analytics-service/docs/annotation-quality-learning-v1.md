@@ -44,6 +44,8 @@ GET  /api/admin/v1/annotation/campaigns/{id}/datasets/{version}/export
 O subject vem do JWT validado. O browser não pode escolher o annotator. Os
 grupos Keycloak `excerpt-annotators`, `excerpt-reviewers`, `operators`,
 `platform-admins` são convertidos em authorities específicas do serviço.
+O primeiro-screen retorna o texto e seu hash, mas não retorna rank, NLI,
+protótipos ou embeddings; esses dados continuam ocultos até o lock.
 
 ## Piloto
 
