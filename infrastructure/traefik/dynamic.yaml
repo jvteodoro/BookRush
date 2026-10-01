@@ -77,6 +77,21 @@ http:
       entryPoints: [web]
       priority: 125
       service: behavior
+    publisher:
+      rule: PathPrefix(`/api/v1/publisher`)
+      entryPoints: [web]
+      priority: 130
+      service: publisher
+    social:
+      rule: PathPrefix(`/api/v1/social`)
+      entryPoints: [web]
+      priority: 130
+      service: social
+    profile:
+      rule: PathPrefix(`/api/v1/profile`)
+      entryPoints: [web]
+      priority: 130
+      service: profile
     content:
       rule: PathPrefix(`/api/v1/content`)
       entryPoints: [web]
@@ -129,6 +144,15 @@ http:
     behavior:
       loadBalancer:
         servers: [{url: http://behavior-service:8097}]
+    publisher:
+      loadBalancer:
+        servers: [{url: http://publisher-service:8099}]
+    social:
+      loadBalancer:
+        servers: [{url: http://social-service:8096}]
+    profile:
+      loadBalancer:
+        servers: [{url: http://reader-profile-service:8095}]
     content:
       loadBalancer:
         servers: [{url: http://book-content-service:8093}]

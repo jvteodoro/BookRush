@@ -81,7 +81,16 @@ function App() {
           id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0,
         }));
         const saved = new Set(await loadLibrary());
+        let submissions: unknown[] = [];
+        try {
+          const response = await authClient.fetch('/api/v1/publisher/submissions');
+          if (response.ok) submissions = await response.json() as unknown[];
+        } catch {
+          // Publisher access is optional for reader accounts; the portal shows
+          // an empty state instead of preventing the reader feed from loading.
+        }
         (window as Window & { __BOOKRUSH_BOOKS__?: PageLoopBook[]; __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_BOOKS__ = books;
+        (window as Window & { __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[] }).__BOOKRUSH_PUBLISHER_SUBMISSIONS__ = submissions;
         (window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_API__ = {
           ...(window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_API__,
           saved,
@@ -109,6 +118,23 @@ function App() {
           profile: async () => {
             const response = await authClient.fetch('/api/v1/profile');
             return response.ok ? response.json() : null;
+          },
+          publisherSubmissions: async () => {
+            const response = await authClient.fetch('/api/v1/publisher/submissions');
+            if (!response.ok) throw new Error('Não foi possível carregar suas publicações.');
+            return response.json();
+          },
+          createSubmission: async (title: string) => {
+            const response = await authClient.fetch('/api/v1/publisher/submissions', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }),
+            });
+            if (!response.ok) throw new Error('Não foi possível salvar o rascunho.');
+            return response.json();
+          },
+          submitSubmission: async (id: string) => {
+            const response = await authClient.fetch(`/api/v1/publisher/submissions/${encodeURIComponent(id)}/submit`, { method: 'POST' });
+            if (!response.ok) throw new Error('Não foi possível enviar a publicação para revisão.');
+            return response.json();
           },
           progress: async (id: string, percent: number, positionCodepoint: number) => {
             await authClient.fetch(`/api/v1/reader/books/${encodeURIComponent(id)}/progress`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ percent, positionCodepoint }) });

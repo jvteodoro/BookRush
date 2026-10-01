@@ -46,3 +46,12 @@ O SDK `frontend/src/telemetry.ts` mantém uma fila em memória, envia lotes ao
 behavior-service com retry limitado e suporta impressão por
 `IntersectionObserver` e dwell. Payloads são reduzidos por allowlist
 estrutural, sem texto livre, tokens ou identificadores pessoais.
+
+O portal PageLoop também consulta o `publisher-service` quando o usuário
+autenticado abre a área de publicador. Rascunhos e submissões são criados e
+enviados por `POST /api/v1/publisher/submissions` e
+`POST /api/v1/publisher/submissions/{id}/submit`; a lista persistida vem de
+`GET /api/v1/publisher/submissions`. Essas rotas são encaminhadas pelo
+Traefik diretamente ao serviço de publicações, sem passar pelo catálogo.
+Métricas editoriais ainda dependem do contrato de analytics do publicador e
+não são inventadas pelo frontend.
