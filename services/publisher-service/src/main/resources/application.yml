@@ -13,6 +13,9 @@ management:
   endpoints.web.exposure.include: health,info,metrics
 publisher:
   ingestion-callback-token: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:}
+  ingestion:
+    url: ${PUBLISHER_INGESTION_URL:http://book-ingestion-service:8090}
+    token: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:}
   behavior-url: ${PUBLISHER_BEHAVIOR_URL:http://behavior-service:8097}
   storage:
     enabled: ${PUBLISHER_STORAGE_ENABLED:false}

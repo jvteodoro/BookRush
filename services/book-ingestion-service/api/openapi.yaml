@@ -13,6 +13,34 @@ tags:
   description: Executa e acompanha importações controladas. Requer JWT do Keycloak
     com role OPERATOR, REVIEWER ou CLEANUP conforme a operação.
 paths:
+  /api/internal/v1/ingestion/publisher-submissions/process:
+    post:
+      summary: Processar objeto finalizado de publisher
+      description: Endpoint interno protegido por credencial entre containers.
+      parameters:
+      - name: X-BookRush-Ingestion-Token
+        in: header
+        required: true
+        schema: {type: string, format: password}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [submissionId, title, objectKey, contentType]
+              properties:
+                submissionId: {type: string, format: uuid}
+                title: {type: string}
+                objectKey: {type: string}
+                bucket: {type: string}
+                contentType: {type: string}
+                sha256: {type: string}
+                ingestionJobId: {type: string, format: uuid}
+      responses:
+        '200': {description: Asset canônico criado e vínculo confirmado}
+        '401': {description: Credencial inválida}
+        '422': {description: Hash do objeto divergente}
   /api/admin/v1/operations/requeue-expired:
     post:
       tags:

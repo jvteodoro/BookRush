@@ -19,6 +19,12 @@ O staging permanece opt-in: habilite `PUBLISHER_STORAGE_ENABLED=true` somente qu
 O cliente S3 usa acesso path-style para SeaweedFS; isso evita resolução virtual-host
 de `bucket.seaweedfs` dentro da rede Compose.
 
+Quando o upload finalizado é submetido para revisão, o publisher chama o
+`book-ingestion-service` pela rede interna. O ingestion baixa o objeto do bucket
+privado de staging, verifica o SHA-256, cria a referência canônica `ADMIN_UPLOAD`,
+envia o asset SOURCE ao catálogo e confirma o `catalogBookId` pelo callback
+idempotente. O fluxo não publica o binário nem expõe o bucket.
+
 Uma submissão pode receber `catalogBookId` quando a canonização confirmar o
 livro. `GET /api/v1/publisher/submissions/{id}/metrics` então consulta os
 agregados diários do behavior-service e devolve apenas dados do livro ligado à

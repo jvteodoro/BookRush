@@ -33,13 +33,18 @@ public final class CatalogAssetClient {
 
   public Map<?, ?> uploadSource(
       UUID bookId, UUID editionId, UUID sourceId, Path file, String filename) {
+    return uploadSource(bookId, editionId, sourceId, file, filename, "EPUB");
+  }
+
+  public Map<?, ?> uploadSource(
+      UUID bookId, UUID editionId, UUID sourceId, Path file, String filename, String type) {
     String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
     MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
     form.add("sourceId", sourceId.toString());
     form.add("editionId", editionId.toString());
-    form.add("type", "EPUB");
+    form.add("type", type);
     form.add("role", "SOURCE");
-    form.add("file", filePart(file, MediaType.parseMediaType("application/epub+zip")));
+    form.add("file", filePart(file, mediaType(type)));
     try {
       var existing =
           client
@@ -51,7 +56,7 @@ public final class CatalogAssetClient {
       for (Object value : existing == null ? java.util.List.of() : existing) {
         if (!(value instanceof Map<?, ?> item)
             || !"SOURCE".equals(String.valueOf(item.get("role")))
-            || !"EPUB".equals(String.valueOf(item.get("type")))) continue;
+            || !type.equals(String.valueOf(item.get("type")))) continue;
         // An old partial import may have created an asset for another edition.
         // Never append a version to that asset: the catalog validates the
         // edition/source lineage on every version request.
@@ -115,6 +120,8 @@ public final class CatalogAssetClient {
     return switch (type.toUpperCase(java.util.Locale.ROOT)) {
       case "TXT" -> MediaType.TEXT_PLAIN;
       case "JSON" -> MediaType.APPLICATION_JSON;
+      case "PDF" -> MediaType.APPLICATION_PDF;
+      case "EPUB" -> MediaType.parseMediaType("application/epub+zip");
       default -> MediaType.APPLICATION_OCTET_STREAM;
     };
   }

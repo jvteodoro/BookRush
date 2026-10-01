@@ -45,8 +45,12 @@ public class IngestionSecurityConfiguration {
                         "/api/admin/v1/ingestion/jobs/*/cancel",
                         "/api/admin/v1/ingestion/jobs/*/resume")
                     .hasAnyRole("OPERATOR", "CLEANUP")
+                    .requestMatchers("/api/internal/v1/ingestion/publisher-submissions/**")
+                    .permitAll()
                     .requestMatchers("/api/admin/v1/ingestion/**")
                     .hasAnyRole("OPERATOR", "REVIEWER", "CLEANUP")
+                    .requestMatchers("/api/internal/v1/ingestion/publisher-submissions/**")
+                    .permitAll()
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(
@@ -107,6 +111,8 @@ public class IngestionSecurityConfiguration {
                     .permitAll()
                     .requestMatchers("/api/admin/v1/ingestion/**")
                     .hasAnyRole("OPERATOR", "REVIEWER", "CLEANUP")
+                    .requestMatchers("/api/internal/v1/ingestion/publisher-submissions/**")
+                    .permitAll()
                     .anyRequest()
                     .denyAll())
         .build();

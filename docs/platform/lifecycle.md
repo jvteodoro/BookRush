@@ -48,3 +48,11 @@ dependências e timeout, configuração pública separada de segredo, comando
 `reconcile`, smoke local e procedimento de backup/restore. O serviço deve
 documentar se autentica por OIDC, SAML, credencial de máquina ou não possui
 interface humana. Não criar um script paralelo ao lifecycle existente.
+
+O fluxo de publicação também participa do lifecycle: `publisher-service` e
+`book-ingestion-service` compartilham somente a credencial de máquina
+`PUBLISHER_INGESTION_CALLBACK_TOKEN`. O publisher mantém o upload no bucket
+privado até o submit; então a ingestão baixa, valida o hash, grava o asset no
+catálogo e confirma o vínculo. Rebuild não recupera objetos de staging; restore
+deve incluir o bucket privado e o `.env` autorizado quando houver submissões
+pendentes.
