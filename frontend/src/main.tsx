@@ -14,7 +14,9 @@ type PageLoopBook = {
 async function loadCatalog(): Promise<CatalogBook[]> {
   // O catálogo de leitura possui uma rota pública própria; a rota internal é
   // reservada para operadores e devolve 401 ao leitor autenticado.
-  const response = await authClient.fetch('/api/v1/books?page=0&size=50');
+  // Esta é uma leitura pública. Não anexe um token possivelmente expirado:
+  // um Bearer inválido transforma uma leitura pública em 401 no resource server.
+  const response = await fetch('/api/v1/books?page=0&size=50', { credentials: 'same-origin' });
   if (!response.ok) throw new Error(response.status === 401 ? 'Sua sessão expirou. Entre novamente.' : `Catálogo indisponível (HTTP ${response.status}).`);
   const page = await response.json() as { items: CatalogBook[] };
   return page.items;
