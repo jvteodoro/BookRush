@@ -6,7 +6,8 @@ localmente com Docker Compose quanto em Kubernetes.
 ## Estrutura
 
 - `services/`: microsserviços Java independentes.
-- `frontend/`: aplicação React entregue pelo Nginx.
+- `frontend/`: aplicação React cliente, responsiva, entregue pelo Nginx; usa OIDC e o catálogo real.
+- `mobile/`: aplicação React Native/Expo para Android/iOS, com o mesmo contrato de catálogo.
 - `admin-web/`: console administrativa React para catálogo, ingestão, analytics e Feed Lab.
 - `infrastructure/compose.yaml`: ambiente local completo (PostgreSQL, Redis,
   backend, frontend e Jenkins).
@@ -105,10 +106,11 @@ docker compose -f infrastructure/compose.yaml --env-file .env up -d --build --wa
 ```
 
 Abra `http://127.0.0.1:18080` no servidor ou o domínio configurado no proxy
-reverso. A tela React consulta `GET /api/status`, e a API Java executa
-`SELECT 1` no PostgreSQL. O botão **Testar conexão novamente** repete a
-verificação. A API retorna HTTP 503 quando não consegue consultar o banco;
-a tela informa a falha, sem confirmar uma conexão inexistente.
+reverso. O frontend React autentica com Keycloak e consulta o catálogo em
+`GET /api/internal/v1/catalog/books`. A busca, a estante local e os detalhes
+funcionam diretamente sobre os dados publicados pelo catálogo; a API continua
+sendo responsável por autorização. O aplicativo mobile equivalente está em
+`mobile/` e pode gerar um APK com Expo.
 
 ```bash
 curl --fail http://127.0.0.1:18080/api/status

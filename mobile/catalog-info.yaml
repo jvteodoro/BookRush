@@ -1,15 +1,14 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: bookrush-frontend
-  description: Cliente BookRush responsivo para descoberta e estante de livros.
+  name: bookrush-mobile
+  description: Aplicativo React Native/Expo para descoberta e estante BookRush.
   annotations:
     backstage.io/techdocs-ref: dir:.
-    github.com/project-slug: jvteodoro/BookRush
 spec:
-  type: website
+  type: mobile-app
   lifecycle: experimental
   owner: group:default/book-platform
   system: book-catalog
   consumesApis:
-  - catalog-api
+    - catalog-api

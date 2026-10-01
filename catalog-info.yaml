@@ -22,6 +22,7 @@ spec:
   - ./services/book-ingestion-service/catalog-info.yaml
   - ./services/book-analytics-service/catalog-info.yaml
   - ./frontend/catalog-info.yaml
+  - ./mobile/catalog-info.yaml
   - ./admin-web/catalog-info.yaml
   - ./backstage/catalog-info.yaml
   - ./platform/catalog-info.yaml

@@ -29,6 +29,8 @@ COPY services/book-analytics-service/docs /repo/services/book-analytics-service/
 COPY services/book-analytics-service/api /repo/services/book-analytics-service/api
 COPY frontend/catalog-info.yaml frontend/mkdocs.yml /repo/frontend/
 COPY frontend/docs /repo/frontend/docs
+COPY mobile/catalog-info.yaml mobile/mkdocs.yml /repo/mobile/
+COPY mobile/docs /repo/mobile/docs
 COPY admin-web/catalog-info.yaml admin-web/mkdocs.yml /repo/admin-web/
 COPY admin-web/docs /repo/admin-web/docs
 FROM source AS validation

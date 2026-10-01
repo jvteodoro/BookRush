@@ -3,11 +3,21 @@
   "enabled": true,
   "roles": {
     "realm": [
-      {"name": "READER"},
-      {"name": "OPERATOR"},
-      {"name": "REVIEWER"},
-      {"name": "CLEANUP"},
-      {"name": "ASSET_ADMIN"}
+      {
+        "name": "READER"
+      },
+      {
+        "name": "OPERATOR"
+      },
+      {
+        "name": "REVIEWER"
+      },
+      {
+        "name": "CLEANUP"
+      },
+      {
+        "name": "ASSET_ADMIN"
+      }
     ]
   },
   "clients": [
@@ -35,8 +45,12 @@
       "publicClient": true,
       "directAccessGrantsEnabled": false,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:18090/*"],
-      "webOrigins": ["http://localhost:18090"],
+      "redirectUris": [
+        "http://localhost:18090/*"
+      ],
+      "webOrigins": [
+        "http://localhost:18090"
+      ],
       "protocolMappers": [
         {
           "name": "bookrush-ingestion-audience",
@@ -56,6 +70,22 @@
       "serviceAccountsEnabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret"
+    },
+    {
+      "clientId": "bookrush-mobile",
+      "name": "BookRush Mobile",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "bookrush://callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
     }
   ]
 }

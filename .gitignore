@@ -47,3 +47,9 @@ infrastructure/kubernetes/base/db-secret.yaml
 
 # Database/storage backups contain operational data
 /backups/
+
+# Expo local state and mobile secrets
+mobile/.env
+mobile/.expo/
+mobile/android/
+mobile/ios/

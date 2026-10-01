@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "BookRush",
+    "slug": "bookrush",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "bookrush",
+    "userInterfaceStyle": "light",
+    "splash": { "backgroundColor": "#f7f7f2" },
+    "android": { "package": "br.com.bookrush.reader" },
+    "ios": { "bundleIdentifier": "br.com.bookrush.reader" }
+  }
+}
