@@ -18,4 +18,12 @@ public class ContentController {
     if(found==null) return Map.of("bookId",bookId,"status","CONTENT_NOT_AVAILABLE");
     return Map.of("book",found,"bookId",bookId,"status","CATALOG_METADATA_AVAILABLE","source","catalog-service");
   }
+  @GetMapping("/books/{bookId}/assets")
+  public Object readerAssets(@PathVariable UUID bookId) {
+    return catalog.get().uri("/api/v1/books/{id}/reader-assets", bookId).retrieve().body(Object.class);
+  }
+  @GetMapping("/books/{bookId}/assets/{assetId}/download-url")
+  public Object downloadUrl(@PathVariable UUID bookId, @PathVariable UUID assetId) {
+    return catalog.get().uri("/api/v1/books/{bookId}/reader-assets/{assetId}/download-url", bookId, assetId).retrieve().body(Object.class);
+  }
 }
