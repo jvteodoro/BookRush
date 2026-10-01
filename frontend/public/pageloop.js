@@ -2,20 +2,7 @@
   const mode = document.body.dataset.mode || 'web';
   const initialRoute = document.body.dataset.start || 'feed';
 
-  const DEFAULT_BOOKS = [
-    {id:'b1',title:'O Jardim Secreto',author:'Frances Hodgson Burnett',genre:'Clássico',keywords:['natureza','amizade','infância'],match:96,a:'#82d4a4',b:'#213e35',quote:'Se você olhar do jeito certo, verá que o mundo inteiro é um jardim.',likes:12840,comments:321,shares:1490,pages:286,progress:43},
-    {id:'b2',title:'A Máquina do Tempo',author:'H. G. Wells',genre:'Ficção científica',keywords:['tempo','futuro','sociedade'],match:93,a:'#74b9ff',b:'#202b52',quote:'Não podemos ver o que está à nossa frente até que sejamos capazes de olhar além do presente.',likes:9420,comments:258,shares:1120,pages:192,progress:18},
-    {id:'b3',title:'Orgulho e Preconceito',author:'Jane Austen',genre:'Romance',keywords:['relações','sociedade','ironia'],match:91,a:'#f0a8bd',b:'#5a2337',quote:'Há poucas pessoas que eu realmente amo, e menos ainda sobre as quais penso bem.',likes:20300,comments:512,shares:2780,pages:432,progress:72},
-    {id:'b4',title:'Frankenstein',author:'Mary Shelley',genre:'Gótico',keywords:['ciência','ética','solidão'],match:89,a:'#c7d87a',b:'#26311f',quote:'Nada é tão doloroso para a mente humana quanto uma grande e súbita mudança.',likes:11590,comments:401,shares:2050,pages:280,progress:8},
-    {id:'b5',title:'O Retrato de Dorian Gray',author:'Oscar Wilde',genre:'Drama',keywords:['estética','sociedade','moral'],match:88,a:'#d2aa6d',b:'#4a2e1f',quote:'A única maneira de se livrar de uma tentação é ceder a ela.',likes:16820,comments:444,shares:2310,pages:254,progress:61},
-    {id:'b6',title:'Alice no País das Maravilhas',author:'Lewis Carroll',genre:'Fantasia',keywords:['absurdo','imaginação','aventura'],match:86,a:'#86d9e8',b:'#3a2458',quote:'Se você não sabe para onde está indo, qualquer caminho pode levá-lo até lá.',likes:17550,comments:478,shares:2980,pages:176,progress:27},
-    {id:'b7',title:'Walden',author:'Henry David Thoreau',genre:'Ensaio',keywords:['natureza','simplicidade','reflexão'],match:84,a:'#b3cf8f',b:'#35412b',quote:'Fui para os bosques porque desejava viver deliberadamente.',likes:6080,comments:144,shares:620,pages:352,progress:0},
-    {id:'b8',title:'O Chamado da Selva',author:'Jack London',genre:'Aventura',keywords:['natureza','sobrevivência','jornada'],match:82,a:'#d6b382',b:'#3a3430',quote:'A vida não era uma questão de sonho, mas de ação.',likes:7740,comments:189,shares:830,pages:160,progress:0},
-    {id:'b9',title:'Drácula',author:'Bram Stoker',genre:'Gótico',keywords:['mistério','terror','viagem'],match:80,a:'#b14e55',b:'#1c1d28',quote:'Há escuridões na vida e há luzes, e você é uma das luzes.',likes:13220,comments:389,shares:1670,pages:418,progress:34},
-    {id:'b10',title:'A Ilha do Tesouro',author:'Robert Louis Stevenson',genre:'Aventura',keywords:['piratas','mar','coragem'],match:78,a:'#65b4af',b:'#51422f',quote:'O mar nunca foi amigo do homem. No máximo foi cúmplice de sua inquietação.',likes:5310,comments:112,shares:510,pages:240,progress:0}
-  ];
-
-  const BOOKS = window.__BOOKRUSH_BOOKS__ || DEFAULT_BOOKS;
+  const BOOKS = window.__BOOKRUSH_BOOKS__ || [];
 
   const USERS = [
     {id:'u1',name:'Clara Nunes',handle:'@claralê',initials:'CN',bio:'Leio clássicos, ficção científica e qualquer coisa que tenha uma boa primeira frase.',followers:'18,4 mil',following:'524',books:'126',private:false},
@@ -32,14 +19,14 @@
 
   const defaultState = {
     route: initialRoute,
-    likes:{}, saved:{b3:true,b5:true}, followed:{}, blocked:{}, removedReports:{},
+    likes:{}, saved:Object.fromEntries(Array.from(window.__BOOKRUSH_API__?.saved || []).map(id=>[id,true])), followed:{}, blocked:{}, removedReports:{},
     readerBook:'b1', readerPage: 43, readerSize:20, readerNight:false,
     libraryTab:'saved', search:'', searchFilter:'Todos', streak:12, minutes:184, booksMonth:4,
     privacy:{activity:true,library:true,streak:true,followers:true}, recent:['b3','b1','b5'], adminTab:'overview', publisherTab:'publish', otherUser:'u2',
     published:[{id:'p1',title:'Cidades de Vidro',author:'Editora Horizonte',views:128400,reads:34200,likes:18400,shares:3910,a:'#7e91ff',b:'#291c54'}]
   };
 
-  const persisted = JSON.parse(localStorage.getItem('bookrush-client-state') || '{}');
+  const persisted = {}; // estado de interface vive em memória; dados do produto ficam nas APIs
   const state = Object.assign({}, defaultState, persisted, {route: initialRoute});
   state.privacy = Object.assign({}, defaultState.privacy, persisted.privacy || {});
 
@@ -74,7 +61,7 @@
   function esc(s=''){return String(s).replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
   function compact(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace('.',',')+' mil':String(n)}
   function book(id){return BOOKS.find(b=>b.id===id)||BOOKS[0]}
-  function save(){const copy={...state};delete copy.route;localStorage.setItem('bookrush-client-state',JSON.stringify(copy));}
+  function save(){const copy={...state};delete copy.route;void copy; // persistência de produto é feita pelo backend}
   function toast(msg){const stack=document.querySelector('.toast-stack')||document.body.appendChild(Object.assign(document.createElement('div'),{className:'toast-stack'}));const t=document.createElement('div');t.className='toast';t.textContent=msg;stack.appendChild(t);setTimeout(()=>t.remove(),2300)}
 
   const NAV = [
@@ -210,7 +197,7 @@
     document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];save();renderSearch()});
   }
 
-  function openBook(id){state.readerBook=id;state.route='reader';state.readerPage=book(id).progress||state.readerPage;state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);save();render();}
+  async function openBook(id){state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.open?.(id)}catch(e){toast(e.message||'Não foi possível abrir o livro')} state.readerPage=book(id).progress||state.readerPage;state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);save();render();}
 
   const PARAS = [
     'A manhã entrou pela janela com a delicadeza de quem não queria interromper nada. Havia um silêncio incomum no jardim, interrompido apenas pelas folhas que se tocavam com o vento.',

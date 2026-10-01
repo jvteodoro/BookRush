@@ -1,6 +1,6 @@
 # Cliente BookRush
 
-O cliente web do BookRush é uma SPA React responsiva inspirada na linguagem visual validada no protótipo PageLoop. O protótipo foi usado como referência de experiência; o cliente usa o catálogo e a autenticação reais do BookRush.
+O cliente web do BookRush é uma SPA React responsiva que carrega o shell original do protótipo PageLoop depois de autenticar. Assim, sidebar, feed, recomendações, busca, biblioteca, leitor, perfil e navegação mobile mantêm a experiência de referência, enquanto livros e ações de biblioteca usam as APIs reais do BookRush.
 
 ## Capacidades atuais
 
@@ -25,10 +25,12 @@ npm run build
 
 A configuração OIDC pode ser sobrescrita com `VITE_OIDC_AUTHORITY` e `VITE_OIDC_CLIENT_ID`. O cliente padrão é `bookrush-web`, provisionado em `infrastructure/keycloak/bookrush-realm.json`.
 
-O layout atual reproduz a linguagem visual do PageLoop diretamente em React
-(capas, abas, busca, biblioteca e modal de leitura). Não carrega `pageloop.js`,
-arrays de demonstração ou `localStorage` como fonte de dados: livros, biblioteca
-e eventos vêm das APIs reais.
+O shell visual é [`public/pageloop.js`](../public/pageloop.js) e seu CSS de
+referência. `src/main.tsx` faz a ponte autenticada: injeta os livros retornados
+por `GET /api/internal/v1/catalog/books`, carrega a biblioteca e fornece as
+ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
+fallback e não usa `localStorage` como fonte de dados; estado transitório da
+interface permanece em memória e dados de produto ficam no backend.
 
 ## Mobile
 
