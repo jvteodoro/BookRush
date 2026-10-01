@@ -341,6 +341,198 @@ services:
       retries: 12
     networks: [bookrush]
 
+  book-content-service:
+    image: bookrush/book-content-service:local
+    build:
+      context: ..
+      dockerfile: services/book-content-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      CATALOG_URL: http://catalog-service:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8093/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  reader-state-service:
+    image: bookrush/reader-state-service:local
+    build:
+      context: ..
+      dockerfile: services/reader-state-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8094/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  reader-profile-service:
+    image: bookrush/reader-profile-service:local
+    build:
+      context: ..
+      dockerfile: services/reader-profile-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8095/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  social-service:
+    image: bookrush/social-service:local
+    build:
+      context: ..
+      dockerfile: services/social-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8096/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  behavior-service:
+    image: bookrush/behavior-service:local
+    build:
+      context: ..
+      dockerfile: services/behavior-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8097/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  recommendation-service:
+    image: bookrush/recommendation-service:local
+    build:
+      context: ..
+      dockerfile: services/recommendation-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      CATALOG_URL: http://catalog-service:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8098/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  publisher-service:
+    image: bookrush/publisher-service:local
+    build:
+      context: ..
+      dockerfile: services/publisher-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8099/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  admin-service:
+    image: bookrush/admin-service:local
+    build:
+      context: ..
+      dockerfile: services/admin-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8100/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
+  reader-bff-service:
+    image: bookrush/reader-bff-service:local
+    build:
+      context: ..
+      dockerfile: services/reader-bff-service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_NAME: ${POSTGRES_DB:-bookrush}
+      DB_USERNAME: ${POSTGRES_USER:-bookrush}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      CATALOG_URL: http://catalog-service:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8101/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [bookrush]
+
   frontend:
     image: ${FRONTEND_IMAGE:-bookrush/frontend:local}
     build:

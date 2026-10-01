@@ -1,0 +1,15 @@
+server:
+  port: ${SERVER_PORT:8093}
+spring:
+  application:
+    name: book-content-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+bookrush:
+  security:
+    enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
+bookrush:
+  catalog-url: ${CATALOG_URL:http://catalog-service:8080}

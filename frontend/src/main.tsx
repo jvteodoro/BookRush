@@ -41,7 +41,13 @@ function App() {
         const catalog = await loadCatalog();
         if (!active) return;
         const palettes = [['#82d4a4', '#213e35'], ['#74b9ff', '#202b52'], ['#f0a8bd', '#5a2337'], ['#c7d87a', '#26311f'], ['#d2aa6d', '#4a2e1f']];
-        (window as Window & { __BOOKRUSH_BOOKS__?: unknown[] }).__BOOKRUSH_BOOKS__ = catalog.map((book, index) => ({
+        const bridge = window as Window & { __BOOKRUSH_BOOKS__?: unknown[]; __BOOKRUSH_API__?: { save: (id: string, saved: boolean) => Promise<void>; like: (id: string, liked: boolean) => Promise<void>; event: (type: string, id: string) => Promise<void> } };
+        bridge.__BOOKRUSH_API__ = {
+          save: async (id, saved) => { const response = await authClient.fetch(`/api/v1/reader/library/${encodeURIComponent(id)}`, { method: saved ? 'PUT' : 'DELETE' }); if (!response.ok) throw new Error(`Falha ao atualizar biblioteca (${response.status})`); },
+          like: async (id, liked) => { const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/like`, { method: liked ? 'PUT' : 'DELETE' }); if (!response.ok) throw new Error(`Falha ao atualizar curtida (${response.status})`); },
+          event: async (type, id) => { await authClient.fetch('/api/v1/behavior/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ events: [{ eventKey: `${type}:${id}:${Date.now()}`, eventType: type, bookId: id, occurredAt: new Date().toISOString(), payload: {} }] }) }); },
+        };
+        bridge.__BOOKRUSH_BOOKS__ = catalog.map((book, index) => ({
           id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0,
         }));
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';

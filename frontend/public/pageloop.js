@@ -163,8 +163,8 @@
   }
 
   function bindFeed(){
-    document.querySelectorAll('[data-like]').forEach(b=>b.onclick=()=>{state.likes[b.dataset.like]=!state.likes[b.dataset.like];save();renderFeed();});
-    document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];save();toast(state.saved[b.dataset.save]?'Adicionado à sua biblioteca':'Removido da biblioteca');renderFeed();});
+    document.querySelectorAll('[data-like]').forEach(b=>b.onclick=async()=>{state.likes[b.dataset.like]=!state.likes[b.dataset.like];try{await window.__BOOKRUSH_API__?.like(b.dataset.like,state.likes[b.dataset.like]);save();renderFeed();}catch(e){state.likes[b.dataset.like]=!state.likes[b.dataset.like];toast(e.message||'Não foi possível curtir');}});
+    document.querySelectorAll('[data-save]').forEach(b=>b.onclick=async()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];try{await window.__BOOKRUSH_API__?.save(b.dataset.save,state.saved[b.dataset.save]);save();toast(state.saved[b.dataset.save]?'Adicionado à sua biblioteca':'Removido da biblioteca');renderFeed();}catch(e){state.saved[b.dataset.save]=!state.saved[b.dataset.save];toast(e.message||'Não foi possível atualizar a biblioteca');}});
     document.querySelectorAll('[data-comments]').forEach(b=>b.onclick=()=>openComments(b.dataset.comments));
     document.querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>openShare(b.dataset.share));
     document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));

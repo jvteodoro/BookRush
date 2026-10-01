@@ -26,6 +26,15 @@ spec:
   - ./admin-web/catalog-info.yaml
   - ./backstage/catalog-info.yaml
   - ./platform/catalog-info.yaml
+  - ./services/reader-bff-service/catalog-info.yaml
+  - ./services/admin-service/catalog-info.yaml
+  - ./services/publisher-service/catalog-info.yaml
+  - ./services/recommendation-service/catalog-info.yaml
+  - ./services/behavior-service/catalog-info.yaml
+  - ./services/social-service/catalog-info.yaml
+  - ./services/reader-profile-service/catalog-info.yaml
+  - ./services/reader-state-service/catalog-info.yaml
+  - ./services/book-content-service/catalog-info.yaml
   - ./backstage/templates/java-spring-service/template.yaml
 ---
 apiVersion: backstage.io/v1alpha1

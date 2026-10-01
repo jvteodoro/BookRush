@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS reader_state.library (subject_key TEXT NOT NULL, book_id UUID NOT NULL, status TEXT NOT NULL DEFAULT 'SAVED', created_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY(subject_key,book_id));
+CREATE TABLE IF NOT EXISTS reader_state.progress (subject_key TEXT NOT NULL, book_id UUID NOT NULL, position_codepoint BIGINT NOT NULL DEFAULT 0, percent NUMERIC(5,2) NOT NULL DEFAULT 0, updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY(subject_key,book_id));
+CREATE TABLE IF NOT EXISTS reader_state.bookmarks (id UUID PRIMARY KEY, subject_key TEXT NOT NULL, book_id UUID NOT NULL, position_codepoint BIGINT NOT NULL, note TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now());

@@ -1,0 +1,13 @@
+server:
+  port: ${SERVER_PORT:8101}
+spring:
+  application:
+    name: reader-bff-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+bookrush:
+  security:
+    enabled: ${BOOKRUSH_SECURITY_ENABLED:false}

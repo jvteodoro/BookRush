@@ -1,0 +1,3 @@
+INHERIT: ../../backstage/mkdocs.base.yml
+site_name: reader-state-service
+docs_dir: docs

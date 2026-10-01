@@ -1,0 +1,13 @@
+server:
+  port: ${SERVER_PORT:8100}
+spring:
+  application:
+    name: admin-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+bookrush:
+  security:
+    enabled: ${BOOKRUSH_SECURITY_ENABLED:false}

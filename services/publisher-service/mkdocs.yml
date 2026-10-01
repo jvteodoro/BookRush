@@ -1,0 +1,3 @@
+INHERIT: ../../backstage/mkdocs.base.yml
+site_name: publisher-service
+docs_dir: docs

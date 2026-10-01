@@ -60,6 +60,26 @@ http:
         - analytics-strip
       service: analytics
 
+    reader-bff:
+      rule: PathPrefix(`/api/v1/reader`)
+      entryPoints: [web]
+      priority: 130
+      service: reader-bff
+    reader-state:
+      rule: PathPrefix(`/api/v1/library`) || PathPrefix(`/api/v1/reader`)
+      entryPoints: [web]
+      priority: 125
+      service: reader-state
+    behavior:
+      rule: PathPrefix(`/api/v1/behavior`)
+      entryPoints: [web]
+      priority: 125
+      service: behavior
+    content:
+      rule: PathPrefix(`/api/v1/content`)
+      entryPoints: [web]
+      priority: 125
+      service: content
     frontend:
       rule: PathPrefix(`/`)
       entryPoints:
@@ -98,6 +118,18 @@ http:
       loadBalancer:
         servers:
           - url: http://book-analytics-service:8091
+    reader-bff:
+      loadBalancer:
+        servers: [{url: http://reader-bff-service:8101}]
+    reader-state:
+      loadBalancer:
+        servers: [{url: http://reader-state-service:8094}]
+    behavior:
+      loadBalancer:
+        servers: [{url: http://behavior-service:8097}]
+    content:
+      loadBalancer:
+        servers: [{url: http://book-content-service:8093}]
     frontend:
       loadBalancer:
         servers:

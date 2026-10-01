@@ -36,3 +36,7 @@ O [relatório operacional e de schema](analytics/report.md) consolida a execuç�
 validada, o modelo relacional e as limitações atuais.
 
 - [Clientes web e mobile](client-platform.md)
+
+- [Arquitetura de produto e bounded contexts](adr/ADR-0034-product-bounded-contexts.md)
+
+- [Productização e bounded contexts](productization/README.md)

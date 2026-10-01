@@ -21,6 +21,12 @@
       },
       {
         "name": "ASSET_ADMIN"
+      },
+      {
+        "name": "PUBLISHER",
+        "description": "BookRush product role PUBLISHER",
+        "composite": false,
+        "clientRole": false
       }
     ]
   },
@@ -90,6 +96,32 @@
       "attributes": {
         "pkce.code.challenge.method": "S256"
       }
+    },
+    {
+      "clientId": "bookrush-reader-bff",
+      "name": "bookrush-reader-bff",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [],
+      "webOrigins": []
+    },
+    {
+      "clientId": "bookrush-behavior",
+      "name": "bookrush-behavior",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [],
+      "webOrigins": []
     }
   ]
 }
