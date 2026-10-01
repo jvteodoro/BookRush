@@ -8,3 +8,10 @@ export async function listBooks(_accessToken: string, query = ''): Promise<BookP
   if (!response.ok) throw new Error(response.status === 401 ? 'Sessão expirada. Entre novamente.' : `Catálogo indisponível (HTTP ${response.status}).`);
   return response.json() as Promise<BookPage>;
 }
+export async function updateLibrary(accessToken: string, bookId: string, saved: boolean): Promise<void> {
+  const response = await fetch(`${baseUrl}/api/v1/reader/library/${encodeURIComponent(bookId)}`, { method: saved ? 'PUT' : 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) throw new Error(`Falha ao atualizar biblioteca (HTTP ${response.status})`);
+}
+export async function trackEvent(accessToken: string, eventType: string, bookId: string): Promise<void> {
+  await fetch(`${baseUrl}/api/v1/behavior/events`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ events: [{ eventKey: `${eventType}:${bookId}:${Date.now()}`, eventType, bookId, occurredAt: new Date().toISOString(), payload: {} }] }) });
+}

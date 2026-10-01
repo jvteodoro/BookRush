@@ -30,6 +30,8 @@ public class BehaviorController {
     }
     return ResponseEntity.accepted().body(Map.of("accepted",accepted,"duplicates",duplicate));
   }
-  @GetMapping("/events/count")
+  @PostMapping("/aggregates/rebuild") public Map<String,Object> rebuild(){jdbc.update("insert into behavior.daily_book(day,book_id,impressions,opens,likes,reads) select occurred_at::date,book_id,count(*) filter(where event_type='EXCERPT_IMPRESSION'),count(*) filter(where event_type='BOOK_OPEN'),count(*) filter(where event_type='BOOK_LIKE'),count(*) filter(where event_type in ('READ_PROGRESS','BOOK_COMPLETE')) from behavior.events where book_id is not null group by occurred_at::date,book_id on conflict(day,book_id) do update set impressions=excluded.impressions,opens=excluded.opens,likes=excluded.likes,reads=excluded.reads");return Map.of("rebuilt",true);}
+ @GetMapping("/aggregates") public Object aggregates(){return jdbc.queryForList("select day,book_id,impressions,opens,likes,reads from behavior.daily_book order by day desc limit 500");}
+ @GetMapping("/events/count")
   public Map<String,Object> count(){return Map.of("events",jdbc.queryForObject("select count(*) from behavior.events",Long.class));}
 }
