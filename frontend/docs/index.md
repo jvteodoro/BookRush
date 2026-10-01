@@ -32,6 +32,8 @@ por `GET /api/v1/books` sem Bearer (leitura pública), carrega a biblioteca em
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
 fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
+O Nginx do container envia `Cache-Control: no-store` para que uma publicação
+não mantenha o bundle anterior no navegador.
 
 ## Mobile
 
