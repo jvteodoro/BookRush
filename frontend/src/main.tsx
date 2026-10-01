@@ -92,6 +92,10 @@ function App() {
         (window as Window & { __BOOKRUSH_BOOKS__?: PageLoopBook[]; __BOOKRUSH_API__?: Record<string, unknown> }).__BOOKRUSH_BOOKS__ = books;
         (window as Window & { __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[] }).__BOOKRUSH_PUBLISHER_SUBMISSIONS__ = submissions;
         try {
+          const profileResponse = await authClient.fetch('/api/v1/profile');
+          (window as Window & { __BOOKRUSH_PROFILE__?: unknown }).__BOOKRUSH_PROFILE__ = profileResponse.ok ? await profileResponse.json() : null;
+        } catch { (window as Window & { __BOOKRUSH_PROFILE__?: unknown }).__BOOKRUSH_PROFILE__ = null; }
+        try {
           const [usersResponse, reportsResponse] = await Promise.all([
             authClient.fetch('/api/v1/admin/users'), authClient.fetch('/api/v1/admin/reports'),
           ]);
@@ -128,6 +132,11 @@ function App() {
           profile: async () => {
             const response = await authClient.fetch('/api/v1/profile');
             return response.ok ? response.json() : null;
+          },
+          updateProfile: async (profile: { displayName?: string; bio?: string; isPublic?: boolean }) => {
+            const response = await authClient.fetch('/api/v1/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) });
+            if (!response.ok) throw new Error('Não foi possível salvar o perfil.');
+            return response.json();
           },
           follow: async (subject: string, enabled: boolean) => {
             const response = await authClient.fetch(`/api/v1/social/users/${encodeURIComponent(subject)}/follow`, { method: enabled ? 'PUT' : 'DELETE' });

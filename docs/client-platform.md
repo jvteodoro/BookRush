@@ -78,3 +78,8 @@ O índice lateral usa a projeção de capítulos persistida e sua versão textua
 quando a obra ainda não tem projeção, a interface informa essa condição em
 vez de fabricar capítulos. O texto reader-ready completo e a navegação Readium
 continuam dependentes da publicação de um artifact autorizado.
+
+O perfil autenticado é carregado de `GET /api/v1/profile`; nome, bio e estado
+público deixam de depender da lista de usuários do protótipo. A tela de
+privacidade persiste `isPublic` por `PUT /api/v1/profile`, mantendo as demais
+preferências como próximas extensões do contrato do serviço.
