@@ -7,3 +7,7 @@ V2 persiste requests e impressions do feed, incluindo versão do modelo e posiç
 The Compose smoke validates startup with the recommendation URL nested under
 `bookrush` and runs the migration against the isolated database. This service
 remains the sole writer for its recommendation schema.
+
+Feed requests require an authenticated principal and persist that subject in
+the request ledger. Each item still carries request ID, impression ID, model
+version and rank for later attribution.
