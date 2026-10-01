@@ -12,6 +12,18 @@ import org.springframework.data.repository.query.Param;
 public interface BookRepository extends JpaRepository<Book, UUID> {
   Page<Book> findByCanonicalTitleContainingIgnoreCase(String title, Pageable pageable);
 
+  @Query(value = "SELECT DISTINCT b.* FROM catalog.book b " +
+      "LEFT JOIN catalog.book_author ba ON ba.book_id=b.id " +
+      "LEFT JOIN catalog.author a ON a.id=ba.author_id " +
+      "LEFT JOIN catalog.book_subject bs ON bs.book_id=b.id " +
+      "LEFT JOIN catalog.subject sub ON sub.id=bs.subject_id " +
+      "WHERE b.canonical_title ILIKE '%' || :q || '%' " +
+      "OR b.original_title ILIKE '%' || :q || '%' " +
+      "OR b.description ILIKE '%' || :q || '%' " +
+      "OR a.name ILIKE '%' || :q || '%' " +
+      "OR sub.canonical_name ILIKE '%' || :q || '%' ORDER BY b.canonical_title", nativeQuery = true)
+  Page<Book> search(@Param("q") String q, Pageable pageable);
+
   /** Resolves work-level identifiers and edition-level identifiers to their owning work. */
   @Query(
       value =

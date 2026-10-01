@@ -39,8 +39,7 @@ public class BookQueryController {
     Page<Book> result =
         q.isBlank()
             ? books.findAll(PageRequest.of(page, size, Sort.by("canonicalTitle").ascending()))
-            : books.findByCanonicalTitleContainingIgnoreCase(
-                q.trim(), PageRequest.of(page, size, Sort.by("canonicalTitle").ascending()));
+            : books.search(q.trim(), PageRequest.of(page, size, Sort.by("canonicalTitle").ascending()));
     return BookPage.from(result);
   }
 

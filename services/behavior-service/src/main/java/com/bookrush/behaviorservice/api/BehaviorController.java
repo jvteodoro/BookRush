@@ -24,6 +24,7 @@ public class BehaviorController {
   public ResponseEntity<Map<String,Object>> ingest(@Valid @RequestBody Batch batch) {
     int accepted=0, duplicate=0;
     if (batch.events()!=null) for (Event e: batch.events()) {
+      if (e.eventType().length()>80 || e.eventKey().length()>200 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",e.payload()==null?"{}":e.payload().toString()); duplicate++; continue; }
       int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
         UUID.randomUUID(),e.eventKey(),e.eventType(),e.issuer(),e.subject(),e.bookId(),e.payload()==null?"{}":e.payload().toString(),e.occurredAt());
       if(n==1) accepted++; else duplicate++;
