@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,6 +25,7 @@ public class BehaviorController {
       String subject, UUID bookId, @NotNull Instant occurredAt, JsonNode payload) {}
   public record Batch(@Valid List<Event> events) {}
   @PostMapping("/events")
+  @Transactional
   public ResponseEntity<Map<String,Object>> ingest(@Valid @RequestBody Batch batch, Principal principal) {
     int accepted=0, duplicate=0;
     if (batch.events()==null || batch.events().size()>100) return ResponseEntity.badRequest().body(Map.of("error","batch must contain between 1 and 100 events"));
@@ -32,9 +34,14 @@ public class BehaviorController {
     for (Event e: batch.events()) {
       String payload = e.payload()==null?"{}":e.payload().toString();
       if (e.eventType().length()>80 || e.eventKey().length()>200 || payload.length()>16_384 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",payload); duplicate++; continue; }
+      UUID eventId = UUID.randomUUID();
       int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
-        UUID.randomUUID(),e.eventKey(),e.eventType(),null,subject,e.bookId(),payload,e.occurredAt());
-      if(n==1) accepted++; else duplicate++;
+        eventId,e.eventKey(),e.eventType(),null,subject,e.bookId(),payload,e.occurredAt());
+      if(n==1) {
+        jdbc.update("INSERT INTO behavior.outbox(id,event_id,event_type,payload,occurred_at) VALUES (?,?,?,?,?)",
+          UUID.randomUUID(),eventId,e.eventType(),payload,e.occurredAt());
+        accepted++;
+      } else duplicate++;
     }
     return ResponseEntity.accepted().body(Map.of("accepted",accepted,"duplicates",duplicate));
   }

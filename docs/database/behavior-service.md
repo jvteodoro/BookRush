@@ -14,3 +14,8 @@ is authenticated and returns only the current principal's rows.
 
 The table is a privacy-sensitive operational projection. It does not create a
 product profile, infer ownership of a book, or replace append-only events.
+
+Migration V6 adds `behavior.outbox`. Each newly accepted event creates one
+outbox row with the same event id; duplicate `event_key` retries create no new
+row. A publisher can claim pending rows and set `published_at` after delivery,
+while the append-only event remains the source of truth.
