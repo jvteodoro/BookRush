@@ -61,7 +61,7 @@
   function esc(s=''){return String(s).replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
   function compact(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace('.',',')+' mil':String(n)}
   function book(id){return BOOKS.find(b=>b.id===id)||BOOKS[0]}
-  function save(){const copy={...state};delete copy.route;void copy; // persistência de produto é feita pelo backend}
+  function save(){const copy={...state};delete copy.route;void copy; /* persistência de produto é feita pelo backend */}
   function toast(msg){const stack=document.querySelector('.toast-stack')||document.body.appendChild(Object.assign(document.createElement('div'),{className:'toast-stack'}));const t=document.createElement('div');t.className='toast';t.textContent=msg;stack.appendChild(t);setTimeout(()=>t.remove(),2300)}
 
   const NAV = [
