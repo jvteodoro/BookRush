@@ -143,3 +143,5 @@ Comentários preservam `subject_key` como identidade técnica, mas resolvem o no
 O contrato interno `GET /api/v1/profile/public?subject=...` retorna `displayName` somente quando `is_public=true`; o `social-service` encaminha o bearer do usuário ao consultar esse contrato e expõe o resultado como `authorName` nos comentários.
 
 Os cartões do feed carregam os contadores persistidos de likes e comentários pelos endpoints do `social-service`. Depois de uma curtida ou comentário, o frontend consulta novamente esses contadores e atualiza o cartão; os valores não são mantidos como números locais do protótipo.
+
+O endpoint de likes também retorna `liked` para o subject autenticado. O feed usa esse campo para restaurar o estado do coração após reload e enviar `DELETE` quando o usuário já curtiu, evitando curtidas duplicadas.

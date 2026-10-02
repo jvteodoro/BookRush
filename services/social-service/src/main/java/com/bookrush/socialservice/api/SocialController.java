@@ -121,10 +121,13 @@ public class SocialController {
   }
 
   @GetMapping("/books/{bookId}/likes")
-  public Map<String, Object> likes(@PathVariable UUID bookId) {
+  public Map<String, Object> likes(@PathVariable UUID bookId, Principal principal) {
+    boolean liked = principal != null && jdbc.queryForObject(
+        "SELECT EXISTS (SELECT 1 FROM social.likes WHERE book_id = ? AND subject_key = ?)",
+        Boolean.class, bookId, principal.getName());
     return Map.of("bookId", bookId,
         "count", jdbc.queryForObject("SELECT count(*) FROM social.likes WHERE book_id = ?",
-            Long.class, bookId));
+            Long.class, bookId), "liked", liked);
   }
 
   public record Comment(@NotBlank @Size(max = 2000) String body) {}

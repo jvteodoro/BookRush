@@ -6,7 +6,7 @@
 
   const defaultState = {
     route: initialRoute,
-    likes:{}, saved:Object.fromEntries(Array.from(window.__BOOKRUSH_API__?.saved || []).map(id=>[id,true])), followed:{}, blocked:{}, removedReports:{},
+    likes:{...(window.__BOOKRUSH_LIKES__||{})}, saved:Object.fromEntries(Array.from(window.__BOOKRUSH_API__?.saved || []).map(id=>[id,true])), followed:{}, blocked:{}, removedReports:{},
     readerBook:BOOKS[0]?.id||'', readerPage: 0, readerSize:20, readerNight:false,
     libraryTab:'saved', search:'', searchFilter:'Todos', streak:0, minutes:0, booksMonth:0,
     privacy:{activity:true,library:true,streak:true,followers:true}, recent:window.__BOOKRUSH_RECENT__||[], adminTab:'overview', publisherTab:'publish', otherUser:'',

@@ -95,19 +95,21 @@ async function loadRecommendationFeed(): Promise<RecommendationItem[]> {
   return payload.items ?? [];
 }
 
-async function loadSocialCounts(bookId: string): Promise<{ likes: number; comments: number }> {
+async function loadSocialCounts(bookId: string): Promise<{ likes: number; comments: number; liked: boolean }> {
   const [likesResponse, commentsResponse] = await Promise.all([
     authClient.fetch(`/api/v1/social/books/${encodeURIComponent(bookId)}/likes`),
     authClient.fetch(`/api/v1/social/books/${encodeURIComponent(bookId)}/comments`),
   ]);
   let likes = 0;
+  let liked = false;
   if (likesResponse.ok) {
-    const payload = await likesResponse.json() as { count?: number };
+    const payload = await likesResponse.json() as { count?: number; liked?: boolean };
     likes = Number(payload.count ?? 0);
+    liked = payload.liked === true;
   }
   const commentsPayload = commentsResponse.ok ? await commentsResponse.json() : [];
   const comments = Array.isArray(commentsPayload) ? commentsPayload.length : 0;
-  return { likes, comments };
+  return { likes, comments, liked };
 }
 
 function App() {
@@ -150,8 +152,9 @@ function App() {
           recommendationRequestId: recommendation?.recommendationRequestId, impressionId: recommendation?.impressionId, modelVersion: recommendation?.modelVersion, rank: recommendation?.rank,
         };
         });
-        const socialCounts = await Promise.all(books.map(book => loadSocialCounts(book.id).catch(() => ({ likes: 0, comments: 0 }))));
+        const socialCounts = await Promise.all(books.map(book => loadSocialCounts(book.id).catch(() => ({ likes: 0, comments: 0, liked: false }))));
         books.forEach((book, index) => Object.assign(book, socialCounts[index]));
+        (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ = Object.fromEntries(books.map((book, index) => [book.id, socialCounts[index].liked]));
         const saved = new Set(await loadLibrary());
         const recent = await loadRecent();
         let submissions: unknown[] = [];
@@ -212,6 +215,9 @@ function App() {
             const counts = await loadSocialCounts(id);
             const book = books.find(item => item.id === id);
             if (book) Object.assign(book, counts);
+            const likes = (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ ?? {};
+            likes[id] = counts.liked;
+            (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ = likes;
             return counts;
           },
           profile: async () => {
