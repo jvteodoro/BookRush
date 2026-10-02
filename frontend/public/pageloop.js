@@ -187,20 +187,17 @@
   async function openBook(id){state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id);window.__BOOKRUSH_CHAPTERS__=await window.__BOOKRUSH_API__?.chapters?.(id)||[]}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);render();}
 
   function renderReader(){
-    const b=book(state.readerBook); const content=`<div class="reader-shell ${state.readerNight?'night':''}" id="readerShell">
-      <aside class="reader-panel"><button class="reader-tool" data-route="${mode==='app'?'feed':'library'}">${icon('chevron','icon-sm')} Voltar <span></span></button><h3>Conteúdo</h3>${(window.__BOOKRUSH_CHAPTERS__||[]).map((x,i)=>`<div class="toc-item ${i===0?'active':''}">${esc(x.title||x.chapter_key||`Capítulo ${i+1}`)}</div>`).join('')||'<p class="muted">Capítulos ainda não projetados.</p>'}</aside>
-      <article class="reader-main"><div class="reader-book-meta"><div class="eyebrow">${b.genre}</div><h1>${esc(b.title)}</h1><p>${esc(b.author)}</p></div><div class="reader-text readium-host" id="readium-reader" style="--reader-size:${state.readerSize}px"><p class="muted">Carregando publicação reader-ready…</p></div></article>
-      <aside class="reader-panel right"><h3>Leitura</h3><button class="reader-tool" id="bookmarkBtn">${icon('bookmark','icon-sm')} Marcar página <span>${state.readerPage}%</span></button><button class="reader-tool" id="nightBtn">${icon('sun','icon-sm')} Tema <span>${state.readerNight?'Noturno':'Papel'}</span></button><button class="reader-tool" id="fontDown">${icon('type','icon-sm')} Texto menor <span>A−</span></button><button class="reader-tool" id="fontUp">${icon('type','icon-sm')} Texto maior <span>A+</span></button><div class="reader-stat"><strong>Estado sincronizado</strong><span>progresso e marcadores são persistidos no servidor</span></div><p class="bookmark-note">Navegação fornecida pelo Readium WebPubNavigator; o texto vem da versão normalizada exata.</p></aside>
-      <div class="reader-progress"><div class="reader-progress-top"><span>Página ${Math.round(state.readerPage/100*b.pages)} de ${b.pages}</span><span>${state.readerPage}%</span></div><input class="reader-slider" id="readerSlider" type="range" min="1" max="100" value="${state.readerPage}" /></div>
+    const b=book(state.readerBook); const chapters=window.__BOOKRUSH_CHAPTERS__||[];
+    const content=`<div class="reader-shell ${state.readerNight?'night':''}" id="readerShell">
+      <aside class="reader-panel"><button class="reader-tool" data-route="${mode==='app'?'feed':'library'}">${icon('chevron','icon-sm')} Voltar <span></span></button><h3>Conteúdo Readium</h3>${chapters.map((x,i)=>`<div class="toc-item ${i===0?'active':''}">${esc(x.title||x.chapter_key||`Capítulo ${i+1}`)}</div>`).join('')||'<p class="muted">Este livro ainda não possui capítulos reader-ready.</p>'}</aside>
+      <article class="reader-main"><header class="reader-book-meta"><div class="eyebrow">READIUM WEB PUBLICATION</div><h1>${esc(b.title)}</h1><p>${esc(b.author)}</p></header><div class="readium-host" id="readium-reader"><p class="muted">Carregando publicação reader-ready…</p></div></article>
+      <aside class="reader-panel right"><h3>Leitura</h3><button class="reader-tool" id="bookmarkBtn">${icon('bookmark','icon-sm')} Marcar posição <span>${state.readerPage}%</span></button><div class="reader-stat"><strong>Readium ativo</strong><span>O conteúdo exibido vem exclusivamente da publicação normalizada.</span></div><p class="bookmark-note">A navegação, paginação e renderização são fornecidas pelo Readium WebPubNavigator.</p></aside>
+      <div class="reader-progress"><div class="reader-progress-top"><span>Progresso</span><span id="readerProgressValue">${state.readerPage}%</span></div><progress class="reader-progress-bar" id="readerProgressBar" max="100" value="${state.readerPage}"></progress></div>
     </div>`;
     shell(content,b.title);
     const host=document.getElementById('readium-reader');
-    if(host && window.__BOOKRUSH_READIUM__){ window.__BOOKRUSH_READIUM__.mount(state.readerBook,host,p=>{ const percent=Math.round((p||0)*100); if(percent>0){state.readerPage=percent;window.__BOOKRUSH_API__?.progress?.(state.readerBook,percent,percent).catch(()=>{});const top=document.querySelector('.reader-progress-top');if(top)top.innerHTML=`<span>Página ${Math.max(1,Math.round(percent/100*b.pages))} de ${b.pages}</span><span>${percent}%</span>`;const slider=document.getElementById('readerSlider');if(slider)slider.value=String(percent);}}).catch(e=>{host.innerHTML=`<p class="notice error">${esc(e.message||'Não foi possível abrir o conteúdo.')}</p>`;}); }
-    document.getElementById('readerSlider').oninput=async e=>{state.readerPage=+e.target.value;await window.__BOOKRUSH_API__?.progress?.(state.readerBook,state.readerPage,Math.round(state.readerPage));save();document.querySelector('.reader-progress-top').innerHTML=`<span>Página ${Math.round(state.readerPage/100*b.pages)} de ${b.pages}</span><span>${state.readerPage}%</span>`};
+    if(host && window.__BOOKRUSH_READIUM__){ window.__BOOKRUSH_READIUM__.mount(state.readerBook,host,p=>{ const percent=Math.round((p||0)*100); if(percent>0){state.readerPage=percent;window.__BOOKRUSH_API__?.progress?.(state.readerBook,percent,percent).catch(()=>{});const value=document.getElementById('readerProgressValue');if(value)value.textContent=`${percent}%`;const bar=document.getElementById('readerProgressBar');if(bar)bar.value=percent;}}).catch(e=>{host.innerHTML=`<p class="notice error">${esc(e.message||'Não foi possível abrir a publicação Readium.')}</p>`;}); }
     document.getElementById('bookmarkBtn')?.addEventListener('click',async()=>{await window.__BOOKRUSH_API__?.bookmark?.(state.readerBook,Math.round(state.readerPage));save();toast(`Página marcada em ${state.readerPage}%`)});
-    document.getElementById('nightBtn')?.addEventListener('click',()=>{state.readerNight=!state.readerNight;save();renderReader()});
-    document.getElementById('fontDown')?.addEventListener('click',()=>{state.readerSize=Math.max(16,state.readerSize-1);save();renderReader()});
-    document.getElementById('fontUp')?.addEventListener('click',()=>{state.readerSize=Math.min(27,state.readerSize+1);save();renderReader()});
   }
 
   function renderLibrary(){
@@ -335,16 +332,6 @@
     modal(`<div class="eyebrow">COMPARTILHAR</div><h2>Envie ${label}</h2><p>Escolha uma opção para compartilhar.</p><div class="share-grid"><button class="share-choice" data-share-choice><strong>↗</strong>Copiar link</button><button class="share-choice" data-share-choice><strong>•••</strong>Mais</button></div>`,`<button class="secondary-btn" data-close-modal>Cancelar</button>`);
     document.querySelectorAll('[data-share-choice]').forEach(b=>b.onclick=async()=>{try{await window.__BOOKRUSH_API__?.share?.(id);await navigator.clipboard?.writeText(`${window.location.origin}/book/${id}`);toast('Compartilhamento registrado')}catch(e){toast(e.message||'Não foi possível compartilhar')}document.querySelector('.modal-wrap')?.remove()});
   }
-
-  function addMobileReaderTools(){
-    if(mode!=='app'||state.route!=='reader')return;
-    const main=document.querySelector('.reader-shell'); if(!main)return;
-    const bar=document.createElement('div');bar.className='mobile-reader-tools';bar.innerHTML=`<button id="mobileBack">${icon('chevron','icon-sm')}</button><button id="mobileBookmark">${icon('bookmark','icon-sm')}</button><button id="mobileTheme">${icon('sun','icon-sm')}</button><button id="mobileFont">${icon('type','icon-sm')} A+</button>`;main.appendChild(bar);
-    bar.querySelector('#mobileBack').onclick=()=>go('library');bar.querySelector('#mobileBookmark').onclick=async()=>{await window.__BOOKRUSH_API__?.bookmark?.(state.readerBook,Math.round(state.readerPage));save();toast(`Página marcada em ${state.readerPage}%`)};bar.querySelector('#mobileTheme').onclick=()=>{state.readerNight=!state.readerNight;save();renderReader();addMobileReaderTools()};bar.querySelector('#mobileFont').onclick=()=>{state.readerSize=state.readerSize>=24?18:state.readerSize+2;save();renderReader();addMobileReaderTools()};
-  }
-
-  const originalRenderReader=renderReader;
-  renderReader=function(){originalRenderReader();addMobileReaderTools();};
 
   window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();go('search')}});
   render();

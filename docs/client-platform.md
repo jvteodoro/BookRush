@@ -111,3 +111,5 @@ privacidade persistem por `PUT /api/v1/profile`. A administração exibe somente
 usuários e denúncias retornados pela facade, e decisões são registradas por
 `POST /api/v1/admin/moderation`; não há bloqueios ou métricas simuladas no
 cliente.
+
+A tela do leitor mantém somente o `WebPubNavigator` do Readium: não há texto de exemplo, slider de paginação, controle manual de fonte/tema ou barra móvel paralela. O shell fornece apenas metadados do livro, progresso persistido e marcador; navegação, paginação e renderização pertencem à publicação Readium.
