@@ -23,12 +23,32 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
 
 @AutoConfiguration
 @ConditionalOnClass(JwtDecoder.class)
 @ConditionalOnProperty(prefix = "bookrush.security", name = "enabled", havingValue = "true")
 @EnableConfigurationProperties(BookrushSecurityProperties.class)
 public class BookrushSecurityAutoConfiguration {
+  /**
+   * Provides the safe default for small services that only need bearer
+   * authentication. Services with route-specific authorization keep their own
+   * chain and take precedence through ConditionalOnMissingBean.
+   */
+  @Bean
+  @ConditionalOnMissingBean(SecurityFilterChain.class)
+  SecurityFilterChain bookrushDefaultSecurity(HttpSecurity http,
+      BookrushJwtAuthenticationConverter converter) throws Exception {
+    http
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+            .anyRequest().authenticated())
+        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(converter)));
+    return http.build();
+  }
+
   @Bean
   @ConditionalOnMissingBean(JwtDecoder.class)
   JwtDecoder bookrushJwtDecoder(BookrushSecurityProperties properties) {

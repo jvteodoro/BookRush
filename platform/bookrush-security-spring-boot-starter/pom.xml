@@ -11,7 +11,7 @@
   </parent>
   <artifactId>bookrush-security-spring-boot-starter</artifactId>
   <name>BookRush Spring Security starter</name>
-  <description>Opt-in JWT decoder and technical identity converter without a global filter chain</description>
+  <description>Opt-in JWT validation, technical identity conversion and a safe default bearer filter chain</description>
   <dependencyManagement>
     <dependencies>
       <dependency>
@@ -28,6 +28,7 @@
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-autoconfigure</artifactId></dependency>
     <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-oauth2-resource-server</artifactId></dependency>
     <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-oauth2-jose</artifactId></dependency>
+    <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-config</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-configuration-processor</artifactId><optional>true</optional></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
   </dependencies>

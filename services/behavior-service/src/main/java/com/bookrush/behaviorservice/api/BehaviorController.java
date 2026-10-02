@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.security.Principal;
 import java.time.Instant;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,10 +37,10 @@ public class BehaviorController {
       if (e.eventType().length()>80 || e.eventKey().length()>200 || payload.length()>16_384 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",payload); duplicate++; continue; }
       UUID eventId = UUID.randomUUID();
       int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
-        eventId,e.eventKey(),e.eventType(),null,subject,e.bookId(),payload,e.occurredAt());
+        eventId,e.eventKey(),e.eventType(),null,subject,e.bookId(),payload,Timestamp.from(e.occurredAt()));
       if(n==1) {
-        jdbc.update("INSERT INTO behavior.outbox(id,event_id,event_type,payload,occurred_at) VALUES (?,?,?,?,?)",
-          UUID.randomUUID(),eventId,e.eventType(),payload,e.occurredAt());
+        jdbc.update("INSERT INTO behavior.outbox(id,event_id,event_type,payload,occurred_at) VALUES (?,?,?,?::jsonb,?)",
+          UUID.randomUUID(),eventId,e.eventType(),payload,Timestamp.from(e.occurredAt()));
         accepted++;
       } else duplicate++;
     }

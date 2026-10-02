@@ -130,3 +130,9 @@ O fetcher autenticado usa `cache: no-store` para manifesto e recursos da publica
 
 
 O host do Readium começa vazio; o frontend não deixa um texto de carregamento sobreposto ao iframe, e só renderiza uma mensagem quando a montagem falha.
+
+
+A sessão OIDC mantém o `User` retornado pelo callback PKCE em memória durante a execução do app. Isso garante que bridges PageLoop também recebam o bearer; tokens continuam fora de localStorage/sessionStorage e são removidos em logout/401.
+
+
+Respostas `401` de endpoints opcionais (administração/publicador) não removem mais a sessão OIDC global. Isso evita que uma API sem permissão faça as chamadas de abertura/eventos perderem o bearer; a sessão só é limpa quando o refresh PKCE falha ou no logout.

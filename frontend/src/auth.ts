@@ -36,6 +36,7 @@ const manager = new UserManager({
 });
 
 let refreshInFlight: Promise<User | null> | null = null;
+let activeUser: User | null = null;
 
 export type AuthState = { status: 'anonymous' | 'loading' | 'authenticated' | 'error'; user?: User; error?: string };
 
@@ -51,13 +52,16 @@ export const authClient = {
     return url.toString();
   },
   async currentUser(): Promise<User | null> {
-    return manager.getUser();
+    if (activeUser) return activeUser;
+    activeUser = await manager.getUser();
+    return activeUser;
   },
   async login(returnTo: string): Promise<void> {
     await manager.signinRedirect({ state: { returnTo: safeReturnTo(returnTo) } });
   },
   async callback(): Promise<{ user: User; returnTo: string }> {
     const user = await manager.signinRedirectCallback();
+    activeUser = user;
     const state = user.state as { returnTo?: unknown } | undefined;
     return { user, returnTo: safeReturnTo(state?.returnTo) };
   },
@@ -65,17 +69,18 @@ export const authClient = {
     await manager.signinSilentCallback();
   },
   async logout(): Promise<void> {
-    await manager.signoutRedirect({ id_token_hint: (await manager.getUser())?.id_token });
+    try { await manager.signoutRedirect({ id_token_hint: (await this.currentUser())?.id_token }); } finally { activeUser = null; }
   },
   async accessToken(): Promise<string | undefined> {
     const user = await this.ensureFresh();
     return user?.access_token;
   },
   async ensureFresh(): Promise<User | null> {
-    const current = await manager.getUser();
+    const current = await this.currentUser();
     if (!current || !current.expires_at || current.expires_at > Math.floor(Date.now() / 1000) + 30) return current;
     if (!refreshInFlight) {
-      refreshInFlight = manager.signinSilent().catch(async () => {
+      refreshInFlight = manager.signinSilent().then(user => { activeUser = user; return user; }).catch(async () => {
+        activeUser = null;
         await manager.removeUser();
         return null;
       }).finally(() => { refreshInFlight = null; });
@@ -89,7 +94,8 @@ export const authClient = {
     const headers = new Headers(init?.headers);
     if (token) headers.set('Authorization', `Bearer ${token}`);
     const response = await fetch(url, { ...init, headers });
-    if (response.status === 401) await manager.removeUser();
+    // A 401 de um endpoint opcional não invalida a sessão global. O token
+    // permanece em memória; a renovação só remove a sessão quando o IdP falha.
     return response;
   },
 };

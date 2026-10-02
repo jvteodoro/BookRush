@@ -460,6 +460,10 @@ services:
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      BOOKRUSH_SECURITY_ENABLED: ${BOOKRUSH_SECURITY_ENABLED:-true}
+      BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
     depends_on:
       postgres:
         condition: service_healthy
@@ -562,6 +566,10 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
       CATALOG_URL: http://catalog-service:8080
+      BOOKRUSH_SECURITY_ENABLED: ${BOOKRUSH_SECURITY_ENABLED:-true}
+      BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
     depends_on:
       postgres:
         condition: service_healthy
