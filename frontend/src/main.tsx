@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { authClient, type AuthState } from './auth';
-import { Manifest, Publication } from '@readium/shared';
+import { HttpFetcher, Manifest, Publication } from '@readium/shared';
 import { WebPubNavigator } from '@readium/navigator';
 import './styles.css';
 
@@ -19,7 +19,15 @@ const readiumBridge: ReadiumBridge = {
     const raw = await response.json();
     const manifest = Manifest.deserialize(raw);
     if (!manifest || !manifest.readingOrder?.items?.length) throw new Error('Este livro ainda não possui conteúdo reader-ready.');
-    const publication = new Publication({ manifest });
+    // Readium does not provide an HTTP fetcher by default. Without an
+    // authenticated fetcher it falls back to EmptyFetcher and fails as soon
+    // as it tries to load the first chapter. Route every publication resource
+    // through the same PKCE-aware client used by the rest of the application.
+    const fetcher = new HttpFetcher(
+      (input, init) => authClient.fetch(String(input), init),
+      window.location.origin,
+    );
+    const publication = new Publication({ manifest, fetcher });
     readiumNavigator = new WebPubNavigator(container, publication, {
       frameLoaded: () => undefined,
       positionChanged: (locator: any) => onLocatorChanged?.(locator.locations?.totalProgression ?? locator.locations?.progression ?? 0),

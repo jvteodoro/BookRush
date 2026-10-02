@@ -98,7 +98,10 @@ O índice lateral usa a projeção de capítulos persistida e sua versão textua
 quando a obra ainda não tem projeção, a interface informa essa condição em
 vez de fabricar capítulos. O `book-content-service` agora expõe um Web
 Publication Manifest por capítulos e recursos HTML derivados da versão textual
-normalizada; o frontend monta o `WebPubNavigator` do Readium. Obras sem
+normalizada; o frontend monta o `WebPubNavigator` do Readium com um
+`HttpFetcher` próprio que injeta o bearer em cada recurso da publicação. Sem
+esse fetcher o Readium usa `EmptyFetcher` e falha com `This is an empty fetcher`.
+Obras sem
 projeção textual disponível permanecem indisponíveis até a ingestão concluir o
 artifact autorizado.
 
