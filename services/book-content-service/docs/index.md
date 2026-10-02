@@ -43,8 +43,10 @@ exact approved text version to the content service; the browser cannot call
 that internal route directly. This avoids making a presigned URL containing a
 container-local `localhost` endpoint part of the reader flow.
 
-The manifest write to S3 is content-addressed. The reader response remains
-available from the catalog projection while the artifact store is temporarily
-unavailable. The SeaweedFS single-node development runtime reserves 256 volume
+The manifest write to S3 is content-addressed and best-effort. The reader
+response remains available from the catalog projection while the artifact
+store is temporarily unavailable; the service logs only the book identifier
+and exception class and returns no storage details. The SeaweedFS single-node
+development runtime reserves 256 volume
 slots because raw, processing, ML and public bucket layouts share one volume
 server; existing volumes are preserved when this limit is increased.

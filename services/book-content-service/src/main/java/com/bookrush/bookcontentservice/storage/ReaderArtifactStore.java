@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.security.MessageDigest;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -16,6 +18,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 /** Persists the immutable manifest snapshot used by a reader session. */
 @Component
 public final class ReaderArtifactStore {
+  private static final Logger log = LoggerFactory.getLogger(ReaderArtifactStore.class);
   private final ObjectMapper mapper;
   private final S3Client client;
   private final String bucket;
@@ -47,7 +50,14 @@ public final class ReaderArtifactStore {
           .contentType("application/webpub+json").metadata(Map.of("sha256", hash, "format", "readium-webpub-v1"))
           .build(), RequestBody.fromBytes(bytes));
       return key;
-    } catch (Exception e) { throw new IllegalStateException("reader artifact persistence failed", e); }
+    } catch (Exception e) {
+      // The manifest is still valid for the current reader session. Artifact
+      // persistence is retried by the next content request and must not turn a
+      // transient object-store outage into a reader-facing 500.
+      log.warn("reader artifact persistence unavailable bookId={} exception={}", bookId,
+          e.getClass().getSimpleName());
+      return null;
+    }
   }
 
   private static String sha256(byte[] value) throws Exception {
