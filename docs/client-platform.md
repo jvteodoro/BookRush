@@ -139,3 +139,5 @@ Respostas `401` de endpoints opcionais (administração/publicador) não removem
 
 
 Comentários preservam `subject_key` como identidade técnica, mas resolvem o nome de exibição público no `reader-profile-service`. O valor é salvo como snapshot no comentário e também atualizado na leitura quando o perfil público estiver disponível; email nunca é usado como chave.
+
+O contrato interno `GET /api/v1/profile/public?subject=...` retorna `displayName` somente quando `is_public=true`; o `social-service` encaminha o bearer do usuário ao consultar esse contrato e expõe o resultado como `authorName` nos comentários.
