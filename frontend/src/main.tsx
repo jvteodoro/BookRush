@@ -95,6 +95,21 @@ async function loadRecommendationFeed(): Promise<RecommendationItem[]> {
   return payload.items ?? [];
 }
 
+async function loadSocialCounts(bookId: string): Promise<{ likes: number; comments: number }> {
+  const [likesResponse, commentsResponse] = await Promise.all([
+    authClient.fetch(`/api/v1/social/books/${encodeURIComponent(bookId)}/likes`),
+    authClient.fetch(`/api/v1/social/books/${encodeURIComponent(bookId)}/comments`),
+  ]);
+  let likes = 0;
+  if (likesResponse.ok) {
+    const payload = await likesResponse.json() as { count?: number };
+    likes = Number(payload.count ?? 0);
+  }
+  const commentsPayload = commentsResponse.ok ? await commentsResponse.json() : [];
+  const comments = Array.isArray(commentsPayload) ? commentsPayload.length : 0;
+  return { likes, comments };
+}
+
 function App() {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
   const [error, setError] = useState('');
@@ -135,6 +150,8 @@ function App() {
           recommendationRequestId: recommendation?.recommendationRequestId, impressionId: recommendation?.impressionId, modelVersion: recommendation?.modelVersion, rank: recommendation?.rank,
         };
         });
+        const socialCounts = await Promise.all(books.map(book => loadSocialCounts(book.id).catch(() => ({ likes: 0, comments: 0 }))));
+        books.forEach((book, index) => Object.assign(book, socialCounts[index]));
         const saved = new Set(await loadLibrary());
         const recent = await loadRecent();
         let submissions: unknown[] = [];
@@ -190,6 +207,12 @@ function App() {
           comment: async (id: string, text: string) => {
             const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text }) });
             if (!response.ok) throw new Error('Não foi possível publicar o comentário.');
+          },
+          refreshCounts: async (id: string) => {
+            const counts = await loadSocialCounts(id);
+            const book = books.find(item => item.id === id);
+            if (book) Object.assign(book, counts);
+            return counts;
           },
           profile: async () => {
             const response = await authClient.fetch('/api/v1/profile');
