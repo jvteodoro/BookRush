@@ -136,3 +136,6 @@ A sessão OIDC mantém o `User` retornado pelo callback PKCE em memória durante
 
 
 Respostas `401` de endpoints opcionais (administração/publicador) não removem mais a sessão OIDC global. Isso evita que uma API sem permissão faça as chamadas de abertura/eventos perderem o bearer; a sessão só é limpa quando o refresh PKCE falha ou no logout.
+
+
+Comentários preservam `subject_key` como identidade técnica, mas resolvem o nome de exibição público no `reader-profile-service`. O valor é salvo como snapshot no comentário e também atualizado na leitura quando o perfil público estiver disponível; email nunca é usado como chave.
