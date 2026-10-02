@@ -189,17 +189,14 @@
   function renderReader(){
     const b=book(state.readerBook);
     const content=`<div class="reader-shell" id="readerShell">
-      <header class="reader-header">
-        <button class="reader-back" data-route="${mode==='app'?'feed':'library'}">${icon('chevron','icon-sm')}<span>Voltar</span></button>
-        <div class="reader-header-book"><span class="eyebrow">READIUM WEB PUBLICATION</span><strong>${esc(b.title)}</strong><small>${esc(b.author)}</small></div>
-        <button class="reader-bookmark" id="bookmarkBtn">${icon('bookmark','icon-sm')}<span>Marcar posição</span><b>${state.readerPage}%</b></button>
-      </header>
+      <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${mode==='app'?'feed':'library'}" aria-label="Voltar">${icon('chevron','icon-sm')}<span>Voltar</span></button></div>
+      <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
+      <div class="reader-overlay reader-overlay-right"><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon('bookmark','icon-sm')}</button></div>
       <main class="reader-main"><div class="readium-host" id="readium-reader"><p class="muted">Carregando publicação reader-ready…</p></div></main>
-      <footer class="reader-progress"><div class="reader-progress-top"><span>Progresso da leitura</span><span id="readerProgressValue">${state.readerPage}%</span></div><progress class="reader-progress-bar" id="readerProgressBar" max="100" value="${state.readerPage}"></progress></footer>
     </div>`;
     shell(content,b.title);
     const host=document.getElementById('readium-reader');
-    if(host && window.__BOOKRUSH_READIUM__){ window.__BOOKRUSH_READIUM__.mount(state.readerBook,host,p=>{ const percent=Math.round((p||0)*100); if(percent>0){state.readerPage=percent;window.__BOOKRUSH_API__?.progress?.(state.readerBook,percent,percent).catch(()=>{});const value=document.getElementById('readerProgressValue');if(value)value.textContent=`${percent}%`;const bar=document.getElementById('readerProgressBar');if(bar)bar.value=percent;const mark=document.querySelector('.reader-bookmark b');if(mark)mark.textContent=`${percent}%`;}}).catch(e=>{host.innerHTML=`<p class="notice error">${esc(e.message||'Não foi possível abrir a publicação Readium.')}</p>`;}); }
+    if(host && window.__BOOKRUSH_READIUM__){ window.__BOOKRUSH_READIUM__.mount(state.readerBook,host,p=>{ const percent=Math.round((p||0)*100); if(percent>0){state.readerPage=percent;window.__BOOKRUSH_API__?.progress?.(state.readerBook,percent,percent).catch(()=>{});}}).catch(e=>{host.innerHTML=`<p class="notice error">${esc(e.message||'Não foi possível abrir a publicação Readium.')}</p>`;}); }
     document.getElementById('bookmarkBtn')?.addEventListener('click',async()=>{await window.__BOOKRUSH_API__?.bookmark?.(state.readerBook,Math.round(state.readerPage));save();toast(`Página marcada em ${state.readerPage}%`)});
   }
 

@@ -115,3 +115,6 @@ cliente.
 A tela do leitor mantém somente o `WebPubNavigator` do Readium: não há texto de exemplo, slider de paginação, controle manual de fonte/tema ou barra móvel paralela. O shell fornece apenas metadados do livro, progresso persistido e marcador; navegação, paginação e renderização pertencem à publicação Readium.
 
 O layout atual do leitor usa uma única coluna responsiva: um cabeçalho compacto para retorno e marcador, o `readium-host` centralizado para o WebPubNavigator e o progresso fixado na base. Os painéis laterais do protótipo antigo não participam da rota de leitura.
+
+
+O leitor ocupa a viewport inteira para preservar a área útil do Readium. Os comandos externos ficam ocultos até foco/hover e funcionam como uma camada mínima de retorno e marcador, deixando o conteúdo e a paginação sob responsabilidade do navegador Readium.
