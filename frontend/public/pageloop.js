@@ -117,7 +117,7 @@
         <button class="primary-btn open-read" data-open-book="${b.id}">${icon('play','icon-sm')} Ler agora</button>
       </div>
       <div class="action-rail">
-        <button class="action ${state.likes[b.id]?'liked':''}" data-like="${b.id}"><span class="action-bubble">${icon('heart','icon-lg')}</span><span class="action-count">${compact(b.likes+(state.likes[b.id]?1:0))}</span></button>
+        <button class="action ${state.likes[b.id]?'liked':''}" data-like="${b.id}"><span class="action-bubble">${icon('heart','icon-lg')}</span><span class="action-count">${compact(b.likes)}</span></button>
         <button class="action" data-comments="${b.id}"><span class="action-bubble">${icon('comment','icon-lg')}</span><span class="action-count">${compact(b.comments)}</span></button>
         <button class="action ${state.saved[b.id]?'saved':''}" data-save="${b.id}"><span class="action-bubble">${icon('bookmark','icon-lg')}</span><span class="action-count">${state.saved[b.id]?'Salvo':'Salvar'}</span></button>
         <button class="action" data-share="${b.id}"><span class="action-bubble">${icon('share','icon-lg')}</span><span class="action-count">${compact(b.shares)}</span></button>
