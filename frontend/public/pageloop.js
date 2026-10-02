@@ -88,7 +88,7 @@
     document.querySelectorAll('[data-route]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.route)));
     document.querySelectorAll('[data-action="notify"]').forEach(el=>el.addEventListener('click',()=>toast('Você está em dia. Nenhuma notificação nova.')));
   }
-  function go(route){state.route=route;render();}
+  function go(route){if(state.route==='reader'&&route!=='reader'){state.route=route;void Promise.resolve(window.__BOOKRUSH_READIUM__?.unmount?.()).catch(()=>{}).finally(render);return;}state.route=route;render();}
 
   function render(){
     switch(state.route){
@@ -192,7 +192,7 @@
       <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${mode==='app'?'feed':'library'}" aria-label="Voltar">${icon('chevron','icon-sm')}<span>Voltar</span></button></div>
       <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
       <div class="reader-overlay reader-overlay-right"><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon('bookmark','icon-sm')}</button></div>
-      <main class="reader-main"><div class="readium-host" id="readium-reader"><p class="muted">Carregando publicação reader-ready…</p></div></main>
+      <main class="reader-main"><div class="readium-host" id="readium-reader" aria-label="Leitor Readium"></div></main>
     </div>`;
     shell(content,b.title);
     const host=document.getElementById('readium-reader');

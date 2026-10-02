@@ -121,3 +121,12 @@ O leitor ocupa a viewport inteira para preservar a área útil do Readium. Os co
 
 
 A tela de leitura também suprime o seletor global do protótipo enquanto o Readium está aberto, evitando que o modo mobile/web apareça sobre a publicação.
+
+
+Ao sair da rota de leitura, o frontend destrói explicitamente o `WebPubNavigator` antes de uma nova abertura. Isso evita manter um iframe/blob antigo e garante que uma reabertura recrie o fetcher autenticado e a publicação atual.
+
+
+O fetcher autenticado usa `cache: no-store` para manifesto e recursos da publicação, evitando que uma segunda montagem reutilize um blob/iframe inválido. A saída aguarda `unmount()` terminar antes de renderizar a rota anterior.
+
+
+O host do Readium começa vazio; o frontend não deixa um texto de carregamento sobreposto ao iframe, e só renderiza uma mensagem quando a montagem falha.
