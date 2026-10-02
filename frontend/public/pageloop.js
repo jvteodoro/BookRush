@@ -75,7 +75,7 @@
       </section>
       <div class="toast-stack"></div>
     </div>
-    ${mode==='web'?`<div class="prototype-switcher"><a class="prototype-pill" href="${state.route==='admin'?'admin.html':state.route==='publisher'?'publisher.html':'app.html'}">${state.route==='admin'||state.route==='publisher'?'BookRush':'BookRush Mobile'}</a></div>`:''}`;
+    ${mode==='web'&&state.route!=='reader'?`<div class="prototype-switcher"><a class="prototype-pill" href="${state.route==='admin'?'admin.html':state.route==='publisher'?'publisher.html':'app.html'}">${state.route==='admin'||state.route==='publisher'?'BookRush':'BookRush Mobile'}</a></div>`:''}`;
     bindCommon();
   }
 

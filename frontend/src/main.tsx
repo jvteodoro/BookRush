@@ -287,8 +287,8 @@ function App() {
         };
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';
         if (document.querySelector('script[data-bookrush-pageloop]')) return;
-        const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261002-readium-kindle'; document.head.appendChild(style);
-        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261002-readium-kindle'; script.async = true; document.body.appendChild(script);
+        const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261002-readium-kindle-2'; document.head.appendChild(style);
+        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261002-readium-kindle-2'; script.async = true; document.body.appendChild(script);
       } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o catálogo.'); }
     }
     void startPrototype();

@@ -84,7 +84,10 @@ public class ContentController {
     String body = Arrays.stream(chapterText.split("\\R\\s*\\R", -1)).map(String::trim).filter(s -> !s.isBlank())
         .map(s -> "<p>" + escape(s).replace("\\n", "<br>") + "</p>").reduce("", String::concat);
     String title = escape(String.valueOf(chapter.getOrDefault("title", "Chapter")));
-    return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body("<!doctype html><html><head><meta charset=\"utf-8\"><title>" + title + "</title><style>body{font:1.1rem/1.7 system-ui;max-width:42rem;margin:2rem auto;padding:0 1rem}</style></head><body><h1>" + title + "</h1>" + body + "</body></html>");
+    String html = "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>" + title + "</title><style>"
+        + ":root{color-scheme:light}*{box-sizing:border-box}html{background:#f7f4ee}body{color:#29261f;background:#f7f4ee;font-family:Georgia,\"Times New Roman\",serif;font-size:clamp(1.08rem,1.25vw,1.32rem);line-height:1.82;max-width:46rem;margin:0 auto;padding:clamp(3.5rem,9vh,7rem) clamp(1.25rem,4vw,3rem) 8rem}h1{font-size:clamp(1.8rem,3vw,2.6rem);font-weight:600;line-height:1.2;text-align:center;margin:0 0 3rem;color:#342f28}p{margin:0 0 1.35em;text-wrap:pretty}p:first-of-type:first-letter{float:left;font-size:4.1em;line-height:.8;padding:0 .1em 0 0;color:#6c5d4c}@media(max-width:640px){body{font-size:1.08rem;line-height:1.76;padding:3.5rem 1.2rem 6rem}h1{margin-bottom:2.4rem}}"
+        + "</style></head><body><h1>" + title + "</h1>" + body + "</body></html>";
+    return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(html);
   }
 
   private List<Map<String, Object>> chaptersFor(UUID bookId) {

@@ -118,3 +118,6 @@ O layout atual do leitor usa uma única coluna responsiva: um cabeçalho compact
 
 
 O leitor ocupa a viewport inteira para preservar a área útil do Readium. Os comandos externos ficam ocultos até foco/hover e funcionam como uma camada mínima de retorno e marcador, deixando o conteúdo e a paginação sob responsabilidade do navegador Readium.
+
+
+A tela de leitura também suprime o seletor global do protótipo enquanto o Readium está aberto, evitando que o modo mobile/web apareça sobre a publicação.
