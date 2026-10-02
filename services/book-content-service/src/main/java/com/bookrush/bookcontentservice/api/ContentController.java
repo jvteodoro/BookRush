@@ -1,6 +1,5 @@
 package com.bookrush.bookcontentservice.api;
 
-import java.net.URI;
 import java.util.*;
 import org.springframework.http.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -75,11 +74,10 @@ public class ContentController {
     Map<String, Object> chapter = chaptersFor(bookId).stream().filter(c -> chapterId.toString().equals(String.valueOf(c.get("id")))).findFirst()
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chapter not found"));
     UUID version = UUID.fromString(String.valueOf(chapter.get("text_asset_version_id")));
-    Map<?, ?> link = catalog.get().uri("/api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/download-url", bookId, version)
-        .header("X-Content-Service-Token", catalogServiceToken).retrieve().body(Map.class);
-    if (link == null || link.get("url") == null) throw new ResponseStatusException(HttpStatus.CONFLICT, "Text artifact unavailable");
-    String text = RestClient.create().get().uri(URI.create(String.valueOf(link.get("url")))).retrieve().body(String.class);
-    int count = text == null ? 0 : text.codePointCount(0, text.length());
+    String text = catalog.get().uri("/api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/content", bookId, version)
+        .header("X-Content-Service-Token", catalogServiceToken).retrieve().body(String.class);
+    if (text == null) throw new ResponseStatusException(HttpStatus.CONFLICT, "Text artifact unavailable");
+    int count = text.codePointCount(0, text.length());
     int start = Math.min(Math.max(((Number) chapter.getOrDefault("start_offset", 0)).intValue(), 0), count);
     int end = Math.min(Math.max(((Number) chapter.getOrDefault("end_offset", start)).intValue(), start), count);
     String chapterText = sliceCodePoints(text == null ? "" : text, start, end);

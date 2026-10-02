@@ -82,3 +82,20 @@ de coordenação e bucket/key/operação/resultado/duração no adaptador. Timer
 interno mede aquisição do stream, não todo o consumo. Falhas de compensação têm
 log específico sem stack do SDK. Não habilitar wire logging do SDK nem access
 logs com query string no proxy S3; assinaturas são credenciais temporárias.
+
+## SeaweedFS volume capacity
+
+O Compose local inicia um único servidor SeaweedFS para os buckets `books-raw`,
+`books-processing`, `books-ml` e `books-public`. O limite de volumes é 256 para
+permitir crescimento do bucket público depois que os volumes históricos dos
+outros buckets forem alocados. Aumentar `-volume.max` é uma alteração aditiva:
+não remove nem recria o volume persistente `seaweedfs_data`. Após alterar a
+imagem, reconcilie somente o serviço com:
+
+```bash
+docker compose -f infrastructure/compose.yaml --env-file .env up -d --build --wait seaweedfs
+```
+
+Valide `GET http://127.0.0.1:9333/dir/status?pretty=y` dentro do container e
+confirme que o layout `books-public` possui volumes graváveis antes de testar o
+manifesto Readium.

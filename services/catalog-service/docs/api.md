@@ -29,3 +29,11 @@ continuam sujeitos às rotas de distribuição e às políticas de direitos.
 chapter projection for the book, including the exact text asset version,
 Unicode code-point offsets, hierarchy and projection confidence. The endpoint
 is read-only and remains owned by the catalog service.
+
+The content service uses the authenticated internal route
+`GET /api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/content`
+with `X-Content-Service-Token`. It streams the exact `AVAILABLE` normalized
+text version after checking the book, asset and object-storage metadata. This
+keeps presigned browser capabilities separate from the server-side Readium
+chapter proxy and prevents container-local storage URLs from leaking into the
+reader flow.

@@ -38,5 +38,13 @@ authorization.
 
 The chapter proxy calls catalog with `X-Content-Service-Token`. Configure
 `CATALOG_READER_INTERNAL_TOKEN` and `CATALOG_SERVICE_TOKEN` from the same
-protected environment secret. The catalog validates this token before issuing
-a URL for a processing text asset; the browser cannot call that route directly.
+protected environment secret. The catalog validates this token and streams the
+exact approved text version to the content service; the browser cannot call
+that internal route directly. This avoids making a presigned URL containing a
+container-local `localhost` endpoint part of the reader flow.
+
+The manifest write to S3 is content-addressed. The reader response remains
+available from the catalog projection while the artifact store is temporarily
+unavailable. The SeaweedFS single-node development runtime reserves 256 volume
+slots because raw, processing, ML and public bucket layouts share one volume
+server; existing volumes are preserved when this limit is increased.

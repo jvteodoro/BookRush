@@ -21,7 +21,28 @@ tags:
     PostgreSQL.
 - name: Distribuição
   description: Acesso de leitura a assets aprovados por URL pré-assinada.
+- name: Conteúdo reader
+  description: Projeção de capítulos e leitura interna da versão textual exata.
 paths:
+  /api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/content:
+    get:
+      tags: [Conteúdo reader]
+      summary: Transmitir versão textual exata ao content-service
+      description: Rota interna autenticada pelo token de conteúdo; não expõe URL permanente nem é destinada ao navegador.
+      operationId: streamTextVersion
+      parameters:
+        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: versionId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-Content-Service-Token, in: header, required: true, schema: {type: string, format: password}}
+      responses:
+        '200':
+          description: Texto UTF-8 normalizado da versão aprovada.
+          content:
+            text/plain:
+              schema: {type: string}
+        '401': {description: Token interno ausente ou inválido.}
+        '404': {description: Livro, asset ou versão não encontrada.}
+        '409': {description: Objeto ausente; reconciliação de storage necessária.}
   /api/internal/v1/catalog/books:
     get:
       tags: [Catálogo interno]

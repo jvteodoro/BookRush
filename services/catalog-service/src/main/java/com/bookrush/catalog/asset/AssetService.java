@@ -476,6 +476,22 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
     });
   }
 
+  /** Streams the exact approved text version to an authenticated content-service caller. */
+  public InputStream downloadVersion(UUID book, UUID versionId) {
+    ObjectStorage.Location location = tx.execute(s -> {
+      BookAssetVersion version = em.find(BookAssetVersion.class, versionId);
+      if (version == null) throw missing();
+      BookAsset asset = asset(book, version.getBookAssetId());
+      if (asset.getStatus() == BookAssetStatus.DELETED
+          || version.getStatus() != BookAssetVersionStatus.AVAILABLE) throw missing();
+      ObjectStorage.Location candidate = location(version);
+      if (storage.head(candidate).isEmpty())
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Object missing; reconciliation required");
+      return candidate;
+    });
+    return storage.download(location);
+  }
+
   public void delete(UUID book, UUID id) {
     List<VersionView> versions =
         tx.execute(

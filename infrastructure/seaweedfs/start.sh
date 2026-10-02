@@ -13,4 +13,8 @@ cat > /etc/seaweedfs/filer.toml <<'EOF_FILER'
 enabled = true
 dir = "/data/filer"
 EOF_FILER
-exec weed server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=128 -volume.max=32 -s3 -s3.config=/tmp/bookrush-s3.json
+# Keep enough volume slots for the per-bucket layouts used by BookRush. The
+# previous limit of 32 was exhausted by the existing raw/processing/ML
+# collections, leaving books-public without a writable volume. Increasing the
+# limit is additive: existing volume metadata and data remain untouched.
+exec weed server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=128 -volume.max=256 -s3 -s3.config=/tmp/bookrush-s3.json
