@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+queries_file="$repo_dir/docs/database/queries.sql"
+test -f "$queries_file"
+export BOOKRUSH_QUERIES_FILE="$queries_file"
 run_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-db-test.XXXXXXXX")"
 project="$(basename "$run_dir" | tr '[:upper:].' '[:lower:]-')"
 compose=(docker compose --project-name "$project" -f "$repo_dir/infrastructure/compose.database-test.yaml")
