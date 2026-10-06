@@ -21,10 +21,24 @@ container="$(docker run -d --name "$name" \
   -p 127.0.0.1::8080 quay.io/keycloak/keycloak:25.0 start-dev --http-port=8080 --import-realm)"
 port="$(docker port "$container" 8080/tcp | awk -F: '{print $NF}')"
 base="http://127.0.0.1:$port"
-for _ in $(seq 1 60); do
+ready=false
+for _ in $(seq 1 180); do
   if curl -fsS "$base/realms/master/.well-known/openid-configuration" >/dev/null 2>&1; then break; fi
+  if [[ "$(docker inspect --format '{{.State.Running}}' "$container")" != "true" ]]; then
+    echo 'Keycloak descartável encerrou antes de disponibilizar o discovery OIDC' >&2
+    docker logs "$container" >&2 || true
+    exit 1
+  fi
   sleep 1
 done
+if curl -fsS "$base/realms/master/.well-known/openid-configuration" >/dev/null 2>&1; then
+  ready=true
+fi
+if [[ "$ready" != true ]]; then
+  echo 'Timeout aguardando o discovery OIDC do Keycloak descartável' >&2
+  docker logs "$container" >&2 || true
+  exit 1
+fi
 curl -fsS "$base/realms/bookrush/.well-known/openid-configuration" >/dev/null
 curl -fsS "$base/realms/bookrush-platform/.well-known/openid-configuration" >/dev/null
 logs="$(docker logs "$container" 2>&1)"
