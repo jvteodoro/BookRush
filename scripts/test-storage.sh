@@ -19,7 +19,33 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-"${compose[@]}" up -d --build --wait --wait-timeout 180 postgres seaweedfs
+wait_for_healthy() {
+  local service="$1" timeout_seconds="${2:-180}" container health deadline
+  container="$("${compose[@]}" ps -q "$service")"
+  test -n "$container"
+  deadline=$(( $(date +%s) + timeout_seconds ))
+  while (( $(date +%s) < deadline )); do
+    health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null || true)"
+    case "$health" in
+      healthy) echo "$service: healthy"; return 0 ;;
+      unhealthy|dead|exited)
+        echo "$service: health=$health" >&2
+        docker logs --tail=120 "$container" >&2 || true
+        return 1
+        ;;
+    esac
+    echo "$service: aguardando healthcheck (estado=${health:-unknown})"
+    sleep 2
+  done
+  echo "$service: timeout aguardando healthcheck de ${timeout_seconds}s" >&2
+  docker inspect "$container" >&2 || true
+  docker logs --tail=160 "$container" >&2 || true
+  return 1
+}
+
+"${compose[@]}" up -d --build postgres seaweedfs
+wait_for_healthy postgres 180
+wait_for_healthy seaweedfs 180
 # Preserve the dynamically allocated port when recreating SeaweedFS.
 STORAGE_TEST_PORT="$("${compose[@]}" port seaweedfs 8333 | awk -F: '{print $NF}')"
 export STORAGE_TEST_PORT
@@ -38,7 +64,8 @@ if [[ "$result" != 0 ]]; then exit "$result"; fi
 docker cp "$test_container:/workspace/persistence-url" "$run_dir/persistence-url"
 # curl config avoids placing the signed capability in logs or process arguments.
 docker run --rm --network host -i --entrypoint curl "$test_image" --fail --silent --show-error --config - < "$run_dir/persistence-url" > "$run_dir/probe-before"
-"${compose[@]}" up -d --no-deps --force-recreate --wait --wait-timeout 180 seaweedfs
+"${compose[@]}" up -d --no-deps --force-recreate seaweedfs
+wait_for_healthy seaweedfs 180
 docker run --rm --network host -i --entrypoint curl "$test_image" --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1 --config - < "$run_dir/persistence-url" > "$run_dir/probe-after"
 cmp "$run_dir/probe-before" "$run_dir/probe-after"
 echo "External presigned GET and persistence after recreation: OK"
@@ -62,7 +89,8 @@ data_volume="$(docker inspect "$weed_container" --format '{{range .Mounts}}{{if 
 docker volume rm "$data_volume" > /dev/null
 docker volume create "$data_volume" > /dev/null
 docker run --rm --network none --mount "type=volume,src=$backup_volume,dst=/backup,readonly" --mount "type=volume,src=$data_volume,dst=/data" --entrypoint sh "$test_image" -c 'cp -a /backup/. /data/'
-"${compose[@]}" up -d --no-deps --wait --wait-timeout 180 seaweedfs
+"${compose[@]}" up -d --no-deps seaweedfs
+wait_for_healthy seaweedfs 180
 docker run --rm --network host -i --entrypoint curl "$test_image" --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1 --config - < "$run_dir/persistence-url" > "$run_dir/probe-after"
 cmp "$run_dir/probe-before" "$run_dir/probe-after"
 echo "PostgreSQL logical restore and SeaweedFS physical restore: OK"

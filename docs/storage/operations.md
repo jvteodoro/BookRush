@@ -104,3 +104,9 @@ O limite padrão de espaço livre do SeaweedFS permanece em 1% em produção. O
 `compose.storage-test.yaml` usa `STORAGE_MIN_FREE_SPACE=100MiB` porque o stack
 é descartável e pode rodar em agentes CI com disco quase cheio; esse valor não
 deve ser copiado para o volume persistente de produção.
+
+O teste `scripts/test-storage.sh` não depende do `docker compose --wait` para
+as recriações do SeaweedFS. Ele consulta o health status do container com
+timeout de 180 segundos, emite heartbeat durante a espera e imprime inspeção e
+logs do container quando a saúde não converge. Isso evita que um daemon Docker
+lento pareça um travamento silencioso para o heartbeat durável do Jenkins.
