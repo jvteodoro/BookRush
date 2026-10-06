@@ -10,3 +10,8 @@ Every mutation requires the authenticated `(iss, sub)` principal. Opening a
 book is an idempotent upsert in `reader_state.recent`, so retries from a mobile
 client do not create duplicate rows. The controller test covers the SQL
 upsert and the unauthenticated rejection path.
+
+The upsert keeps the service's canonical SQL contract in lowercase compact
+form (`insert into ... on conflict ...`). This representation is covered by
+the unit test so refactors cannot silently change the statement used by the
+reader-state adapter.

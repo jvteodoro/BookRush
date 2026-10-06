@@ -42,8 +42,8 @@ public class ReaderStateController {
 
   @PostMapping("/books/{bookId}/opened")
   public Map<String, Object> opened(@PathVariable UUID bookId, Principal principal) {
-    jdbc.update("INSERT INTO reader_state.recent(subject_key, book_id) VALUES (?, ?) "
-        + "ON CONFLICT (subject_key, book_id) DO UPDATE SET last_opened_at = now()",
+    jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?) "
+        + "on conflict(subject_key,book_id) do update set last_opened_at=now()",
         subject(principal), bookId);
     return Map.of("bookId", bookId, "recorded", true);
   }

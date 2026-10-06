@@ -10,7 +10,7 @@ trap 'rm -f "$ingestion_log" "$database_log"' EXIT
 
 cd "$repo_root"
 echo "[1/2] ingestion fixtures: staging replay, matching, subjects and Wikidata snapshot"
-docker build --target build -t bookrush/ingestion-e2e services/book-ingestion-service >/dev/null
+docker build --target build -t bookrush/ingestion-e2e -f services/book-ingestion-service/Dockerfile . >/dev/null
 docker run --rm --entrypoint mvn bookrush/ingestion-e2e test -DskipTests=false | tee "$ingestion_log"
 grep -Eq 'Tests run: 26, Failures: 0, Errors: 0' "$ingestion_log"
 
