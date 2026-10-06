@@ -24,8 +24,9 @@ docker cp "$repo_dir/infrastructure/keycloak/bookrush-realm.json" \
 docker cp "$repo_dir/infrastructure/keycloak/bookrush-platform-realm.json" \
   "$container:/opt/keycloak/bookrush-platform-realm.json"
 docker start "$container" >/dev/null
-port="$(docker port "$container" 8080/tcp | awk -F: '{print $NF}')"
-base="http://127.0.0.1:$port"
+container_ip="$(docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container")"
+test -n "$container_ip"
+base="http://$container_ip:8080"
 ready=false
 for _ in $(seq 1 180); do
   if curl -fsS "$base/realms/master/.well-known/openid-configuration" >/dev/null 2>&1; then break; fi
