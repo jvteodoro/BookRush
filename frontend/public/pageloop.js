@@ -208,13 +208,78 @@
       <div class="section-row"><h2>Mais recomendações do seu feed</h2><span class="muted tiny">Baseado em temas e comportamento</span></div><div class="book-grid">${BOOKS.slice(5,10).map(bookCard).join('')}</div></main>`;
     shell(content,'Recomendações');
     document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));
-    document.getElementById('luckyBtn').onclick=()=>{const b=BOOKS[Math.floor(Math.random()*BOOKS.length)];openLucky(b)};
+    document.getElementById('luckyBtn').onclick=openLuckyPrompt;
   }
 
-  function openLucky(b){
-    modal(`<div class="eyebrow">ESTOU COM SORTE</div><h2>${esc(b.title)}</h2><p>${esc(b.quote)}</p><div style="display:flex;gap:10px;align-items:center;margin-top:18px"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};background:linear-gradient(145deg,${b.a},${b.b})"></div><div><strong>${esc(b.author)}</strong><div class="muted tiny">${b.genre} • ${b.pages} páginas</div></div></div>`,`<button class="secondary-btn" data-close-modal>Outra vez</button><button class="primary-btn" data-modal-open="${b.id}">Ler este livro ${icon('arrow','icon-sm')}</button>`);
-    document.querySelector('[data-close-modal]').onclick=()=>{document.querySelector('.modal-wrap').remove();document.getElementById('luckyBtn').click()};
-    document.querySelector('[data-modal-open]').onclick=()=>openBook(b.id);
+    const LUCKY_PALETTES=[['#82d4a4','#213e35'],['#74b9ff','#202b52'],['#f0a8bd','#5a2337'],['#c7d87a','#26311f'],['#d2aa6d','#4a2e1f']];
+  const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
+  function scoreBook(b,terms){
+    const title=norm(b.title), author=norm(b.author), kw=(b.keywords||[]).map(norm), text=norm(b.quote);
+    let total=0;
+    for(const t of terms){
+      let s=0;
+      if(new RegExp('(^|[^a-z0-9])'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z0-9]|$)').test(title)) s+=4;
+      else if(title.includes(t)) s+=3;
+      if(author.includes(t)) s+=2;
+      if(kw.some(k=>k.includes(t))) s+=2;
+      if(text.includes(t)) s+=1;
+      if(!s) return 0; // todas as palavras precisam casar em algum campo
+      total+=s;
+    }
+    return total;
+  }
+
+  function localLucky(term){
+    const terms=norm(term).split(/\s+/).filter(t=>t.length>1);
+    if(!terms.length) return [];
+    return BOOKS.map(b=>({b,s:scoreBook(b,terms)})).filter(x=>x.s>0).sort((x,y)=>y.s-x.s).map(x=>x.b);
+  }
+
+  async function remoteLucky(term){
+    try{
+      const r=await fetch('/api/v1/books?q='+encodeURIComponent(term)+'&size=20',{credentials:'same-origin'});
+      if(!r.ok) return [];
+      const page=await r.json();
+      return (page.items||[]).filter(i=>!BOOKS.some(b=>b.id===i.id)).map((i,n)=>{
+        const p=LUCKY_PALETTES[n%LUCKY_PALETTES.length];
+        const book={id:i.id,title:i.canonicalTitle,author:'Catálogo BookRush',genre:(i.originalLanguage||'Clássico').toUpperCase(),keywords:[],match:80,a:p[0],b:p[1],quote:i.description||`Descubra ${i.canonicalTitle} no catálogo BookRush.`,likes:0,comments:0,shares:0,pages:0,progress:0};
+        BOOKS.push(book); // necessário para book(id)/openBook funcionarem
+        return book;
+      });
+    }catch{ return []; }
+  }
+
+  function openLuckyPrompt(){
+    modal(`<div class="eyebrow">ESTOU COM SORTE</div><h2>Quer dar uma dica?</h2><p>Digite uma palavra (ex.: <em>campo</em>, <em>amor</em>, <em>Machado</em>) e eu sorteio um livro relacionado. Deixe em branco para uma surpresa total.</p><input id="luckyTerm" class="lucky-input" maxlength="60" placeholder="Uma palavra, título ou autor…" autocomplete="off" autofocus/>`,
+      `<button class="secondary-btn" data-close-modal>Cancelar</button><button class="primary-btn" id="luckyGo">${icon('sparkle','icon-sm')} Sortear</button>`);
+    const input=document.getElementById('luckyTerm');
+    const go=()=>pickLucky(input.value.trim());
+    document.getElementById('luckyGo').onclick=go;
+    input.addEventListener('keydown',e=>{if(e.key==='Enter')go()});
+    setTimeout(()=>input.focus(),0);
+  }
+
+  async function pickLucky(term,excludeId){
+    let pool=term?localLucky(term):BOOKS.slice();
+    if(term&&!pool.length) pool=await remoteLucky(term).then(r=>r.length?localLucky(term).concat(r.filter(b=>!localLucky(term).includes(b))):[]);
+    pool=pool.filter(b=>b.id!==excludeId);
+    let note='';
+    if(!pool.length){
+      pool=BOOKS.filter(b=>b.id!==excludeId);
+      if(term) note=`Nada encontrado para “${term}”. Sorteei outro livro para você.`;
+    }
+    if(!pool.length){toast('Nenhum livro disponível no momento.');return;}
+    const top=term&&!note?pool.slice(0,5):pool;
+    openLucky(top[Math.floor(Math.random()*top.length)],term,note);
+  }
+
+  function openLucky(b,term='',note=''){
+    modal(`<div class="eyebrow">ESTOU COM SORTE${term&&!note?` · “${esc(term)}”`:''}</div><h2>${esc(b.title)}</h2>${note?`<p class="notice">${esc(note)}</p>`:''}<p>${esc(b.quote)}</p><div style="display:flex;gap:10px;align-items:center;margin-top:18px"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};background:linear-gradient(145deg,${b.a},${b.b})"></div><div><strong>${esc(b.author)}</strong><div class="muted tiny">${esc(b.genre)}${b.pages?` • ${b.pages} páginas`:''}</div></div></div>`,
+      `<button class="ghost-btn" data-lucky-change>Mudar palavra</button><button class="secondary-btn" data-lucky-again>Outra vez</button><button class="primary-btn" data-modal-open="${b.id}">Ler este livro ${icon('arrow','icon-sm')}</button>`);
+    document.querySelector('[data-lucky-again]').onclick=()=>{document.querySelector('.modal-wrap')?.remove();pickLucky(note?'':term,b.id)};
+    document.querySelector('[data-lucky-change]').onclick=openLuckyPrompt;
+    document.querySelector('[data-modal-open]').onclick=()=>{document.querySelector('.modal-wrap')?.remove();openBook(b.id)};
   }
 
   function renderSearch(){
