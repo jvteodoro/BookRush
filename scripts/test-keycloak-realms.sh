@@ -11,14 +11,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-container="$(docker run -d --name "$name" \
+container="$(docker create --name "$name" \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
   -e KC_BOOTSTRAP_ADMIN_PASSWORD=validation-only \
   -e KEYCLOAK_ADMIN=admin \
   -e KEYCLOAK_ADMIN_PASSWORD=validation-only \
-  -v "$repo_dir/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro" \
-  -v "$repo_dir/infrastructure/keycloak/bookrush-platform-realm.json:/opt/keycloak/data/import/bookrush-platform-realm.json:ro" \
-  -p 127.0.0.1::8080 quay.io/keycloak/keycloak:25.0 start-dev --http-port=8080 --import-realm)"
+  -p 127.0.0.1::8080 \
+  --entrypoint /bin/sh quay.io/keycloak/keycloak:25.0 \
+  -c 'mkdir -p /opt/keycloak/data/import && cp /opt/keycloak/bookrush-*.json /opt/keycloak/data/import/ && exec /opt/keycloak/bin/kc.sh start-dev --http-port=8080 --import-realm')"
+docker cp "$repo_dir/infrastructure/keycloak/bookrush-realm.json" \
+  "$container:/opt/keycloak/bookrush-realm.json"
+docker cp "$repo_dir/infrastructure/keycloak/bookrush-platform-realm.json" \
+  "$container:/opt/keycloak/bookrush-platform-realm.json"
+docker start "$container" >/dev/null
 port="$(docker port "$container" 8080/tcp | awk -F: '{print $NF}')"
 base="http://127.0.0.1:$port"
 ready=false
