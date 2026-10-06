@@ -81,10 +81,12 @@ usa ../../docs/database/queries.sql. A fixture está em src/test/resources e
 ## Analytics
 
 O schema `analytics` é de propriedade do `book-analytics-service` e não é
-migrado pelo catalog-service. Sua migration inicial referencia por FK a versão
-exata em `catalog.book_asset_version`; consulte o [ADR-004](../adr/ADR-004-analytics-ownership.md)
-e o [relatório de analytics](../analytics/report.md) para o modelo de
-excerpts/features/embeddings e seu estado operacional.
+migrado pelo catalog-service. Ele referencia por FK a versão exata em
+`catalog.book_asset_version` e, quando aplicável, `catalog.book_chapter`.
+Consulte o [ADR-004](../adr/ADR-004-analytics-ownership.md), o
+[modelo de dados de analytics](../analytics/data-model.md) e o
+[relatório operacional](../analytics/report.md) para excerpts, features,
+embeddings, anotações, consumidores e evidências de execução.
 
 Para acessar dados pelo DBeaver sem publicar PostgreSQL na internet, siga o
 [guia de acesso remoto por SSH](dbeaver-access.md). Use sempre a credencial

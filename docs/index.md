@@ -33,8 +33,10 @@ do serviço no catálogo Backstage; a propriedade e os limites estão em
 [ADR-004](adr/ADR-004-analytics-ownership.md).
 Consulte também o [contrato Analytics V1](analytics-v1.md) e o
 [procedimento de preparação de modelos](analytics-models.md).
-O [relatório operacional e de schema](analytics/report.md) consolida a execução
-validada, o modelo relacional e as limitações atuais.
+O [modelo de dados de analytics](analytics/data-model.md) documenta o schema
+atual, diagramas E/R, linhagem, anotações humanas e consumidores. O
+[relatório operacional](analytics/report.md) consolida a execução validada e
+as limitações atuais.
 O [relatório de integração de excerpts no feed](analytics/excerpt-feed-integration.md)
 descreve o que já está persistido, o contrato interno disponível e as etapas
 necessárias para apresentar trechos com fallback seguro.

@@ -1,6 +1,6 @@
-# Relatório operacional e schema da pipeline de analytics
+# Relatório operacional da pipeline de analytics
 
-**Data da inspeção:** 30 de setembro de 2026 (BRT)  
+**Base de evidência operacional:** 30 de setembro de 2026 (BRT)
 **Owner:** `book-analytics-service` / schema PostgreSQL `analytics`  
 **Escopo:** estado implementado e dados persistidos; este documento não declara
 prontidão para processamento em massa ou validação científica de modelos.
@@ -11,7 +11,7 @@ A pipeline barata está operacional no ambiente atual. O serviço Spring Boot é
 único writer do schema `analytics`, o worker persistente está habilitado e o
 modo offline está ativo. A execução não baixa modelos no startup.
 
-A inspeção do PostgreSQL encontrou:
+A inspeção do PostgreSQL naquela data encontrou:
 
 | Medida | Valor |
 | --- | ---: |
@@ -25,11 +25,17 @@ A inspeção do PostgreSQL encontrou:
 | Features de documento persistidas | 0 |
 | Features de capítulo persistidas | 0 |
 
-O último job que processou duas versões textuais foi criado em 15/09/2026,
+O último job registrado nessa inspeção, que processou duas versões textuais, foi criado em 15/09/2026,
 terminou com `COMPLETED`, processou 2/2 itens e não registrou falhas. Os dados
 foram produzidos a partir da validação controlada dos livros Gutenberg 84 e
 1342. O histórico de incidentes e o procedimento reprodutível estão em
 [troubleshooting da pipeline](pipeline-troubleshooting.md).
+
+As migrations V7–V14 evoluíram o modelo após essa fotografia: metadados V2 de
+features, runtime opcional linguístico/semântico, campanhas de anotação humana
+e elegibilidade estrutural para o feed. Isso não altera os números acima. O
+[modelo de dados](data-model.md) separa estruturas implementadas de observações
+efetivamente produzidas.
 
 ## Fronteira e linhagem
 
@@ -80,7 +86,7 @@ crawling ou processamento em massa no boot.
 
 As migrations estão no caminho
 `services/book-analytics-service/src/main/resources/db/migration` do checkout.
-Elas são aditivas; V1–V6 não devem ser alteradas depois de aplicadas.
+Elas são aditivas; nenhuma migration aplicada deve ser alterada.
 
 | Grupo | Tabelas | Responsabilidade |
 | --- | --- | --- |
@@ -89,6 +95,7 @@ Elas são aditivas; V1–V6 não devem ser alteradas depois de aplicadas.
 | Trechos | `excerpt`, `excerpt_rank` | Texto candidato, offsets, hash, gerador e score explicável. |
 | Embeddings | `embedding_model`, `document_embedding`, `chapter_embedding`, `excerpt_embedding` | Identidade de modelo, dimensão, hash de entrada e referência ao artefato externo. |
 | Artefatos/modelos | `model_artifact`, `corpus_frequency_model`, `style_normalization_model`, `prototype_set`, `topic_model` | Reprodutibilidade de modelos, corpus, protótipos e classificadores. |
+| Qualidade humana | `annotation_campaign`, `annotation_campaign_item`, `annotation_assignment`, `annotation`, `annotation_dimension_value`, `annotation_failure_tag`, `annotation_context_diagnostic`, `annotation_event`, `annotation_adjudication`, `annotation_dataset_version`, `annotation_dataset_item` | Campanhas, protocolo, amostra, rótulos, auditoria, adjudicação e snapshot exportável de dataset. |
 | Controle técnico | `flyway_schema_history` | Histórico de DDL do owner analytics. |
 
 ### Integridade e histórico
@@ -97,6 +104,8 @@ Elas são aditivas; V1–V6 não devem ser alteradas depois de aplicadas.
   capítulo, versão textual, analyzer, feature, excerpt ou modelo.
 - `analysis_job_item` é único por `(job_id, input_asset_version_id)`.
 - Um excerpt é único por versão textual, intervalo e versão do gerador.
+- `body_eligible` e `exclusion_reason` registram o filtro estrutural usado
+  antes do consumo pelo feed.
 - Embeddings são únicos por entidade, modelo e hash da entrada.
 - Observações usam tabelas por escopo; não há chave polimórfica
   `entity_type/entity_id` sem integridade.
@@ -115,8 +124,12 @@ Elas são aditivas; V1–V6 não devem ser alteradas depois de aplicadas.
 | V4 | Registro de modelo de embedding desabilitado localmente. |
 | V5 | Hash de requisição para idempotência. |
 | V6 | Linhagem V1: artefatos de modelo, status de valor, embedding de capítulo, corpus, estilo, protótipos, tópicos e ranking. |
+| V7–V10 | Categorias/versões de features e definições estruturais, linguísticas, lexicais e spaCy V2. |
+| V11–V12 | Definições de observações NLI e similaridade com protótipos semânticos. |
+| V13 | Campanhas e datasets versionados de anotação humana. |
+| V14 | Elegibilidade estrutural persistida de excerpts para o feed. |
 
-## Features efetivamente produzidas
+## Features efetivamente produzidas na inspeção
 
 A execução validada gerou cinco medições determinísticas por excerpt:
 
@@ -128,9 +141,11 @@ A execução validada gerou cinco medições determinísticas por excerpt:
 | `dialogue_ratio` | Caracteres em delimitadores de diálogo divididos por code points. |
 | `estimated_read_time` | Palavras divididas por 200 palavras/minuto no baseline atualmente implementado. |
 
-O contrato V1 contém mais métricas estruturais, lexicais, linguísticas,
-semânticas e narrativas. Elas não devem ser consideradas calculadas só porque
-têm definição, tabela ou migration. A ausência atual de
+O checkout atual contém definições adicionais estruturais, lexicais,
+linguísticas, semânticas e narrativas e o worker tenta produzi-las quando os
+adaptadores locais retornam `VALID`. Elas não devem ser consideradas calculadas
+em um ambiente só porque têm definição, tabela ou migration. A ausência, na
+inspeção, de
 `document_feature` e `chapter_feature` confirma que a execução validada focou
 features baratas de excerpt.
 
@@ -149,12 +164,13 @@ ANALYTICS_OFFLINE=true
 ANALYTICS_MODEL_CACHE_DIR=/var/lib/bookrush/models
 ```
 
-O contrato V1 prevê fastText para validação de idioma, spaCy EN/PT, BGE-M3 e um
-modelo NLI multilíngue. Ainda faltam revisões imutáveis, checksums e artefatos
-preparados para execução. Portanto, nesta fase não foram produzidos embeddings
-BGE, scores de protótipos, NLI narrativo/emocional, vetores de estilo ou
-classificação de tópicos. O serviço deve retornar indisponibilidade de modelo
-ou status apropriado, e nunca baixar um artefato de forma implícita.
+O código atual contém adaptadores para fastText, spaCy EN/PT, BGE-M3 e NLI
+multilíngue. Eles são condicionais ao runtime e aos artefatos locais válidos;
+o serviço não baixa modelos no startup. A fotografia de 30/09 não comprovou
+embeddings BGE, scores de protótipos ou NLI persistidos. Para qualquer ambiente
+posterior, confirmar `analysis_run`, `value_status` e os registros de embedding
+antes de declarar essas saídas disponíveis. Artefato ausente ou inválido deve
+produzir status apropriado, nunca um score inventado.
 
 Veja [preparação de modelos](../analytics-models.md),
 [contrato Content Analytics V1](../analytics-v1.md),
@@ -177,6 +193,11 @@ criam e controlam jobs; as internas leem dados ligados ao catálogo.
 | GET | `/api/internal/v1/content-analytics/books/{bookId}/excerpts` | Excerpts paginados por livro. |
 | GET | `/api/internal/v1/content-analytics/asset-versions/{assetVersionId}` | Observações/excerpts de uma versão exata. |
 | GET | `/api/internal/v1/content-analytics/excerpts/{excerptId}` | Excerpt, hash e linhagem. |
+
+O namespace administrativo `/api/admin/v1/annotation` implementa campanhas de
+anotação: criação/amostragem, claim, first-screen lock, submissão, métricas,
+adjudicação e exportação de dataset. Ele é reservado a operadores, anotadores e
+revisores; detalhes do modelo estão em [data-model.md](data-model.md).
 
 `Idempotency-Key`, quando presente, deve ser igual a `operationKey`. A API
 rejeita a mesma chave com corpo diferente. O contrato OpenAPI do serviço é a

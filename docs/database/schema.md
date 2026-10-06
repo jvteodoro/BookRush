@@ -190,3 +190,14 @@ erDiagram
 
 O detalhamento de cobertura por história, decisões de produto e evolução de
 APIs está em [user-stories-data-model.md](user-stories-data-model.md).
+
+## Analytics de conteúdo
+
+`analytics` é um schema separado, migrado pelo `book-analytics-service`. Ele
+tem FK para versões e capítulos do `catalog`, mas é o dono exclusivo de jobs,
+runs, excerpts, features, embeddings, ranking e datasets de anotação. A
+referência é sempre a versão textual exata — nunca somente `book_id` — para que
+offsets, hashes e observações coexistam quando um arquivo é substituído.
+
+O modelo completo, diagramas E/R, invariantes e fronteira com
+recomendação/telemetria estão em [Analytics: modelo de dados](../analytics/data-model.md).
