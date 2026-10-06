@@ -96,7 +96,7 @@ erDiagram
 
 ## Modelo alvo a acrescentar
 
-As estruturas abaixo são o **desenho proposto**, não migrations aplicadas. Devem ser entregues em migrations novas, sem editar versões Flyway já aplicadas.
+As estruturas abaixo foram implementadas em migrations novas, sem editar versões Flyway já aplicadas. Elas serão aplicadas ao ambiente pelo início das imagens atualizadas de cada serviço; a validação desta entrega executou todas em transação com `ROLLBACK`, portanto não alterou o banco ativo durante a análise.
 
 ### Perfil, privacidade e atividade social
 
@@ -295,15 +295,15 @@ erDiagram
 
 `daily_publication_metric` é projeção reconstruível de `behavior.events` e `social`, nunca fonte de verdade. `published_work` resolve a limitação de inferir titularidade apenas por `submission.catalog_book_id`, inclusive quando houver edição/republicação.
 
-## Plano de migrations recomendado
+## Migrations implementadas
 
-1. `reader-profile` V3: política de privacidade; migrar `is_public` para defaults e manter a coluna até a API ser migrada.
-2. `reader-state` V5: locator/versão/capítulo nullable e índices por `(subject_key, updated_at)`; preencher legados gradualmente.
-3. `recommendation` V3/V4: request strategy/seed e item/impression compatíveis; backfill sintético quando necessário.
-4. `social` V6/V7: estado de comentário e atividade, com índices de feed por ator e livro.
-5. `admin` V4+: casos/ações/restrições tipados e ponte idempotente de sincronização com Keycloak.
-6. `publisher` V6+: metadata, contributors, attestation, review, published work e métricas diárias.
-7. `behavior` V7: shares/comments nas projeções, ou uma única projeção idempotente no publisher; registrar a decisão de ownership.
+1. `reader-profile` V3: política de privacidade e backfill de `is_public` para defaults.
+2. `reader-state` V5: locator/versão/capítulo nullable, índices e `plant_state` versionado.
+3. `recommendation` V3: strategy/seed/context e item/impression compatíveis, incluindo backfill sintético do ledger existente.
+4. `social` V6: estado de comentário e atividade, com índices de feed por ator e livro.
+5. `admin` V4: casos/ações/restrições tipados e command key idempotente para sincronização com Keycloak.
+6. `publisher` V6: metadata, contributors, attestation, review, published work e métricas diárias.
+7. `behavior` V7: colunas de shares/comments nas projeções diárias; o produtor das projeções deve preencher esses contadores em uma entrega de comportamento posterior.
 
 Cada migration deve trazer constraints/checks, índices que acompanhem a consulta real, teste de upgrade com dados existentes e teste de autorização. Não criar FK cross-schema por conveniência: publicar eventos ou validar por contrato quando os donos forem diferentes.
 

@@ -75,6 +75,8 @@ usa ../../docs/database/queries.sql. A fixture está em src/test/resources e
 é revertida após cada teste; nunca é migration de produção.
 
 - [Relatório de entrega do épico](report.md)
+- [Projeto de dados das histórias de usuário](user-stories-data-model.md):
+  cobertura atual, lacunas, modelo alvo e diagramas E/R.
 
 ## Analytics
 

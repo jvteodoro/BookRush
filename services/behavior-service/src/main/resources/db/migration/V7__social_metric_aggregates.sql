@@ -1,0 +1,7 @@
+ALTER TABLE behavior.daily_book
+  ADD COLUMN IF NOT EXISTS shares BIGINT NOT NULL DEFAULT 0 CHECK (shares >= 0),
+  ADD COLUMN IF NOT EXISTS comments BIGINT NOT NULL DEFAULT 0 CHECK (comments >= 0);
+
+ALTER TABLE behavior.daily_user_book
+  ADD COLUMN IF NOT EXISTS shares BIGINT NOT NULL DEFAULT 0 CHECK (shares >= 0),
+  ADD COLUMN IF NOT EXISTS comments BIGINT NOT NULL DEFAULT 0 CHECK (comments >= 0);
