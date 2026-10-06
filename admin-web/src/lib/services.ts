@@ -57,7 +57,7 @@ export const services = {
   },
   async listBooks(query = '', page = 0, size = 50): Promise<BookCandidate[]> { return (await this.listBookPage(query, page, size)).items; },
   async getBook(bookId: string) { if (config.useMocks) return mutableBooks.find(book => book.id === bookId); try { const { data } = await catalogHttp.get(`/internal/v1/catalog/books/${bookId}`); return mapBook(data); } catch (error) { throw problem(error, 'Não foi possível consultar a obra.'); } },
-  async importBook(bookId: string): Promise<ImportJob> {
+  async importBook(bookId: string, reprocess = false): Promise<ImportJob> {
     if (config.useMocks) { await sleep(500); mutableBooks = mutableBooks.map(book => book.id === bookId ? { ...book, status: 'IMPORTED' } : book); return { status: 'IMPORTED' }; }
     try {
       const operationKey = idempotencyKey('admin-import', bookId);
@@ -68,6 +68,7 @@ export const services = {
         maxItems: 1,
         dryRun: false,
         processAssets: true,
+        reprocess,
       }, { headers: { 'Idempotency-Key': operationKey } });
       return { id: data.jobId ?? data.id, status: data.status ?? 'QUEUED' };
     } catch (error) { throw problem(error, 'A importação foi rejeitada.'); }

@@ -15,6 +15,14 @@ class IngestionRunRequestTest {
     assertEquals(List.of("1342", "84"), request.externalIds());
     assertEquals(List.of("en", "pt"), request.languages());
     assertEquals(100, request.maxItems());
+    assertFalse(request.reprocess());
+  }
+
+  @Test
+  void acceptsExplicitReprocessFlag() {
+    var request =
+        new IngestionRunRequest("GUTENBERG", List.of("84"), List.of(), 1, false, true, true, null);
+    assertTrue(request.reprocess());
   }
 
   @Test

@@ -352,6 +352,11 @@ components:
           description: Quando true, continua para descoberta/download e normalização
             de assets; quando false, processa somente metadata.
           example: false
+        reprocess:
+          type: boolean
+          description: Quando true, cria uma nova execução mesmo para IDs já importados; use para atualizar assets e thumbnails.
+          default: false
+          example: true
         publisherSubmissionId:
           type: string
           format: uuid

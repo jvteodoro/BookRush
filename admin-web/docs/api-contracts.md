@@ -16,6 +16,9 @@ disponíveis são incluídas. A importação usa
 `Idempotency-Key` e o payload `source`, `externalIds`, `languages`, `maxItems`,
 `dryRun` e `processAssets`. O portal acompanha
 `GET /ingestion/api/admin/v1/ingestion/jobs/{id}` até um estado terminal.
+Para uma obra já importada, o portal envia `reprocess=true`: isso cria uma
+execução nova, preserva o controle de idempotência da requisição e permite
+atualizar EPUB, derivados e thumbnails sem duplicar o livro canônico.
 
 O endpoint de catálogo consulta somente metadados do índice; não baixa EPUB,
 PDF ou TXT. Os assets só são adquiridos depois que a operação de ingestão é

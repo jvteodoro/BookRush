@@ -37,7 +37,12 @@ public class IngestionJobService {
       throw new IllegalArgumentException("Idempotency-Key is required");
     var actor = principal == null || principal.isBlank() ? "anonymous" : principal.trim();
     var parameters = canonicalParameters(request);
-    var requestHash = sha256(parameters);
+    // A reprocess is an explicit new execution. The idempotency key still
+    // protects retries of that command, while the nonce prevents the old
+    // parameter fingerprint and task operation key from being reused. The
+    // idempotency key makes retries produce the same fingerprint.
+    var requestHash =
+        sha256(parameters + (request.reprocess() ? "\u0000" + idempotencyKey : ""));
     var replay = findCommand(actor, idempotencyKey);
     if (replay != null) {
       if (!requestHash.equals(replay.requestHash()))
@@ -50,7 +55,7 @@ public class IngestionJobService {
         jdbc
             .query(
                 "SELECT id, status FROM catalog.ingestion_job WHERE source_id=? AND"
-                    + " parameter_fingerprint=?",
+                + " parameter_fingerprint=?",
                 (rs, row) ->
                     new ExistingJob(rs.getObject("id", UUID.class), rs.getString("status")),
                 sourceId,
@@ -58,6 +63,7 @@ public class IngestionJobService {
             .stream()
             .findFirst()
             .orElse(null);
+    if (request.reprocess()) existing = null;
     var job =
         existing == null ? createJob(sourceId, request, parameters, requestHash, actor) : existing;
     var body =
@@ -291,6 +297,7 @@ SELECT i.id, i.external_identifier, i.status, i.attempt_number, i.book_id, i.edi
     values.put("maxItems", request.maxItems());
     values.put("dryRun", request.dryRun());
     values.put("processAssets", request.processAssets());
+    values.put("reprocess", request.reprocess());
     values.put("publisherSubmissionId", request.publisherSubmissionId());
     try {
       return mapper.writeValueAsString(values);

@@ -43,6 +43,11 @@ public record IngestionRunRequest(
                     + " false, processa somente metadata.",
             example = "false")
         boolean processAssets,
+    @Schema(
+            description =
+                "Quando true, cria uma nova execução mesmo que os mesmos parâmetros já tenham sido processados; use para reprocessar assets.",
+            example = "false")
+        boolean reprocess,
         UUID publisherSubmissionId) {
   public IngestionRunRequest {
     source =
@@ -68,7 +73,7 @@ public record IngestionRunRequest(
       Integer maxItems,
       boolean dryRun,
       boolean processAssets) {
-    this(source, externalIds, languages, maxItems, dryRun, processAssets, null);
+    this(source, externalIds, languages, maxItems, dryRun, processAssets, false, null);
   }
 
   private static List<String> normalize(List<String> values, boolean language) {
