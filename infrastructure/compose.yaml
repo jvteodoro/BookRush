@@ -1,5 +1,9 @@
 name: ${BOOKRUSH_COMPOSE_NAME:-bookrush}
 
+x-java-db-pool: &java-db-pool
+  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_MAX_SIZE:-4}
+  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${DB_POOL_MIN_IDLE:-1}
+
 services:
   reverse-proxy:
     # Routing is loaded from a file so the proxy does not depend on the Docker
@@ -79,6 +83,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    command: ["postgres", "-c", "max_connections=150", "-c", "superuser_reserved_connections=5"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bookrush}
       POSTGRES_USER: ${POSTGRES_USER:-bookrush}
@@ -178,6 +183,7 @@ services:
       context: ..
       dockerfile: services/catalog-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       BOOKRUSH_PUBLIC_URL: ${BOOKRUSH_PUBLIC_URL:-https://bookrush.jteodoro.tec.br}
       # The persistent installation already contains V7/V9 checksums from the
@@ -234,6 +240,7 @@ services:
       context: ..
       dockerfile: services/book-ingestion-service/Dockerfile
     environment:
+      <<: *java-db-pool
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
@@ -288,6 +295,7 @@ services:
     build:
       context: ../services/book-analytics-service
     environment:
+      <<: *java-db-pool
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
@@ -356,6 +364,10 @@ services:
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      BOOKRUSH_SECURITY_ENABLED: ${BOOKRUSH_SECURITY_ENABLED:-true}
+      BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
       CATALOG_URL: http://catalog-service:8080
       CATALOG_SERVICE_TOKEN: ${CATALOG_READER_INTERNAL_TOKEN:-${CANONICAL_SERVICE_TOKEN:-}}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
@@ -380,6 +392,7 @@ services:
       context: ..
       dockerfile: services/reader-state-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
@@ -405,6 +418,7 @@ services:
       context: ..
       dockerfile: services/reader-profile-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
@@ -430,6 +444,7 @@ services:
       context: ..
       dockerfile: services/social-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
@@ -456,6 +471,7 @@ services:
       context: ..
       dockerfile: services/behavior-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
@@ -481,14 +497,29 @@ services:
       context: ..
       dockerfile: services/recommendation-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
       CATALOG_URL: http://catalog-service:8080
+      BOOKRUSH_SECURITY_ENABLED: ${BOOKRUSH_SECURITY_ENABLED:-true}
+      BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      FEED_EXCERPTS_ENABLED: ${FEED_EXCERPTS_ENABLED:-false}
+      FEED_EXCERPTS_PERCENTAGE: ${FEED_EXCERPTS_PERCENTAGE:-0}
+      FEED_EXCERPTS_ANALYTICS_URL: ${FEED_EXCERPTS_ANALYTICS_URL:-http://book-analytics-service:8091}
+      FEED_EXCERPTS_TOKEN_URI: ${FEED_EXCERPTS_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+      FEED_EXCERPTS_CLIENT_ID: ${FEED_EXCERPTS_CLIENT_ID:-bookrush-recommendation-s2s}
+      FEED_EXCERPTS_CLIENT_SECRET: ${FEED_EXCERPTS_CLIENT_SECRET:-}
+      FEED_EXCERPTS_AUDIENCE: ${FEED_EXCERPTS_AUDIENCE:-bookrush-analytics}
+      FEED_EXCERPTS_SCOPE: ${FEED_EXCERPTS_SCOPE:-bookrush.analytics}
     depends_on:
       postgres:
+        condition: service_healthy
+      book-analytics-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8098/actuator/health"]
@@ -503,6 +534,7 @@ services:
       context: ..
       dockerfile: services/publisher-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
@@ -536,6 +568,7 @@ services:
       context: ..
       dockerfile: services/admin-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}
@@ -561,6 +594,7 @@ services:
       context: ..
       dockerfile: services/reader-bff-service/Dockerfile
     environment:
+      <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres
       DB_NAME: ${POSTGRES_DB:-bookrush}

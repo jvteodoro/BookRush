@@ -298,6 +298,29 @@
       ]
     },
     {
+      "clientId": "bookrush-recommendation-s2s",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "protocolMappers": [
+        {
+          "name": "recommendation-analytics-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-analytics",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "defaultClientScopes": ["bookrush.analytics"]
+    },
+    {
       "clientId": "bookrush-seaweedfs",
       "enabled": true,
       "publicClient": false,

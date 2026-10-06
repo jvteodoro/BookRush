@@ -142,10 +142,62 @@
     document.querySelectorAll('[data-comments]').forEach(b=>b.onclick=()=>openComments(b.dataset.comments));
     document.querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>openShare(b.dataset.share));
     document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));
+    document.querySelectorAll('.feed-card[data-book]').forEach(card=>{
+      const id=card.dataset.book, item=book(id);
+      if(!item?.excerpt) return;
+      const track=(type,payload={})=>window.__BOOKRUSH_API__?.trackExcerpt?.(type,id,item.excerpt,payload);
+      if('IntersectionObserver' in window){
+        const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting&&e.intersectionRatio>=.5)){track('EXCERPT_IMPRESSION',{position: [...document.querySelectorAll('.feed-card[data-book]')].indexOf(card)});observer.disconnect();}},{threshold:.5});
+        observer.observe(card);
+      } else track('EXCERPT_IMPRESSION',{position: [...document.querySelectorAll('.feed-card[data-book]')].indexOf(card)});
+      card.querySelector('.feed-quote')?.addEventListener('dblclick',()=>track('EXCERPT_DWELL',{durationMs:0}));
+    });
     document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=async()=>{const id=b.dataset.follow, enabled=!state.followed[id];try{await window.__BOOKRUSH_API__?.follow?.(id,enabled);state.followed[id]=enabled;renderFeed();}catch(e){toast(e.message||'Não foi possível atualizar o acompanhamento')}});
     document.querySelectorAll('[data-user-profile]').forEach(b=>b.onclick=()=>{state.otherUser=b.dataset.userProfile;state.route='otherProfile';render();});
     const fs=document.getElementById('feedScroll'); if(fs){document.onkeydown=e=>{if(!['ArrowDown','ArrowUp'].includes(e.key))return;fs.scrollBy({top:(e.key==='ArrowDown'?1:-1)*fs.clientHeight,behavior:'smooth'})}}
+    scheduleFeedQuoteFit();
   }
+
+  let feedQuoteFitFrame=0;
+  function scheduleFeedQuoteFit(){
+    cancelAnimationFrame(feedQuoteFitFrame);
+    feedQuoteFitFrame=requestAnimationFrame(fitFeedQuotes);
+  }
+
+  function fitFeedQuotes(){
+    document.querySelectorAll('.feed-card .feed-quote').forEach(quote=>{
+      const card=quote.closest('.feed-card');
+      if(!card) return;
+      const appMode=document.body.dataset.mode==='app';
+      const maxSize=appMode?30:53;
+      const minSize=appMode?18:22;
+      const cardHeight=card.clientHeight;
+      if(!cardHeight) return;
+      // Keep the quote inside the visual reading area, leaving room for the
+      // metadata, title, action and safe areas on phones.
+      const maxHeight=Math.max(appMode?170:220, Math.floor(cardHeight*(appMode?.47:.52)));
+      quote.style.maxHeight=`${maxHeight}px`;
+      quote.style.setProperty('--quote-size',`${maxSize}px`);
+      quote.style.webkitLineClamp='unset';
+      let size=maxSize;
+      while(quote.scrollHeight>quote.clientHeight && size>minSize){
+        size-=1;
+        quote.style.setProperty('--quote-size',`${size}px`);
+      }
+      // Extremely long excerpts remain bounded and readable instead of
+      // pushing the book metadata and actions outside the viewport.
+      if(quote.scrollHeight>quote.clientHeight){
+        quote.style.display='-webkit-box';
+        quote.style.webkitBoxOrient='vertical';
+        quote.style.webkitLineClamp=String(appMode?8:10);
+      } else {
+        quote.style.display='block';
+        quote.style.webkitLineClamp='unset';
+      }
+    });
+  }
+
+  window.addEventListener('resize',scheduleFeedQuoteFit,{passive:true});
 
   function bookCard(b){return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank?`posição ${b.rank}`:'disponível'}</span></div></article>`}
 
@@ -184,7 +236,7 @@
     document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];save();renderSearch()});
   }
 
-  async function openBook(id){state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id);window.__BOOKRUSH_CHAPTERS__=await window.__BOOKRUSH_API__?.chapters?.(id)||[]}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);render();}
+  async function openBook(id){const item=book(id);if(item?.excerpt)window.__BOOKRUSH_API__?.trackExcerpt?.('BOOK_OPEN_FROM_EXCERPT',id,item.excerpt);state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id);window.__BOOKRUSH_CHAPTERS__=await window.__BOOKRUSH_API__?.chapters?.(id)||[]}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);render();}
 
   function renderReader(){
     const b=book(state.readerBook);

@@ -21,3 +21,23 @@ bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
+feed:
+  excerpts:
+    enabled: ${FEED_EXCERPTS_ENABLED:false}
+    percentage: ${FEED_EXCERPTS_PERCENTAGE:0}
+    ranker-version: ${FEED_EXCERPTS_RANKER_VERSION:}
+    max-text-codepoints: ${FEED_EXCERPTS_MAX_TEXT_CODEPOINTS:1600}
+    max-excerpts-per-book: 1
+    require-body-eligible: ${FEED_EXCERPTS_REQUIRE_BODY_ELIGIBLE:true}
+    positive-ttl: ${FEED_EXCERPTS_POSITIVE_TTL:15m}
+    negative-ttl: ${FEED_EXCERPTS_NEGATIVE_TTL:2m}
+    connect-timeout: ${FEED_EXCERPTS_CONNECT_TIMEOUT:250ms}
+    read-timeout: ${FEED_EXCERPTS_READ_TIMEOUT:500ms}
+    total-budget: ${FEED_EXCERPTS_TOTAL_BUDGET:900ms}
+    max-concurrency: ${FEED_EXCERPTS_MAX_CONCURRENCY:8}
+    analytics-url: ${FEED_EXCERPTS_ANALYTICS_URL:http://book-analytics-service:8091}
+    token-uri: ${FEED_EXCERPTS_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+    client-id: ${FEED_EXCERPTS_CLIENT_ID:}
+    client-secret: ${FEED_EXCERPTS_CLIENT_SECRET:}
+    audience: ${FEED_EXCERPTS_AUDIENCE:bookrush-analytics}
+    scope: ${FEED_EXCERPTS_SCOPE:bookrush.analytics}

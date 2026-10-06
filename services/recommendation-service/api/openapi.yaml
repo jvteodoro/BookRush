@@ -10,7 +10,12 @@ paths:
       parameters:
         - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
       responses:
-        '200': {description: Feed with request and impression lineage}
+        '200':
+          description: Feed with request, impression and optional analytics excerpt lineage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse'
         '401': {description: Authentication required}
   /api/v1/recommendations/impressions/{impressionId}/viewable:
     post:
@@ -25,3 +30,41 @@ paths:
 components:
   securitySchemes:
     bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  schemas:
+    FeedResponse:
+      type: object
+      required: [requestId, modelVersion, items]
+      properties:
+        requestId: {type: string, format: uuid}
+        modelVersion: {type: string}
+        items:
+          type: array
+          items:
+            type: object
+            required: [book, recommendationRequestId, impressionId, modelVersion, rank]
+            properties:
+              book: {type: object}
+              recommendationRequestId: {type: string, format: uuid}
+              impressionId: {type: string, format: uuid}
+              modelVersion: {type: string}
+              rank: {type: integer}
+              excerpt:
+                $ref: '#/components/schemas/FeedExcerpt'
+    FeedExcerpt:
+      type: object
+      required: [id, text, sourceAssetVersionId, textSha256, startCodepoint, endCodepoint, generationMethod, generatorVersion]
+      properties:
+        id: {type: string, format: uuid}
+        text: {type: string}
+        sourceAssetVersionId: {type: string, format: uuid}
+        textSha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        startCodepoint: {type: integer, minimum: 0}
+        endCodepoint: {type: integer, exclusiveMinimum: 0}
+        generationMethod: {type: string}
+        generatorVersion: {type: string}
+        rank:
+          type: object
+          nullable: true
+          properties:
+            version: {type: string}
+            score: {type: number, nullable: true}

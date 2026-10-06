@@ -367,7 +367,7 @@ SELECT a.id AS asset_id, a.asset_type, a.asset_role,
             """
 SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
        e.end_codepoint, e.text, e.text_sha256, e.generation_method,
-       e.generator_version, e.created_at,
+       e.generator_version, e.created_at, e.body_eligible, e.exclusion_reason,
        er.final_score AS candidate_score, er.ranker_code, er.ranker_version,
        em.code AS embedding_model, em.model_version AS embedding_model_version
   FROM analytics.excerpt e
@@ -378,7 +378,24 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
  LEFT JOIN analytics.embedding_model em ON em.id = ee.embedding_model_id
  LEFT JOIN LATERAL (SELECT final_score, ranker_code, ranker_version FROM analytics.excerpt_rank er
                     WHERE er.excerpt_id=e.id ORDER BY er.created_at DESC LIMIT 1) er ON TRUE
- WHERE a.book_id = ? ORDER BY e.created_at, e.start_codepoint
+ WHERE a.book_id = ?
+   AND e.body_eligible = TRUE
+   AND e.exclusion_reason IS NULL
+   AND v.status = 'AVAILABLE'
+   AND a.asset_role IN ('NORMALIZED', 'PROCESSING', 'ANALYTICS')
+   AND a.asset_type IN ('TXT', 'HTML')
+   AND e.source_asset_version_id = (
+       SELECT latest.id
+         FROM catalog.book_asset_version latest
+         JOIN catalog.book_asset latest_asset ON latest_asset.id = latest.book_asset_id
+        WHERE latest_asset.book_id = a.book_id
+          AND latest_asset.asset_role IN ('NORMALIZED', 'PROCESSING', 'ANALYTICS')
+          AND latest_asset.asset_type IN ('TXT', 'HTML')
+          AND latest_asset.status <> 'DELETED'
+          AND latest.status = 'AVAILABLE'
+        ORDER BY latest.version_number DESC, latest.created_at DESC, latest.id DESC
+        LIMIT 1)
+ ORDER BY e.created_at, e.start_codepoint
  LIMIT ? OFFSET ?
 """,
             bookId,
@@ -403,7 +420,7 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
     var excerpts =
         jdbc.queryForList(
             "SELECT id, chapter_id, start_codepoint, end_codepoint, text_sha256, word_count,"
-                + " sentence_count, generation_method, generator_version FROM analytics.excerpt"
+                + " sentence_count, generation_method, generator_version, body_eligible, exclusion_reason FROM analytics.excerpt"
                 + " WHERE source_asset_version_id=? ORDER BY start_codepoint",
             assetVersionId);
     return ResponseEntity.ok(Map.of("assetVersionId", assetVersionId, "excerpts", excerpts));

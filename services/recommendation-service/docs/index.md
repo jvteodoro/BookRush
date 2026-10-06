@@ -16,3 +16,15 @@ version and rank for later attribution.
 impression only when the authenticated subject owns the originating request.
 The browser calls this after its viewability threshold, so non-visible feed
 items are not treated as negative outcomes. The endpoint is idempotent.
+
+## Analytics excerpts
+
+The optional `excerpt` field is enriched in this service through a technical
+client-credentials token. The user bearer is never sent to analytics. Enable
+`FEED_EXCERPTS_ENABLED` and a non-zero `FEED_EXCERPTS_PERCENTAGE` only after
+reconciling `bookrush-recommendation-s2s` in the administrative realm and
+providing its protected secret in `.env`.
+
+Missing analytics, expired credentials, missing processing and structural
+exclusions degrade to a normal feed item. The BFF passes the nullable field
+through and the browser never calls an analytics endpoint.

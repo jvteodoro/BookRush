@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
+import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
@@ -24,12 +25,15 @@ public class RecommendationController {
   private static final String MODEL_VERSION = "heuristic-v1";
   private final RestClient catalog;
   private final JdbcTemplate jdbc;
+  private final ExcerptEnrichmentService excerptEnrichment;
 
   public RecommendationController(
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
-      JdbcTemplate jdbc) {
+      JdbcTemplate jdbc,
+      ExcerptEnrichmentService excerptEnrichment) {
     catalog = RestClient.builder().baseUrl(url).build();
     this.jdbc = jdbc;
+    this.excerptEnrichment = excerptEnrichment;
   }
 
   private String subject(Principal principal) {
@@ -57,9 +61,15 @@ public class RecommendationController {
       UUID impressionId = UUID.randomUUID();
       jdbc.update("INSERT INTO recommendation.impression(id, request_id, book_id, rank) "
           + "VALUES (?, ?, ?, ?)", impressionId, requestId, UUID.fromString(String.valueOf(bookId)), rank);
-      items.add(Map.of("book", book, "recommendationRequestId", requestId,
-          "impressionId", impressionId, "modelVersion", MODEL_VERSION, "rank", rank++));
+      var item = new java.util.LinkedHashMap<String, Object>();
+      item.put("book", book);
+      item.put("recommendationRequestId", requestId);
+      item.put("impressionId", impressionId);
+      item.put("modelVersion", MODEL_VERSION);
+      item.put("rank", rank++);
+      items.add(item);
     }
+    excerptEnrichment.enrich(items);
     return Map.of("requestId", requestId, "modelVersion", MODEL_VERSION,
         "generatedAt", Instant.now(), "items", items);
   }

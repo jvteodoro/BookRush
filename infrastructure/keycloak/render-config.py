@@ -14,6 +14,7 @@ SECRETS = {
     "bookrush-canonical-service-s2s": "INGESTION_CANONICAL_CLIENT_SECRET",
     "bookrush-asset-service-s2s": "INGESTION_ASSET_CLIENT_SECRET",
     "bookrush-seaweedfs": "SEAWEEDFS_OIDC_CLIENT_SECRET",
+    "bookrush-recommendation-s2s": "FEED_EXCERPTS_CLIENT_SECRET",
 }
 
 

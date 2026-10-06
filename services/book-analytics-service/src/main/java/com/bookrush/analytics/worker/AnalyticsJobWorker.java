@@ -443,10 +443,11 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
             ? Math.max(1, textLength)
             : chapter.endCodepoint() - chapter.startCodepoint();
     var excerpt = UUID.randomUUID();
+    var eligibility = com.bookrush.analytics.excerpts.StructuredContentEligibility.classify(candidate.text());
     jdbc.update(
         """
-INSERT INTO analytics.excerpt(id,source_asset_version_id,chapter_id,start_codepoint,end_codepoint,text,text_sha256,word_count,sentence_count,generation_method,generator_version)
-VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_codepoint,end_codepoint,generator_version) DO NOTHING
+INSERT INTO analytics.excerpt(id,source_asset_version_id,chapter_id,start_codepoint,end_codepoint,text,text_sha256,word_count,sentence_count,generation_method,generator_version,body_eligible,exclusion_reason)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_codepoint,end_codepoint,generator_version) DO NOTHING
 """,
         excerpt,
         version,
@@ -458,7 +459,9 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_codepo
         candidate.wordCount(),
         candidate.sentenceCount(),
         "SENTENCE_WINDOW",
-        candidate.generatorVersion());
+        candidate.generatorVersion(),
+        eligibility.bodyEligible(),
+        eligibility.exclusionReason());
     var actual =
         jdbc.query(
             "SELECT id FROM analytics.excerpt WHERE source_asset_version_id=? AND start_codepoint=?"

@@ -4,6 +4,7 @@ Git é a fonte canônica. Backstage é o portal oficial de descoberta e consulta
 
 - [Política de documentação](documentation-policy.md)
 - [Modelo PostgreSQL](database/README.md)
+- [Projeto de dados das histórias de usuário](database/user-stories-data-model.md)
 - [Storage S3](storage/README.md)
 - [Ingestão](ingestion/README.md)
 - [Decisões arquiteturais](adr/README.md)
@@ -34,6 +35,11 @@ Consulte também o [contrato Analytics V1](analytics-v1.md) e o
 [procedimento de preparação de modelos](analytics-models.md).
 O [relatório operacional e de schema](analytics/report.md) consolida a execução
 validada, o modelo relacional e as limitações atuais.
+O [relatório de integração de excerpts no feed](analytics/excerpt-feed-integration.md)
+descreve o que já está persistido, o contrato interno disponível e as etapas
+necessárias para apresentar trechos com fallback seguro.
+O [registro de execução da integração V1](analytics/excerpt-feed-integration-v1-beads.md)
+mantém o mapa dos beads importados, suas evidências e o gate final.
 
 - [Clientes web e mobile](client-platform.md)
 
