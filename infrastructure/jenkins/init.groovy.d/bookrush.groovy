@@ -28,6 +28,28 @@ if (!(adminWebJob.getDefinition() instanceof CpsFlowDefinition) || adminWebJob.g
     adminWebJob.setDefinition(new CpsFlowDefinition(adminWebScript, true))
     adminWebJob.save()
 }
+def microservicePipelineFile = new File('/opt/bookrush/microservice.Jenkinsfile')
+def verticalPipelineFile = new File('/opt/bookrush/vertical.Jenkinsfile')
+def createOrUpdatePipeline = { String name, File file ->
+    def pipelineJob = instance.getItem(name)
+    if (pipelineJob == null) {
+        pipelineJob = instance.createProject(WorkflowJob, name)
+    }
+    def script = file.text
+    if (!(pipelineJob.getDefinition() instanceof CpsFlowDefinition) || pipelineJob.getDefinition().getScript() != script) {
+        pipelineJob.setDefinition(new CpsFlowDefinition(script, true))
+        pipelineJob.save()
+    }
+}
+[
+    'admin-service', 'behavior-service', 'book-content-service',
+    'book-ingestion-service', 'book-analytics-service', 'catalog-service',
+    'publisher-service', 'reader-bff-service', 'reader-profile-service',
+    'reader-state-service', 'recommendation-service', 'social-service'
+].each { service -> createOrUpdatePipeline("bookrush-microservice-${service}", microservicePipelineFile) }
+['catalog', 'ingestion', 'reader', 'social', 'analytics', 'publishing', 'platform'].each { vertical ->
+    createOrUpdatePipeline("bookrush-vertical-${vertical}", verticalPipelineFile)
+}
 def backstageScript = backstagePipelineFile.text
 if (!(backstageJob.getDefinition() instanceof CpsFlowDefinition) || backstageJob.getDefinition().getScript() != backstageScript) {
     backstageJob.setDefinition(new CpsFlowDefinition(backstageScript, true))

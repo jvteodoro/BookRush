@@ -101,6 +101,14 @@ cria um arquivo temporário a partir de `POSTGRES_PASSWORD` e o remove ao sair.
 O deploy usa a imagem gerada no próprio build e aguarda PostgreSQL e Backstage
 ficarem saudáveis.
 
+### Pipelines por microserviço e vertical
+
+O bootstrap também cria jobs isolados para os 12 microserviços e para as sete
+verticais funcionais. Eles usam os Jenkinsfiles reutilizáveis
+`microservice.Jenkinsfile` e `vertical.Jenkinsfile`, sem fazer deploy. A matriz,
+os nomes dos jobs e os comandos locais correspondentes estão em
+[`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
+
 ### Importação Gutenberg (opt-in)
 
 O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para
