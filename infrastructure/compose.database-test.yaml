@@ -19,8 +19,6 @@ services:
       dockerfile: services/catalog-service/Dockerfile
       target: build
     command: [mvn, -B, -Pintegration-tests, verify]
-    volumes:
-      - ${BOOKRUSH_QUERIES_FILE:?BOOKRUSH_QUERIES_FILE must point to docs/database/queries.sql}:/workspace/documented-queries.sql:ro
     environment:
       DB_HOST: postgres
       DB_NAME: bookrush_test

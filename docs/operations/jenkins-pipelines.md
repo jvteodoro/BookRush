@@ -40,10 +40,10 @@ local e impedindo que um parâmetro execute caminhos arbitrários. As verticais
 executa o E2E offline; `platform` executa contratos e reconciliação descartável
 do Keycloak.
 
-O harness bibliográfico valida `docs/database/queries.sql` e exporta o caminho
-absoluto em `scripts/test-database.sh` antes de iniciar o Compose. Isso evita
-que o bind mount do fixture seja interpretado como diretório em agentes Jenkins
-cujo diretório de execução não coincide com a raiz do repositório.
+O harness bibliográfico valida `docs/database/queries.sql` antes de iniciar o
+Compose. O Dockerfile do catálogo copia o fixture para a imagem de testes, em
+vez de usar bind mount; isso funciona também quando o Jenkins usa um daemon
+Docker fora do container do agente.
 
 ## Arquivos e operação
 

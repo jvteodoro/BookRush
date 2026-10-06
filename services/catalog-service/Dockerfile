@@ -5,6 +5,7 @@ RUN mvn -q -f platform/pom.xml install -DskipTests
 COPY services/catalog-service/pom.xml pom.xml
 RUN mvn -q -DskipTests dependency:go-offline
 COPY services/catalog-service/src src
+COPY docs/database/queries.sql documented-queries.sql
 RUN mvn -q package
 
 FROM eclipse-temurin:21-jre-alpine
