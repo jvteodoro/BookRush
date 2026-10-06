@@ -25,8 +25,8 @@ npm run build
 
 A configuração OIDC pode ser sobrescrita com `VITE_OIDC_AUTHORITY` e `VITE_OIDC_CLIENT_ID`. O cliente padrão é `bookrush-web`, provisionado em `infrastructure/keycloak/bookrush-realm.json`.
 
-O shell visual é [`public/pageloop.js`](../public/pageloop.js) e seu CSS de
-referência. `src/main.tsx` faz a ponte autenticada: injeta os livros retornados
+O shell visual é `frontend/public/pageloop.js` e seu CSS de referência.
+`frontend/src/main.tsx` faz a ponte autenticada: injeta os livros retornados
 por `GET /api/v1/books` sem Bearer (leitura pública), carrega a biblioteca em
 `/api/v1/reader/library` e fornece as
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
@@ -45,7 +45,9 @@ caches de borda durante uma publicação.
 
 ## Mobile
 
-O aplicativo React Native/Expo está em [`mobile/`](../../mobile/README.md). Ele compartilha o contrato do catálogo, usa o client público `bookrush-mobile` e pode gerar APK com `npx expo run:android` ou EAS. Os tokens também ficam somente na memória.
+O aplicativo React Native/Expo está em `mobile/`. Ele compartilha o contrato do
+catálogo, usa o client público `bookrush-mobile` e pode gerar APK com `npx expo
+run:android` ou EAS. Os tokens também ficam somente na memória.
 
 ## Limitações intencionais
 

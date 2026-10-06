@@ -41,7 +41,7 @@ paths:
             text/plain:
               schema: {type: string}
         '401': {description: Token interno ausente ou inválido.}
-        '404': {description: Livro, asset ou versão não encontrada.}
+        '404': {description: "Livro, asset ou versão não encontrada."}
         '409': {description: Objeto ausente; reconciliação de storage necessária.}
   /api/internal/v1/catalog/books:
     get:
