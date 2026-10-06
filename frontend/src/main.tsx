@@ -47,13 +47,14 @@ const readiumBridge: ReadiumBridge = {
   },
 };
 
-type CatalogBook = { id: string; canonicalTitle: string; originalLanguage?: string | null; description?: string | null };
+type CatalogBook = { id: string; canonicalTitle: string; originalLanguage?: string | null; description?: string | null; thumbnailUrl?: string | null };
 type FeedExcerpt = { id: string; text: string; sourceAssetVersionId: string; textSha256: string; startCodepoint: number; endCodepoint: number; generationMethod: string; generatorVersion: string; rank?: { version?: string; score?: number | null } | null };
 
 type PageLoopBook = {
   id: string; title: string; author: string; genre: string; keywords: string[];
   match: number; a: string; b: string; quote: string; excerpt?: FeedExcerpt | null; likes: number; comments: number;
   shares: number; pages: number; progress: number;
+  thumbnailUrl?: string | null;
   recommendationRequestId?: string; impressionId?: string; modelVersion?: string; rank?: number;
 };
 
@@ -157,7 +158,7 @@ function App() {
         const books: PageLoopBook[] = source.map((book, index) => {
           const recommendation = recommendations.find(item => item.book?.id === book.id);
           return {
-          id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: recommendation?.excerpt?.text?.trim() || book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, excerpt: recommendation?.excerpt ?? null, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0,
+          id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: recommendation?.excerpt?.text?.trim() || book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, excerpt: recommendation?.excerpt ?? null, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0, thumbnailUrl: book.thumbnailUrl,
           recommendationRequestId: recommendation?.recommendationRequestId, impressionId: recommendation?.impressionId, modelVersion: recommendation?.modelVersion, rank: recommendation?.rank,
         };
         });
@@ -329,6 +330,7 @@ function App() {
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';
         if (document.querySelector('script[data-bookrush-pageloop]')) return;
         const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261002-readium-kindle-7'; document.head.appendChild(style);
+        const thumbnailStyle = document.createElement('link'); thumbnailStyle.id = 'bookrush-thumbnail-style'; thumbnailStyle.rel = 'stylesheet'; thumbnailStyle.href = '/thumbnails.css?v=20261006-gutenberg'; document.head.appendChild(thumbnailStyle);
         const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261002-readium-kindle-7'; script.async = true; document.body.appendChild(script);
       } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o catálogo.'); }
     }

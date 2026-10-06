@@ -1,0 +1,9 @@
+/* Gutenberg thumbnails replace the generated gradient while retaining it as a fallback. */
+.mini-cover,
+.book-cover,
+.result-cover,
+.library-cover {
+  background-image: var(--cover-image, linear-gradient(145deg, var(--cover-a), var(--cover-b)));
+  background-size: cover;
+  background-position: center;
+}

@@ -382,7 +382,8 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
           BookAsset a = asset(book, id);
           em.lock(a, LockModeType.PESSIMISTIC_WRITE);
           if (a.getStatus() == BookAssetStatus.DELETED
-              || a.getAssetRole() != BookAssetAssetRole.PUBLIC
+              || (a.getAssetRole() != BookAssetAssetRole.PUBLIC
+                  && a.getAssetRole() != BookAssetAssetRole.COVER)
               || !distributionAllowed(a))
             throw new ResponseStatusException(
                 HttpStatus.CONFLICT,
@@ -446,7 +447,8 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
           if (a.getStatus() == BookAssetStatus.DELETED) throw missing();
           if (publicRequest
               && (a.getStatus() != BookAssetStatus.ACTIVE
-                  || a.getAssetRole() != BookAssetAssetRole.PUBLIC
+                  || (a.getAssetRole() != BookAssetAssetRole.PUBLIC
+                      && a.getAssetRole() != BookAssetAssetRole.COVER)
                   || em.find(Book.class, book).getStatus() != BookStatus.ACTIVE
                   || !distributionAllowed(a))) throw missing();
           var v = latest(id);

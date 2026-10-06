@@ -76,6 +76,7 @@ public class BookQueryController {
       String originalLanguage,
       Short firstPublicationYear,
       String description,
+      String thumbnailUrl,
       String status,
       Instant createdAt,
       Instant updatedAt) {
@@ -87,6 +88,7 @@ public class BookQueryController {
           book.getOriginalLanguage(),
           book.getFirstPublicationYear(),
           book.getDescription(),
+          "/api/v1/books/" + book.getId() + "/thumbnail",
           book.getStatus().name(),
           book.getCreatedAt(),
           book.getUpdatedAt());

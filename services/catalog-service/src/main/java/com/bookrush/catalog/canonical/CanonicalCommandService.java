@@ -137,6 +137,7 @@ public class CanonicalCommandService {
       result = changed == 0 ? "NOOP" : "UPDATED";
     }
     var authorIds = new ArrayList<UUID>();
+    applyGutenbergLicense(command, editionId);
     if (command.authorName() != null && !command.authorName().isBlank()) {
       var normalized = normalizeName(command.authorName());
       var author =
@@ -274,6 +275,27 @@ public class CanonicalCommandService {
         rule,
         mapper.valueToTree(previousValue).toString(),
         PRINCIPAL);
+  }
+
+  private void applyGutenbergLicense(CanonicalCommand command, UUID editionId) {
+    if (!"GUTENBERG".equalsIgnoreCase(command.sourceCode())
+        || command.metadata() == null
+        || !command.metadata().path("rights").asText("").toLowerCase(Locale.ROOT).contains("public domain")) return;
+    jdbc.update(
+        "UPDATE catalog.edition SET license_id=COALESCE(license_id,(SELECT id FROM catalog.license WHERE code='PUBLIC_DOMAIN')) WHERE id=?",
+        editionId);
+    var evidence = command.metadata().path("rdfUrl").asText("Gutenberg rights metadata");
+    jdbc.update(
+        "INSERT INTO catalog.rights_decision(id, edition_id, action, territory, distribution_status,"
+            + " evidence_reference, policy_code, actor) SELECT ?, ?, 'DISTRIBUTION', 'GLOBAL',"
+            + " 'APPROVED', ?, 'GUTENBERG_PUBLIC_DOMAIN', ? WHERE NOT EXISTS (SELECT 1 FROM"
+            + " catalog.rights_decision WHERE edition_id=? AND action='DISTRIBUTION' AND"
+            + " policy_code='GUTENBERG_PUBLIC_DOMAIN' AND distribution_status='APPROVED')",
+        UUID.randomUUID(),
+        editionId,
+        evidence,
+        PRINCIPAL,
+        editionId);
   }
 
   private String normalizeLanguage(String value) {

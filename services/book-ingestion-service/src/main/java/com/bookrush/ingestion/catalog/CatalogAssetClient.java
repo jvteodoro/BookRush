@@ -110,6 +110,61 @@ public final class CatalogAssetClient {
         .body(Map.class);
   }
 
+  public Map<?, ?> uploadThumbnail(
+      UUID bookId, UUID editionId, UUID sourceId, Path file, String filename) {
+    String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
+    var existing =
+        client
+            .get()
+            .uri("/api/admin/books/{bookId}/assets", bookId)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .retrieve()
+            .body(java.util.List.class);
+    for (Object value : existing == null ? java.util.List.of() : existing) {
+      if (!(value instanceof Map<?, ?> item)
+          || !"COVER".equals(String.valueOf(item.get("role")))
+          || !"THUMBNAIL".equals(String.valueOf(item.get("type")))
+          || !editionId.toString().equals(String.valueOf(item.get("editionId")))) continue;
+      var versions =
+          client
+              .get()
+              .uri("/api/admin/books/{bookId}/assets/{assetId}/versions", bookId, item.get("id"))
+              .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+              .retrieve()
+              .body(java.util.List.class);
+      if (versions != null && !versions.isEmpty()) return Map.of("asset", item, "version", versions.getFirst());
+    }
+    MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+    form.add("sourceId", sourceId.toString());
+    form.add("editionId", editionId.toString());
+    form.add("type", "THUMBNAIL");
+    form.add("role", "COVER");
+    form.add("file", filePart(file, MediaType.IMAGE_JPEG));
+    try {
+      return client
+          .post()
+          .uri("/api/admin/books/{bookId}/assets", bookId)
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+          .contentType(MediaType.MULTIPART_FORM_DATA)
+          .body(form)
+          .retrieve()
+          .body(Map.class);
+    } catch (RestClientResponseException e) {
+      throw new IllegalStateException(
+          "catalog thumbnail upload failed: " + e.getStatusCode() + " " + e.getResponseBodyAsString(), e);
+    }
+  }
+
+  public void approve(UUID bookId, UUID assetId) {
+    String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
+    client
+        .post()
+        .uri("/api/admin/books/{bookId}/assets/{assetId}/approve", bookId, assetId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+        .retrieve()
+        .toBodilessEntity();
+  }
+
   private static HttpEntity<FileSystemResource> filePart(Path file, MediaType contentType) {
     var headers = new HttpHeaders();
     headers.setContentType(contentType);
@@ -122,6 +177,7 @@ public final class CatalogAssetClient {
       case "JSON" -> MediaType.APPLICATION_JSON;
       case "PDF" -> MediaType.APPLICATION_PDF;
       case "EPUB" -> MediaType.parseMediaType("application/epub+zip");
+      case "COVER", "THUMBNAIL" -> MediaType.IMAGE_JPEG;
       default -> MediaType.APPLICATION_OCTET_STREAM;
     };
   }

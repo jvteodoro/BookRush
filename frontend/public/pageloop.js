@@ -46,6 +46,7 @@
 
   function icon(name, cls='') { return `<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.sparkle}</svg>`; }
   function esc(s=''){return String(s).replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));}
+  function coverStyle(b){const url=String(b?.thumbnailUrl||'').trim();if(!url)return '';return `--cover-image:url("${encodeURI(url).replace(/["'()\\]/g,'')}")`;}
   function compact(n){return n>=1000?(n/1000).toFixed(n>=10000?0:1).replace('.',',')+' mil':String(n)}
   function book(id){return BOOKS.find(b=>b.id===id)||BOOKS[0]}
   function save(){const copy={...state};delete copy.route;void copy; /* persistência de produto é feita pelo backend */}
@@ -108,7 +109,7 @@
   }
 
   function feedCard(b,idx){
-    return `<article class="feed-card" style="--cover-a:${b.a};--cover-b:${b.b}" data-book="${b.id}">
+    return `<article class="feed-card" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}" data-book="${b.id}">
       <div class="feed-noise"></div>
       <div class="feed-copy">
         <div class="feed-meta"><span class="genre-chip">${b.genre}</span><span class="match">${b.rank ? `posição ${b.rank}` : 'catálogo'}</span><span>•</span><span>${b.modelVersion ? esc(b.modelVersion) : 'conteúdo disponível'}</span></div>
@@ -199,7 +200,7 @@
 
   window.addEventListener('resize',scheduleFeedQuoteFit,{passive:true});
 
-  function bookCard(b){return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank?`posição ${b.rank}`:'disponível'}</span></div></article>`}
+  function bookCard(b){return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank?`posição ${b.rank}`:'disponível'}</span></div></article>`}
 
   function renderRecommendations(){
     const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">CURADORIA PERSONALIZADA</div><h1>Descubra sua próxima leitura</h1><p>Recomendações retornadas pelo recommendation-service e ordenadas pelo modelo ativo.</p></div><button class="primary-btn" id="luckyBtn">${icon('sparkle')} Estou com sorte</button></div>
@@ -243,7 +244,7 @@
       const page=await r.json();
       return (page.items||[]).filter(i=>!BOOKS.some(b=>b.id===i.id)).map((i,n)=>{
         const p=LUCKY_PALETTES[n%LUCKY_PALETTES.length];
-        const book={id:i.id,title:i.canonicalTitle,author:'Catálogo BookRush',genre:(i.originalLanguage||'Clássico').toUpperCase(),keywords:[],match:80,a:p[0],b:p[1],quote:i.description||`Descubra ${i.canonicalTitle} no catálogo BookRush.`,likes:0,comments:0,shares:0,pages:0,progress:0};
+        const book={id:i.id,title:i.canonicalTitle,author:'Catálogo BookRush',genre:(i.originalLanguage||'Clássico').toUpperCase(),keywords:[],match:80,a:p[0],b:p[1],quote:i.description||`Descubra ${i.canonicalTitle} no catálogo BookRush.`,likes:0,comments:0,shares:0,pages:0,progress:0,thumbnailUrl:i.thumbnailUrl};
         BOOKS.push(book); // necessário para book(id)/openBook funcionarem
         return book;
       });
@@ -275,7 +276,7 @@
   }
 
   function openLucky(b,term='',note=''){
-    modal(`<div class="eyebrow">ESTOU COM SORTE${term&&!note?` · “${esc(term)}”`:''}</div><h2>${esc(b.title)}</h2>${note?`<p class="notice">${esc(note)}</p>`:''}<p>${esc(b.quote)}</p><div style="display:flex;gap:10px;align-items:center;margin-top:18px"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};background:linear-gradient(145deg,${b.a},${b.b})"></div><div><strong>${esc(b.author)}</strong><div class="muted tiny">${esc(b.genre)}${b.pages?` • ${b.pages} páginas`:''}</div></div></div>`,
+    modal(`<div class="eyebrow">ESTOU COM SORTE${term&&!note?` · “${esc(term)}”`:''}</div><h2>${esc(b.title)}</h2>${note?`<p class="notice">${esc(note)}</p>`:''}<p>${esc(b.quote)}</p><div style="display:flex;gap:10px;align-items:center;margin-top:18px"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"></div><div><strong>${esc(b.author)}</strong><div class="muted tiny">${esc(b.genre)}${b.pages?` • ${b.pages} páginas`:''}</div></div></div>`,
       `<button class="ghost-btn" data-lucky-change>Mudar palavra</button><button class="secondary-btn" data-lucky-again>Outra vez</button><button class="primary-btn" data-modal-open="${b.id}">Ler este livro ${icon('arrow','icon-sm')}</button>`);
     document.querySelector('[data-lucky-again]').onclick=()=>{document.querySelector('.modal-wrap')?.remove();pickLucky(note?'':term,b.id)};
     document.querySelector('[data-lucky-change]').onclick=openLuckyPrompt;
@@ -293,7 +294,7 @@
       <div class="search-box">${icon('search')}<input id="searchInput" value="${esc(state.search)}" placeholder="Ex.: Jane Austen, futuro, natureza..." autofocus/><kbd>⌘ K</kbd></div>
       <div class="filter-row">${filters.map(f=>`<button class="filter-chip ${state.searchFilter===f?'active':''}" data-filter="${f}">${f}</button>`).join('')}</div>
       <div class="section-row"><h2>${results.length} ${results.length===1?'resultado':'resultados'}</h2><span class="muted tiny">Ordenados por relevância</span></div>
-      <div class="search-results">${results.map(b=>`<article class="result-row" style="--cover-a:${b.a};--cover-b:${b.b}"><div class="result-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)} • ${b.genre}</p><div class="result-tags">${b.keywords.slice(0,3).map(k=>`<span class="pill">${k}</span>`).join('')}</div></div><div class="result-actions"><button class="secondary-btn" data-save="${b.id}">${icon('bookmark','icon-sm')} ${state.saved[b.id]?'Salvo':'Salvar'}</button><button class="primary-btn" data-open-book="${b.id}">Ler</button></div></article>`).join('')||`<div class="panel-card"><h3>Nenhum livro encontrado</h3><p class="muted">Tente outra palavra ou remova o filtro atual.</p></div>`}</div></main>`;
+      <div class="search-results">${results.map(b=>`<article class="result-row" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"><div class="result-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)} • ${b.genre}</p><div class="result-tags">${b.keywords.slice(0,3).map(k=>`<span class="pill">${k}</span>`).join('')}</div></div><div class="result-actions"><button class="secondary-btn" data-save="${b.id}">${icon('bookmark','icon-sm')} ${state.saved[b.id]?'Salvo':'Salvar'}</button><button class="primary-btn" data-open-book="${b.id}">Ler</button></div></article>`).join('')||`<div class="panel-card"><h3>Nenhum livro encontrado</h3><p class="muted">Tente outra palavra ou remova o filtro atual.</p></div>`}</div></main>`;
     shell(content,'Buscar');
     const inp=document.getElementById('searchInput'); inp.oninput=e=>{state.search=e.target.value;renderSearch();const i=document.getElementById('searchInput');i.focus();i.setSelectionRange(i.value.length,i.value.length)};
     document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.searchFilter=b.dataset.filter;renderSearch()});
@@ -322,7 +323,7 @@
     let list=state.libraryTab==='saved'?BOOKS.filter(b=>state.saved[b.id]):state.libraryTab==='reading'?BOOKS.filter(b=>b.progress>0):(state.recent||[]).map(book);
     const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">SUA ESTANTE</div><h1>Minha biblioteca</h1><p>Livros salvos, leituras em andamento e itens abertos recentemente.</p></div></div>
       <div class="tab-row">${tabs.map(([id,l])=>`<button class="tab-btn ${state.libraryTab===id?'active':''}" data-tab="${id}">${l}</button>`).join('')}</div>
-      <div class="library-grid">${list.map(b=>`<article class="library-item" data-open-book="${b.id}" style="--cover-a:${b.a};--cover-b:${b.b}"><div class="library-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="library-progress"><span style="width:${b.progress||12}%"></span></div><span class="library-percent">${b.progress||12}% lido</span></div></article>`).join('')||`<div class="panel-card"><h3>Nada aqui ainda</h3><p class="muted">Salve livros no feed para vê-los nesta seção.</p></div>`}</div>
+      <div class="library-grid">${list.map(b=>`<article class="library-item" data-open-book="${b.id}" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"><div class="library-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="library-progress"><span style="width:${b.progress||12}%"></span></div><span class="library-percent">${b.progress||12}% lido</span></div></article>`).join('')||`<div class="panel-card"><h3>Nada aqui ainda</h3><p class="muted">Salve livros no feed para vê-los nesta seção.</p></div>`}</div>
       <div class="section-row"><h2>Retomar rapidamente</h2></div><div class="book-grid">${BOOKS.filter(b=>b.progress>20).slice(0,5).map(bookCard).join('')}</div></main>`;
     shell(content,'Biblioteca');
     document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{state.libraryTab=b.dataset.tab;renderLibrary()});

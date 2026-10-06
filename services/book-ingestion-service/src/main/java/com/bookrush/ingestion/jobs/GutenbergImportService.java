@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -92,6 +93,11 @@ public class GutenbergImportService {
                 + record.creator()
                 + "\u0000"
                 + record.language());
+    var canonicalMetadata = new LinkedHashMap<String, Object>();
+    canonicalMetadata.put("rdfUrl", rdfUri.toString());
+    canonicalMetadata.put("snapshotSha256", snapshot.sha256());
+    canonicalMetadata.put("rights", record.rights());
+    canonicalMetadata.put("thumbnailUrl", thumbnailUri(id).toString());
     var result =
         catalog.apply(
             new CanonicalCatalogPort.CanonicalCatalogCommand(
@@ -104,7 +110,7 @@ public class GutenbergImportService {
                 record.title() == null ? "Gutenberg " + id : record.title(),
                 record.language(),
                 record.rights(),
-                Map.of("rdfUrl", rdfUri.toString(), "snapshotSha256", snapshot.sha256()),
+                canonicalMetadata,
                 null,
                 null,
                 record.creator(),
@@ -119,7 +125,8 @@ public class GutenbergImportService {
             .put("language", record.language())
             .put("creator", record.creator())
             .put("rights", record.rights())
-            .put("rdfUrl", rdfUri.toString());
+            .put("rdfUrl", rdfUri.toString())
+            .put("thumbnailUrl", thumbnailUri(id).toString());
     jdbc.update(
         "INSERT INTO catalog.source_record(id, source_id, external_id, raw_metadata, retrieved_at,"
             + " content_hash, raw_sha256, semantic_sha256, raw_locator, small_metadata) VALUES (?,"
@@ -214,6 +221,24 @@ public class GutenbergImportService {
           "EPUB_TO_TEXT_AND_CHAPTERS",
           Map.of("sha256", normalized.sha256()));
     }
+    if (processAssets) {
+      var thumbnail = staging.resolve("gutenberg-" + id + ".cover.medium.jpg");
+      var thumbnailSnapshot =
+          downloader.download(
+              thumbnailUri(id),
+              thumbnail,
+              "gutenberg/" + id + "/thumbnail.jpg",
+              null,
+              raw);
+      var thumbnailResult =
+          assets.uploadThumbnail(
+              bookId, editionId, sourceId, thumbnailSnapshot.localFile(), "gutenberg-" + id + ".jpg");
+      if (isPublicDomain(record.rights())) {
+        var asset = thumbnailResult.get("asset");
+        if (asset instanceof Map<?, ?> value && value.get("id") != null)
+          assets.approve(bookId, UUID.fromString(String.valueOf(value.get("id"))));
+      }
+    }
     jdbc.update(
         "UPDATE catalog.ingestion_item SET source_record_id=(SELECT id FROM catalog.source_record"
             + " WHERE source_id=? AND external_id=? ORDER BY created_at DESC LIMIT 1), book_id=?,"
@@ -234,6 +259,14 @@ public class GutenbergImportService {
     } catch (Exception e) {
       throw new IllegalStateException("invalid publisher submission correlation", e);
     }
+  }
+
+  private URI thumbnailUri(String id) {
+    return URI.create(gutenberg.baseUrl() + "/cache/epub/" + id + "/pg" + id + ".cover.medium.jpg");
+  }
+
+  private boolean isPublicDomain(String rights) {
+    return rights != null && rights.toLowerCase(java.util.Locale.ROOT).contains("public domain");
   }
 
   private String sha256(String value) {

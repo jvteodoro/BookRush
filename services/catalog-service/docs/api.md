@@ -23,6 +23,13 @@ obra ou `404`. Ambos exigem um token de serviço com `bookrush.catalog.read` ou
 
 Essas rotas expõem somente metadados bibliográficos. Assets e conteúdo físico
 continuam sujeitos às rotas de distribuição e às políticas de direitos.
+
+## Thumbnails de capa
+
+`GET /api/v1/books/{bookId}/thumbnail` procura o asset `THUMBNAIL` com papel
+`COVER` em estado `ACTIVE` e responde com um redirecionamento para uma URL S3
+temporária. A listagem de livros retorna `thumbnailUrl` apontando para essa
+rota; clientes devem tratar `404` como ausência de capa e manter seu placeholder.
 ## Reader chapters
 
 `GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted

@@ -35,6 +35,11 @@ interface permanece em memória e dados de produto ficam no backend.
 O feed usa `GET /api/v1/reader/feed` e registra viewability em
 `POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
 livro.
+As respostas do catálogo incluem `thumbnailUrl` quando a edição possui uma
+thumbnail Gutenberg aprovada. O shell aplica essa URL nas capas do feed,
+recomendações, busca, biblioteca e sorteio; se a rota retornar `404`, o
+gradiente gerado permanece como fallback. A URL é temporária e nunca é salva
+no navegador.
 Curtidas, comentários, compartilhamentos, progresso e bookmarks usam os
 endpoints dos bounded contexts `social` e `reader-state`; falhas são exibidas
 ao usuário e não são mascaradas como sucesso local.

@@ -24,6 +24,18 @@ tags:
 - name: Conteúdo reader
   description: Projeção de capítulos e leitura interna da versão textual exata.
 paths:
+  /api/v1/books/{bookId}/thumbnail:
+    get:
+      tags: [Distribuição]
+      summary: Obter thumbnail da capa
+      description: Redireciona para uma URL temporária do thumbnail COVER aprovado.
+      operationId: getBookThumbnail
+      parameters:
+        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '302': {description: Redirecionamento para o objeto público temporário.}
+        '404': {description: Livro sem thumbnail aprovado.}
+        '409': {description: Distribuição ainda não autorizada ou objeto inconsistente.}
   /api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/content:
     get:
       tags: [Conteúdo reader]
@@ -596,6 +608,7 @@ components:
         originalLanguage: {type: string, nullable: true}
         firstPublicationYear: {type: integer, format: int32, nullable: true}
         description: {type: string, nullable: true}
+        thumbnailUrl: {type: string, format: uri, nullable: true}
         status: {type: string, enum: [ACTIVE, INACTIVE, MERGED, REVIEW_REQUIRED]}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
