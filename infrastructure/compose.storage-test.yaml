@@ -17,6 +17,9 @@ services:
     environment:
       STORAGE_ACCESS_KEY: storage-test
       STORAGE_SECRET_KEY: storage-test-secret
+      # Disposable tests need to work on CI hosts whose root filesystem is
+      # nearly full; production keeps SeaweedFS's safer 1% default.
+      STORAGE_MIN_FREE_SPACE: 100MiB
     volumes:
       - storage_test_data:/data
     ports:

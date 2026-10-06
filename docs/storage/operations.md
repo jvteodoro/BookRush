@@ -99,3 +99,8 @@ docker compose -f infrastructure/compose.yaml --env-file .env up -d --build --wa
 Valide `GET http://127.0.0.1:9333/dir/status?pretty=y` dentro do container e
 confirme que o layout `books-public` possui volumes graváveis antes de testar o
 manifesto Readium.
+
+O limite padrão de espaço livre do SeaweedFS permanece em 1% em produção. O
+`compose.storage-test.yaml` usa `STORAGE_MIN_FREE_SPACE=100MiB` porque o stack
+é descartável e pode rodar em agentes CI com disco quase cheio; esse valor não
+deve ser copiado para o volume persistente de produção.
