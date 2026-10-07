@@ -56,7 +56,9 @@ O job `bookrush-admin-web` valida e empacota a console administrativa. Ele
 aceita `BRANCH` e `DEPLOY`; quando `DEPLOY=true`, recria somente o serviço
 `admin-web` no Compose. A definição usa blocos declarativos separados para
 `when` e `steps`, portanto deve ser validada com `scripts/validate-pipelines.sh`
-antes de ser publicada no Jenkins.
+antes de ser publicada no Jenkins. Como o job é criado como Pipeline inline,
+seu estágio de checkout usa explicitamente o repositório e a branch informada;
+ele não depende de `checkout scm` de Multibranch.
 
 As pipelines isoladas não fazem deploy. Publicação de imagem é opt-in somente
 na pipeline de microserviço, com `PUBLISH=true`, `REGISTRY` e credential

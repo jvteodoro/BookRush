@@ -6,7 +6,18 @@ pipeline {
   }
   options { timestamps(); disableConcurrentBuilds(); timeout(time: 20, unit: 'MINUTES') }
   stages {
-    stage('Checkout') { steps { checkout scm } }
+    stage('Checkout') {
+      steps {
+        script {
+          def selectedBranch = (params.BRANCH ?: 'main').trim()
+          sh 'git check-ref-format --branch "' + selectedBranch + '"'
+          deleteDir()
+          checkout([$class: 'GitSCM',
+            branches: [[name: "refs/remotes/origin/${selectedBranch}"]],
+            userRemoteConfigs: [[url: 'https://github.com/jvteodoro/BookRush.git']]])
+        }
+      }
+    }
     stage('Build e lint') { steps { dir('admin-web') { sh 'npm ci'; sh 'npm run build'; sh 'npm run lint' } } }
     stage('Imagem') { steps { sh 'image="${ADMIN_WEB_IMAGE:-local/bookrush/admin-web:${BUILD_NUMBER}-${GIT_COMMIT:0:7}}"; docker build -t "$image" admin-web' } }
     stage('Deploy opcional') {
