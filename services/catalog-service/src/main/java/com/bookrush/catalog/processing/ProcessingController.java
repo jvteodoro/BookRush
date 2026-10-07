@@ -146,7 +146,9 @@ public class ProcessingController {
       summary = "Projetar capítulos",
       description =
           "Materializa chapters.json no PostgreSQL de forma idempotente para a versão de texto"
-              + " informada.")
+              + " informada. Se a projeção já existir para a mesma versão imutável, retorna"
+              + " ALREADY_PROJECTED sem apagar ou recriar capítulos, preservando IDs usados pelo"
+              + " analytics.")
   public Map<String, Object> chapters(@RequestBody ChapterRequest request) {
     if (request.bookId() == null
         || request.editionId() == null
@@ -154,9 +156,22 @@ public class ProcessingController {
         || request.chapters() == null
         || request.chapters().isEmpty())
       throw new IllegalArgumentException("book, edition, text version and chapters are required");
-    jdbc.update(
-        "DELETE FROM catalog.book_chapter WHERE text_asset_version_id=?",
-        request.textAssetVersionId());
+    var existing =
+        jdbc.queryForList(
+            "SELECT id FROM catalog.book_chapter WHERE text_asset_version_id=?",
+            request.textAssetVersionId());
+    if (!existing.isEmpty()) {
+      // Chapter IDs are referenced by analytics excerpts. A replay for the
+      // same immutable text version must preserve those IDs instead of
+      // deleting and recreating the projection.
+      return Map.of(
+          "textAssetVersionId",
+          request.textAssetVersionId(),
+          "chapters",
+          existing.size(),
+          "status",
+          "ALREADY_PROJECTED");
+    }
     var ids = new HashMap<String, UUID>();
     for (var chapter : request.chapters()) {
       var id = UUID.randomUUID();

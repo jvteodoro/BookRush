@@ -137,7 +137,9 @@ paths:
       - Processamento interno
       summary: Projetar capítulos
       description: Materializa chapters.json no PostgreSQL de forma idempotente para
-        a versão de texto informada.
+        a versão de texto informada. Se a projeção já existir para a mesma versão
+        imutável, retorna ALREADY_PROJECTED sem apagar ou recriar capítulos, para
+        preservar os IDs referenciados pelo analytics.
       operationId: chapters
       requestBody:
         content:

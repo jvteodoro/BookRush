@@ -44,3 +44,16 @@ text version after checking the book, asset and object-storage metadata. This
 keeps presigned browser capabilities separate from the server-side Readium
 chapter proxy and prevents container-local storage URLs from leaking into the
 reader flow.
+
+## Projeção interna de capítulos
+
+`POST /api/internal/v1/catalog/processings/chapters` materializa o
+`chapters.json` recebido pela ingestão para a versão textual informada. A
+operação é idempotente: versões textuais são imutáveis e, quando já existem
+capítulos projetados para `textAssetVersionId`, o catálogo responde
+`ALREADY_PROJECTED` sem apagar nem recriar as linhas.
+
+Essa regra preserva os IDs estáveis de `catalog.book_chapter`, que podem estar
+referenciados por `analytics.excerpt`. Portanto, reimportações e retries não
+removem capítulos usados pelo analytics nem falham por violação de chave
+estrangeira.
