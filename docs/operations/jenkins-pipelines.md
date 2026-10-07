@@ -58,7 +58,8 @@ aceita `BRANCH` e `DEPLOY`; quando `DEPLOY=true`, recria somente o serviço
 `when` e `steps`, portanto deve ser validada com `scripts/validate-pipelines.sh`
 antes de ser publicada no Jenkins. Como o job é criado como Pipeline inline,
 seu estágio de checkout usa explicitamente o repositório e a branch informada;
-ele não depende de `checkout scm` de Multibranch.
+ele não depende de `checkout scm` de Multibranch. O build e o lint rodam em um
+container `node:22-alpine`, pois o agente Jenkins não precisa ter Node instalado.
 
 As pipelines isoladas não fazem deploy. Publicação de imagem é opt-in somente
 na pipeline de microserviço, com `PUBLISH=true`, `REGISTRY` e credential

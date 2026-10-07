@@ -18,7 +18,11 @@ pipeline {
         }
       }
     }
-    stage('Build e lint') { steps { dir('admin-web') { sh 'npm ci'; sh 'npm run build'; sh 'npm run lint' } } }
+    stage('Build e lint') {
+      steps {
+        sh 'docker run --rm -v "$PWD/admin-web:/app" -w /app node:22-alpine sh -lc "npm ci && npm run build && npm run lint"'
+      }
+    }
     stage('Imagem') { steps { sh 'image="${ADMIN_WEB_IMAGE:-local/bookrush/admin-web:${BUILD_NUMBER}-${GIT_COMMIT:0:7}}"; docker build -t "$image" admin-web' } }
     stage('Deploy opcional') {
       when { expression { params.DEPLOY } }
