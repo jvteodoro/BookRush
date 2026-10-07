@@ -23,7 +23,7 @@ pipeline {
         sh 'docker build --target build -t "bookrush/admin-web-test:$BUILD_NUMBER" admin-web'
       }
     }
-    stage('Imagem') { steps { sh 'image="${ADMIN_WEB_IMAGE:-local/bookrush/admin-web:${BUILD_NUMBER}-${GIT_COMMIT:0:7}}"; docker build -t "$image" admin-web' } }
+    stage('Imagem') { steps { sh 'image="${ADMIN_WEB_IMAGE:-local/bookrush/admin-web:${BUILD_NUMBER}-${GIT_COMMIT}}"; docker build -t "$image" admin-web' } }
     stage('Deploy opcional') {
       when { expression { params.DEPLOY } }
       steps {

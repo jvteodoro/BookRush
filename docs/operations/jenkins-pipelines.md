@@ -61,7 +61,8 @@ seu estágio de checkout usa explicitamente o repositório e a branch informada;
 ele não depende de `checkout scm` de Multibranch. O build e o lint rodam em um
 container `node:22-alpine` por meio do `Dockerfile` do `admin-web`, pois o
 agente Jenkins e o daemon Docker podem ter filesystems diferentes; o build e o
-lint são executados no contexto enviado pelo `docker build`.
+lint são executados no contexto enviado pelo `docker build`. A tag da imagem
+usa expansão POSIX compatível com o `sh` do Jenkins.
 
 As pipelines isoladas não fazem deploy. Publicação de imagem é opt-in somente
 na pipeline de microserviço, com `PUBLISH=true`, `REGISTRY` e credential
