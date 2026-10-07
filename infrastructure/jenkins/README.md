@@ -60,6 +60,10 @@ vazio quando um callback é repetido, está em
 
 ## Build e deploy pelo navegador
 
+Para execução automatizada pelo agente, incluindo autenticação OIDC, crumb
+CSRF, fila, jobs inline e diagnóstico, use o
+[`runbook do agente Jenkins`](../../docs/operations/jenkins-agent-runbook.md).
+
 1. Abra **bookrush-deploy → Build with Parameters**.
 2. Informe **BRANCH** (nome exato, como `main` ou `feature/catalogo`).
 3. Use **DEPLOY_TARGET=compose** para este servidor.

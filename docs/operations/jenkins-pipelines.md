@@ -1,5 +1,9 @@
 # Pipelines por microserviço e por vertical
 
+Para disparos automatizados autenticados, sincronização de jobs inline e
+diagnóstico de erros de CSRF/checkout, consulte o
+[`runbook do agente Jenkins`](jenkins-agent-runbook.md).
+
 O job `bookrush-deploy` continua sendo a validação integrada e o caminho de
 deploy. Para reduzir o tempo de feedback, o Jenkins também cria pipelines
 isoladas no bootstrap da instância.
