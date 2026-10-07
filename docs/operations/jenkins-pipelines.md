@@ -52,6 +52,12 @@ Docker fora do container do agente.
 - `infrastructure/jenkins/init.groovy.d/bookrush.groovy`: cria/atualiza os 12 + 7 jobs.
 - `infrastructure/jenkins/Dockerfile`: embarca os Jenkinsfiles no bootstrap.
 
+O job `bookrush-admin-web` valida e empacota a console administrativa. Ele
+aceita `BRANCH` e `DEPLOY`; quando `DEPLOY=true`, recria somente o serviço
+`admin-web` no Compose. A definição usa blocos declarativos separados para
+`when` e `steps`, portanto deve ser validada com `scripts/validate-pipelines.sh`
+antes de ser publicada no Jenkins.
+
 As pipelines isoladas não fazem deploy. Publicação de imagem é opt-in somente
 na pipeline de microserviço, com `PUBLISH=true`, `REGISTRY` e credential
 configurados. O deploy permanece centralizado no `bookrush-deploy`.
