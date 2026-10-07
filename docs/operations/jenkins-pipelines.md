@@ -59,8 +59,9 @@ aceita `BRANCH` e `DEPLOY`; quando `DEPLOY=true`, recria somente o serviço
 antes de ser publicada no Jenkins. Como o job é criado como Pipeline inline,
 seu estágio de checkout usa explicitamente o repositório e a branch informada;
 ele não depende de `checkout scm` de Multibranch. O build e o lint rodam em um
-container `node:22-alpine` usando `npm install`, pois o agente Jenkins não
-precisa ter Node instalado e o workspace pode não conter o lockfile.
+container `node:22-alpine` por meio do `Dockerfile` do `admin-web`, pois o
+agente Jenkins e o daemon Docker podem ter filesystems diferentes; o build e o
+lint são executados no contexto enviado pelo `docker build`.
 
 As pipelines isoladas não fazem deploy. Publicação de imagem é opt-in somente
 na pipeline de microserviço, com `PUBLISH=true`, `REGISTRY` e credential
