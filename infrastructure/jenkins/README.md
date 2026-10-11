@@ -134,7 +134,10 @@ e o `.env` em `/run/bookrush.env`, ambos somente leitura. O profile `auth` é
 ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
-deploy falhar. PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
+deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
+frontend, perfis de leitores e social; isso garante que contratos usados pelo
+frontend sejam implantados na mesma revisão. PostgreSQL, Redis, pgAdmin e
+Jenkins são preservados.
 O `.env` deve definir `BOOKRUSH_REPO_ROOT` com o caminho absoluto do checkout
 visível ao daemon Docker; ele é usado para montar o realm do Keycloak e o
 arquivo dinâmico do Traefik quando o Compose é executado de dentro do Jenkins.

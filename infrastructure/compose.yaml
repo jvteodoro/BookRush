@@ -413,7 +413,7 @@ services:
     networks: [bookrush]
 
   reader-profile-service:
-    image: bookrush/reader-profile-service:local
+    image: ${READER_PROFILE_IMAGE:-bookrush/reader-profile-service:local}
     build:
       context: ..
       dockerfile: services/reader-profile-service/Dockerfile
@@ -439,7 +439,7 @@ services:
     networks: [bookrush]
 
   social-service:
-    image: bookrush/social-service:local
+    image: ${SOCIAL_IMAGE:-bookrush/social-service:local}
     build:
       context: ..
       dockerfile: services/social-service/Dockerfile
