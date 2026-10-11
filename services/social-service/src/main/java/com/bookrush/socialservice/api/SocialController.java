@@ -93,6 +93,14 @@ public class SocialController {
     return Map.of("user", user, "following", true);
   }
 
+  @GetMapping("/users/{user}/follow")
+  public Map<String, Object> followStatus(@PathVariable String user, Principal principal) {
+    boolean following = jdbc.queryForObject(
+        "SELECT EXISTS (SELECT 1 FROM social.follows WHERE follower = ? AND followed = ?)",
+        Boolean.class, subject(principal), user);
+    return Map.of("user", user, "following", following);
+  }
+
   @DeleteMapping("/users/{user}/follow")
   public void unfollow(@PathVariable String user, Principal principal) {
     jdbc.update("DELETE FROM social.follows WHERE follower = ? AND followed = ?",

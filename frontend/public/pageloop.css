@@ -100,3 +100,5 @@ body[data-mode="app"] .analytics-book-row{grid-template-columns:45px 1fr 64px 64
 @media(max-width:700px){.compact-heading{align-items:flex-start}.mini-search{width:100%}.form-actions{flex-direction:column}.analytics-book-row{grid-template-columns:48px 1fr 70px!important}.analytics-book-row>*:nth-child(n+4){display:none}.page-heading .primary-btn,.page-heading .secondary-btn{width:100%}}
 
 @media(max-width:640px){.reader-overlay{top:12px}.reader-overlay-left{left:12px}.reader-overlay-right{right:12px}.reader-overlay-center{max-width:55vw}.reader-title{max-width:55vw;padding:10px 13px;font-size:10px}}
+
+.comment{display:block}.comment-author{display:inline-flex;align-items:center;gap:10px;color:inherit;text-decoration:none;border-radius:8px}.comment-author:hover strong,.comment-author:focus-visible strong{text-decoration:underline}.comment-author:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.comment p{margin-left:41px}

@@ -203,7 +203,8 @@ function App() {
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(`/api/v1/reader/library/${encodeURIComponent(id)}`, { method: enabled ? 'PUT' : 'DELETE' });
             if (!response.ok) throw new Error('Não foi possível atualizar sua biblioteca.');
-            enabled ? saved.add(id) : saved.delete(id);
+            if (enabled) saved.add(id);
+            else saved.delete(id);
           },
           like: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(`/api/v1/social/books/${encodeURIComponent(id)}/like`, { method: enabled ? 'PUT' : 'DELETE' });
@@ -234,6 +235,12 @@ function App() {
             const response = await authClient.fetch('/api/v1/profile');
             return response.ok ? response.json() : null;
           },
+          publicProfile: async (subject: string) => {
+            const response = await authClient.fetch(`/api/v1/profile/public?subject=${encodeURIComponent(subject)}`);
+            if (!response.ok) throw new Error('Não foi possível carregar este perfil.');
+            const profile = await response.json() as { displayName?: string; subject_key?: string; bio?: string };
+            return profile.displayName?.trim() ? profile : null;
+          },
           updateProfile: async (profile: { displayName?: string; bio?: string; isPublic?: boolean }) => {
             const response = await authClient.fetch('/api/v1/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) });
             if (!response.ok) throw new Error('Não foi possível salvar o perfil.');
@@ -242,6 +249,11 @@ function App() {
           follow: async (subject: string, enabled: boolean) => {
             const response = await authClient.fetch(`/api/v1/social/users/${encodeURIComponent(subject)}/follow`, { method: enabled ? 'PUT' : 'DELETE' });
             if (!response.ok) throw new Error('Não foi possível atualizar o acompanhamento.');
+          },
+          followStatus: async (subject: string) => {
+            const response = await authClient.fetch(`/api/v1/social/users/${encodeURIComponent(subject)}/follow`);
+            if (!response.ok) throw new Error('Não foi possível consultar o acompanhamento.');
+            return (await response.json() as { following: boolean }).following;
           },
           adminUsers: async () => {
             const response = await authClient.fetch('/api/v1/admin/users');
@@ -329,15 +341,15 @@ function App() {
         };
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';
         if (document.querySelector('script[data-bookrush-pageloop]')) return;
-        const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261002-readium-kindle-7'; document.head.appendChild(style);
+        const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261011-public-profile'; document.head.appendChild(style);
         const thumbnailStyle = document.createElement('link'); thumbnailStyle.id = 'bookrush-thumbnail-style'; thumbnailStyle.rel = 'stylesheet'; thumbnailStyle.href = '/thumbnails.css?v=20261006-gutenberg'; document.head.appendChild(thumbnailStyle);
-        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261002-readium-kindle-7'; script.async = true; document.body.appendChild(script);
+        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261011-public-profile'; script.async = true; document.body.appendChild(script);
       } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o catálogo.'); }
     }
     void startPrototype();
     return () => { active = false; };
   }, [auth.status]);
-  async function login() { setAuth({ status: 'loading' }); try { await authClient.login('/'); } catch (cause) { setAuth({ status: 'error', error: cause instanceof Error ? cause.message : 'Não foi possível iniciar o login.' }); } }
+  async function login() { setAuth({ status: 'loading' }); try { await authClient.login(window.location.pathname + window.location.search); } catch (cause) { setAuth({ status: 'error', error: cause instanceof Error ? cause.message : 'Não foi possível iniciar o login.' }); } }
   if (auth.status === 'authenticated') return error ? <main className="landing"><span className="eyebrow">BOOKRUSH</span><h1>Não conseguimos abrir seu feed.</h1><p>{error}</p><button className="primary-button" onClick={() => window.location.reload()}>Tentar novamente</button></main> : <div id="app" />;
   if (auth.status === 'loading') return <div className="splash"><div className="brand-mark">B</div><p>Preparando seu feed…</p></div>;
   return <main className="landing"><div className="landing-art"><span className="brand-mark large">B</span><div className="floating-word">READ<br /><em>MORE</em></div></div><span className="eyebrow">UM UNIVERSO DE HISTÓRIAS</span><h1>Seu próximo<br /><em>capítulo</em> começa aqui.</h1><p>Descubra trechos, livros e leitores que combinam com você.</p>{auth.status === 'error' && <div className="notice error">{auth.error}</div>}<button className="primary-button" onClick={() => void login()}>Entrar com Keycloak <span>→</span></button><a className="register-link" href={authClient.registrationUrl()}>Ainda não tem conta? <strong>Cadastre-se</strong></a><small>Login seguro · Seus dados ficam protegidos</small></main>;
