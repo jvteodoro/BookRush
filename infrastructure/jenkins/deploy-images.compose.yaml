@@ -1,0 +1,5 @@
+services:
+  reader-profile-service:
+    image: ${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}
+  social-service:
+    image: ${SOCIAL_IMAGE:?Imagem social ausente}

@@ -6,7 +6,8 @@ set -Eeuo pipefail
 : "${ANALYTICS_IMAGE:?Imagem analytics ausente}"
 : "${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}"
 : "${SOCIAL_IMAGE:?Imagem social ausente}"
-compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml --env-file /run/bookrush.env --profile auth)
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --profile auth)
 storage_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' bookrush-seaweedfs-1 2>/dev/null || true)"
 if [[ "$storage_health" != healthy ]]; then
   echo 'SeaweedFS não está provisionado/saudável. Execute o procedimento inicial de infraestrutura antes do deploy.' >&2

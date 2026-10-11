@@ -138,6 +138,9 @@ deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
 frontend, perfis de leitores e social; isso garante que contratos usados pelo
 frontend sejam implantados na mesma revisão. PostgreSQL, Redis, pgAdmin e
 Jenkins são preservados.
+O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
+`deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
+perfil e social para as imagens criadas pela construção atual.
 O `.env` deve definir `BOOKRUSH_REPO_ROOT` com o caminho absoluto do checkout
 visível ao daemon Docker; ele é usado para montar o realm do Keycloak e o
 arquivo dinâmico do Traefik quando o Compose é executado de dentro do Jenkins.
