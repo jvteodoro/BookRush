@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.client.RestClient;
@@ -82,8 +83,8 @@ public class SocialController {
         subject(principal), bookId);
   }
 
-  @PutMapping("/users/{user}/follow")
-  public Map<String, Object> follow(@PathVariable String user, Principal principal) {
+  @PutMapping("/follow")
+  public Map<String, Object> follow(@RequestParam String user, Principal principal) {
     String current = subject(principal);
     if (current.equals(user)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot follow self");
@@ -93,8 +94,16 @@ public class SocialController {
     return Map.of("user", user, "following", true);
   }
 
-  @DeleteMapping("/users/{user}/follow")
-  public void unfollow(@PathVariable String user, Principal principal) {
+  @GetMapping("/follow")
+  public Map<String, Object> followStatus(@RequestParam String user, Principal principal) {
+    boolean following = jdbc.queryForObject(
+        "SELECT EXISTS (SELECT 1 FROM social.follows WHERE follower = ? AND followed = ?)",
+        Boolean.class, subject(principal), user);
+    return Map.of("user", user, "following", following);
+  }
+
+  @DeleteMapping("/follow")
+  public void unfollow(@RequestParam String user, Principal principal) {
     jdbc.update("DELETE FROM social.follows WHERE follower = ? AND followed = ?",
         subject(principal), user);
   }

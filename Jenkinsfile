@@ -69,6 +69,8 @@ pipeline {
           env.FRONTEND_IMAGE = "${registry}/bookrush/frontend:${env.IMAGE_TAG}"
           env.INGESTION_IMAGE = "${registry}/bookrush/book-ingestion-service:${env.IMAGE_TAG}"
           env.ANALYTICS_IMAGE = "${registry}/bookrush/book-analytics-service:${env.IMAGE_TAG}"
+          env.READER_PROFILE_IMAGE = "${registry}/bookrush/reader-profile-service:${env.IMAGE_TAG}"
+          env.SOCIAL_IMAGE = "${registry}/bookrush/social-service:${env.IMAGE_TAG}"
         }
         sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" -f services/catalog-service/Dockerfile .'
         sh 'docker run --rm "bookrush/catalog-test:$BUILD_NUMBER" mvn -B verify'
@@ -76,6 +78,8 @@ pipeline {
         sh 'docker build -t "$FRONTEND_IMAGE" frontend'
         sh 'docker build -t "$INGESTION_IMAGE" -f services/book-ingestion-service/Dockerfile .'
         sh 'docker build -t "$ANALYTICS_IMAGE" services/book-analytics-service'
+        sh 'docker build -t "$READER_PROFILE_IMAGE" -f services/reader-profile-service/Dockerfile .'
+        sh 'docker build -t "$SOCIAL_IMAGE" -f services/social-service/Dockerfile .'
       }
     }
 
@@ -149,7 +153,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin'
-          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE"'
+          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE"'
         }
       }
     }

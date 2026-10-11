@@ -78,7 +78,7 @@ vínculo é idempotente e não permite substituir uma referência já confirmada
 
 As ações sociais usam os payloads do contrato vigente: comentários enviam
 `{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de
-seguir usa `PUT`/`DELETE /api/v1/social/users/{subject}/follow`. O frontend não
+seguir usa `PUT`/`DELETE /api/v1/social/follow?user={subject}`. O frontend não
 faz fallback local quando uma dessas operações falha.
 
 Em Compose, `reader-profile-service` e `social-service` validam tokens do
@@ -140,7 +140,22 @@ Respostas `401` de endpoints opcionais (administração/publicador) não removem
 
 Comentários preservam `subject_key` como identidade técnica, mas resolvem o nome de exibição público no `reader-profile-service`. O valor é salvo como snapshot no comentário e também atualizado na leitura quando o perfil público estiver disponível; email nunca é usado como chave.
 
-O contrato interno `GET /api/v1/profile/public?subject=...` retorna `displayName` somente quando `is_public=true`; o `social-service` encaminha o bearer do usuário ao consultar esse contrato e expõe o resultado como `authorName` nos comentários.
+O contrato `GET /api/v1/profile/public?subject=...` retorna `displayName` e
+`bio` somente quando `is_public=true`; o `social-service` encaminha o bearer do
+usuário ao consultar esse contrato e expõe o nome como `authorName` nos
+comentários.
+
+No cliente web, o nome e o avatar do autor no painel de comentários abrem
+`/usuarios/{subject_key}`. A rota consulta o mesmo perfil público usando o
+bearer do leitor. O nome exibido no comentário não é usado como identificador:
+perfis privados ou ausentes mostram uma página de indisponibilidade sem dados
+adicionais. A URL pode ser aberta diretamente ou após o login OIDC; o botão
+"Voltar ao feed" retorna à página principal e o botão Voltar do navegador
+retorna à página anterior. O botão Seguir consulta
+`GET /api/v1/social/follow?user={subject}` para restaurar o estado após reload
+e usa os contratos existentes `PUT`/`DELETE` para alterá-lo. Se a consulta
+social falhar, o nome e a biografia públicos ainda aparecem, mas o botão fica
+indisponível.
 
 Os cartões do feed carregam os contadores persistidos de likes e comentários pelos endpoints do `social-service`. Depois de uma curtida ou comentário, o frontend consulta novamente esses contadores e atualiza o cartão; os valores não são mantidos como números locais do protótipo.
 
