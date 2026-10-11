@@ -78,7 +78,7 @@ vínculo é idempotente e não permite substituir uma referência já confirmada
 
 As ações sociais usam os payloads do contrato vigente: comentários enviam
 `{body}`, compartilhamentos enviam `{channel: "copy-link"}` e seguir/deixar de
-seguir usa `PUT`/`DELETE /api/v1/social/users/{subject}/follow`. O frontend não
+seguir usa `PUT`/`DELETE /api/v1/social/follow?user={subject}`. O frontend não
 faz fallback local quando uma dessas operações falha.
 
 Em Compose, `reader-profile-service` e `social-service` validam tokens do
@@ -152,7 +152,7 @@ perfis privados ou ausentes mostram uma página de indisponibilidade sem dados
 adicionais. A URL pode ser aberta diretamente ou após o login OIDC; o botão
 "Voltar ao feed" retorna à página principal e o botão Voltar do navegador
 retorna à página anterior. O botão Seguir consulta
-`GET /api/v1/social/users/{subject}/follow` para restaurar o estado após reload
+`GET /api/v1/social/follow?user={subject}` para restaurar o estado após reload
 e usa os contratos existentes `PUT`/`DELETE` para alterá-lo. Se a consulta
 social falhar, o nome e a biografia públicos ainda aparecem, mas o botão fica
 indisponível.

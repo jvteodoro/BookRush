@@ -247,11 +247,11 @@ function App() {
             return response.json();
           },
           follow: async (subject: string, enabled: boolean) => {
-            const response = await authClient.fetch(`/api/v1/social/users/${encodeURIComponent(subject)}/follow`, { method: enabled ? 'PUT' : 'DELETE' });
+            const response = await authClient.fetch(`/api/v1/social/follow?user=${encodeURIComponent(subject)}`, { method: enabled ? 'PUT' : 'DELETE' });
             if (!response.ok) throw new Error('Não foi possível atualizar o acompanhamento.');
           },
           followStatus: async (subject: string) => {
-            const response = await authClient.fetch(`/api/v1/social/users/${encodeURIComponent(subject)}/follow`);
+            const response = await authClient.fetch(`/api/v1/social/follow?user=${encodeURIComponent(subject)}`);
             if (!response.ok) throw new Error('Não foi possível consultar o acompanhamento.');
             return (await response.json() as { following: boolean }).following;
           },
