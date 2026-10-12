@@ -81,6 +81,7 @@
     </div>
     ${mode==='web'&&state.route!=='reader'?`<div class="prototype-switcher"><a class="prototype-pill" href="${state.route==='admin'?'admin.html':state.route==='publisher'?'publisher.html':'app.html'}">${state.route==='admin'||state.route==='publisher'?'BookRush':'BookRush Mobile'}</a></div>`:''}`;
     bindCommon();
+    window.dispatchEvent(new CustomEvent('bookrush:legacy-route', {detail:state.route}));
   }
 
   function mobileNav(){
@@ -176,7 +177,7 @@
     });
     document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=async()=>{const id=b.dataset.follow, enabled=!state.followed[id];try{await window.__BOOKRUSH_API__?.follow?.(id,enabled);state.followed[id]=enabled;renderFeed();}catch(e){toast(e.message||'Não foi possível atualizar o acompanhamento')}});
     document.querySelectorAll('[data-user-profile]').forEach(b=>b.onclick=()=>openUserProfile(b.dataset.userProfile));
-    const fs=document.getElementById('feedScroll'); if(fs){document.onkeydown=e=>{if(!['ArrowDown','ArrowUp'].includes(e.key))return;fs.scrollBy({top:(e.key==='ArrowDown'?1:-1)*fs.clientHeight,behavior:'smooth'})}}
+    const fs=document.getElementById('feedScroll'); if(fs){document.onkeydown=e=>{if(document.getElementById('app')?.hidden||!['ArrowDown','ArrowUp'].includes(e.key))return;fs.scrollBy({top:(e.key==='ArrowDown'?1:-1)*fs.clientHeight,behavior:'smooth'})}}
     scheduleFeedQuoteFit();
   }
 
@@ -504,5 +505,12 @@
   }
 
   window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();go('search')}});
+  function syncReactFeed(){state.saved=Object.fromEntries(Array.from(window.__BOOKRUSH_API__?.saved||[]).map(id=>[id,true]));state.likes={...(window.__BOOKRUSH_LIKES__||{})};}
+  window.__BOOKRUSH_LEGACY__={
+    navigate:(route,query='')=>{if(![...NAV.map(item=>item[0]),'admin','publisher','prototype'].includes(route))return;syncReactFeed();if(route==='search')state.search=query;go(route==='prototype'?'feed':route)},
+    openBook:async id=>{syncReactFeed();await openBook(id)},
+    openComments,
+    openShare,
+  };
   render();
 })();
