@@ -40,7 +40,7 @@ services:
   seaweedfs:
     build:
       context: ./seaweedfs
-    image: bookrush/seaweedfs:4.46
+    image: ${SEAWEEDFS_IMAGE:-bookrush/seaweedfs:4.46}
     environment:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Set STORAGE_ACCESS_KEY in .env}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Set STORAGE_SECRET_KEY in .env}

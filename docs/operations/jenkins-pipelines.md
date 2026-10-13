@@ -8,6 +8,27 @@ O job `bookrush-deploy` continua sendo a validação integrada e o caminho de
 deploy. Para reduzir o tempo de feedback, o Jenkins também cria pipelines
 isoladas no bootstrap da instância.
 
+## SeaweedFS
+
+O job `bookrush-seaweedfs` é a pipeline dedicada da infraestrutura de
+armazenamento. Ele executa o change gate, valida a configuração do Compose,
+roda `scripts/test-storage.sh` com PostgreSQL e SeaweedFS descartáveis e
+constrói a imagem customizada em `infrastructure/seaweedfs/`. O volume de
+produção nunca é usado pelos testes.
+
+`PUBLISH=true` publica a imagem como
+`<REGISTRY>/bookrush/seaweedfs:<build>-<sha>`. `DEPLOY=true` é opt-in e
+recria somente `seaweedfs`, `seaweedfs-oidc` e `reverse-proxy` no Compose de
+produção, preservando o volume `seaweedfs_data`. Antes de alterar a instância,
+o script exige que o SeaweedFS atual esteja saudável; se a nova versão falhar
+no healthcheck, restaura a imagem anterior automaticamente.
+
+Os parâmetros do job são `BRANCH`, `GIT_CREDENTIAL_ID`, `REGISTRY`,
+`REGISTRY_CREDENTIAL_ID`, `PUBLISH` e `DEPLOY`. A publicação e o deploy ficam
+desativados por padrão. O deploy usa `BOOKRUSH_REPO_ROOT` e
+`BOOKRUSH_ENV_FILE` do ambiente protegido do Jenkins, normalmente
+`/opt/bookrush` e `/run/bookrush.env`.
+
 ## Microserviços
 
 Cada job `bookrush-microservice-<serviço>` executa o `change gate`, compila o
@@ -64,7 +85,9 @@ marca a execução como falha.
 
 - `infrastructure/jenkins/microservice.Jenkinsfile`: pipeline reutilizável por serviço.
 - `infrastructure/jenkins/vertical.Jenkinsfile`: pipeline reutilizável por vertical.
-- `infrastructure/jenkins/init.groovy.d/bookrush.groovy`: cria/atualiza os 12 + 7 jobs.
+- `infrastructure/jenkins/seaweedfs.Jenkinsfile`: pipeline dedicada do storage.
+- `infrastructure/jenkins/deploy-seaweedfs.sh`: deploy isolado com healthcheck e rollback.
+- `infrastructure/jenkins/init.groovy.d/bookrush.groovy`: cria/atualiza os 12 + 7 jobs e o job SeaweedFS.
 - `infrastructure/jenkins/Dockerfile`: embarca os Jenkinsfiles no bootstrap.
 
 O job `bookrush-admin-web` valida e empacota a console administrativa. Ele
