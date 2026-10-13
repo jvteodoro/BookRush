@@ -24,6 +24,14 @@ O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. A
 
 ## Consultar livros por HTTP
 
+### Busca paginada
+
+`GET /api/v1/books?q=franken&page=0&size=20` executa a pesquisa no catálogo.
+`q` procura título canônico, título original, descrição, autor e assunto; os
+resultados são ordenados por relevância textual e depois por título. `size` é
+limitado a 100. A aba Buscar usa esta API diretamente e solicita somente a
+página atual.
+
 Consumidores como ingestão e analytics consultam o catálogo pelas rotas internas,
 sem credenciais ou conexão direta ao PostgreSQL:
 

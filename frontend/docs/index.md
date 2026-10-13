@@ -257,6 +257,9 @@ interface permanece em memória e dados de produto ficam no backend.
 O feed usa `GET /api/v1/reader/feed` e registra viewability em
 `POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
 livro.
+Na aba Buscar, `searchCatalog` chama `GET /api/v1/books?q=...&page=...&size=20`
+com debounce e paginação; não baixa mais os primeiros 50 livros para filtrar
+localmente.
 As respostas do catálogo incluem `thumbnailUrl` quando a edição possui uma
 thumbnail Gutenberg aprovada. A rota exige o bearer do usuário do realm de
 produto; o frontend busca cada imagem com `authClient.fetch`, cria uma URL de
