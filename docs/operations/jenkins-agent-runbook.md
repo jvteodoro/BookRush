@@ -7,6 +7,11 @@ materializados.
 
 ## Pré-condições
 
+O estágio de validação do `bookrush-deploy` executa
+`scripts/validate-change.sh --ci` dentro da imagem `python:3.12-slim`. Assim,
+o agente Jenkins precisa apenas do Docker CLI/daemon acessível; ele não precisa
+ter `python3` instalado diretamente no container do agente.
+
 1. Publique o commit na branch remota antes de disparar o job. O Jenkins não
    executa alterações que existem somente no checkout local.
 2. Confirme que `https://jenkins-bookrush.jteodoro.tec.br` resolve e responde.

@@ -42,7 +42,7 @@ pipeline {
 
     stage('Developer Portal e documentação') {
       steps {
-        sh 'bash scripts/validate-change.sh --ci'
+        sh 'docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim bash scripts/validate-change.sh --ci'
         sh 'bash scripts/test-portal.sh'
       }
     }
