@@ -108,7 +108,14 @@ public class AssetSecurity {
         .addFilterBefore(filter, AnonymousAuthenticationFilter.class)
         .authorizeHttpRequests(
             a ->
-                a.requestMatchers("/api/admin/**", "/actuator/metrics", "/actuator/metrics/**")
+                a.requestMatchers(
+                        HttpMethod.GET,
+                        "/api/admin/**")
+                    .hasAnyAuthority(
+                        "ROLE_ASSET_ADMIN",
+                        "SCOPE_bookrush.catalog.read",
+                        "SCOPE_bookrush.assets.write")
+                    .requestMatchers("/api/admin/**", "/actuator/metrics", "/actuator/metrics/**")
                     .hasAnyAuthority("ROLE_ASSET_ADMIN", "SCOPE_bookrush.assets.write")
                     .requestMatchers("/api/v1/books/*/reader-assets/text-versions/**")
                     .hasAnyAuthority("ROLE_CATALOG_SERVICE", "SCOPE_bookrush.catalog.read")

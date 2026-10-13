@@ -89,6 +89,7 @@ public class AssetController {
       summary = "Listar assets de um livro",
       description =
           "Lista assets paginados, incluindo tipo, papel, estado e referência à versão atual.")
+  @SecurityRequirement(name = "catalogService")
   public List<AssetService.AssetView> list(
       @PathVariable UUID bookId, @RequestParam(defaultValue = "0") int page) {
     return service.list(bookId, page);

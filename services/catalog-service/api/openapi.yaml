@@ -240,7 +240,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/AssetView'
       security:
-      - assetAdmin: []
+      - catalogService: []
     post:
       tags:
       - Assets administrativos

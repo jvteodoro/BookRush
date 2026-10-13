@@ -117,6 +117,15 @@ class StorageIT {
                         .SecurityMockMvcRequestPostProcessors.user("reader")
                         .roles("READER")))
         .andExpect(status().isForbidden());
+    mvc.perform(
+            getRequest(base)
+                .with(
+                    org.springframework.security.test.web.servlet.request
+                        .SecurityMockMvcRequestPostProcessors.jwt()
+                        .authorities(
+                            new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                "SCOPE_bookrush.catalog.read"))))
+        .andExpect(status().isOk());
     String result =
         mvc.perform(
                 multipart(base)

@@ -9,6 +9,11 @@ somente das origens configuradas em `CATALOG_CORS_ALLOWED_ORIGINS`. Isso permite
 que Swagger/Backstage enviem o bearer sem transformar um preflight recusado em
 `TypeError: NetworkError` no navegador.
 
+As operações `GET` de assets exigem `bookrush.catalog.read` (ou uma autoridade
+administrativa de assets). Operações de alteração continuam exigindo
+`bookrush.assets.write`; portanto, o cliente de documentação pode consultar
+assets sem receber permissão de escrita.
+
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 
 ## Consultar livros por HTTP
