@@ -17,7 +17,7 @@ public interface BookRepository extends JpaRepository<Book, UUID> {
           """
           SELECT b.*
           FROM catalog.book b
-          WHERE to_tsvector('simple', concat_ws(' ', b.canonical_title, b.original_title, b.description))
+          WHERE to_tsvector('simple', coalesce(b.canonical_title, '') || ' ' || coalesce(b.original_title, '') || ' ' || coalesce(b.description, ''))
                     @@ websearch_to_tsquery('simple', :q)
              OR b.canonical_title ILIKE '%' || :q || '%'
              OR b.original_title ILIKE '%' || :q || '%'
@@ -33,7 +33,7 @@ public interface BookRepository extends JpaRepository<Book, UUID> {
                  WHERE bs.book_id = b.id AND sub.canonical_name ILIKE '%' || :q || '%'
              )
           ORDER BY ts_rank_cd(
-                     to_tsvector('simple', concat_ws(' ', b.canonical_title, b.original_title, b.description)),
+                     to_tsvector('simple', coalesce(b.canonical_title, '') || ' ' || coalesce(b.original_title, '') || ' ' || coalesce(b.description, '')),
                      websearch_to_tsquery('simple', :q)
                    ) DESC,
                    lower(b.canonical_title), b.id
@@ -42,7 +42,7 @@ public interface BookRepository extends JpaRepository<Book, UUID> {
           """
           SELECT count(*)
           FROM catalog.book b
-          WHERE to_tsvector('simple', concat_ws(' ', b.canonical_title, b.original_title, b.description))
+          WHERE to_tsvector('simple', coalesce(b.canonical_title, '') || ' ' || coalesce(b.original_title, '') || ' ' || coalesce(b.description, ''))
                     @@ websearch_to_tsquery('simple', :q)
              OR b.canonical_title ILIKE '%' || :q || '%'
              OR b.original_title ILIKE '%' || :q || '%'
