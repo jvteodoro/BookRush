@@ -20,7 +20,8 @@ para master, volumes e metadata filer LevelDB. Recriar containers preserva dados
 |---|---|
 | STORAGE_ENABLED | false fora do Compose; true no Compose |
 | STORAGE_ENDPOINT | http://seaweedfs:8333 no backend Docker |
-| STORAGE_PUBLIC_ENDPOINT | http://localhost:18333; trocar por HTTPS alcançável pelo leitor em servidor remoto |
+| STORAGE_PUBLIC_ENDPOINT | https://seaweedfs-s3-bookrush.jteodoro.tec.br em produção; http://localhost:18333 somente no desenvolvimento local |
+| STORAGE_ALLOWED_ORIGINS | origens do frontend permitidas pelo CORS do S3 |
 | STORAGE_REGION | us-east-1 |
 | STORAGE_ACCESS_KEY / STORAGE_SECRET_KEY | par; ausente no Spring usa cadeia de credenciais AWS |
 | STORAGE_PATH_STYLE | true; S3 virtual-host pode usar false |
@@ -35,6 +36,11 @@ Spring usa @ConfigurationProperties validado. SDK 2.31.54, SeaweedFS 4.46 fixado
 Checksum SHA-256 explícito no PUT; não usamos ETag como hash.
 Clientes e presigner possuem região/path-style iguais, endpoints separados.
 Storage habilitado com endpoint custom exige public-endpoint explícito.
+
+Em produção, `STORAGE_PUBLIC_ENDPOINT` é usado pelo presigner e precisa apontar
+para o hostname S3 externo. O hostname administrativo
+`seaweedfs-bookrush.jteodoro.tec.br` serve o Filer via OIDC e não deve ser usado
+para URLs de objetos.
 
 ## Saúde e buckets
 

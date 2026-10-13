@@ -42,6 +42,20 @@ let activeUser: User | null = null;
 let callbackInFlight: Promise<{ user: User; returnTo: string }> | null = null;
 let silentCallbackInFlight: Promise<void> | null = null;
 
+async function refreshSession(): Promise<User | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = manager.signinSilent().then(user => {
+      activeUser = user;
+      return user;
+    }).catch(async () => {
+      activeUser = null;
+      await manager.removeUser();
+      return null;
+    }).finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
+}
+
 export type AuthState = { status: 'anonymous' | 'loading' | 'authenticated' | 'error'; user?: User; error?: string };
 
 export const authClient = {
@@ -87,14 +101,7 @@ export const authClient = {
   async ensureFresh(): Promise<User | null> {
     const current = await this.currentUser();
     if (!current || !current.expires_at || current.expires_at > Math.floor(Date.now() / 1000) + 30) return current;
-    if (!refreshInFlight) {
-      refreshInFlight = manager.signinSilent().then(user => { activeUser = user; return user; }).catch(async () => {
-        activeUser = null;
-        await manager.removeUser();
-        return null;
-      }).finally(() => { refreshInFlight = null; });
-    }
-    return refreshInFlight;
+    return refreshSession();
   },
   async fetch(input: string, init?: RequestInit): Promise<Response> {
     const url = new URL(input, origin);
@@ -102,9 +109,19 @@ export const authClient = {
     const token = await this.accessToken();
     const headers = new Headers(init?.headers);
     if (token) headers.set('Authorization', `Bearer ${token}`);
-    const response = await fetch(url, { ...init, headers });
-    // A 401 de um endpoint opcional não invalida a sessão global. O token
-    // permanece em memória; a renovação só remove a sessão quando o IdP falha.
+    let response = await fetch(url, { ...init, headers });
+    // A renovação preventiva cobre a maior parte dos casos, mas uma requisição
+    // pode cruzar a fronteira de expiração entre ensureFresh() e o servidor.
+    // Tente uma única renovação e repetição para evitar transformar expiração
+    // normal em falha silenciosa de thumbnails e demais imagens protegidas.
+    const retryable = ['GET', 'HEAD', 'OPTIONS'].includes((init?.method ?? 'GET').toUpperCase());
+    if (response.status === 401 && token && retryable) {
+      const refreshed = await refreshSession();
+      if (refreshed?.access_token && refreshed.access_token !== token) {
+        headers.set('Authorization', `Bearer ${refreshed.access_token}`);
+        response = await fetch(url, { ...init, headers });
+      }
+    }
     return response;
   },
   async imageUrl(input: string): Promise<string | undefined> {

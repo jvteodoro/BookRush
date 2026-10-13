@@ -28,6 +28,15 @@ http:
       priority: 300
       service: seaweedfs-oauth
 
+    seaweedfs-s3:
+      # Presigned URLs authenticate the object request. This route must not be
+      # wrapped in the Filer's interactive OIDC proxy.
+      rule: Host(`seaweedfs-s3-bookrush.jteodoro.tec.br`)
+      entryPoints:
+        - web
+      priority: 300
+      service: seaweedfs-s3
+
     catalog-docs:
       rule: PathPrefix(`/swagger-ui`) || PathPrefix(`/v3/api-docs`)
       entryPoints:
@@ -180,3 +189,7 @@ http:
       loadBalancer:
         servers:
           - url: http://seaweedfs-oidc:4180
+    seaweedfs-s3:
+      loadBalancer:
+        servers:
+          - url: http://seaweedfs:8333

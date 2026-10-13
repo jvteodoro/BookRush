@@ -8,6 +8,11 @@ set -Eeuo pipefail
 : "${SOCIAL_IMAGE:?Imagem social ausente}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --profile auth)
+storage_public_endpoint="$(awk -F= '$1 == "STORAGE_PUBLIC_ENDPOINT" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
+if [[ -z "$storage_public_endpoint" || "$storage_public_endpoint" =~ ^https?://(localhost|127\.0\.0\.1)(:|/|$) || "$storage_public_endpoint" != https://* ]]; then
+  echo 'STORAGE_PUBLIC_ENDPOINT deve ser uma URL HTTPS pública do endpoint S3; localhost não pode ser usado em produção.' >&2
+  exit 1
+fi
 storage_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' bookrush-seaweedfs-1 2>/dev/null || true)"
 if [[ "$storage_health" != healthy ]]; then
   echo 'SeaweedFS não está provisionado/saudável. Execute o procedimento inicial de infraestrutura antes do deploy.' >&2

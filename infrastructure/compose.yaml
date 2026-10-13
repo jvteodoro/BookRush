@@ -44,6 +44,7 @@ services:
     environment:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Set STORAGE_ACCESS_KEY in .env}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Set STORAGE_SECRET_KEY in .env}
+      STORAGE_ALLOWED_ORIGINS: ${STORAGE_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br}
     volumes:
       - seaweedfs_data:/data
     ulimits:
@@ -221,7 +222,9 @@ services:
       STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-300}
       STORAGE_MAX_UPLOAD_BYTES: ${STORAGE_MAX_UPLOAD_BYTES:-104857600}
       STORAGE_TIMEOUT: ${STORAGE_TIMEOUT:-30s}
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      # This endpoint is embedded in presigned URLs consumed by browsers. It
+      # must be an externally reachable HTTPS S3 endpoint, never localhost.
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-https://seaweedfs-s3-bookrush.jteodoro.tec.br}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       ASSET_ADMIN_TOKEN: ${ASSET_ADMIN_TOKEN:?Set ASSET_ADMIN_TOKEN in .env}
@@ -570,7 +573,7 @@ services:
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_ADMIN_SECURITY_AUDIENCE:-bookrush-ingestion}
       PUBLISHER_STORAGE_ENABLED: ${PUBLISHER_STORAGE_ENABLED:-false}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-https://seaweedfs-s3-bookrush.jteodoro.tec.br}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}
