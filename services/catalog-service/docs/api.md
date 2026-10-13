@@ -18,6 +18,11 @@ O endpoint `GET /api/v1/books/{bookId}/thumbnail` é público: ele somente
 redireciona para uma URL temporária assinada de um thumbnail aprovado. O bearer
 do usuário não é necessário para carregar imagens da biblioteca.
 
+A rota é isolada em uma cadeia de segurança pública de prioridade máxima,
+separada da cadeia que valida os endpoints protegidos. Se ela retornar `401`,
+a imagem do `catalog-service` em execução está desatualizada e deve ser
+reimplantada.
+
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 
 ## Consultar livros por HTTP

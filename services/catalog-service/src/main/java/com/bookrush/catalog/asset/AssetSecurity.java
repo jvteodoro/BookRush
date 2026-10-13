@@ -12,6 +12,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -44,6 +45,18 @@ public class AssetSecurity {
   }
 
   @Bean
+  @Order(0)
+  SecurityFilterChain publicThumbnailSecurity(HttpSecurity http) throws Exception {
+    return http
+        .securityMatcher("/api/v1/books/*/thumbnail")
+        .csrf(c -> c.disable())
+        .cors(Customizer.withDefaults())
+        .authorizeHttpRequests(a -> a.anyRequest().permitAll())
+        .build();
+  }
+
+  @Bean
+  @Order(1)
   SecurityFilterChain security(
       HttpSecurity http,
       StorageProperties props,
