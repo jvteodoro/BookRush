@@ -26,6 +26,7 @@ bookrush:
   openapi.server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}/analytics
   security.enabled: ${ANALYTICS_SECURITY_ENABLED:false}
   security.issuer: ${ANALYTICS_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+  security.jwk-set-uri: ${ANALYTICS_OIDC_JWK_SET_URI:}
   security.audience: ${ANALYTICS_OIDC_AUDIENCE:bookrush-analytics}
 analytics:
   models:

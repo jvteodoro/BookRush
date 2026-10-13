@@ -12,10 +12,17 @@ services:
     command:
       - --providers.docker=false
       - --providers.file.filename=/etc/traefik/dynamic.yaml
-      - --providers.file.watch=true
+      # The host can exhaust inotify watches with the complete BookRush stack
+      # and other Compose projects. The route file is immutable for the
+      # running stack, so load it once instead of requiring a file watcher.
+      - --providers.file.watch=false
       - --entrypoints.web.address=:80
       - --api.dashboard=false
       - --ping=true
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
       - "127.0.0.1:${BOOKRUSH_PROXY_PORT:-18081}:80"
     volumes:
@@ -39,6 +46,10 @@ services:
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Set STORAGE_SECRET_KEY in .env}
     volumes:
       - seaweedfs_data:/data
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
       - "127.0.0.1:${BOOKRUSH_S3_PORT:-18333}:8333"
     healthcheck:
@@ -57,6 +68,11 @@ services:
     command:
       - --provider=keycloak-oidc
       - --oidc-issuer-url=${SEAWEEDFS_OIDC_ISSUER_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      - --oidc-jwks-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs
+      - --skip-oidc-discovery
+      - --login-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/auth
+      - --redeem-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token
+      - --profile-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/userinfo
       - --client-id=${SEAWEEDFS_OIDC_CLIENT_ID:-bookrush-seaweedfs}
       - --client-secret=${SEAWEEDFS_OIDC_CLIENT_SECRET:?Set SEAWEEDFS_OIDC_CLIENT_SECRET in .env}
       - --redirect-url=${SEAWEEDFS_OIDC_REDIRECT_URL:-https://seaweedfs-bookrush.jteodoro.tec.br/oauth2/callback}
@@ -304,6 +320,7 @@ services:
       BOOKRUSH_PUBLIC_URL: ${BOOKRUSH_PUBLIC_URL:-https://bookrush.jteodoro.tec.br}
       ANALYTICS_SECURITY_ENABLED: ${ANALYTICS_SECURITY_ENABLED:-true}
       ANALYTICS_OIDC_ISSUER: ${ANALYTICS_OIDC_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      ANALYTICS_OIDC_JWK_SET_URI: ${ANALYTICS_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       ANALYTICS_OIDC_AUDIENCE: ${ANALYTICS_OIDC_AUDIENCE:-bookrush-analytics}
       ANALYTICS_SCOPE_EMBEDDINGS_ENABLED: ${ANALYTICS_SCOPE_EMBEDDINGS_ENABLED:-true}
       ANALYTICS_NLI_ENABLED: ${ANALYTICS_NLI_ENABLED:-false}

@@ -6,5 +6,7 @@ resources:
   - postgres.yaml
   - redis.yaml
   - catalog-service.yaml
+  - book-ingestion-service.yaml
+  - book-analytics-service.yaml
   - frontend.yaml
   - ingress.yaml

@@ -109,7 +109,9 @@ ficarem saudáveis.
 
 O bootstrap também cria jobs isolados para os 12 microserviços e para as sete
 verticais funcionais. Eles usam os Jenkinsfiles reutilizáveis
-`microservice.Jenkinsfile` e `vertical.Jenkinsfile`, sem fazer deploy. A matriz,
+`microservice.Jenkinsfile` e `vertical.Jenkinsfile`. Por padrão executam apenas
+validação; com `PUBLISH=true` publicam as imagens e com `DEPLOY=true` fazem
+deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
@@ -201,3 +203,8 @@ ASSET_ADMIN_TOKEN no .env do host e provisionar SeaweedFS conforme
 docs/storage/operations.md. A pipeline executa infrastructure/jenkins/deploy-compose.sh da branch selecionada,
 sem depender da cópia antiga em /opt/bookrush. Ela recusa deploy se storage não estiver
 saudável. As alterações precisam estar publicadas na branch remota selecionada.
+O deploy Compose exige as imagens `BACKEND_IMAGE`, `INGESTION_IMAGE`,
+`ANALYTICS_IMAGE`, `READER_PROFILE_IMAGE` e `FRONTEND_IMAGE`; o Jenkinsfile
+constrói/publica todas elas antes de executar o script de deploy. Essa matriz
+também é refletida em `infrastructure/compose.yaml`, evitando que uma imagem
+obrigatória fique apenas com o fallback `:local`.

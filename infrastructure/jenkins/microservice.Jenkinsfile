@@ -8,6 +8,9 @@ pipeline {
     string(name: 'REGISTRY', defaultValue: '', description: 'Registry sem barra final. Vazio: não publica.')
     string(name: 'REGISTRY_CREDENTIAL_ID', defaultValue: 'docker-registry', description: 'Credential Jenkins do registry.')
     booleanParam(name: 'PUBLISH', defaultValue: false, description: 'Publicar a imagem validada.')
+    choice(name: 'DEPLOY_TARGET', choices: ['none', 'compose', 'kubernetes'], description: 'Destino do deploy; none apenas valida.')
+    booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Implantar a imagem validada no destino escolhido.')
+    string(name: 'KUBECONFIG_CREDENTIAL_ID', defaultValue: 'bookrush-kubeconfig', description: 'Credential Jenkins do tipo Secret file para Kubernetes.')
   }
 
   options { timestamps(); disableConcurrentBuilds(); skipDefaultCheckout(); timeout(time: 30, unit: 'MINUTES'); buildDiscarder(logRotator(numToKeepStr: '20')) }
@@ -28,6 +31,10 @@ pipeline {
             env.SELECTED_SERVICE = env.JOB_NAME.replaceFirst(/^.*bookrush-microservice-/, '')
           }
           currentBuild.description = "${env.SELECTED_SERVICE} — ${env.SELECTED_BRANCH} @ ${env.GIT_COMMIT.take(7)}"
+          if (params.PUBLISH && !params.REGISTRY?.trim()) { error('PUBLISH exige REGISTRY.') }
+          if (params.DEPLOY && params.DEPLOY_TARGET == 'none') { error('DEPLOY exige DEPLOY_TARGET.') }
+          if (params.DEPLOY && params.DEPLOY_TARGET == 'kubernetes' && !params.REGISTRY?.trim()) { error('Deploy Kubernetes exige REGISTRY.') }
+          if (params.DEPLOY && params.DEPLOY_TARGET == 'kubernetes' && !params.PUBLISH) { error('Deploy Kubernetes exige PUBLISH para disponibilizar a imagem no registry.') }
         }
       }
     }
@@ -37,15 +44,32 @@ pipeline {
         sh 'bash scripts/test-microservice.sh "$SELECTED_SERVICE"'
       }
     }
+    stage('Preparar imagem') {
+      steps {
+        script { env.SERVICE_IMAGE = "bookrush/${env.SELECTED_SERVICE}:${env.BUILD_NUMBER}" }
+      }
+    }
     stage('Publicar') {
       when { expression { return params.PUBLISH && params.REGISTRY?.trim() } }
       steps {
         script {
-          env.SERVICE_IMAGE = "${params.REGISTRY.trim().replaceAll('/$', '')}/bookrush/${env.SELECTED_SERVICE}:${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-          sh 'docker tag "bookrush/$SELECTED_SERVICE:$BUILD_NUMBER" "$SERVICE_IMAGE"'
+          env.PUBLISHED_IMAGE = "${params.REGISTRY.trim().replaceAll('/$', '')}/bookrush/${env.SELECTED_SERVICE}:${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+          sh 'docker tag "$SERVICE_IMAGE" "$PUBLISHED_IMAGE"'
         }
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
-          sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin && docker push "$SERVICE_IMAGE"'
+          sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin && docker push "$PUBLISHED_IMAGE"'
+        }
+      }
+    }
+    stage('Deploy Compose') {
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
+      steps { sh 'bash scripts/deploy-compose-service.sh "$SELECTED_SERVICE" "$SERVICE_IMAGE"' }
+    }
+    stage('Deploy Kubernetes') {
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'kubernetes' } }
+      steps {
+        withCredentials([file(credentialsId: params.KUBECONFIG_CREDENTIAL_ID, variable: 'KUBECONFIG')]) {
+          sh 'bash scripts/deploy-kubernetes-service.sh "$SELECTED_SERVICE" "$PUBLISHED_IMAGE"'
         }
       }
     }

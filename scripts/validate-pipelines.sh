@@ -12,7 +12,7 @@ test -f infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline dedicada 
 test -f infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço ausente'
 test -f infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical ausente'
 
-for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-microservice.sh scripts/test-vertical.sh infrastructure/jenkins/deploy-compose.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
+for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-microservice.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
   test -f "$file" || fail "script referenciado não existe: $file"
   bash -n "$file" || fail "sintaxe inválida: $file"
 done
@@ -24,4 +24,7 @@ grep -Fq 'scripts/test-storage.sh' Jenkinsfile || fail 'pipeline principal sem v
 grep -Fq 'bash scripts/test-keycloak-reconcile.sh' Jenkinsfile || fail 'pipeline principal sem validação de reconcile Keycloak'
 grep -Fq 'scripts/test-microservice.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem executor'
 grep -Fq 'scripts/test-vertical.sh' infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical sem executor'
+grep -Fq 'scripts/deploy-compose-service.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem deploy Compose'
+grep -Fq 'scripts/deploy-kubernetes-service.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem deploy Kubernetes'
+grep -Fq 'scripts/deploy-compose-service.sh' infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical sem deploy Compose'
 echo 'Pipeline contracts: OK'

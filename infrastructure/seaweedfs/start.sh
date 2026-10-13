@@ -17,7 +17,10 @@ EOF_FILER
 # previous limit of 32 was exhausted by the existing raw/processing/ML
 # collections, leaving books-public without a writable volume. Increasing the
 # limit is additive: existing volume metadata and data remain untouched.
+# SeaweedFS 4.46 accepts byte quantities here (for example 1GiB), not a
+# percentage. Keep a production safety margin while allowing an explicit
+# override for disposable CI stacks.
 exec weed server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 \
   -master.volumeSizeLimitMB=128 -volume.max=256 \
-  -volume.minFreeSpace="${STORAGE_MIN_FREE_SPACE:-1%}" \
+  -volume.minFreeSpace="${STORAGE_MIN_FREE_SPACE:-1GiB}" \
   -s3 -s3.config=/tmp/bookrush-s3.json

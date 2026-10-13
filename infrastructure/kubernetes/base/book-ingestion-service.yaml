@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-ingestion-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: book-ingestion-service }
+  template:
+    metadata:
+      labels: { app: book-ingestion-service }
+    spec:
+      containers:
+        - name: book-ingestion-service
+          image: bookrush/book-ingestion-service:latest
+          ports: [{ containerPort: 8090 }]
+          env:
+            - { name: DB_HOST, value: postgres }
+            - { name: CATALOG_SERVICE_URL, value: http://catalog-service:8080 }
+            - { name: INGESTION_SECURITY_ENABLED, value: "false" }
+            - name: DB_NAME
+              valueFrom: { secretKeyRef: { name: bookrush-db, key: POSTGRES_DB } }
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: bookrush-db, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: bookrush-db, key: POSTGRES_PASSWORD } }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8090 }
+            initialDelaySeconds: 20
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8090 }
+            initialDelaySeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-ingestion-service
+spec:
+  selector: { app: book-ingestion-service }
+  ports: [{ port: 8090, targetPort: 8090 }]

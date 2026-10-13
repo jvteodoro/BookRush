@@ -60,8 +60,8 @@ normalmente significa crumb ausente, expirado ou cookie não enviado.
 
 | Objetivo | Job | Faz deploy? |
 | --- | --- | --- |
-| Validar/construir um serviço | `bookrush-microservice-<service>` | Não |
-| Validar uma vertical | `bookrush-vertical-<vertical>` | Não |
+| Validar/construir um serviço | `bookrush-microservice-<service>` | Com `DEPLOY=true` |
+| Validar uma vertical | `bookrush-vertical-<vertical>` | Com `DEPLOY=true` |
 | Atualizar o stack Compose | `bookrush-deploy` | Sim, com `DEPLOY=true` |
 | Atualizar a console administrativa | `bookrush-admin-web` | Sim, com `DEPLOY=true` |
 
@@ -74,7 +74,7 @@ curl -fsS -X POST \
   --data-urlencode BRANCH=main
 ```
 
-Para atualizar a aplicação no Compose:
+Para atualizar a aplicação integrada no Compose:
 
 ```bash
 curl -fsS -X POST \
@@ -89,6 +89,11 @@ curl -fsS -X POST \
 Para o `admin-web`, use os parâmetros `BRANCH=main` e `DEPLOY=true`. Esse job
 é separado do `bookrush-deploy`; executar somente o deploy principal não
 recria automaticamente o `admin-web`.
+
+Nos jobs isolados, use `DEPLOY_TARGET=compose` para recriar somente o
+microserviço ou todos os serviços da vertical. Para Kubernetes, use
+`DEPLOY_TARGET=kubernetes`, `PUBLISH=true`, `REGISTRY` e
+`KUBECONFIG_CREDENTIAL_ID`; a imagem precisa estar acessível pelo cluster.
 
 ### 4. Acompanhar fila e build
 

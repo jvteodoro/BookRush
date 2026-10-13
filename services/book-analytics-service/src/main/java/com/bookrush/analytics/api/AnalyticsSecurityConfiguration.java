@@ -27,6 +27,7 @@ public class AnalyticsSecurityConfiguration {
       HttpSecurity http,
       @Value("${bookrush.security.enabled:false}") boolean enabled,
       @Value("${bookrush.security.issuer:}") String issuer,
+      @Value("${bookrush.security.jwk-set-uri:}") String jwkSetUri,
       @Value("${bookrush.security.audience:bookrush-analytics}") String audience)
       throws Exception {
     http.csrf(csrf -> csrf.disable())
@@ -52,7 +53,10 @@ public class AnalyticsSecurityConfiguration {
               } else auth.anyRequest().permitAll();
             });
     if (enabled) {
-      NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuer).build();
+      NimbusJwtDecoder decoder =
+          jwkSetUri == null || jwkSetUri.isBlank()
+              ? NimbusJwtDecoder.withIssuerLocation(issuer).build()
+              : NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
       OAuth2TokenValidator<Jwt> issuerValidator = new JwtIssuerValidator(issuer);
       OAuth2TokenValidator<Jwt> audienceValidator =
           token ->
