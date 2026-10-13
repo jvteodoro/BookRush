@@ -38,11 +38,13 @@ frontend de iniciar com `API_FACTORY_CONFLICT`; uma fábrica manual também pode
 deixar `api` indefinida durante a inicialização.
 
 As chamadas **Try it out** que usam `Authorization` fazem preflight para a API.
-O catálogo permite somente a origem configurada em
+O catálogo permite somente as origens configuradas em
 `CATALOG_CORS_ALLOWED_ORIGINS` (por padrão,
-`https://docs-bookrush.jteodoro.tec.br`) e apenas `GET`/`OPTIONS` na rota
-interna de consulta. O cliente Keycloak `bookrush-backstage` recebe somente o
-escopo de leitura `bookrush.catalog.read` e a audiência
+`https://docs-bookrush.jteodoro.tec.br` e
+`https://doc-bookrush.jteodoro.tec.br`) e aplica essa política às rotas de
+consulta interna e administrativas de assets. As rotas administrativas também
+aceitam os métodos e cabeçalhos necessários ao painel. O cliente Keycloak
+`bookrush-backstage` recebe somente o escopo de leitura `bookrush.catalog.read` e a audiência
 `bookrush-catalog-admin`; ele não recebe escopo de escrita.
 
 O portal também define `backend.csp.connect-src` no overlay Docker. A diretiva

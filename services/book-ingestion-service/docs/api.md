@@ -12,6 +12,10 @@ O payload também aceita `reprocess=true`. Esse modo cria uma nova execução pa
 IDs já concluídos, sem duplicar o livro canônico, e é o caminho suportado para
 atualizar assets importados anteriormente.
 
+O status do catálogo Gutenberg prefere uma tentativa ativa e, na ausência dela,
+uma tentativa `SUCCEEDED`/`SKIPPED` com livro canônico. Assim, uma tentativa
+antiga com falha não faz uma obra já importada voltar a aparecer como disponível.
+
 OIDC Keycloak com audiência bookrush-ingestion e papéis administrativos; não aceitar credenciais no request de ingestão.
 
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.

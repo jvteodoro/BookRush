@@ -150,12 +150,21 @@ public class AssetSecurity {
   CorsConfigurationSource catalogCorsConfigurationSource(CatalogCorsProperties properties) {
     var configuration = new CorsConfiguration();
     configuration.setAllowedOrigins(properties.allowedOrigins());
-    configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.OPTIONS.name()));
-    configuration.setAllowedHeaders(List.of("Authorization", "Accept", "Content-Type"));
+    configuration.setAllowedMethods(
+        List.of(
+            HttpMethod.GET.name(),
+            HttpMethod.POST.name(),
+            HttpMethod.PUT.name(),
+            HttpMethod.PATCH.name(),
+            HttpMethod.DELETE.name(),
+            HttpMethod.OPTIONS.name()));
+    configuration.setAllowedHeaders(
+        List.of("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client"));
     configuration.setAllowCredentials(false);
     configuration.setMaxAge(3600L);
     var source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/internal/v1/catalog/**", configuration);
+    source.registerCorsConfiguration("/api/admin/**", configuration);
     return source;
   }
 

@@ -93,4 +93,4 @@ catalog:
       legacy-static-enabled: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:false}
       reader-internal-token: ${CATALOG_READER_INTERNAL_TOKEN:${CANONICAL_SERVICE_TOKEN:}}
     cors:
-      allowed-origins: ${CATALOG_CORS_ALLOWED_ORIGINS:https://docs-bookrush.jteodoro.tec.br}
+      allowed-origins: ${CATALOG_CORS_ALLOWED_ORIGINS:https://docs-bookrush.jteodoro.tec.br,https://doc-bookrush.jteodoro.tec.br}

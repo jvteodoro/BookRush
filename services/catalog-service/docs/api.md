@@ -4,6 +4,11 @@ Mantém obras, edições, autores, identificadores e assets; autoriza distribui�
 
 Tokens administrativos de assets e token interno canônico; leitura pública somente nas rotas explicitamente permitidas.
 
+As rotas administrativas de assets (`/api/admin/**`) aceitam preflight CORS
+somente das origens configuradas em `CATALOG_CORS_ALLOWED_ORIGINS`. Isso permite
+que Swagger/Backstage enviem o bearer sem transformar um preflight recusado em
+`TypeError: NetworkError` no navegador.
+
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 
 ## Consultar livros por HTTP
