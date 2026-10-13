@@ -369,22 +369,26 @@
     const name=remote.display_name||remote.displayName||'Leitor BookRush';
     const subject=remote.subject_key||remote.subject||'identidade autenticada';
     const bio=remote.bio||'';
-    const isPublic=remote.is_public!==false && remote.isPublic!==false;
     const content=`<main class="content"><section class="profile-hero"><div class="profile-avatar">${esc(name.slice(0,2).toUpperCase())}</div><div><div class="eyebrow">PERFIL PÚBLICO</div><h1>${esc(name)}</h1><p>${esc(subject)}</p><p class="muted">${esc(bio||'Adicione uma descrição ao seu perfil.')}</p></div><div class="profile-actions"><button class="secondary-btn" data-route="privacy">${icon('settings','icon-sm')} Privacidade</button><button class="secondary-btn" id="shareProfile">${icon('share','icon-sm')}</button></div></section>
       <section class="form-card"><h3>Editar perfil</h3><form id="profileForm" class="form-grid"><div class="field full"><label for="profileName">Nome de exibição</label><input id="profileName" maxlength="160" value="${esc(name)}" /></div><div class="field full"><label for="profileBio">Biografia</label><textarea id="profileBio" maxlength="2000" rows="4">${esc(bio)}</textarea></div><div class="field full"><button class="primary-btn" type="submit">Salvar perfil</button><span id="profileStatus" class="muted tiny"></span></div></form></section></main>`;
     shell(content,name);
     document.getElementById('shareProfile').onclick=()=>openShare('profile');
-    document.getElementById('profileForm').onsubmit=async e=>{e.preventDefault();const status=document.getElementById('profileStatus');try{status.textContent='Salvando…';window.__BOOKRUSH_PROFILE__=await window.__BOOKRUSH_API__?.updateProfile?.({displayName:document.getElementById('profileName').value.trim(),bio:document.getElementById('profileBio').value.trim(),isPublic});status.textContent='Perfil salvo';toast('Perfil atualizado')}catch(err){status.textContent='';toast(err.message||'Não foi possível salvar o perfil')}};
+    document.getElementById('profileForm').onsubmit=async e=>{e.preventDefault();const status=document.getElementById('profileStatus');try{status.textContent='Salvando…';window.__BOOKRUSH_PROFILE__=await window.__BOOKRUSH_API__?.updateProfile?.({displayName:document.getElementById('profileName').value.trim(),bio:document.getElementById('profileBio').value.trim()});status.textContent='Perfil salvo';toast('Perfil atualizado')}catch(err){status.textContent='';toast(err.message||'Não foi possível salvar o perfil')}};
   }
 
   function renderPrivacy(){
     const current=window.__BOOKRUSH_PROFILE__||{};
-    const publicProfile=current.is_public!==false && current.isPublic!==false;
-    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">CONTROLE DE VISIBILIDADE</div><h1>Privacidade do perfil</h1><p>Esta configuração é persistida pelo reader-profile-service.</p></div><button class="primary-btn" id="savePrivacy">Salvar alterações</button></div><section class="settings-grid"><section class="setting-card"><div class="setting-row"><div><strong>Perfil público</strong><span>Permite que outros leitores encontrem seu perfil quando o contrato público estiver habilitado.</span></div><button class="switch ${publicProfile?'on':''}" id="publicProfile" aria-label="Alternar perfil público"></button></div><p class="muted">Preferências detalhadas de atividade, biblioteca e seguidores serão adicionadas quando os respectivos campos existirem no contrato.</p></section></section></main>`;
+    const settings=[
+      ['profileVisibility','Perfil','Controla quem pode encontrar seu perfil e ler sua biografia.',current.profileVisibility||(current.is_public===false||current.isPublic===false?'PRIVATE':'PUBLIC')],
+      ['activityVisibility','Atividade','Define quem vê curtidas, comentários e outras atividades.',current.activityVisibility||'PUBLIC'],
+      ['libraryVisibility','Biblioteca','Define quem pode ver os livros salvos na sua estante.',current.libraryVisibility||'PRIVATE'],
+      ['recentVisibility','Leituras recentes','Define quem pode ver os livros abertos recentemente.',current.recentVisibility||'PRIVATE'],
+      ['socialGraphVisibility','Seguidores e seguindo','Define quem pode consultar suas conexões sociais.',current.socialGraphVisibility||'PUBLIC']
+    ];
+    const options=value=>[['PUBLIC','Todos'],['FOLLOWERS','Seguidores'],['PRIVATE','Somente eu']].map(([id,label])=>`<option value="${id}" ${value===id?'selected':''}>${label}</option>`).join('');
+    const content=`<main class="content"><div class="page-heading"><div><div class="eyebrow">CONTROLE DE VISIBILIDADE</div><h1>Privacidade do perfil</h1><p>Escolha uma audiência diferente para cada parte da sua experiência.</p></div><button class="primary-btn" id="savePrivacy">Salvar alterações</button></div><section class="settings-grid privacy-settings">${settings.map(([id,label,description,value])=>`<section class="setting-card"><div class="setting-row"><div><strong>${label}</strong><span>${description}</span></div><label class="visibility-field"><span class="sr-only">Visibilidade de ${label}</span><select id="${id}">${options(value)}</select></label></div></section>`).join('')}</section><div class="privacy-preview"><strong>Como funciona:</strong> “Todos” permite acesso público; “Seguidores” limita a pessoas que acompanham você; “Somente eu” mantém o conteúdo privado.</div></main>`;
     shell(content,'Privacidade');
-    let enabled=publicProfile;
-    document.getElementById('publicProfile').onclick=()=>{enabled=!enabled;document.getElementById('publicProfile').classList.toggle('on',enabled)};
-    document.getElementById('savePrivacy').onclick=async()=>{try{window.__BOOKRUSH_PROFILE__=await window.__BOOKRUSH_API__?.updateProfile?.({displayName:current.display_name||current.displayName||'',bio:current.bio||'',isPublic:enabled});toast('Privacidade salva')}catch(e){toast(e.message||'Não foi possível salvar a privacidade')}};
+    document.getElementById('savePrivacy').onclick=async()=>{const button=document.getElementById('savePrivacy');try{button.disabled=true;button.textContent='Salvando…';const preferences=Object.fromEntries(settings.map(([id])=>[id,document.getElementById(id).value]));window.__BOOKRUSH_PROFILE__=await window.__BOOKRUSH_API__?.updateProfile?.(preferences);toast('Preferências de privacidade salvas')}catch(e){toast(e.message||'Não foi possível salvar a privacidade')}finally{button.disabled=false;button.textContent='Salvar alterações'}};
   }
 
   function renderPlant(){

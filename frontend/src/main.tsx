@@ -267,7 +267,14 @@ function App() {
             const profile = await response.json() as { displayName?: string; subject_key?: string; bio?: string };
             return profile.displayName?.trim() ? profile : null;
           },
-          updateProfile: async (profile: { displayName?: string; bio?: string; isPublic?: boolean }) => {
+          updateProfile: async (profile: {
+            displayName?: string; bio?: string; isPublic?: boolean;
+            profileVisibility?: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+            activityVisibility?: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+            libraryVisibility?: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+            recentVisibility?: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+            socialGraphVisibility?: 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+          }) => {
             const response = await authClient.fetch('/api/v1/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile) });
             if (!response.ok) throw new Error('Não foi possível salvar o perfil.');
             return response.json();
@@ -370,9 +377,9 @@ function App() {
         };
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';
         if (document.querySelector('script[data-bookrush-pageloop]')) { if (active) setFeedReady(true); return; }
-        const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261011-public-profile'; document.head.appendChild(style);
+        const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261013-privacy-preferences'; document.head.appendChild(style);
         const thumbnailStyle = document.createElement('link'); thumbnailStyle.id = 'bookrush-thumbnail-style'; thumbnailStyle.rel = 'stylesheet'; thumbnailStyle.href = '/thumbnails.css?v=20261006-gutenberg'; document.head.appendChild(thumbnailStyle);
-        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261012-design-system-bridge'; script.async = true;
+        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261013-privacy-preferences'; script.async = true;
         script.onload = () => { if (active) setFeedReady(true); };
         script.onerror = () => { if (active) setError('Não foi possível carregar a navegação. Recarregue a página para tentar novamente.'); };
         document.body.appendChild(script);
