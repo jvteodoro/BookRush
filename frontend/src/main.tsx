@@ -12,6 +12,7 @@ import { HomePreview } from './design-system/HomePreview';
 import './styles/reader-shell.css';
 import './styles/reader-refinements.css';
 import './styles/search.css';
+import './styles/recommendations.css';
 import { LiveReader } from './reader/LiveReader';
 
 type ReadiumBridge = {
@@ -128,14 +129,14 @@ function App() {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
   const [error, setError] = useState('');
   const [feedReady, setFeedReady] = useState(false);
-  const [readerTab, setReaderTab] = useState<'feed' | 'library' | 'search'>('feed');
+  const [readerTab, setReaderTab] = useState<'feed' | 'library' | 'search' | 'recommendations'>('feed');
   const [legacyQuery, setLegacyQuery] = useState('');
   const [legacyVisible, setLegacyVisible] = useState(window.location.pathname.startsWith('/usuarios/'));
   useEffect(() => {
     const handler = (event: Event) => {
       const route = (event as CustomEvent<string>).detail;
-      if (route === 'feed' || route === 'library' || route === 'search') setReaderTab(route);
-      setLegacyVisible(route !== 'feed' && route !== 'library' && route !== 'search');
+      if (route === 'feed' || route === 'library' || route === 'search' || route === 'recommendations') setReaderTab(route);
+      setLegacyVisible(route !== 'feed' && route !== 'library' && route !== 'search' && route !== 'recommendations');
     };
     window.addEventListener('bookrush:legacy-route', handler);
     const queryHandler = (event: Event) => setLegacyQuery((event as CustomEvent<string>).detail);

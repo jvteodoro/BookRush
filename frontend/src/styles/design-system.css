@@ -62,6 +62,12 @@
 .br-progress { height: .375rem; border-radius: var(--br-radius-pill); background: var(--br-outline-soft); overflow: hidden; }
 .br-progress__fill { height: 100%; background: var(--br-teal); transition: width 300ms; }
 .br-logo { display: block; border-radius: 12px; object-fit: contain; }
+.br-overflow-title { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
+.br-overflow-title .br-overflow-title__text { display: block; width: max-content; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: inherit; color: inherit; }
+.br-overflow-title--scrollable:hover .br-overflow-title__text,
+.br-book-card:hover .br-overflow-title--scrollable .br-overflow-title__text,
+.br-book-card:focus-visible .br-overflow-title--scrollable .br-overflow-title__text { max-width: none; overflow: visible; animation: br-title-scroll var(--br-title-duration) linear infinite; }
+@keyframes br-title-scroll { 0%, 15% { transform: translateX(0); } 70%, 90% { transform: translateX(var(--br-title-shift)); } 100% { transform: translateX(0); } }
 .br-switch { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: var(--br-content); font-family: var(--br-font-sans); cursor: pointer; }
 .br-switch__label { line-height: 1.5; }
 .br-switch__control { position: relative; flex: 0 0 48px; height: 28px; }
@@ -95,6 +101,9 @@
 .br-preview__reading { font-family: var(--br-font-reading); font-size: 1.25rem; }
 .br-preview__swatch { width: 40px; height: 40px; border: 2px solid var(--br-outline); border-radius: 10px; }
 @media (prefers-reduced-motion: reduce) {
+  .br-overflow-title--scrollable:hover .br-overflow-title__text,
+  .br-book-card:hover .br-overflow-title--scrollable .br-overflow-title__text,
+  .br-book-card:focus-visible .br-overflow-title--scrollable .br-overflow-title__text { animation: none; max-width: 100%; overflow: hidden; }
   .br-switch__track, .br-switch__thumb, .br-carousel-control, .br-carousel-control svg { transition: none; }
   .br-carousel-control:hover:not(:disabled), .br-carousel-control:active:not(:disabled) { transform: none; }
   .br-carousel-control--next:hover:not(:disabled) svg { transform: none; }

@@ -7,6 +7,7 @@ import { authClient } from '../auth';
 import { LibraryPage } from './LibraryPage';
 import type { LibraryBook } from './library';
 import { SearchPage } from './SearchPage';
+import { RecommendationsPage } from './RecommendationsPage';
 
 type SourceBook = { id: string; title: string; author: string; genre: string; quote: string; progress: number; thumbnailUrl?: string | null; excerpt?: unknown; impressionId?: string };
 type Runtime = {
@@ -14,11 +15,11 @@ type Runtime = {
   __BOOKRUSH_LIKES__: Record<string, boolean>;
   __BOOKRUSH_STREAK__?: { currentDays?: number };
   __BOOKRUSH_API__: { saved: Set<string>; save: (id: string, enabled: boolean) => Promise<void>; like: (id: string, enabled: boolean) => Promise<void>; viewable: (id: string) => Promise<void>; trackExcerpt: (type: string, id: string, excerpt: unknown) => void };
-  __BOOKRUSH_LEGACY__: { navigate: (route: string, query?: string) => void; openBook: (id: string, query?: string) => Promise<void>; openComments: (id: string) => Promise<void>; openShare: (id: string) => void };
+  __BOOKRUSH_LEGACY__: { navigate: (route: string, query?: string) => void; openBook: (id: string, query?: string) => Promise<void>; openComments: (id: string) => Promise<void>; openShare: (id: string) => void; openLucky: () => void };
 };
 const runtime = () => window as unknown as Runtime;
 
-export function LiveReader({ visible, userName, onLegacy, initialTab = 'feed', legacyQuery = '' }: { visible: boolean; userName: string; onLegacy: () => void; initialTab?: 'feed' | 'library' | 'search'; legacyQuery?: string }) {
+export function LiveReader({ visible, userName, onLegacy, initialTab = 'feed', legacyQuery = '' }: { visible: boolean; userName: string; onLegacy: () => void; initialTab?: 'feed' | 'library' | 'search' | 'recommendations'; legacyQuery?: string }) {
   const [tab, setTab] = useState<ReaderTab>('feed');
   const [query, setQuery] = useState('');
   const [saved, setSaved] = useState(() => [...runtime().__BOOKRUSH_API__.saved]);
@@ -85,7 +86,7 @@ export function LiveReader({ visible, userName, onLegacy, initialTab = 'feed', l
     if (book.impressionId) void runtime().__BOOKRUSH_API__.viewable(id).catch(() => { viewed.current.delete(id); });
   }, []);
   const navigate = (tab: ReaderTab) => {
-    if (tab === 'feed' || tab === 'library' || tab === 'search' || tab === 'prototype') { setMessage(''); setTab(tab); return; }
+    if (tab === 'feed' || tab === 'library' || tab === 'search' || tab === 'recommendations' || tab === 'prototype') { setMessage(''); setTab(tab); return; }
     runtime().__BOOKRUSH_LEGACY__.navigate(tab, query); onLegacy();
   };
   const streak = runtime().__BOOKRUSH_STREAK__?.currentDays;
@@ -96,7 +97,7 @@ export function LiveReader({ visible, userName, onLegacy, initialTab = 'feed', l
     await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query); onLegacy();
   });
   return <AppShell active={tab} query={query} onSearch={setQuery} onNavigate={navigate} userName={userName}>
-    {tab === 'search' ? <SearchPage visible={visible} query={query} onQuery={setQuery} saved={saved} pending={pending} message={message} onSave={save} onOpen={openCatalogBook} /> : tab === 'library' ? <LibraryPage visible={visible} saved={saved} pending={pending} message={message} onLoaded={syncSaved} onOpen={openCatalogBook} onRemove={save} onDiscover={() => navigate('feed')} /> : tab === 'prototype' ? <Card className="br-profile-card"><h1>Menu do protótipo</h1><p>Escolha uma área do BookRush.</p><div className="br-preview__row"><Button onClick={() => navigate('feed')}>Para você</Button><Button variant="ghost" onClick={() => navigate('admin')}>Administração</Button><Button variant="ghost" onClick={() => navigate('publisher')}>Publicador</Button></div></Card> : <ExcerptFeed books={books} saved={saved} onSave={save} onOpen={book => void action(book.id, async () => { await runtime().__BOOKRUSH_LEGACY__.openBook(book.id); onLegacy(); })} live={{ liked, pending, message, onLike: like, onComments: id => void action(id, () => runtime().__BOOKRUSH_LEGACY__.openComments(id)), onShare: id => runtime().__BOOKRUSH_LEGACY__.openShare(id), onViewable, sidebar: <>
+    {tab === 'recommendations' ? <RecommendationsPage books={books} saved={saved} pending={pending} message={message} onSave={save} onOpen={book => void action(book.id, async () => { await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query); onLegacy(); })} onLucky={() => runtime().__BOOKRUSH_LEGACY__.openLucky()} onSearch={() => navigate('search')} /> : tab === 'search' ? <SearchPage visible={visible} query={query} onQuery={setQuery} saved={saved} pending={pending} message={message} onSave={save} onOpen={openCatalogBook} /> : tab === 'library' ? <LibraryPage visible={visible} saved={saved} pending={pending} message={message} onLoaded={syncSaved} onOpen={openCatalogBook} onRemove={save} onDiscover={() => navigate('feed')} /> : tab === 'prototype' ? <Card className="br-profile-card"><h1>Menu do protótipo</h1><p>Escolha uma área do BookRush.</p><div className="br-preview__row"><Button onClick={() => navigate('feed')}>Para você</Button><Button variant="ghost" onClick={() => navigate('admin')}>Administração</Button><Button variant="ghost" onClick={() => navigate('publisher')}>Publicador</Button></div></Card> : <ExcerptFeed books={books} saved={saved} onSave={save} onOpen={book => void action(book.id, async () => { await runtime().__BOOKRUSH_LEGACY__.openBook(book.id); onLegacy(); })} live={{ liked, pending, message, onLike: like, onComments: id => void action(id, () => runtime().__BOOKRUSH_LEGACY__.openComments(id)), onShare: id => runtime().__BOOKRUSH_LEGACY__.openShare(id), onViewable, sidebar: <>
       <Card><h2>{typeof streak === 'number' ? `${streak} dias de sequência` : 'Sua leitura'}</h2><p>Continue seu hábito, uma história de cada vez.</p></Card>
       <Card><h2>Feito para você</h2><p>Descubra histórias do seu catálogo e salve as que quiser ler depois.</p></Card>
       <Card><h2>Sua biblioteca</h2><p>{saved.length} {saved.length === 1 ? 'livro salvo' : 'livros salvos'} para sua próxima leitura.</p></Card>

@@ -523,6 +523,7 @@
     openBook:async(id,query)=>{if(typeof query==='string')state.search=query;syncReactFeed();await openBook(id)},
     openComments,
     openShare,
+    openLucky:openLuckyPrompt,
   };
   render();
 })();

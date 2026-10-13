@@ -3,12 +3,26 @@
 O cliente web do BookRush é uma SPA React responsiva. Após autenticar, Para você
 usa o novo shell React e o design system BookRush com livros, trechos, curtidas,
 biblioteca e impressões reais. Biblioteca também usa o novo shell, com Salvos,
-Em leitura e Recentes. Buscar consulta o catálogo no mesmo shell React.
+Em leitura e Recentes. Buscar e Recomendações também usam o mesmo shell React.
 As outras telas continuam no PageLoop durante
-a migração, preservando leitor, recomendações, perfil,
+a migração, preservando leitor, perfil,
 privacidade, planta, administração e publicador.
 
 ## Capacidades atuais
+
+Recomendações usa `reader/RecommendationsPage.tsx`, com os mesmos livros reais
+e a ordem do feed carregado no bootstrap autenticado. As fileiras usam `BookRow`,
+capas e controles de rolagem compartilhados, com Salvar/Salvo conectado ao estado
+de Para você e Biblioteca. A primeira fileira mostra cinco livros; os demais
+ficam na segunda. Não são gerados scores ou interesses demonstrativos.
+
+O botão Estou com sorte delega ao fluxo existente via
+`window.__BOOKRUSH_LEGACY__.openLucky`, preservando dica, sorteio e abertura no
+leitor. A entrada Buscar abre a nova busca. Recomendações também pode ser
+acessada a partir das telas PageLoop sem perder o shell React. Para validar,
+recarregue o frontend, confira Recomendações, salve/remova um livro, confira
+Biblioteca e teste abrir livro e Estou com sorte. As telas não migradas ainda
+usam o visual anterior, inclusive o diálogo de sorteio.
 
 Buscar agora usa `reader/SearchPage.tsx` no novo shell React, com resultados,
 paginação, capas, salvamento e abertura no leitor. A consulta tem debounce de
@@ -86,6 +100,12 @@ A API continua sendo a fronteira de autorização. O navegador não persiste acc
 
 ## Desenvolvimento
 
+`components/ui/OverflowTitle.tsx` limita títulos longos com reticências e
+desliza o texto no hover ou foco do card quando há conteúdo oculto. O nome
+completo permanece no tooltip e no nome acessível do livro. O componente mede
+o excesso de largura e respeita redução de movimento. `BookCard` reserva altura
+fixa para os metadados, mantendo todos os cards e botões da fileira alinhados.
+
 Os componentes reutilizáveis `Switch` e `CarouselControl` fazem parte de
 `src/components/ui/` e têm exemplos interativos em `/design-system`.
 `Switch` recebe `label` e as propriedades nativas de input, incluindo
@@ -157,7 +177,8 @@ trechos reais selecionados pelo recommendation-service.
 Confira `/home-preview` nos dois temas e em larguras de 375px e 1280px:
 sidebar recolhível no desktop, barra inferior no mobile, rolagem das fileiras,
 filtros, busca, detalhes e biblioteca. A rota normal `/` abre o novo feed
-autenticado com dados reais; feed, Biblioteca e Buscar usam React, e as demais telas
+autenticado com dados reais; feed, Biblioteca, Buscar e Recomendações usam React,
+e as demais telas
 continuam no shell PageLoop.
 A prévia não persiste dados demonstrativos nem envia telemetria.
 
