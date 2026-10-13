@@ -4,9 +4,36 @@ Mantém obras, edições, autores, identificadores e assets; autoriza distribui�
 
 Tokens administrativos de assets e token interno canônico; leitura pública somente nas rotas explicitamente permitidas.
 
+As rotas administrativas de assets (`/api/admin/**`) aceitam preflight CORS
+somente das origens configuradas em `CATALOG_CORS_ALLOWED_ORIGINS`. Isso permite
+que Swagger/Backstage enviem o bearer sem transformar um preflight recusado em
+`TypeError: NetworkError` no navegador.
+
+As operações `GET` de assets exigem `bookrush.catalog.read` (ou uma autoridade
+administrativa de assets). Operações de alteração continuam exigindo
+`bookrush.assets.write`; portanto, o cliente de documentação pode consultar
+assets sem receber permissão de escrita.
+
+O endpoint `GET /api/v1/books/{bookId}/thumbnail` exige o bearer do usuário do
+realm de produto `bookrush`. Ele redireciona para uma URL temporária assinada
+de um thumbnail aprovado. O frontend deve buscar a imagem com `Authorization`
+e usar uma URL de `Blob`; uma tag `<img src="...">` não envia bearer
+automaticamente.
+
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 
 ## Consultar livros por HTTP
+
+### Busca paginada
+
+`GET /api/v1/books?q=franken&page=0&size=20` executa a pesquisa no catálogo.
+O ranking textual e o `count` usam a mesma expressão imutável indexada pela V16;
+filtros `ILIKE` continuam cobrindo títulos, autores e assuntos quando a busca
+textual não encontra todos os resultados.
+`q` procura título canônico, título original, descrição, autor e assunto; os
+resultados são ordenados por relevância textual e depois por título. `size` é
+limitado a 100. A aba Buscar usa esta API diretamente e solicita somente a
+página atual.
 
 Consumidores como ingestão e analytics consultam o catálogo pelas rotas internas,
 sem credenciais ou conexão direta ao PostgreSQL:
@@ -28,8 +55,9 @@ continuam sujeitos às rotas de distribuição e às políticas de direitos.
 
 `GET /api/v1/books/{bookId}/thumbnail` procura o asset `THUMBNAIL` com papel
 `COVER` em estado `ACTIVE` e responde com um redirecionamento para uma URL S3
-temporária. A listagem de livros retorna `thumbnailUrl` apontando para essa
-rota; clientes devem tratar `404` como ausência de capa e manter seu placeholder.
+temporária. O serviço valida issuer e audience do token do realm de produto;
+ausência ou rejeição do bearer retorna `401`, e ausência de capa retorna `404`.
+A listagem de livros retorna `thumbnailUrl` apontando para essa rota.
 ## Reader chapters
 
 `GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted

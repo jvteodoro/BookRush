@@ -12,6 +12,7 @@ import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.*;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,9 +23,16 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.*;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -35,6 +43,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @EnableConfigurationProperties({
   CanonicalServiceProperties.class,
   CatalogOidcProperties.class,
+  CatalogProductOidcProperties.class,
   CatalogCorsProperties.class
 })
 public class AssetSecurity {
@@ -44,6 +53,40 @@ public class AssetSecurity {
   }
 
   @Bean
+  @Order(0)
+  SecurityFilterChain productThumbnailSecurity(
+      HttpSecurity http, CatalogProductOidcProperties productOidc) throws Exception {
+    return http
+        .securityMatcher(
+            new AntPathRequestMatcher("/api/v1/books/*/thumbnail", HttpMethod.GET.name()))
+        .csrf(c -> c.disable())
+        .cors(Customizer.withDefaults())
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(a -> a.anyRequest().authenticated())
+        .oauth2ResourceServer(
+            oauth -> oauth.jwt(jwt -> jwt.decoder(productJwtDecoder(productOidc))))
+        .build();
+  }
+
+  @Bean
+  JwtDecoder productJwtDecoder(CatalogProductOidcProperties productOidc) {
+    if (!productOidc.enabled() || productOidc.jwkSetUri().isBlank()) {
+      throw new IllegalStateException("Product OIDC must be configured for protected thumbnails");
+    }
+    var decoder = org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withJwkSetUri(productOidc.jwkSetUri()).build();
+    OAuth2TokenValidator<Jwt> issuer = JwtValidators.createDefaultWithIssuer(productOidc.issuer());
+    OAuth2TokenValidator<Jwt> audience =
+        token ->
+            token.getAudience().contains(productOidc.audience())
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(
+                    new OAuth2Error("invalid_token", "product audience mismatch", null));
+    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuer, audience));
+    return decoder;
+  }
+
+  @Bean
+  @Order(1)
   SecurityFilterChain security(
       HttpSecurity http,
       StorageProperties props,
@@ -108,7 +151,14 @@ public class AssetSecurity {
         .addFilterBefore(filter, AnonymousAuthenticationFilter.class)
         .authorizeHttpRequests(
             a ->
-                a.requestMatchers("/api/admin/**", "/actuator/metrics", "/actuator/metrics/**")
+                a.requestMatchers(
+                        HttpMethod.GET,
+                        "/api/admin/**")
+                    .hasAnyAuthority(
+                        "ROLE_ASSET_ADMIN",
+                        "SCOPE_bookrush.catalog.read",
+                        "SCOPE_bookrush.assets.write")
+                    .requestMatchers("/api/admin/**", "/actuator/metrics", "/actuator/metrics/**")
                     .hasAnyAuthority("ROLE_ASSET_ADMIN", "SCOPE_bookrush.assets.write")
                     .requestMatchers("/api/v1/books/*/reader-assets/text-versions/**")
                     .hasAnyAuthority("ROLE_CATALOG_SERVICE", "SCOPE_bookrush.catalog.read")
@@ -117,6 +167,9 @@ public class AssetSecurity {
                         "ROLE_CATALOG_SERVICE",
                         "SCOPE_bookrush.catalog.write",
                         "SCOPE_bookrush.catalog.read")
+                    .requestMatchers(
+                        HttpMethod.GET, "/api/v1/books/*/thumbnail")
+                    .hasAnyAuthority("SCOPE_bookrush.catalog.read", "ROLE_CATALOG_SERVICE")
                     .requestMatchers(
                         HttpMethod.GET,
                         "/api/v1/books",
@@ -150,12 +203,21 @@ public class AssetSecurity {
   CorsConfigurationSource catalogCorsConfigurationSource(CatalogCorsProperties properties) {
     var configuration = new CorsConfiguration();
     configuration.setAllowedOrigins(properties.allowedOrigins());
-    configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.OPTIONS.name()));
-    configuration.setAllowedHeaders(List.of("Authorization", "Accept", "Content-Type"));
+    configuration.setAllowedMethods(
+        List.of(
+            HttpMethod.GET.name(),
+            HttpMethod.POST.name(),
+            HttpMethod.PUT.name(),
+            HttpMethod.PATCH.name(),
+            HttpMethod.DELETE.name(),
+            HttpMethod.OPTIONS.name()));
+    configuration.setAllowedHeaders(
+        List.of("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client"));
     configuration.setAllowCredentials(false);
     configuration.setMaxAge(3600L);
     var source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/internal/v1/catalog/**", configuration);
+    source.registerCorsConfiguration("/api/admin/**", configuration);
     return source;
   }
 

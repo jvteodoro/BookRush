@@ -49,6 +49,17 @@ Compose. O Dockerfile do catálogo copia o fixture para a imagem de testes, em
 vez de usar bind mount; isso funciona também quando o Jenkins usa um daemon
 Docker fora do container do agente.
 
+As pipelines isoladas aceitam `PUBLISH`, `DEPLOY` e `DEPLOY_TARGET`. O bootstrap
+do Jenkins reconcilia esses parâmetros também nos jobs já existentes; portanto,
+após atualizar a imagem do Jenkins, os controles de deploy aparecem sem recriar
+o job nem perder histórico ou credenciais. Compose
+usa a imagem construída localmente e recria somente o serviço selecionado; o
+deploy Kubernetes exige `PUBLISH=true`, `REGISTRY` e `KUBECONFIG_CREDENTIAL_ID`.
+Uma pipeline vertical publica e implanta todos os serviços da sua matriz. O
+deploy individual preserva rollback somente no Compose; no Kubernetes o
+rollout falho deixa o Deployment disponível para diagnóstico e o Jenkins
+marca a execução como falha.
+
 ## Arquivos e operação
 
 - `infrastructure/jenkins/microservice.Jenkinsfile`: pipeline reutilizável por serviço.
@@ -68,9 +79,14 @@ agente Jenkins e o daemon Docker podem ter filesystems diferentes; o build e o
 lint são executados no contexto enviado pelo `docker build`. A tag da imagem
 usa expansão POSIX compatível com o `sh` do Jenkins.
 
-As pipelines isoladas não fazem deploy. Publicação de imagem é opt-in somente
-na pipeline de microserviço, com `PUBLISH=true`, `REGISTRY` e credential
-configurados. O deploy permanece centralizado no `bookrush-deploy`.
+Publicação e deploy são opt-in nas pipelines isoladas. Para publicar, use
+`PUBLISH=true`, `REGISTRY` e a credential correspondente. Para Compose, use
+`DEPLOY=true` e `DEPLOY_TARGET=compose`; para Kubernetes, também é obrigatório
+publicar no registry e fornecer o kubeconfig. O `bookrush-deploy` continua
+sendo o caminho integrado para atualizar catálogo,
+ingestão, analytics, perfil do leitor e frontend juntos. A imagem
+`READER_PROFILE_IMAGE` é obrigatória no contrato do deploy Compose e deve ser
+gerada e publicada pela mesma execução que atualiza os demais serviços.
 
 Em uma instalação existente, é necessário reconstruir/recriar somente o
 container Jenkins para que o `init.groovy.d` e os Jenkinsfiles novos sejam

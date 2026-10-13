@@ -39,4 +39,10 @@ class StatusControllerTest {
                     "{\"service\":\"catalog-service\",\"status\":\"error\",\"database\":\"down\"}",
                     true));
   }
+
+  @Test
+  void thumbnailRouteRequiresProductBearerEvenWhenStorageControllerIsDisabled() throws Exception {
+    mvc.perform(get("/api/v1/books/00000000-0000-4000-8000-000000000001/thumbnail"))
+        .andExpect(status().isUnauthorized());
+  }
 }

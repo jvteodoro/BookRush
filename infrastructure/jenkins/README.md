@@ -81,6 +81,12 @@ Esse gate exige documentação ou contrato para mudanças de código, infraestru
 e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
 executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
 
+O gate roda em um container Python efêmero. Como o agente Jenkins usa o socket
+Docker e o workspace está no volume nomeado `jenkins_home`, a etapa usa
+`--volumes-from "$HOSTNAME"` para compartilhar o workspace com o container do
+gate, mantendo a chamada `bash scripts/validate-change.sh --ci`. Não use `-v "$PWD:/repo"` nesse agente: esse caminho é resolvido pelo
+daemon Docker no host e resulta em um diretório vazio dentro do gate.
+
 ### Pipeline dedicada do Backstage
 
 `backstage.Jenkinsfile` valida e empacota somente o Developer Portal. Cadastre
@@ -109,7 +115,9 @@ ficarem saudáveis.
 
 O bootstrap também cria jobs isolados para os 12 microserviços e para as sete
 verticais funcionais. Eles usam os Jenkinsfiles reutilizáveis
-`microservice.Jenkinsfile` e `vertical.Jenkinsfile`, sem fazer deploy. A matriz,
+`microservice.Jenkinsfile` e `vertical.Jenkinsfile`. Por padrão executam apenas
+validação; com `PUBLISH=true` publicam as imagens e com `DEPLOY=true` fazem
+deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
@@ -141,6 +149,11 @@ Jenkins são preservados.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
 perfil e social para as imagens criadas pela construção atual.
+Quando a thumbnail é protegida, a imagem do catálogo precisa ser atualizada
+junto com o frontend. O Compose configura `CATALOG_PRODUCT_OIDC_ISSUER`,
+`CATALOG_PRODUCT_OIDC_JWK_SET_URI` e `CATALOG_PRODUCT_OIDC_AUDIENCE` para que
+o `catalog-service` valide o bearer do realm de produto; a pipeline deve
+publicar/deployar `catalog-service` e `frontend` da mesma revisão.
 O `.env` deve definir `BOOKRUSH_REPO_ROOT` com o caminho absoluto do checkout
 visível ao daemon Docker; ele é usado para montar o realm do Keycloak e o
 arquivo dinâmico do Traefik quando o Compose é executado de dentro do Jenkins.
@@ -201,3 +214,8 @@ ASSET_ADMIN_TOKEN no .env do host e provisionar SeaweedFS conforme
 docs/storage/operations.md. A pipeline executa infrastructure/jenkins/deploy-compose.sh da branch selecionada,
 sem depender da cópia antiga em /opt/bookrush. Ela recusa deploy se storage não estiver
 saudável. As alterações precisam estar publicadas na branch remota selecionada.
+O deploy Compose exige as imagens `BACKEND_IMAGE`, `INGESTION_IMAGE`,
+`ANALYTICS_IMAGE`, `READER_PROFILE_IMAGE` e `FRONTEND_IMAGE`; o Jenkinsfile
+constrói/publica todas elas antes de executar o script de deploy. Essa matriz
+também é refletida em `infrastructure/compose.yaml`, evitando que uma imagem
+obrigatória fique apenas com o fallback `:local`.

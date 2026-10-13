@@ -164,7 +164,10 @@ SELECT i.id, i.external_identifier, i.status, i.attempt_number, i.book_id, i.edi
             + "WHERE s.code=? AND i.external_identifier IN ("
             + placeholders
             + ") "
-            + "ORDER BY i.external_identifier, i.updated_at DESC, i.attempt_number DESC";
+            + "ORDER BY i.external_identifier, "
+            + "CASE WHEN i.status IN ('PENDING','RUNNING') THEN 0 "
+            + "WHEN i.status IN ('SUCCEEDED','SKIPPED') AND i.book_id IS NOT NULL THEN 1 "
+            + "ELSE 2 END, i.updated_at DESC, i.attempt_number DESC";
     var rows = jdbc.queryForList(sql, args);
     var result = new LinkedHashMap<String, Map<String, Object>>();
     for (var row : rows) result.put(String.valueOf(row.get("external_identifier")), row);

@@ -11,6 +11,9 @@ O portal usa o cliente confidencial `bookrush-backstage` no realm
 `bookrush-platform`, com Authorization Code e redirect URI exata:
 `https://docs-bookrush.jteodoro.tec.br/api/auth/oidc/handler/frame`. A Web Origin
 é `https://docs-bookrush.jteodoro.tec.br`; password grant permanece desabilitado.
+O domínio canônico é `docs-bookrush.jteodoro.tec.br`. O alias legado
+`doc-bookrush.jteodoro.tec.br` é aceito como origem adicional durante a migração,
+para evitar `NotAllowedError` em sessões abertas no endereço antigo.
 
 O Compose recebe `BACKSTAGE_OIDC_ENABLED`, `AUTH_OIDC_METADATA_URL`,
 `AUTH_OIDC_CLIENT_ID`, `AUTH_OIDC_CLIENT_SECRET` e `AUTH_SESSION_SECRET` do

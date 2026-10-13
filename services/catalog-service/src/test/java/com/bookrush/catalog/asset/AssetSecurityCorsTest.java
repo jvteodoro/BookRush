@@ -8,21 +8,25 @@ import org.springframework.mock.web.MockHttpServletRequest;
 
 class AssetSecurityCorsTest {
   @Test
-  void exposesOnlyTheBackstageOriginForInternalCatalogReads() {
+  void exposesConfiguredOriginsForCatalogBrowserRoutes() {
     var source =
         new AssetSecurity()
             .catalogCorsConfigurationSource(
                 new CatalogCorsProperties(List.of("https://docs-bookrush.jteodoro.tec.br")));
 
-    var request = new MockHttpServletRequest("OPTIONS", "/api/internal/v1/catalog/books");
-    var configuration = source.getCorsConfiguration(request);
+    var internal = source.getCorsConfiguration(
+        new MockHttpServletRequest("OPTIONS", "/api/internal/v1/catalog/books"));
+    var admin = source.getCorsConfiguration(
+        new MockHttpServletRequest("OPTIONS", "/api/admin/books/book/assets"));
 
-    assertThat(configuration).isNotNull();
-    assertThat(configuration.getAllowedOrigins())
+    assertThat(internal).isNotNull();
+    assertThat(admin).isNotNull();
+    assertThat(admin.getAllowedOrigins())
         .containsExactly("https://docs-bookrush.jteodoro.tec.br");
-    assertThat(configuration.getAllowedMethods()).containsExactly("GET", "OPTIONS");
-    assertThat(configuration.getAllowedHeaders())
-        .containsExactly("Authorization", "Accept", "Content-Type");
-    assertThat(configuration.getAllowCredentials()).isFalse();
+    assertThat(admin.getAllowedMethods())
+        .containsExactly("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+    assertThat(admin.getAllowedHeaders())
+        .containsExactly("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client");
+    assertThat(admin.getAllowCredentials()).isFalse();
   }
 }
