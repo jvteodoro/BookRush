@@ -10,6 +10,19 @@ privacidade, planta, administração e publicador.
 
 ## Capacidades atuais
 
+Comentários usam `reader/CommentsDrawer.tsx` e o componente reutilizável
+`components/ui/Drawer.tsx`, um diálogo modal com foco contido, fechamento por
+Escape, botão ou clique no fundo e restauração de foco pelo navegador. O painel
+usa tokens e barra de rolagem do design system nos dois temas. Telas PageLoop
+delegam ao React por `bookrush:open-comments`, mantendo um único fluxo visual.
+
+`reader/comments.ts` consulta e publica no social-service. A publicação aceita
+até 2000 caracteres, bloqueia envio duplicado e mantém o rascunho quando falha.
+Um comentário só entra na lista após confirmação do servidor; a lista e a
+contagem do feed são atualizadas em seguida. Nome/avatar abrem o perfil público
+existente. `tests/comments.test.mjs` cobre leitura, identidade do autor,
+publicação, validação e erros sem publicar comentários reais.
+
 Recomendações usa `reader/RecommendationsPage.tsx`, com os mesmos livros reais
 e a ordem do feed carregado no bootstrap autenticado. As fileiras usam `BookRow`,
 capas e controles de rolagem compartilhados, com Salvar/Salvo conectado ao estado
@@ -99,6 +112,23 @@ o fluxo autenticado requer validação no navegador com a conta do usuário.
 A API continua sendo a fronteira de autorização. O navegador não persiste access tokens; a implementação usa memória e estado transitório de protocolo.
 
 ## Desenvolvimento
+
+Os ícones de curtida e comentários do feed exibem contagens do social-service.
+Após curtir/descurtir, o estado muda somente com sucesso HTTP e a contagem é
+reconsultada. `bookrush:social-counts` mantém o feed React sincronizado quando
+o diálogo PageLoop publica comentários ou atualiza as contagens.
+
+`br-scroll-area` padroniza a barra de rolagem com tamanho, cores de tema,
+trilho e indicador arredondados. Está demonstrada em `/design-system` e aplicada
+à citação do feed, cuja barra aparece ao expandir no hover/foco. A citação remove
+somente um par completo de aspas externas na apresentação, sem alterar o trecho
+original ou suas aspas internas.
+
+`OverflowQuote` limita citações do feed às linhas que cabem no card e mostra
+reticências. No hover ou foco, o texto completo fica disponível na mesma área
+e pode ser rolado manualmente, sem avançar o feed. Ao sair da área e perder
+o foco, retorna ao começo e às reticências. A geometria é recalculada ao
+redimensionar ou carregar fontes. O texto completo permanece no nome acessível.
 
 `components/ui/OverflowTitle.tsx` limita títulos longos com reticências e
 desliza o texto no hover ou foco do card quando há conteúdo oculto. O nome

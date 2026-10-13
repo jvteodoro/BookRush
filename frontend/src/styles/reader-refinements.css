@@ -1,4 +1,12 @@
 /* Preview refinements: shared SVG icons and one book per feed viewport. */
+.br-feed-layout .br-quote-window { position: relative; height: clamp(6rem, 26dvh, 15rem); overflow: hidden; }
+.br-feed-layout--live .br-excerpt-copy .br-quote-window { flex: 0 1 auto; }
+.br-quote-text, .br-quote-measure { margin: 0; font: inherit; line-height: inherit; overflow-wrap: anywhere; }
+.br-quote-text { display: -webkit-box; -webkit-line-clamp: var(--br-quote-lines); -webkit-box-orient: vertical; overflow: hidden; }
+.br-quote-measure { position: absolute; top: 0; left: 0; width: 100%; visibility: hidden; pointer-events: none; }
+.br-quote-window--overflow:hover .br-quote-text, .br-quote-window--overflow:focus .br-quote-text { display: block; overflow: visible; }
+.br-feed-layout .br-quote-window--overflow:hover, .br-feed-layout .br-quote-window--overflow:focus { overflow-y: auto; overscroll-behavior-y: contain; }
+.br-quote-window:focus-visible { outline: 2px solid var(--br-outline-soft); outline-offset: 4px; }
 .br-book-card__meta { height: 104px; grid-template-rows: 1.2rem 1rem .375rem 1rem; align-content: start; }
 .br-book-card__author, .br-book-cover__author { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .br-book-cover { flex-shrink: 0; overflow: hidden; }
@@ -12,6 +20,10 @@
 .br-excerpt-mini img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .br-live-empty { padding: 1.5rem; }
 .br-action-rail button:disabled { opacity: .5; cursor: wait; }
+.br-action-rail button > span { transition: transform 160ms ease, box-shadow 160ms ease; }
+@media (hover: hover) {
+  .br-action-rail button:hover:not(:disabled) > span { transform: translateY(-2px); box-shadow: 2px 3px 0 var(--br-outline-soft); }
+}
 .br-excerpt-text { max-height: 45%; overflow-y: auto; overflow-wrap: anywhere; scrollbar-width: thin; }
 .br-feed-layout--live .br-excerpt-copy { display: flex; flex-direction: column; max-height: 100%; min-height: 0; }
 .br-feed-layout--live .br-excerpt-copy > :not(.br-excerpt-text) { flex-shrink: 0; }
@@ -23,7 +35,6 @@
 .br-like[aria-pressed='true'] svg { fill: currentColor; animation: br-heart-pop 380ms cubic-bezier(.22, 1, .36, 1); }
 .br-like__bubble::after { content: ''; position: absolute; inset: -2px; border: 2px solid var(--br-red); border-radius: 50%; opacity: 0; pointer-events: none; }
 .br-like[aria-pressed='true'] .br-like__bubble::after { animation: br-heart-ring 450ms ease-out; }
-.br-like:hover .br-like__bubble svg { transform: scale(1.1); }
 .br-like:active .br-like__bubble svg { transform: scale(.9); }
 @keyframes br-heart-pop { 0% { transform: scale(.75); } 45% { transform: scale(1.3); } 75% { transform: scale(.95); } 100% { transform: scale(1); } }
 @keyframes br-heart-ring { 0% { opacity: .65; transform: scale(.85); } 100% { opacity: 0; transform: scale(1.6); } }
@@ -84,9 +95,11 @@
 .br-shell--collapsed .br-panel-arrow { transform: scaleX(-1); }
 .br-sidebar .br-nav-label { overflow: hidden; white-space: nowrap; transition: opacity 140ms; }
 @media (prefers-reduced-motion: reduce) {
+  .br-action-rail button > span { transition: none; }
+  .br-action-rail button:hover:not(:disabled) > span { transform: none; }
   .br-like__bubble svg { transition: none; }
   .br-like[aria-pressed='true'] svg, .br-like[aria-pressed='true'] .br-like__bubble::after { animation: none; }
-  .br-like:hover .br-like__bubble svg, .br-like:active .br-like__bubble svg { transform: none; }
+  .br-like:active .br-like__bubble svg { transform: none; }
   .br-book-row__edge { transition: none; }
   .br-sidebar, .br-sidebar__nav button, .br-nav-indicator, .br-sidebar-toggle, .br-sidebar-toggle svg, .br-panel-arrow, .br-sidebar .br-nav-label, .br-home-shortcut, .br-home-shortcut svg { transition: none; }
   .br-home-shortcut:hover svg, .br-sidebar-toggle:hover svg, .br-shell--collapsed .br-sidebar-toggle:hover svg, .br-home-shortcut:active, .br-sidebar-toggle:active { transform: none; }

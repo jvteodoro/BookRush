@@ -13,6 +13,7 @@
   --br-font-reading: 'Source Serif 4', Georgia, serif;
   --br-radius-card: 14px;
   --br-radius-pill: 999px;
+  --br-scroll-size: 6px;
   --br-bg: var(--br-cream);
   --br-surface: #fffdf6;
   --br-surface-2: #f1e9d2;
@@ -62,6 +63,12 @@
 .br-progress { height: .375rem; border-radius: var(--br-radius-pill); background: var(--br-outline-soft); overflow: hidden; }
 .br-progress__fill { height: 100%; background: var(--br-teal); transition: width 300ms; }
 .br-logo { display: block; border-radius: 12px; object-fit: contain; }
+.br-scroll-area { scrollbar-width: thin; scrollbar-color: var(--br-content-dim) var(--br-surface-2); scrollbar-gutter: stable; }
+.br-scroll-area:hover, .br-scroll-area:focus-within { scrollbar-color: var(--br-teal) var(--br-surface-2); }
+.br-scroll-area::-webkit-scrollbar { width: var(--br-scroll-size); height: var(--br-scroll-size); }
+.br-scroll-area::-webkit-scrollbar-track { background: var(--br-surface-2); border-radius: var(--br-radius-pill); }
+.br-scroll-area::-webkit-scrollbar-thumb { background: var(--br-content-dim); border-radius: var(--br-radius-pill); }
+.br-scroll-area:hover::-webkit-scrollbar-thumb, .br-scroll-area:focus-within::-webkit-scrollbar-thumb { background: var(--br-teal); }
 .br-overflow-title { display: block; min-width: 0; overflow: hidden; white-space: nowrap; }
 .br-overflow-title .br-overflow-title__text { display: block; width: max-content; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: inherit; color: inherit; }
 .br-overflow-title--scrollable:hover .br-overflow-title__text,

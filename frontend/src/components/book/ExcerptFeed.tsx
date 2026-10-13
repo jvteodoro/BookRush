@@ -3,8 +3,10 @@ import type { ReaderBook } from './BookCard';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Icon } from '../ui/Icon';
+import { OverflowQuote } from '../ui/OverflowQuote';
 
-type Props = { books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; sidebar: ReactNode; message: string } };
+type Props = { books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; sidebar: ReactNode; message: string } };
+const compactCount = (count: number) => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(count);
 export function ExcerptFeed({ books, saved, onSave, onOpen, live }: Props) {
   const [demoLiked, setLiked] = useState<string[]>([]);
   const liked = live?.liked ?? demoLiked;
@@ -63,7 +65,7 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live }: Props) {
       animationFrame = window.requestAnimationFrame(animate);
     };
     const wheel = (event: WheelEvent) => {
-      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX) || (event.target instanceof Element && event.target.closest('.br-feed-comments'))) return;
+      if (event.ctrlKey || Math.abs(event.deltaY) <= Math.abs(event.deltaX) || (event.target instanceof Element && event.target.closest('.br-feed-comments, .br-quote-window--overflow'))) return;
       event.preventDefault();
       if (!gestureActive) move(Math.sign(event.deltaY));
       gestureActive = true;
@@ -71,7 +73,7 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live }: Props) {
       resetTimer = setTimeout(() => { gestureActive = false; }, 180);
     };
     const key = (event: KeyboardEvent) => {
-      if (event.target instanceof Element && event.target.closest('input, textarea, button')) return;
+      if (event.target instanceof Element && event.target.closest('input, textarea, button, .br-quote-window--overflow')) return;
       if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key === 'ArrowUp' || event.key === 'PageUp') {
         event.preventDefault(); move(event.key === 'ArrowDown' || event.key === 'PageDown' ? 1 : -1);
       }
@@ -85,13 +87,13 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live }: Props) {
       <div ref={scroll} className="br-feed-scroll" tabIndex={0} aria-label={`${live ? 'Feed de leitura' : 'Trechos demonstrativos'}; role ou use as setas para ver mais livros`}>
         {books.map((book, index) => <article key={book.id} data-book-id={book.id} className={`br-excerpt-card br-excerpt-card--${index % 3}`} aria-label={book.title}>
           <div className="br-excerpt-copy"><div className="br-excerpt-meta"><span>{book.genre}</span><span>{live ? 'Para você' : 'Prévia'} · {index + 1} de {books.length}</span></div>
-            <span className="br-excerpt-quote-mark" aria-hidden="true">“</span><p className="br-excerpt-text">{book.description}</p>
+            <span className="br-excerpt-quote-mark" aria-hidden="true">“</span><OverflowQuote text={book.description} />
             <div className="br-excerpt-book"><span className="br-excerpt-mini" aria-hidden="true">{book.coverUrl ? <img src={book.coverUrl} alt="" /> : 'B'}</span><div><h2>{book.title}</h2><p>{book.author}</p></div></div>
             <Button disabled={live?.pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora →</Button>
           </div>
           <div className="br-action-rail">
-            <button type="button" className="br-like" disabled={live?.pending.includes(book.id)} aria-pressed={liked.includes(book.id)} aria-label={`${liked.includes(book.id) ? 'Descurtir' : 'Curtir'} ${book.title}`} onClick={() => live ? live.onLike(book.id) : setLiked(current => current.includes(book.id) ? current.filter(id => id !== book.id) : [...current, book.id])}><span className="br-like__bubble"><Icon name="heart" /></span><small>{liked.includes(book.id) ? 'Curtido' : 'Curtir'}</small></button>
-            <button type="button" aria-expanded={live ? undefined : commentsFor === book.id} onClick={() => { if (live) { live.onComments(book.id); return; } setCommentsFor(current => current === book.id ? null : book.id); setDraft(''); }}><span><Icon name="comment" /></span><small>Comentários{comments[book.id]?.length ? ` (${comments[book.id].length})` : ''}</small></button>
+            <button type="button" className="br-like" disabled={live?.pending.includes(book.id)} aria-pressed={liked.includes(book.id)} aria-label={`${liked.includes(book.id) ? 'Descurtir' : 'Curtir'} ${book.title}, ${live?.counts[book.id]?.likes ?? Number(liked.includes(book.id))} curtidas`} onClick={() => live ? live.onLike(book.id) : setLiked(current => current.includes(book.id) ? current.filter(id => id !== book.id) : [...current, book.id])}><span className="br-like__bubble"><Icon name="heart" /></span><small>{compactCount(live?.counts[book.id]?.likes ?? Number(liked.includes(book.id)))}</small></button>
+            <button type="button" aria-label={`Comentários de ${book.title}, ${live?.counts[book.id]?.comments ?? comments[book.id]?.length ?? 0} comentários`} aria-expanded={live ? undefined : commentsFor === book.id} onClick={() => { if (live) { live.onComments(book.id); return; } setCommentsFor(current => current === book.id ? null : book.id); setDraft(''); }}><span><Icon name="comment" /></span><small>{compactCount(live?.counts[book.id]?.comments ?? comments[book.id]?.length ?? 0)}</small></button>
             <button type="button" disabled={live?.pending.includes(book.id)} aria-pressed={saved.includes(book.id)} aria-label={`${saved.includes(book.id) ? 'Remover' : 'Salvar'} ${book.title} na biblioteca`} onClick={() => onSave(book.id)}><span><Icon name="bookmark" /></span><small>{saved.includes(book.id) ? 'Salvo' : 'Salvar'}</small></button>
             <button type="button" onClick={() => live ? live.onShare(book.id) : setMessage(`Compartilhamento de “${book.title}” será conectado na integração. Esta prévia não cria links públicos.`)}><span><Icon name="share" /></span><small>Compartilhar</small></button>
           </div>

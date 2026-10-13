@@ -13,6 +13,7 @@ import './styles/reader-shell.css';
 import './styles/reader-refinements.css';
 import './styles/search.css';
 import './styles/recommendations.css';
+import './styles/comments.css';
 import { LiveReader } from './reader/LiveReader';
 
 type ReadiumBridge = {
@@ -253,6 +254,7 @@ function App() {
             const likes = (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ ?? {};
             likes[id] = counts.liked;
             (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ = likes;
+            window.dispatchEvent(new CustomEvent('bookrush:social-counts', { detail: { id, counts } }));
             return counts;
           },
           profile: async () => {

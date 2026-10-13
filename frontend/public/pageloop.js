@@ -503,6 +503,7 @@
   function bindModalClose(){document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=()=>document.querySelector('.modal-wrap')?.remove())}
 
   async function openComments(id){
+    if(window.__BOOKRUSH_REACT_COMMENTS__){window.dispatchEvent(new CustomEvent('bookrush:open-comments',{detail:{id,title:book(id).title}}));return;}
     const b=book(id); let comments=[]; try{comments=await (window.__BOOKRUSH_API__?.comments?.(id)||[])}catch(e){toast(e.message||'Não foi possível carregar comentários')}
     const rows=Array.isArray(comments)?comments:[];
     const overlay=document.createElement('div');overlay.className='overlay';overlay.innerHTML=`<aside class="drawer"><div class="drawer-head"><div><h3>Comentários</h3><span class="muted tiny">${esc(b.title)}</span></div><button class="icon-btn" data-close-drawer>${icon('close')}</button></div><div class="drawer-body">${rows.map(c=>{const author=esc(c.authorName||'Leitor'),initials=esc(c.authorInitials||String(c.authorName||'').trim().slice(0,2).toUpperCase()||'•');return `<div class="comment">${c.subject_key?`<a class="comment-author" href="/usuarios/${encodeURIComponent(c.subject_key)}" data-profile-subject="${esc(c.subject_key)}" aria-label="Abrir perfil de ${author}"><span class="avatar">${initials}</span><strong>${author}</strong></a>`:`<div class="comment-author"><span class="avatar">${initials}</span><strong>${author}</strong></div>`}<p>${esc(c.body||c.text||'')}</p></div>`}).join('')||'<p class="muted">Ainda não há comentários.</p>'}</div><div class="comment-compose"><input id="commentInput" placeholder="Escreva um comentário..."/><button class="primary-btn" id="commentSend">Enviar</button></div></aside>`;document.body.appendChild(overlay);
@@ -524,6 +525,7 @@
     openComments,
     openShare,
     openLucky:openLuckyPrompt,
+    openProfile:openUserProfile,
   };
   render();
 })();

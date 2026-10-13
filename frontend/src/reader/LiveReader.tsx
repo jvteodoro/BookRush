@@ -8,14 +8,17 @@ import { LibraryPage } from './LibraryPage';
 import type { LibraryBook } from './library';
 import { SearchPage } from './SearchPage';
 import { RecommendationsPage } from './RecommendationsPage';
+import { CommentsDrawer } from './CommentsDrawer';
 
-type SourceBook = { id: string; title: string; author: string; genre: string; quote: string; progress: number; thumbnailUrl?: string | null; excerpt?: unknown; impressionId?: string };
+type SourceBook = { id: string; title: string; author: string; genre: string; quote: string; progress: number; likes?: number; comments?: number; thumbnailUrl?: string | null; excerpt?: unknown; impressionId?: string };
+type SocialCounts = { likes: number; comments: number; liked: boolean };
 type Runtime = {
+  __BOOKRUSH_REACT_COMMENTS__?: boolean;
   __BOOKRUSH_BOOKS__: SourceBook[];
   __BOOKRUSH_LIKES__: Record<string, boolean>;
   __BOOKRUSH_STREAK__?: { currentDays?: number };
-  __BOOKRUSH_API__: { saved: Set<string>; save: (id: string, enabled: boolean) => Promise<void>; like: (id: string, enabled: boolean) => Promise<void>; viewable: (id: string) => Promise<void>; trackExcerpt: (type: string, id: string, excerpt: unknown) => void };
-  __BOOKRUSH_LEGACY__: { navigate: (route: string, query?: string) => void; openBook: (id: string, query?: string) => Promise<void>; openComments: (id: string) => Promise<void>; openShare: (id: string) => void; openLucky: () => void };
+  __BOOKRUSH_API__: { saved: Set<string>; save: (id: string, enabled: boolean) => Promise<void>; like: (id: string, enabled: boolean) => Promise<void>; refreshCounts: (id: string) => Promise<SocialCounts>; viewable: (id: string) => Promise<void>; trackExcerpt: (type: string, id: string, excerpt: unknown) => void };
+  __BOOKRUSH_LEGACY__: { navigate: (route: string, query?: string) => void; openBook: (id: string, query?: string) => Promise<void>; openComments: (id: string) => Promise<void>; openShare: (id: string) => void; openLucky: () => void; openProfile: (subject: string) => void };
 };
 const runtime = () => window as unknown as Runtime;
 
@@ -25,6 +28,28 @@ export function LiveReader({ visible, userName, onLegacy, initialTab = 'feed', l
   const [saved, setSaved] = useState(() => [...runtime().__BOOKRUSH_API__.saved]);
   const [liked, setLiked] = useState(() => Object.keys(runtime().__BOOKRUSH_LIKES__).filter(id => runtime().__BOOKRUSH_LIKES__[id]));
   const [pending, setPending] = useState<string[]>([]);
+  const [commentsBook, setCommentsBook] = useState<{ id: string; title: string } | null>(null);
+  useEffect(() => {
+    const open = (event: Event) => setCommentsBook((event as CustomEvent<{ id: string; title: string }>).detail);
+    runtime().__BOOKRUSH_REACT_COMMENTS__ = true;
+    window.addEventListener('bookrush:open-comments', open);
+    return () => { runtime().__BOOKRUSH_REACT_COMMENTS__ = false; window.removeEventListener('bookrush:open-comments', open); };
+  }, []);
+  const onCommentCount = useCallback((id: string, total: number) => {
+    setCounts(current => ({ ...current, [id]: { likes: current[id]?.likes ?? 0, comments: total } }));
+    const book = runtime().__BOOKRUSH_BOOKS__.find(item => item.id === id);
+    if (book) book.comments = total;
+  }, []);
+  const [counts, setCounts] = useState<Record<string, { likes: number; comments: number }>>(() => Object.fromEntries(runtime().__BOOKRUSH_BOOKS__.map(book => [book.id, { likes: book.likes ?? 0, comments: book.comments ?? 0 }])));
+  useEffect(() => {
+    const update = (event: Event) => {
+      const { id, counts } = (event as CustomEvent<{ id: string; counts: SocialCounts }>).detail;
+      setCounts(current => ({ ...current, [id]: counts }));
+      setLiked(current => counts.liked ? [...new Set([...current, id])] : current.filter(item => item !== id));
+    };
+    window.addEventListener('bookrush:social-counts', update);
+    return () => window.removeEventListener('bookrush:social-counts', update);
+  }, []);
   const [message, setMessage] = useState('');
   const locks = useRef(new Set<string>());
   const viewed = useRef(new Set<string>());
@@ -76,6 +101,9 @@ export function LiveReader({ visible, userName, onLegacy, initialTab = 'feed', l
     await runtime().__BOOKRUSH_API__.like(id, enabled);
     runtime().__BOOKRUSH_LIKES__[id] = enabled;
     setLiked(current => enabled ? [...current, id] : current.filter(item => item !== id));
+    setCounts(current => ({ ...current, [id]: { likes: Math.max(0, (current[id]?.likes ?? 0) + (enabled ? 1 : -1)), comments: current[id]?.comments ?? 0 } }));
+    try { await runtime().__BOOKRUSH_API__.refreshCounts(id); }
+    catch { setMessage('Curtida atualizada. Não foi possível atualizar a contagem agora.'); }
   });
   const onViewable = useCallback((id: string) => {
     if (viewed.current.has(id)) return;
@@ -97,10 +125,11 @@ export function LiveReader({ visible, userName, onLegacy, initialTab = 'feed', l
     await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query); onLegacy();
   });
   return <AppShell active={tab} query={query} onSearch={setQuery} onNavigate={navigate} userName={userName}>
-    {tab === 'recommendations' ? <RecommendationsPage books={books} saved={saved} pending={pending} message={message} onSave={save} onOpen={book => void action(book.id, async () => { await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query); onLegacy(); })} onLucky={() => runtime().__BOOKRUSH_LEGACY__.openLucky()} onSearch={() => navigate('search')} /> : tab === 'search' ? <SearchPage visible={visible} query={query} onQuery={setQuery} saved={saved} pending={pending} message={message} onSave={save} onOpen={openCatalogBook} /> : tab === 'library' ? <LibraryPage visible={visible} saved={saved} pending={pending} message={message} onLoaded={syncSaved} onOpen={openCatalogBook} onRemove={save} onDiscover={() => navigate('feed')} /> : tab === 'prototype' ? <Card className="br-profile-card"><h1>Menu do protótipo</h1><p>Escolha uma área do BookRush.</p><div className="br-preview__row"><Button onClick={() => navigate('feed')}>Para você</Button><Button variant="ghost" onClick={() => navigate('admin')}>Administração</Button><Button variant="ghost" onClick={() => navigate('publisher')}>Publicador</Button></div></Card> : <ExcerptFeed books={books} saved={saved} onSave={save} onOpen={book => void action(book.id, async () => { await runtime().__BOOKRUSH_LEGACY__.openBook(book.id); onLegacy(); })} live={{ liked, pending, message, onLike: like, onComments: id => void action(id, () => runtime().__BOOKRUSH_LEGACY__.openComments(id)), onShare: id => runtime().__BOOKRUSH_LEGACY__.openShare(id), onViewable, sidebar: <>
+    {tab === 'recommendations' ? <RecommendationsPage books={books} saved={saved} pending={pending} message={message} onSave={save} onOpen={book => void action(book.id, async () => { await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query); onLegacy(); })} onLucky={() => runtime().__BOOKRUSH_LEGACY__.openLucky()} onSearch={() => navigate('search')} /> : tab === 'search' ? <SearchPage visible={visible} query={query} onQuery={setQuery} saved={saved} pending={pending} message={message} onSave={save} onOpen={openCatalogBook} /> : tab === 'library' ? <LibraryPage visible={visible} saved={saved} pending={pending} message={message} onLoaded={syncSaved} onOpen={openCatalogBook} onRemove={save} onDiscover={() => navigate('feed')} /> : tab === 'prototype' ? <Card className="br-profile-card"><h1>Menu do protótipo</h1><p>Escolha uma área do BookRush.</p><div className="br-preview__row"><Button onClick={() => navigate('feed')}>Para você</Button><Button variant="ghost" onClick={() => navigate('admin')}>Administração</Button><Button variant="ghost" onClick={() => navigate('publisher')}>Publicador</Button></div></Card> : <ExcerptFeed books={books} saved={saved} onSave={save} onOpen={book => void action(book.id, async () => { await runtime().__BOOKRUSH_LEGACY__.openBook(book.id); onLegacy(); })} live={{ liked, counts, pending, message, onLike: like, onComments: id => { const book = books.find(item => item.id === id); if (book) setCommentsBook({ id: book.id, title: book.title }); }, onShare: id => runtime().__BOOKRUSH_LEGACY__.openShare(id), onViewable, sidebar: <>
       <Card><h2>{typeof streak === 'number' ? `${streak} dias de sequência` : 'Sua leitura'}</h2><p>Continue seu hábito, uma história de cada vez.</p></Card>
       <Card><h2>Feito para você</h2><p>Descubra histórias do seu catálogo e salve as que quiser ler depois.</p></Card>
       <Card><h2>Sua biblioteca</h2><p>{saved.length} {saved.length === 1 ? 'livro salvo' : 'livros salvos'} para sua próxima leitura.</p></Card>
     </> }} />}
+    {commentsBook && <CommentsDrawer key={commentsBook.id} book={commentsBook} userName={userName} onClose={() => setCommentsBook(null)} onCount={onCommentCount} onProfile={subject => { setCommentsBook(null); runtime().__BOOKRUSH_LEGACY__.openProfile(subject); onLegacy(); }} />}
   </AppShell>;
 }
