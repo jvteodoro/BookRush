@@ -32,6 +32,11 @@ SEAWEEDFS_OIDC_CLIENT_SECRET
 SEAWEEDFS_OAUTH2_COOKIE_SECRET
 ```
 
+O endpoint de autorização (`SEAWEEDFS_OIDC_LOGIN_URL`) precisa usar o domínio
+HTTPS público do Keycloak, pois esse URL é seguido pelo navegador. Os endpoints
+de token, perfil e JWKS podem continuar usando `http://keycloak:8080` na rede
+privada do Compose.
+
 Depois de alterar o realm, execute:
 
 ```bash

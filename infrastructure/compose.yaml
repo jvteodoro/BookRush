@@ -70,7 +70,10 @@ services:
       - --oidc-issuer-url=${SEAWEEDFS_OIDC_ISSUER_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       - --oidc-jwks-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs
       - --skip-oidc-discovery
-      - --login-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/auth
+      # The authorization endpoint is followed by the user's browser, so it
+      # must be reachable outside the Docker network. Token, profile and JWKS
+      # calls below remain on the private Compose network.
+      - --login-url=${SEAWEEDFS_OIDC_LOGIN_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/auth}
       - --redeem-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token
       - --profile-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/userinfo
       - --client-id=${SEAWEEDFS_OIDC_CLIENT_ID:-bookrush-seaweedfs}
