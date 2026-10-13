@@ -370,6 +370,9 @@ function App() {
         };
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';
         if (document.querySelector('script[data-bookrush-pageloop]')) { if (active) setFeedReady(true); return; }
+        document.body.dataset.mode = new URLSearchParams(window.location.search).get('mode') === 'app' ? 'app' : 'web';
+        document.body.dataset.start = 'feed';
+        if (document.querySelector('script[data-bookrush-pageloop]')) return;
         const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261011-public-profile'; document.head.appendChild(style);
         const thumbnailStyle = document.createElement('link'); thumbnailStyle.id = 'bookrush-thumbnail-style'; thumbnailStyle.rel = 'stylesheet'; thumbnailStyle.href = '/thumbnails.css?v=20261006-gutenberg'; document.head.appendChild(thumbnailStyle);
         const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261012-design-system-bridge'; script.async = true;

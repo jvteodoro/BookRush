@@ -18,7 +18,7 @@ flowchart TB
 ```
 
 Plugins: Catalog, API Docs, TechDocs, Catalog Graph, Org, Search PostgreSQL,
-Scaffolder GitHub, Auth e User Settings. Não há Kubernetes, broker, MCP ou
+Scaffolder GitHub, Auth e User Settings. Não existe Kubernetes, broker, MCP ou
 plugins de demonstração no portal. Backstage não entra no caminho de requisições
 dos serviços nem acessa tabelas dos livros.
 

@@ -1,5 +1,5 @@
 (() => {
-  const mode = document.body.dataset.mode || 'web';
+  const getMode = () => document.body.dataset.mode === 'app' ? 'app' : 'web';
   const profilePath = window.location.pathname.match(/^\/usuarios\/([^/]+)\/?$/);
   let initialSubject = '';
   try { initialSubject = profilePath ? decodeURIComponent(profilePath[1]) : ''; } catch { initialSubject = ''; }
@@ -69,7 +69,7 @@
           <button class="nav-item publisher-link ${state.route==='publisher'?'active':''}" data-route="publisher">${icon('upload')}<span class="nav-label">Publicador</span></button>
         </nav>
         <div class="sidebar-spacer"></div>
-        <a href="index.html" class="nav-item">${icon('menu')}<span class="nav-label">Menu do protótipo</span></a>
+        <button class="nav-item" data-switch-mode>${icon('menu')}<span class="nav-label">Versão mobile</span></button>
         <div class="profile-mini"><div class="avatar">JV</div><div><strong>João Victor</strong><span>@joaovictor</span></div></div>
       </aside>
       <section class="main-area">
@@ -79,10 +79,11 @@
       </section>
       <div class="toast-stack"></div>
     </div>
-    ${mode==='web'&&state.route!=='reader'?`<div class="prototype-switcher"><a class="prototype-pill" href="${state.route==='admin'?'admin.html':state.route==='publisher'?'publisher.html':'app.html'}">${state.route==='admin'||state.route==='publisher'?'BookRush':'BookRush Mobile'}</a></div>`:''}`;
+`;
     bindCommon();
     window.dispatchEvent(new CustomEvent('bookrush:legacy-route', {detail:state.route}));
     if(state.route==='search')window.dispatchEvent(new CustomEvent('bookrush:legacy-search', {detail:state.search}));
+    updateModeSwitcher();
   }
 
   function mobileNav(){
@@ -93,7 +94,28 @@
   function bindCommon(){
     document.querySelectorAll('[data-route]').forEach(el=>el.addEventListener('click',()=>go(el.dataset.route)));
     document.querySelectorAll('[data-action="notify"]').forEach(el=>el.addEventListener('click',()=>toast('Você está em dia. Nenhuma notificação nova.')));
+    document.querySelectorAll('[data-switch-mode]').forEach(el=>el.addEventListener('click',()=>setMode('app')));
   }
+  function setMode(next){
+    document.body.dataset.mode = next;
+    const url = new URL(window.location.href);
+    if(next==='app') url.searchParams.set('mode','app'); else url.searchParams.delete('mode');
+    window.history.replaceState(window.history.state,'',url);
+    if(next==='app' && (state.route==='admin'||state.route==='publisher')) state.route='feed';
+    render();
+    }
+    function updateModeSwitcher(){
+    let el=document.querySelector('.prototype-switcher');
+    if(state.route==='reader'){ el?.remove(); return; }
+    if(!el){
+        el=document.createElement('div');
+        el.className='prototype-switcher';
+        el.innerHTML='<button type="button" class="prototype-pill"></button>';
+        el.firstChild.addEventListener('click',()=>setMode(getMode()==='app'?'web':'app'));
+        document.body.appendChild(el);
+    }
+    el.firstChild.textContent = getMode()==='app' ? 'BookRush Web' : 'BookRush Mobile';
+    }
   function go(route){
     if(window.location.pathname.startsWith('/usuarios/')) window.history.pushState({route},'', '/');
     if(state.route==='reader'&&route!=='reader'){state.route=route;void Promise.resolve(window.__BOOKRUSH_READIUM__?.unmount?.()).catch(()=>{}).finally(render);return;}
@@ -341,7 +363,7 @@
   function renderReader(){
     const b=book(state.readerBook);
     const content=`<div class="reader-shell" id="readerShell">
-      <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${mode==='app'?'feed':'library'}" aria-label="Voltar">${icon('chevron','icon-sm')}<span>Voltar</span></button></div>
+      <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${getMode()==='app'?'feed':'library'}" aria-label="Voltar">${icon('chevron','icon-sm')}<span>Voltar</span></button></div>
       <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
       <div class="reader-overlay reader-overlay-right"><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon('bookmark','icon-sm')}</button></div>
       <main class="reader-main"><div class="readium-host" id="readium-reader" aria-label="Leitor Readium"></div></main>
