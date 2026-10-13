@@ -128,6 +128,7 @@ public class AssetSecurity {
                         HttpMethod.GET,
                         "/api/v1/books",
                         "/api/v1/books/**",
+                        "/api/v1/books/*/thumbnail",
                         "/api",
                         "/api/",
                         "/api/status",

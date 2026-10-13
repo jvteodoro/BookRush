@@ -14,6 +14,10 @@ administrativa de assets). Operações de alteração continuam exigindo
 `bookrush.assets.write`; portanto, o cliente de documentação pode consultar
 assets sem receber permissão de escrita.
 
+O endpoint `GET /api/v1/books/{bookId}/thumbnail` é público: ele somente
+redireciona para uma URL temporária assinada de um thumbnail aprovado. O bearer
+do usuário não é necessário para carregar imagens da biblioteca.
+
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 
 ## Consultar livros por HTTP
