@@ -81,6 +81,8 @@
     </div>
     ${mode==='web'&&state.route!=='reader'?`<div class="prototype-switcher"><a class="prototype-pill" href="${state.route==='admin'?'admin.html':state.route==='publisher'?'publisher.html':'app.html'}">${state.route==='admin'||state.route==='publisher'?'BookRush':'BookRush Mobile'}</a></div>`:''}`;
     bindCommon();
+    window.dispatchEvent(new CustomEvent('bookrush:legacy-route', {detail:state.route}));
+    if(state.route==='search')window.dispatchEvent(new CustomEvent('bookrush:legacy-search', {detail:state.search}));
   }
 
   function mobileNav(){
@@ -176,7 +178,7 @@
     });
     document.querySelectorAll('[data-follow]').forEach(b=>b.onclick=async()=>{const id=b.dataset.follow, enabled=!state.followed[id];try{await window.__BOOKRUSH_API__?.follow?.(id,enabled);state.followed[id]=enabled;renderFeed();}catch(e){toast(e.message||'Não foi possível atualizar o acompanhamento')}});
     document.querySelectorAll('[data-user-profile]').forEach(b=>b.onclick=()=>openUserProfile(b.dataset.userProfile));
-    const fs=document.getElementById('feedScroll'); if(fs){document.onkeydown=e=>{if(!['ArrowDown','ArrowUp'].includes(e.key))return;fs.scrollBy({top:(e.key==='ArrowDown'?1:-1)*fs.clientHeight,behavior:'smooth'})}}
+    const fs=document.getElementById('feedScroll'); if(fs){document.onkeydown=e=>{if(document.getElementById('app')?.hidden||!['ArrowDown','ArrowUp'].includes(e.key))return;fs.scrollBy({top:(e.key==='ArrowDown'?1:-1)*fs.clientHeight,behavior:'smooth'})}}
     scheduleFeedQuoteFit();
   }
 
@@ -304,6 +306,7 @@
     document.querySelector('[data-modal-open]').onclick=()=>{document.querySelector('.modal-wrap')?.remove();openBook(b.id)};
   }
 
+  const pendingSearchSaves=new Set();
   function renderSearch(){
     const filters=['Todos','Título','Autor','Palavra-chave'];
     const q=state.search.trim().toLowerCase();
@@ -320,7 +323,17 @@
     const inp=document.getElementById('searchInput'); inp.oninput=e=>{state.search=e.target.value;renderSearch();const i=document.getElementById('searchInput');i.focus();i.setSelectionRange(i.value.length,i.value.length)};
     document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.searchFilter=b.dataset.filter;renderSearch()});
     document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));
-    document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];save();renderSearch()});
+    document.querySelectorAll('[data-save]').forEach(b=>{
+      const id=b.dataset.save;b.disabled=pendingSearchSaves.has(id);
+      b.onclick=async()=>{
+        if(pendingSearchSaves.has(id))return;
+        const enabled=!state.saved[id];pendingSearchSaves.add(id);b.disabled=true;
+        let message='';
+        try{await window.__BOOKRUSH_API__.save(id,enabled);state.saved[id]=enabled;save();}
+        catch(e){message=e.message||'Não foi possível atualizar sua biblioteca.';}
+        finally{pendingSearchSaves.delete(id);if(state.route==='search')renderSearch();if(message)toast(message);}
+      };
+    });
   }
 
   async function openBook(id){const item=book(id);if(item?.excerpt)window.__BOOKRUSH_API__?.trackExcerpt?.('BOOK_OPEN_FROM_EXCERPT',id,item.excerpt);state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id);window.__BOOKRUSH_CHAPTERS__=await window.__BOOKRUSH_API__?.chapters?.(id)||[]}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);render();}
@@ -490,6 +503,7 @@
   function bindModalClose(){document.querySelectorAll('[data-close-modal]').forEach(b=>b.onclick=()=>document.querySelector('.modal-wrap')?.remove())}
 
   async function openComments(id){
+    if(window.__BOOKRUSH_REACT_COMMENTS__){window.dispatchEvent(new CustomEvent('bookrush:open-comments',{detail:{id,title:book(id).title}}));return;}
     const b=book(id); let comments=[]; try{comments=await (window.__BOOKRUSH_API__?.comments?.(id)||[])}catch(e){toast(e.message||'Não foi possível carregar comentários')}
     const rows=Array.isArray(comments)?comments:[];
     const overlay=document.createElement('div');overlay.className='overlay';overlay.innerHTML=`<aside class="drawer"><div class="drawer-head"><div><h3>Comentários</h3><span class="muted tiny">${esc(b.title)}</span></div><button class="icon-btn" data-close-drawer>${icon('close')}</button></div><div class="drawer-body">${rows.map(c=>{const author=esc(c.authorName||'Leitor'),initials=esc(c.authorInitials||String(c.authorName||'').trim().slice(0,2).toUpperCase()||'•');return `<div class="comment">${c.subject_key?`<a class="comment-author" href="/usuarios/${encodeURIComponent(c.subject_key)}" data-profile-subject="${esc(c.subject_key)}" aria-label="Abrir perfil de ${author}"><span class="avatar">${initials}</span><strong>${author}</strong></a>`:`<div class="comment-author"><span class="avatar">${initials}</span><strong>${author}</strong></div>`}<p>${esc(c.body||c.text||'')}</p></div>`}).join('')||'<p class="muted">Ainda não há comentários.</p>'}</div><div class="comment-compose"><input id="commentInput" placeholder="Escreva um comentário..."/><button class="primary-btn" id="commentSend">Enviar</button></div></aside>`;document.body.appendChild(overlay);
@@ -504,5 +518,14 @@
   }
 
   window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();go('search')}});
+  function syncReactFeed(){state.saved=Object.fromEntries(Array.from(window.__BOOKRUSH_API__?.saved||[]).map(id=>[id,true]));state.likes={...(window.__BOOKRUSH_LIKES__||{})};}
+  window.__BOOKRUSH_LEGACY__={
+    navigate:(route,query='')=>{if(![...NAV.map(item=>item[0]),'admin','publisher','prototype'].includes(route))return;syncReactFeed();if(route==='search')state.search=query;go(route==='prototype'?'feed':route)},
+    openBook:async(id,query)=>{if(typeof query==='string')state.search=query;syncReactFeed();await openBook(id)},
+    openComments,
+    openShare,
+    openLucky:openLuckyPrompt,
+    openProfile:openUserProfile,
+  };
   render();
 })();

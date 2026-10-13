@@ -37,6 +37,10 @@ const manager = new UserManager({
 
 let refreshInFlight: Promise<User | null> | null = null;
 let activeUser: User | null = null;
+// React StrictMode replays mount effects in development. A callback code is
+// single-use: every caller must await the same exchange, including failures.
+let callbackInFlight: Promise<{ user: User; returnTo: string }> | null = null;
+let silentCallbackInFlight: Promise<void> | null = null;
 
 export type AuthState = { status: 'anonymous' | 'loading' | 'authenticated' | 'error'; user?: User; error?: string };
 
@@ -59,14 +63,19 @@ export const authClient = {
   async login(returnTo: string): Promise<void> {
     await manager.signinRedirect({ state: { returnTo: safeReturnTo(returnTo) } });
   },
-  async callback(): Promise<{ user: User; returnTo: string }> {
-    const user = await manager.signinRedirectCallback();
-    activeUser = user;
-    const state = user.state as { returnTo?: unknown } | undefined;
-    return { user, returnTo: safeReturnTo(state?.returnTo) };
+  callback(): Promise<{ user: User; returnTo: string }> {
+    if (!callbackInFlight) {
+      callbackInFlight = manager.signinRedirectCallback(window.location.href).then(user => {
+        activeUser = user;
+        const state = user.state as { returnTo?: unknown } | undefined;
+        return { user, returnTo: safeReturnTo(state?.returnTo) };
+      });
+    }
+    return callbackInFlight;
   },
-  async silentCallback(): Promise<void> {
-    await manager.signinSilentCallback();
+  silentCallback(): Promise<void> {
+    if (!silentCallbackInFlight) silentCallbackInFlight = manager.signinSilentCallback();
+    return silentCallbackInFlight;
   },
   async logout(): Promise<void> {
     try { await manager.signoutRedirect({ id_token_hint: (await this.currentUser())?.id_token }); } finally { activeUser = null; }

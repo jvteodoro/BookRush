@@ -5,6 +5,16 @@ import { createTelemetry } from './telemetry';
 import { HttpFetcher, Manifest, Publication } from '@readium/shared';
 import { WebPubNavigator } from '@readium/navigator';
 import './styles.css';
+import './styles/design-system.css';
+import { ThemeProvider } from './theme/ThemeProvider';
+import { DesignSystemPreview } from './design-system/DesignSystemPreview';
+import { HomePreview } from './design-system/HomePreview';
+import './styles/reader-shell.css';
+import './styles/reader-refinements.css';
+import './styles/search.css';
+import './styles/recommendations.css';
+import './styles/comments.css';
+import { LiveReader } from './reader/LiveReader';
 
 type ReadiumBridge = {
   mount: (bookId: string, container: HTMLElement, onLocatorChanged?: (progression: number) => void) => Promise<void>;
@@ -119,6 +129,21 @@ async function loadSocialCounts(bookId: string): Promise<{ likes: number; commen
 function App() {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
   const [error, setError] = useState('');
+  const [feedReady, setFeedReady] = useState(false);
+  const [readerTab, setReaderTab] = useState<'feed' | 'library' | 'search' | 'recommendations'>('feed');
+  const [legacyQuery, setLegacyQuery] = useState('');
+  const [legacyVisible, setLegacyVisible] = useState(window.location.pathname.startsWith('/usuarios/'));
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const route = (event as CustomEvent<string>).detail;
+      if (route === 'feed' || route === 'library' || route === 'search' || route === 'recommendations') setReaderTab(route);
+      setLegacyVisible(route !== 'feed' && route !== 'library' && route !== 'search' && route !== 'recommendations');
+    };
+    window.addEventListener('bookrush:legacy-route', handler);
+    const queryHandler = (event: Event) => setLegacyQuery((event as CustomEvent<string>).detail);
+    window.addEventListener('bookrush:legacy-search', queryHandler);
+    return () => { window.removeEventListener('bookrush:legacy-route', handler); window.removeEventListener('bookrush:legacy-search', queryHandler); };
+  }, []);
   useEffect(() => {
     let active = true;
     async function restore() {
@@ -229,6 +254,7 @@ function App() {
             const likes = (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ ?? {};
             likes[id] = counts.liked;
             (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ = likes;
+            window.dispatchEvent(new CustomEvent('bookrush:social-counts', { detail: { id, counts } }));
             return counts;
           },
           profile: async () => {
@@ -333,26 +359,38 @@ function App() {
           },
           viewable: async (id: string) => {
             const item = recommendations.find(candidate => candidate.book?.id === id);
-            if (item?.impressionId) await authClient.fetch(`/api/v1/recommendations/impressions/${item.impressionId}/viewable`, { method: 'POST' });
+            if (item?.impressionId) {
+              const response = await authClient.fetch(`/api/v1/recommendations/impressions/${encodeURIComponent(item.impressionId)}/viewable`, { method: 'POST' });
+              if (!response.ok) throw new Error('Não foi possível registrar a visualização.');
+            }
           },
           trackExcerpt: (eventType: string, bookId: string, excerpt?: FeedExcerpt | null, payload: Record<string, unknown> = {}) => {
             telemetry.track(eventType, bookId, { ...payload, excerptId: excerpt?.id, sourceAssetVersionId: excerpt?.sourceAssetVersionId });
           },
         };
         document.body.dataset.mode = 'web'; document.body.dataset.start = 'feed';
-        if (document.querySelector('script[data-bookrush-pageloop]')) return;
+        if (document.querySelector('script[data-bookrush-pageloop]')) { if (active) setFeedReady(true); return; }
         const style = document.createElement('link'); style.id = 'bookrush-pageloop-style'; style.rel = 'stylesheet'; style.href = '/pageloop.css?v=20261011-public-profile'; document.head.appendChild(style);
         const thumbnailStyle = document.createElement('link'); thumbnailStyle.id = 'bookrush-thumbnail-style'; thumbnailStyle.rel = 'stylesheet'; thumbnailStyle.href = '/thumbnails.css?v=20261006-gutenberg'; document.head.appendChild(thumbnailStyle);
-        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261011-public-profile'; script.async = true; document.body.appendChild(script);
+        const script = document.createElement('script'); script.dataset.bookrushPageloop = 'true'; script.src = '/pageloop.js?v=20261012-design-system-bridge'; script.async = true;
+        script.onload = () => { if (active) setFeedReady(true); };
+        script.onerror = () => { if (active) setError('Não foi possível carregar a navegação. Recarregue a página para tentar novamente.'); };
+        document.body.appendChild(script);
       } catch (cause) { if (active) setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o catálogo.'); }
     }
     void startPrototype();
     return () => { active = false; };
   }, [auth.status]);
   async function login() { setAuth({ status: 'loading' }); try { await authClient.login(window.location.pathname + window.location.search); } catch (cause) { setAuth({ status: 'error', error: cause instanceof Error ? cause.message : 'Não foi possível iniciar o login.' }); } }
-  if (auth.status === 'authenticated') return error ? <main className="landing"><span className="eyebrow">BOOKRUSH</span><h1>Não conseguimos abrir seu feed.</h1><p>{error}</p><button className="primary-button" onClick={() => window.location.reload()}>Tentar novamente</button></main> : <div id="app" />;
+  if (auth.status === 'authenticated') return error ? <main className="landing"><span className="eyebrow">BOOKRUSH</span><h1>Não conseguimos abrir seu feed.</h1><p>{error}</p><button className="primary-button" onClick={() => window.location.reload()}>Tentar novamente</button></main> : <>
+    <div id="app" hidden={!legacyVisible} />
+    {!feedReady && <div className="splash"><p>Preparando seu feed…</p></div>}
+    {feedReady && <div hidden={legacyVisible}><LiveReader visible={!legacyVisible} initialTab={readerTab} legacyQuery={legacyQuery} userName={String(auth.user?.profile.name ?? auth.user?.profile.preferred_username ?? 'Leitor')} onLegacy={() => setLegacyVisible(true)} /></div>}
+  </>;
   if (auth.status === 'loading') return <div className="splash"><div className="brand-mark">B</div><p>Preparando seu feed…</p></div>;
   return <main className="landing"><div className="landing-art"><span className="brand-mark large">B</span><div className="floating-word">READ<br /><em>MORE</em></div></div><span className="eyebrow">UM UNIVERSO DE HISTÓRIAS</span><h1>Seu próximo<br /><em>capítulo</em> começa aqui.</h1><p>Descubra trechos, livros e leitores que combinam com você.</p>{auth.status === 'error' && <div className="notice error">{auth.error}</div>}<button className="primary-button" onClick={() => void login()}>Entrar com Keycloak <span>→</span></button><a className="register-link" href={authClient.registrationUrl()}>Ainda não tem conta? <strong>Cadastre-se</strong></a><small>Login seguro · Seus dados ficam protegidos</small></main>;
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
+createRoot(document.getElementById('root')!).render(
+  <StrictMode><ThemeProvider>{import.meta.env.DEV && window.location.pathname === '/design-system' ? <DesignSystemPreview /> : import.meta.env.DEV && window.location.pathname === '/home-preview' ? <HomePreview /> : <App />}</ThemeProvider></StrictMode>,
+);

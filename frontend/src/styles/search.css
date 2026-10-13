@@ -1,0 +1,26 @@
+.br-search-field { display: flex; align-items: center; gap: .75rem; max-width: 650px; padding: .75rem 1rem; background: var(--br-surface); border: 2px solid var(--br-outline); border-radius: var(--br-radius-pill); margin: 1.5rem 0 2rem; }
+.br-search-field .br-search-input { border: 0; padding: .25rem; flex: 1; min-width: 0; max-width: none; }
+.br-search-field > button { background: transparent; color: var(--br-content-dim); display: grid; place-items: center; padding: .25rem; }
+.br-search-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; font-size: .85rem; }
+.br-search-summary span { color: var(--br-content-dim); font-size: .75rem; }
+.br-search-results { display: grid; gap: 1rem; }
+.br-search-result { display: grid; grid-template-columns: 100px minmax(0, 1fr) auto; align-items: center; gap: 1.5rem; padding: 1rem; }
+.br-search-result__cover .br-book-card { width: 100%; border: 0; box-shadow: none; }
+.br-search-result__cover .br-book-card__meta { display: none; }
+.br-search-result__cover .br-book-cover { padding: .5rem; }
+.br-search-result__cover .br-book-cover__title { font-size: .65rem; }
+.br-search-result__cover .br-book-cover__edition { font-size: .35rem; }
+.br-search-result__cover .br-book-cover__author { font-size: .5rem; }
+.br-search-result__copy h2 { font-family: var(--br-font-sans); font-size: 1rem; margin: 0; overflow-wrap: anywhere; }
+.br-search-result__copy p { color: var(--br-content-dim); font-size: .75rem; }
+.br-search-result__description { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.br-search-result__actions { display: flex; flex-direction: column; gap: .75rem; }
+.br-search-result__actions .br-button[aria-pressed='true'] svg { fill: currentColor; animation: br-save-pop 280ms ease-out; }
+@keyframes br-save-pop { 0% { transform: scale(.9); } 55% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .br-search-result__actions .br-button[aria-pressed='true'] svg { animation: none; } }
+.br-search-pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 2rem 0; font-size: .8rem; }
+@media (max-width: 767px) {
+  .br-search-result { grid-template-columns: 80px minmax(0, 1fr); gap: 1rem; }
+  .br-search-result__actions { grid-column: 1 / -1; flex-direction: row; }
+  .br-search-result__actions .br-button { flex: 1; }
+}
