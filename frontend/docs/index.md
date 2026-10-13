@@ -3,13 +3,29 @@
 O cliente web do BookRush é uma SPA React responsiva. Após autenticar, Para você
 usa o novo shell React e o design system BookRush com livros, trechos, curtidas,
 biblioteca e impressões reais. Biblioteca também usa o novo shell, com Salvos,
-Em leitura e Recentes. As outras telas continuam no PageLoop durante
-a migração, preservando leitor, recomendações, busca, biblioteca, perfil,
+Em leitura e Recentes. Buscar consulta o catálogo no mesmo shell React.
+As outras telas continuam no PageLoop durante
+a migração, preservando leitor, recomendações, perfil,
 privacidade, planta, administração e publicador.
 
 ## Capacidades atuais
 
-Enquanto Buscar permanece no PageLoop, seu botão Salvar chama a mesma API
+Buscar agora usa `reader/SearchPage.tsx` no novo shell React, com resultados,
+paginação, capas, salvamento e abertura no leitor. A consulta tem debounce de
+300ms e descarta respostas de buscas canceladas. Salvamento compartilha o estado
+com Para você e Biblioteca e aguarda confirmação HTTP.
+
+O endpoint publicado com `q` retorna 401 mesmo sem Bearer; nesta etapa,
+`reader/search.ts` carrega todas as páginas do catálogo público sem filtro
+e pesquisa títulos e descrições em memória, sem acentos ou distinção de caixa.
+O catálogo é reutilizado nesta sessão, com até quatro páginas simultâneas;
+falhas podem ser tentadas novamente. Não há filtro por autor separado, pois
+o contrato público de metadados não retorna nomes de autores. O ajuste da
+consulta filtrada no backend fica pendente para uma etapa própria.
+`tests/catalog-search.test.mjs` cobre busca, paginação, cache e recuperação;
+o teste via proxy local é habilitado por `BOOKRUSH_TEST_SEARCH_LIVE=1`.
+
+O botão Salvar de Buscar chama a mesma API
 persistente da biblioteca e só altera o estado visual após confirmação HTTP.
 Requisições duplicadas ficam bloqueadas; falhas mantêm o estado anterior e
 exibem erro. A regressão está em `tests/search-save.test.mjs`.
@@ -141,7 +157,7 @@ trechos reais selecionados pelo recommendation-service.
 Confira `/home-preview` nos dois temas e em larguras de 375px e 1280px:
 sidebar recolhível no desktop, barra inferior no mobile, rolagem das fileiras,
 filtros, busca, detalhes e biblioteca. A rota normal `/` abre o novo feed
-autenticado com dados reais; feed e Biblioteca usam React, e as demais telas
+autenticado com dados reais; feed, Biblioteca e Buscar usam React, e as demais telas
 continuam no shell PageLoop.
 A prévia não persiste dados demonstrativos nem envia telemetria.
 

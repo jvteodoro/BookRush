@@ -40,6 +40,12 @@
   transition: transform 75ms, box-shadow 75ms;
 }
 .br-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; box-shadow: var(--br-shadow); }
+.br-button { transition: transform 160ms ease, box-shadow 160ms ease, background-color 180ms, color 180ms; }
+.br-button svg { transition: transform 180ms ease, fill 180ms; }
+@media (hover: hover) {
+  .br-button:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 4px 6px 0 var(--br-outline); }
+  .br-button:hover:not(:disabled) svg { transform: scale(1.08); }
+}
 .br-button--primary { background: var(--br-red); color: white; }
 .br-button--secondary { background: var(--br-gold); color: var(--br-ink); }
 .br-button--ghost { background: transparent; color: var(--br-content); }
@@ -94,5 +100,7 @@
   .br-carousel-control--next:hover:not(:disabled) svg { transform: none; }
   .br-carousel-control--previous:hover:not(:disabled) svg { transform: rotate(180deg); }
   .br-button, .br-chip, .br-progress__fill { transition: none; }
+  .br-button svg { transition: none; }
+  .br-button:hover:not(:disabled), .br-button:hover:not(:disabled) svg { transform: none; }
   .br-button:active:not(:disabled) { transform: none; }
 }

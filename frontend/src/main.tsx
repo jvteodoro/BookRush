@@ -11,6 +11,7 @@ import { DesignSystemPreview } from './design-system/DesignSystemPreview';
 import { HomePreview } from './design-system/HomePreview';
 import './styles/reader-shell.css';
 import './styles/reader-refinements.css';
+import './styles/search.css';
 import { LiveReader } from './reader/LiveReader';
 
 type ReadiumBridge = {
@@ -127,16 +128,19 @@ function App() {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
   const [error, setError] = useState('');
   const [feedReady, setFeedReady] = useState(false);
-  const [readerTab, setReaderTab] = useState<'feed' | 'library'>('feed');
+  const [readerTab, setReaderTab] = useState<'feed' | 'library' | 'search'>('feed');
+  const [legacyQuery, setLegacyQuery] = useState('');
   const [legacyVisible, setLegacyVisible] = useState(window.location.pathname.startsWith('/usuarios/'));
   useEffect(() => {
     const handler = (event: Event) => {
       const route = (event as CustomEvent<string>).detail;
-      if (route === 'feed' || route === 'library') setReaderTab(route);
-      setLegacyVisible(route !== 'feed' && route !== 'library');
+      if (route === 'feed' || route === 'library' || route === 'search') setReaderTab(route);
+      setLegacyVisible(route !== 'feed' && route !== 'library' && route !== 'search');
     };
     window.addEventListener('bookrush:legacy-route', handler);
-    return () => window.removeEventListener('bookrush:legacy-route', handler);
+    const queryHandler = (event: Event) => setLegacyQuery((event as CustomEvent<string>).detail);
+    window.addEventListener('bookrush:legacy-search', queryHandler);
+    return () => { window.removeEventListener('bookrush:legacy-route', handler); window.removeEventListener('bookrush:legacy-search', queryHandler); };
   }, []);
   useEffect(() => {
     let active = true;
@@ -378,7 +382,7 @@ function App() {
   if (auth.status === 'authenticated') return error ? <main className="landing"><span className="eyebrow">BOOKRUSH</span><h1>Não conseguimos abrir seu feed.</h1><p>{error}</p><button className="primary-button" onClick={() => window.location.reload()}>Tentar novamente</button></main> : <>
     <div id="app" hidden={!legacyVisible} />
     {!feedReady && <div className="splash"><p>Preparando seu feed…</p></div>}
-    {feedReady && <div hidden={legacyVisible}><LiveReader visible={!legacyVisible} initialTab={readerTab} userName={String(auth.user?.profile.name ?? auth.user?.profile.preferred_username ?? 'Leitor')} onLegacy={() => setLegacyVisible(true)} /></div>}
+    {feedReady && <div hidden={legacyVisible}><LiveReader visible={!legacyVisible} initialTab={readerTab} legacyQuery={legacyQuery} userName={String(auth.user?.profile.name ?? auth.user?.profile.preferred_username ?? 'Leitor')} onLegacy={() => setLegacyVisible(true)} /></div>}
   </>;
   if (auth.status === 'loading') return <div className="splash"><div className="brand-mark">B</div><p>Preparando seu feed…</p></div>;
   return <main className="landing"><div className="landing-art"><span className="brand-mark large">B</span><div className="floating-word">READ<br /><em>MORE</em></div></div><span className="eyebrow">UM UNIVERSO DE HISTÓRIAS</span><h1>Seu próximo<br /><em>capítulo</em> começa aqui.</h1><p>Descubra trechos, livros e leitores que combinam com você.</p>{auth.status === 'error' && <div className="notice error">{auth.error}</div>}<button className="primary-button" onClick={() => void login()}>Entrar com Keycloak <span>→</span></button><a className="register-link" href={authClient.registrationUrl()}>Ainda não tem conta? <strong>Cadastre-se</strong></a><small>Login seguro · Seus dados ficam protegidos</small></main>;

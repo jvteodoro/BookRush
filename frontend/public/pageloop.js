@@ -82,6 +82,7 @@
     ${mode==='web'&&state.route!=='reader'?`<div class="prototype-switcher"><a class="prototype-pill" href="${state.route==='admin'?'admin.html':state.route==='publisher'?'publisher.html':'app.html'}">${state.route==='admin'||state.route==='publisher'?'BookRush':'BookRush Mobile'}</a></div>`:''}`;
     bindCommon();
     window.dispatchEvent(new CustomEvent('bookrush:legacy-route', {detail:state.route}));
+    if(state.route==='search')window.dispatchEvent(new CustomEvent('bookrush:legacy-search', {detail:state.search}));
   }
 
   function mobileNav(){
@@ -519,7 +520,7 @@
   function syncReactFeed(){state.saved=Object.fromEntries(Array.from(window.__BOOKRUSH_API__?.saved||[]).map(id=>[id,true]));state.likes={...(window.__BOOKRUSH_LIKES__||{})};}
   window.__BOOKRUSH_LEGACY__={
     navigate:(route,query='')=>{if(![...NAV.map(item=>item[0]),'admin','publisher','prototype'].includes(route))return;syncReactFeed();if(route==='search')state.search=query;go(route==='prototype'?'feed':route)},
-    openBook:async id=>{syncReactFeed();await openBook(id)},
+    openBook:async(id,query)=>{if(typeof query==='string')state.search=query;syncReactFeed();await openBook(id)},
     openComments,
     openShare,
   };
