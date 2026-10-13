@@ -30,6 +30,33 @@ if (!(adminWebJob.getDefinition() instanceof CpsFlowDefinition) || adminWebJob.g
 }
 def microservicePipelineFile = new File('/opt/bookrush/microservice.Jenkinsfile')
 def verticalPipelineFile = new File('/opt/bookrush/vertical.Jenkinsfile')
+def replaceParameters = { WorkflowJob pipelineJob, List definitions ->
+    pipelineJob.removeProperty(ParametersDefinitionProperty.class)
+    pipelineJob.addProperty(new ParametersDefinitionProperty(definitions))
+    pipelineJob.save()
+}
+def microserviceParameters = [
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a validar.'),
+    new StringParameterDefinition('SERVICE', '', 'Microserviço. Em jobs nomeados, o sufixo do job é usado quando vazio.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git opcional para repositório privado.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
+    new BooleanParameterDefinition('PUBLISH', false, 'Publicar a imagem validada.'),
+    new ChoiceParameterDefinition('DEPLOY_TARGET', ['none', 'compose', 'kubernetes'] as String[], 'Destino do deploy; none apenas valida.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Implantar a imagem validada no destino escolhido.'),
+    new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Credential Jenkins do tipo Secret file para Kubernetes.')
+]
+def verticalParameters = [
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a validar.'),
+    new StringParameterDefinition('VERTICAL', '', 'Vertical. Em jobs nomeados, o sufixo do job é usado quando vazio.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git opcional para repositório privado.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Obrigatório para publicar ou Kubernetes.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
+    new BooleanParameterDefinition('PUBLISH', false, 'Publicar todas as imagens validadas da vertical.'),
+    new ChoiceParameterDefinition('DEPLOY_TARGET', ['none', 'compose', 'kubernetes'] as String[], 'Destino do deploy; none apenas valida.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Implantar todas as imagens validadas da vertical.'),
+    new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Credential Jenkins do tipo Secret file para Kubernetes.')
+]
 def createOrUpdatePipeline = { String name, File file ->
     def pipelineJob = instance.getItem(name)
     if (pipelineJob == null) {
@@ -40,6 +67,7 @@ def createOrUpdatePipeline = { String name, File file ->
         pipelineJob.setDefinition(new CpsFlowDefinition(script, true))
         pipelineJob.save()
     }
+    replaceParameters(pipelineJob, file == microservicePipelineFile ? microserviceParameters : verticalParameters)
 }
 [
     'admin-service', 'behavior-service', 'book-content-service',

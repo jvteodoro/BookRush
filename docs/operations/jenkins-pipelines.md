@@ -49,7 +49,10 @@ Compose. O Dockerfile do catálogo copia o fixture para a imagem de testes, em
 vez de usar bind mount; isso funciona também quando o Jenkins usa um daemon
 Docker fora do container do agente.
 
-As pipelines isoladas aceitam `PUBLISH`, `DEPLOY` e `DEPLOY_TARGET`. Compose
+As pipelines isoladas aceitam `PUBLISH`, `DEPLOY` e `DEPLOY_TARGET`. O bootstrap
+do Jenkins reconcilia esses parâmetros também nos jobs já existentes; portanto,
+após atualizar a imagem do Jenkins, os controles de deploy aparecem sem recriar
+o job nem perder histórico ou credenciais. Compose
 usa a imagem construída localmente e recria somente o serviço selecionado; o
 deploy Kubernetes exige `PUBLISH=true`, `REGISTRY` e `KUBECONFIG_CREDENTIAL_ID`.
 Uma pipeline vertical publica e implanta todos os serviços da sua matriz. O
