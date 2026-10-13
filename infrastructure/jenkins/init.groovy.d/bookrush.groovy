@@ -28,6 +28,25 @@ if (!(adminWebJob.getDefinition() instanceof CpsFlowDefinition) || adminWebJob.g
     adminWebJob.setDefinition(new CpsFlowDefinition(adminWebScript, true))
     adminWebJob.save()
 }
+def seaweedfsPipelineFile = new File('/opt/bookrush/seaweedfs.Jenkinsfile')
+def seaweedfsJob = instance.getItem('bookrush-seaweedfs')
+if (seaweedfsJob == null) {
+    seaweedfsJob = instance.createProject(WorkflowJob, 'bookrush-seaweedfs')
+}
+def seaweedfsScript = seaweedfsPipelineFile.text
+if (!(seaweedfsJob.getDefinition() instanceof CpsFlowDefinition) || seaweedfsJob.getDefinition().getScript() != seaweedfsScript) {
+    seaweedfsJob.setDefinition(new CpsFlowDefinition(seaweedfsScript, true))
+}
+seaweedfsJob.removeProperty(ParametersDefinitionProperty.class)
+seaweedfsJob.addProperty(new ParametersDefinitionProperty([
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a validar.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git opcional para repositório privado.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
+    new BooleanParameterDefinition('PUBLISH', false, 'Publicar a imagem validada.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Implantar SeaweedFS e seu proxy OIDC no Compose.')
+]))
+seaweedfsJob.save()
 def microservicePipelineFile = new File('/opt/bookrush/microservice.Jenkinsfile')
 def verticalPipelineFile = new File('/opt/bookrush/vertical.Jenkinsfile')
 def replaceParameters = { WorkflowJob pipelineJob, List definitions ->

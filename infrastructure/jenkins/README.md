@@ -121,6 +121,22 @@ deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+### Pipeline dedicada do SeaweedFS
+
+O bootstrap cria o job `bookrush-seaweedfs` a partir de
+`seaweedfs.Jenkinsfile`. A execução normal apenas valida a infraestrutura,
+executa `scripts/test-storage.sh` e constrói a imagem customizada. Use
+`PUBLISH=true` com `REGISTRY` para publicar a imagem; use `DEPLOY=true` para
+recriar somente SeaweedFS, o proxy OIDC e o reverse-proxy no Compose de
+produção. O deploy exige que o container atual esteja saudável e possui
+rollback automático para a imagem anterior. O volume persistente não é
+removido.
+
+O Compose aceita `SEAWEEDFS_IMAGE` para que a pipeline injete a imagem
+construída sem alterar o `.env` protegido. O valor padrão continua sendo
+`bookrush/seaweedfs:4.46`. O procedimento, parâmetros e limites estão em
+[`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
+
 ### Importação Gutenberg (opt-in)
 
 O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para
