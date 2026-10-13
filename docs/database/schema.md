@@ -22,6 +22,7 @@ PostgreSQL não armazena livros binários, texto integral ou URLs assinadas.
 | V13 | execução dry-run e ajustes da projeção de capítulos |
 | V14 | assuntos bibliográficos e relação livro–assunto |
 | V15 | índices para busca por título, autor, assunto e descrição |
+| V16 | extensão `pg_trgm` e índices GIN textual/trigram para busca paginada |
 
 ## ER completo
 

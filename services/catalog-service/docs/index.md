@@ -6,6 +6,9 @@ Leia [arquitetura](architecture/overview.md), [desenvolvimento](development/loca
 
 Documentação transversal detalhada: [handbook](https://github.com/jvteodoro/BookRush/tree/main/docs).
 
-A busca pública aceita título, título original, descrição, autor e subject. A migration V15 cria índices de lookup; os resultados continuam sob ownership do catálogo.
+A busca pública aceita título, título original, descrição, autor e subject. A
+API executa a busca no PostgreSQL com paginação, ranking textual e fallback de
+correspondência parcial; o frontend não baixa o catálogo inteiro para filtrar
+no navegador. A migration V16 adiciona os índices GIN/trigram necessários.
 
 Reader clients use `/api/v1/books/{bookId}/reader-assets` to list active assets and request a non-cacheable, temporary download URL for approved content.
