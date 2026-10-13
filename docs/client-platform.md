@@ -6,6 +6,11 @@ O cliente web em `frontend/` e o aplicativo React Native em `mobile/` são as in
 
 O Vite gera uma SPA responsiva servida pelo Nginx. O login usa `bookrush-web` no realm `bookrush`, Authorization Code + PKCE e tokens somente em memória. Após autenticar, a aplicação consulta `GET /api/v1/books`, oferece busca, detalhes e uma estante local do dispositivo. O backend continua responsável por autorização e pode retornar 401/403 sem que o cliente tente contornar a política.
 
+No build Docker, a autoridade OIDC vem de `KEYCLOAK_PUBLIC_URL` e o Nginx do
+frontend encaminha `/api/v1/profile` diretamente ao `reader-profile-service`.
+Isso mantém login e preferências funcionais também no endereço local
+`http://localhost:18080`, sem depender dos domínios de produção.
+
 Validação local:
 
 ```bash
