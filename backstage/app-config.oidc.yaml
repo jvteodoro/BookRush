@@ -1,5 +1,9 @@
 auth:
   environment: production
+  # O domínio canônico é docs-bookrush; o alias sem "s" permanece permitido
+  # durante a migração para evitar NotAllowedError em sessões antigas.
+  experimentalExtraAllowedOrigins:
+    - https://doc-bookrush.jteodoro.tec.br
   session:
     secret: ${AUTH_SESSION_SECRET}
   providers:
