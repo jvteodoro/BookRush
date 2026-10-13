@@ -81,6 +81,12 @@ Esse gate exige documentação ou contrato para mudanças de código, infraestru
 e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
 executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
 
+O gate roda em um container Python efêmero. Como o agente Jenkins usa o socket
+Docker e o workspace está no volume nomeado `jenkins_home`, a etapa usa
+`--volumes-from "$HOSTNAME"` para compartilhar o workspace com o container do
+gate, mantendo a chamada `bash scripts/validate-change.sh --ci`. Não use `-v "$PWD:/repo"` nesse agente: esse caminho é resolvido pelo
+daemon Docker no host e resulta em um diretório vazio dentro do gate.
+
 ### Pipeline dedicada do Backstage
 
 `backstage.Jenkinsfile` valida e empacota somente o Developer Portal. Cadastre
