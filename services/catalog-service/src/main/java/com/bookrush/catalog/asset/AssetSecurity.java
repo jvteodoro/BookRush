@@ -18,6 +18,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -26,6 +27,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.*;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -53,6 +55,15 @@ public class AssetSecurity {
         .cors(Customizer.withDefaults())
         .authorizeHttpRequests(a -> a.anyRequest().permitAll())
         .build();
+  }
+
+  @Bean
+  WebSecurityCustomizer publicThumbnailWebSecurity() {
+    return web ->
+        web.ignoring()
+            .requestMatchers(
+                new AntPathRequestMatcher(
+                    "/api/v1/books/*/thumbnail", HttpMethod.GET.name()));
   }
 
   @Bean
