@@ -34,8 +34,10 @@ paths:
         - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
         '302': {description: Redirecionamento para o objeto público temporário.}
+        '401': {description: "Bearer do usuário ausente, expirado ou inválido."}
         '404': {description: Livro sem thumbnail aprovado.}
         '409': {description: Distribuição ainda não autorizada ou objeto inconsistente.}
+      security: [{productUser: []}]
   /api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/content:
     get:
       tags: [Conteúdo reader]
@@ -828,6 +830,11 @@ components:
           type: string
           format: date-time
   securitySchemes:
+    productUser:
+      type: http
+      description: Bearer JWT do usuário autenticado no realm de produto.
+      scheme: bearer
+      bearerFormat: JWT
     catalogService:
       type: http
       description: Token interno usado pelo book-ingestion-service.

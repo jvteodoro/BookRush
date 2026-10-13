@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Public redirect to a short-lived signed URL for an approved book thumbnail. */
+/** Authenticated redirect to a short-lived signed URL for an approved thumbnail. */
 @RestController
 @ConditionalOnProperty(name = "storage.enabled", havingValue = "true")
 public class ThumbnailController {

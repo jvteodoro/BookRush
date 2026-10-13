@@ -107,6 +107,11 @@ export const authClient = {
     // permanece em memória; a renovação só remove a sessão quando o IdP falha.
     return response;
   },
+  async imageUrl(input: string): Promise<string | undefined> {
+    const response = await this.fetch(input, { cache: 'no-store' });
+    if (!response.ok) return undefined;
+    return URL.createObjectURL(await response.blob());
+  },
 };
 
 export { safeReturnTo };

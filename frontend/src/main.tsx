@@ -180,13 +180,13 @@ function App() {
         const ordered = recommendations.map(item => item.book).filter((book): book is CatalogBook => Boolean(book && byId.has(book.id)));
         const source = ordered.length ? ordered : catalog;
         const palettes = [['#82d4a4', '#213e35'], ['#74b9ff', '#202b52'], ['#f0a8bd', '#5a2337'], ['#c7d87a', '#26311f'], ['#d2aa6d', '#4a2e1f']];
-        const books: PageLoopBook[] = source.map((book, index) => {
+        const books: PageLoopBook[] = await Promise.all(source.map(async (book, index) => {
           const recommendation = recommendations.find(item => item.book?.id === book.id);
           return {
-          id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: recommendation?.excerpt?.text?.trim() || book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, excerpt: recommendation?.excerpt ?? null, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0, thumbnailUrl: book.thumbnailUrl,
+          id: book.id, title: book.canonicalTitle, author: 'Catálogo BookRush', genre: book.originalLanguage?.toUpperCase() ?? 'Clássico', keywords: [], match: Math.max(70, 96 - index * 2), a: palettes[index % palettes.length][0], b: palettes[index % palettes.length][1], quote: recommendation?.excerpt?.text?.trim() || book.description || `Descubra ${book.canonicalTitle} no catálogo BookRush.`, excerpt: recommendation?.excerpt ?? null, likes: 0, comments: 0, shares: 0, pages: 0, progress: 0, thumbnailUrl: book.thumbnailUrl ? await authClient.imageUrl(book.thumbnailUrl) : undefined,
           recommendationRequestId: recommendation?.recommendationRequestId, impressionId: recommendation?.impressionId, modelVersion: recommendation?.modelVersion, rank: recommendation?.rank,
         };
-        });
+        }));
         const socialCounts = await Promise.all(books.map(book => loadSocialCounts(book.id).catch(() => ({ likes: 0, comments: 0, liked: false }))));
         books.forEach((book, index) => Object.assign(book, socialCounts[index]));
         (window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }).__BOOKRUSH_LIKES__ = Object.fromEntries(books.map((book, index) => [book.id, socialCounts[index].liked]));

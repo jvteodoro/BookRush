@@ -149,6 +149,11 @@ Jenkins são preservados.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
 perfil e social para as imagens criadas pela construção atual.
+Quando a thumbnail é protegida, a imagem do catálogo precisa ser atualizada
+junto com o frontend. O Compose configura `CATALOG_PRODUCT_OIDC_ISSUER`,
+`CATALOG_PRODUCT_OIDC_JWK_SET_URI` e `CATALOG_PRODUCT_OIDC_AUDIENCE` para que
+o `catalog-service` valide o bearer do realm de produto; a pipeline deve
+publicar/deployar `catalog-service` e `frontend` da mesma revisão.
 O `.env` deve definir `BOOKRUSH_REPO_ROOT` com o caminho absoluto do checkout
 visível ao daemon Docker; ele é usado para montar o realm do Keycloak e o
 arquivo dinâmico do Traefik quando o Compose é executado de dentro do Jenkins.

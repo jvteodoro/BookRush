@@ -14,14 +14,11 @@ administrativa de assets). Operações de alteração continuam exigindo
 `bookrush.assets.write`; portanto, o cliente de documentação pode consultar
 assets sem receber permissão de escrita.
 
-O endpoint `GET /api/v1/books/{bookId}/thumbnail` é público: ele somente
-redireciona para uma URL temporária assinada de um thumbnail aprovado. O bearer
-do usuário não é necessário para carregar imagens da biblioteca.
-
-A rota é explicitamente excluída do firewall web do Spring Security para que
-nenhuma cadeia de autenticação ou sessão possa interceptar o redirecionamento
-público. Se ela retornar `401`, a imagem do `catalog-service` em execução não
-contém esta configuração ou a resposta não veio do catálogo.
+O endpoint `GET /api/v1/books/{bookId}/thumbnail` exige o bearer do usuário do
+realm de produto `bookrush`. Ele redireciona para uma URL temporária assinada
+de um thumbnail aprovado. O frontend deve buscar a imagem com `Authorization`
+e usar uma URL de `Blob`; uma tag `<img src="...">` não envia bearer
+automaticamente.
 
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 
@@ -47,8 +44,9 @@ continuam sujeitos às rotas de distribuição e às políticas de direitos.
 
 `GET /api/v1/books/{bookId}/thumbnail` procura o asset `THUMBNAIL` com papel
 `COVER` em estado `ACTIVE` e responde com um redirecionamento para uma URL S3
-temporária. A listagem de livros retorna `thumbnailUrl` apontando para essa
-rota; clientes devem tratar `404` como ausência de capa e manter seu placeholder.
+temporária. O serviço valida issuer e audience do token do realm de produto;
+ausência ou rejeição do bearer retorna `401`, e ausência de capa retorna `404`.
+A listagem de livros retorna `thumbnailUrl` apontando para essa rota.
 ## Reader chapters
 
 `GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted

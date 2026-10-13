@@ -258,10 +258,13 @@ O feed usa `GET /api/v1/reader/feed` e registra viewability em
 `POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
 livro.
 As respostas do catálogo incluem `thumbnailUrl` quando a edição possui uma
-thumbnail Gutenberg aprovada. O shell aplica essa URL nas capas do feed,
-recomendações, busca, biblioteca e sorteio; se a rota retornar `404`, o
-gradiente gerado permanece como fallback. A URL é temporária e nunca é salva
-no navegador.
+thumbnail Gutenberg aprovada. A rota exige o bearer do usuário do realm de
+produto; o frontend busca cada imagem com `authClient.fetch`, cria uma URL de
+`Blob` apenas em memória; os componentes revogam suas URLs ao desmontar. Isso evita
+enviar uma URL protegida diretamente em `<img src>` sem credenciais. O shell
+aplica as imagens autenticadas nas capas do feed, recomendações, busca,
+biblioteca e sorteio; se a rota retornar `404`, o gradiente gerado permanece
+como fallback.
 Curtidas, comentários, compartilhamentos, progresso e bookmarks usam os
 endpoints dos bounded contexts `social` e `reader-state`; falhas são exibidas
 ao usuário e não são mascaradas como sucesso local.

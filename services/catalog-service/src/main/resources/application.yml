@@ -92,5 +92,10 @@ catalog:
       audience: ${CATALOG_OIDC_AUDIENCE:bookrush-catalog-admin}
       legacy-static-enabled: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:false}
       reader-internal-token: ${CATALOG_READER_INTERNAL_TOKEN:${CANONICAL_SERVICE_TOKEN:}}
+    product-oidc:
+      enabled: ${CATALOG_PRODUCT_OIDC_ENABLED:true}
+      issuer: ${CATALOG_PRODUCT_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      jwk-set-uri: ${CATALOG_PRODUCT_OIDC_JWK_SET_URI:http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      audience: ${CATALOG_PRODUCT_OIDC_AUDIENCE:account}
     cors:
       allowed-origins: ${CATALOG_CORS_ALLOWED_ORIGINS:https://docs-bookrush.jteodoro.tec.br,https://doc-bookrush.jteodoro.tec.br}

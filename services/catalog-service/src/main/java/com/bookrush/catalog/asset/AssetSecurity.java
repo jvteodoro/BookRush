@@ -18,12 +18,17 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.*;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
@@ -38,6 +43,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @EnableConfigurationProperties({
   CanonicalServiceProperties.class,
   CatalogOidcProperties.class,
+  CatalogProductOidcProperties.class,
   CatalogCorsProperties.class
 })
 public class AssetSecurity {
@@ -48,22 +54,35 @@ public class AssetSecurity {
 
   @Bean
   @Order(0)
-  SecurityFilterChain publicThumbnailSecurity(HttpSecurity http) throws Exception {
+  SecurityFilterChain productThumbnailSecurity(
+      HttpSecurity http, CatalogProductOidcProperties productOidc) throws Exception {
     return http
-        .securityMatcher("/api/v1/books/*/thumbnail")
+        .securityMatcher(
+            new AntPathRequestMatcher("/api/v1/books/*/thumbnail", HttpMethod.GET.name()))
         .csrf(c -> c.disable())
         .cors(Customizer.withDefaults())
-        .authorizeHttpRequests(a -> a.anyRequest().permitAll())
+        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .authorizeHttpRequests(a -> a.anyRequest().authenticated())
+        .oauth2ResourceServer(
+            oauth -> oauth.jwt(jwt -> jwt.decoder(productJwtDecoder(productOidc))))
         .build();
   }
 
   @Bean
-  WebSecurityCustomizer publicThumbnailWebSecurity() {
-    return web ->
-        web.ignoring()
-            .requestMatchers(
-                new AntPathRequestMatcher(
-                    "/api/v1/books/*/thumbnail", HttpMethod.GET.name()));
+  JwtDecoder productJwtDecoder(CatalogProductOidcProperties productOidc) {
+    if (!productOidc.enabled() || productOidc.jwkSetUri().isBlank()) {
+      throw new IllegalStateException("Product OIDC must be configured for protected thumbnails");
+    }
+    var decoder = org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withJwkSetUri(productOidc.jwkSetUri()).build();
+    OAuth2TokenValidator<Jwt> issuer = JwtValidators.createDefaultWithIssuer(productOidc.issuer());
+    OAuth2TokenValidator<Jwt> audience =
+        token ->
+            token.getAudience().contains(productOidc.audience())
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(
+                    new OAuth2Error("invalid_token", "product audience mismatch", null));
+    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuer, audience));
+    return decoder;
   }
 
   @Bean
@@ -149,10 +168,12 @@ public class AssetSecurity {
                         "SCOPE_bookrush.catalog.write",
                         "SCOPE_bookrush.catalog.read")
                     .requestMatchers(
+                        HttpMethod.GET, "/api/v1/books/*/thumbnail")
+                    .hasAnyAuthority("SCOPE_bookrush.catalog.read", "ROLE_CATALOG_SERVICE")
+                    .requestMatchers(
                         HttpMethod.GET,
                         "/api/v1/books",
                         "/api/v1/books/**",
-                        "/api/v1/books/*/thumbnail",
                         "/api",
                         "/api/",
                         "/api/status",
