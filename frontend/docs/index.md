@@ -2,11 +2,39 @@
 
 O cliente web do BookRush é uma SPA React responsiva. Após autenticar, Para você
 usa o novo shell React e o design system BookRush com livros, trechos, curtidas,
-biblioteca e impressões reais. As outras telas continuam no PageLoop durante
+biblioteca e impressões reais. Biblioteca também usa o novo shell, com Salvos,
+Em leitura e Recentes. As outras telas continuam no PageLoop durante
 a migração, preservando leitor, recomendações, busca, biblioteca, perfil,
 privacidade, planta, administração e publicador.
 
 ## Capacidades atuais
+
+Enquanto Buscar permanece no PageLoop, seu botão Salvar chama a mesma API
+persistente da biblioteca e só altera o estado visual após confirmação HTTP.
+Requisições duplicadas ficam bloqueadas; falhas mantêm o estado anterior e
+exibem erro. A regressão está em `tests/search-save.test.mjs`.
+
+A Biblioteca (`reader/LibraryPage.tsx`) consulta a estante e os recentes reais,
+resolve os metadados pelo ID de cada livro e busca progresso no reader-state.
+Metadados do catálogo usam GET público sem Bearer, pois o catálogo valida o
+realm de plataforma; biblioteca, recentes e progresso usam o token do leitor.
+Ela não limita a estante aos livros do feed.
+Ao retornar de uma tela PageLoop, a Biblioteca recarrega o snapshot completo,
+mesmo se o componente continuou montado enquanto estava oculto. Consultas
+anteriores são canceladas ao ocultar a página; a atualização do feed não
+sobrescreve a consulta da estante enquanto Biblioteca está ativa.
+Requisições de metadados têm
+concorrência limitada a seis livros. Livros indisponíveis continuam visíveis
+para remoção; erros de progresso/recentes são informados sem esconder a estante.
+Capas indisponíveis usam o fallback visual do design system.
+
+Salvos permite remover itens após confirmação HTTP; Em leitura mostra progresso
+entre 0 e 100%; Recentes respeita a ordem retornada pela API. Abrir um livro
+fora do feed registra seus metadados no bridge do leitor antes de delegar ao
+Readium. Para testar, salve no feed, visite Biblioteca, abra um livro, volte à
+Biblioteca pelo leitor e remova o item. Refaça o login para verificar persistência.
+Execute `node --test frontend/tests/*.test.mjs` para os testes do callback e
+da carga da biblioteca (sem chamadas reais às APIs).
 
 O componente `src/reader/LiveReader.tsx` adapta o runtime autenticado ao
 `ExcerptFeed` compartilhado com a prévia. Não injeta dados demonstrativos no
@@ -113,7 +141,8 @@ trechos reais selecionados pelo recommendation-service.
 Confira `/home-preview` nos dois temas e em larguras de 375px e 1280px:
 sidebar recolhível no desktop, barra inferior no mobile, rolagem das fileiras,
 filtros, busca, detalhes e biblioteca. A rota normal `/` abre o novo feed
-autenticado com dados reais; as demais telas continuam no shell PageLoop.
+autenticado com dados reais; feed e Biblioteca usam React, e as demais telas
+continuam no shell PageLoop.
 A prévia não persiste dados demonstrativos nem envia telemetria.
 
 As logos PNG são as artes do ZIP de referência; as fontes são carregadas do

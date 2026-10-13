@@ -305,6 +305,7 @@
     document.querySelector('[data-modal-open]').onclick=()=>{document.querySelector('.modal-wrap')?.remove();openBook(b.id)};
   }
 
+  const pendingSearchSaves=new Set();
   function renderSearch(){
     const filters=['Todos','Título','Autor','Palavra-chave'];
     const q=state.search.trim().toLowerCase();
@@ -321,7 +322,17 @@
     const inp=document.getElementById('searchInput'); inp.oninput=e=>{state.search=e.target.value;renderSearch();const i=document.getElementById('searchInput');i.focus();i.setSelectionRange(i.value.length,i.value.length)};
     document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.searchFilter=b.dataset.filter;renderSearch()});
     document.querySelectorAll('[data-open-book]').forEach(b=>b.onclick=()=>openBook(b.dataset.openBook));
-    document.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{state.saved[b.dataset.save]=!state.saved[b.dataset.save];save();renderSearch()});
+    document.querySelectorAll('[data-save]').forEach(b=>{
+      const id=b.dataset.save;b.disabled=pendingSearchSaves.has(id);
+      b.onclick=async()=>{
+        if(pendingSearchSaves.has(id))return;
+        const enabled=!state.saved[id];pendingSearchSaves.add(id);b.disabled=true;
+        let message='';
+        try{await window.__BOOKRUSH_API__.save(id,enabled);state.saved[id]=enabled;save();}
+        catch(e){message=e.message||'Não foi possível atualizar sua biblioteca.';}
+        finally{pendingSearchSaves.delete(id);if(state.route==='search')renderSearch();if(message)toast(message);}
+      };
+    });
   }
 
   async function openBook(id){const item=book(id);if(item?.excerpt)window.__BOOKRUSH_API__?.trackExcerpt?.('BOOK_OPEN_FROM_EXCERPT',id,item.excerpt);state.readerBook=id;state.route='reader'; try{await window.__BOOKRUSH_API__?.viewable?.(id);await window.__BOOKRUSH_API__?.open?.(id);window.__BOOKRUSH_CHAPTERS__=await window.__BOOKRUSH_API__?.chapters?.(id)||[]}catch(e){toast(e.message||'Não foi possível registrar a abertura')} state.recent=[id,...(state.recent||[]).filter(x=>x!==id)].slice(0,8);render();}
