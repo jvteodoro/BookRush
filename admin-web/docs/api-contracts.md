@@ -45,3 +45,11 @@ deduplicação e parâmetros são imutáveis por versão.
 Quando um serviço ainda não estiver implantado, o portal pode operar em
 `VITE_USE_MOCKS=true`; o modo de produção falha com uma mensagem sanitizada e
 não converte erro de rede em sucesso.
+
+## Review Queue
+
+O painel consulta a fila administrativa do catálogo e solicita uma URL
+pré-assinada somente quando o revisor clica em “Abrir para revisão”. O
+visualizador integrado mostra capas/thumbnails e outras imagens como imagem,
+TXT/JSON em texto formatado e EPUB em leitor paginado. A URL é mantida apenas
+em memória durante a sessão do painel e nunca é persistida.

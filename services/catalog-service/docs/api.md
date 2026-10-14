@@ -83,7 +83,9 @@ ou atualiza o asset, não libera a obra automaticamente.
 
 `GET /api/admin/books/{bookId}/assets/{assetId}/download-url` gera uma URL
 pré-assinada curta para inspeção administrativa do arquivo. O painel abre essa
-URL em uma nova aba; o objeto continua privado e a URL não deve ser persistida.
+URL apenas durante a revisão: imagens são renderizadas diretamente, TXT/JSON
+como texto e EPUB em leitor embutido. O objeto continua privado e a URL não
+deve ser persistida.
 
 `GET /api/admin/books/approval-history?page=0&size=25` lista as decisões de
 aprovação e revogação com livro, ator, horários, transição de status e estado
