@@ -43,6 +43,31 @@ wait_for_healthy() {
   return 1
 }
 
+start_tests_with_runtime_retry() {
+  local attempt output status
+  for attempt in 1 2 3; do
+    set +e
+    output="$("${compose[@]}" start tests 2>&1)"
+    status=$?
+    set -e
+    printf '%s\n' "$output"
+    (( status == 0 )) && return 0
+
+    # Docker/containerd can transiently fail to create the systemd scope while
+    # other disposable containers are being torn down. Retry only this known
+    # runtime error; application/test failures must still fail immediately.
+    if ! grep -Fq 'unable to apply cgroup configuration' <<<"$output" ||
+       ! grep -Fq 'Argument list too long' <<<"$output"; then
+      return "$status"
+    fi
+    if (( attempt < 3 )); then
+      echo "Runtime cgroup indisponível ao iniciar tests; nova tentativa $((attempt + 1))/3." >&2
+      sleep 5
+    fi
+  done
+  return "$status"
+}
+
 "${compose[@]}" up -d --build postgres seaweedfs
 wait_for_healthy postgres 180
 wait_for_healthy seaweedfs 180
@@ -55,7 +80,7 @@ export STORAGE_HOST_ENDPOINT="http://localhost:$STORAGE_TEST_PORT"
 test_container="$("${compose[@]}" ps -aq tests)"
 # docker cp works with Jenkins's host socket; no bind from an inaccessible workspace.
 docker cp "$repo_dir/docs/database/queries.sql" "$test_container:/workspace/documented-queries.sql"
-"${compose[@]}" start tests
+start_tests_with_runtime_retry
 result="$(docker wait "$test_container")"
 docker logs "$test_container"
 test_image="$(docker inspect --format '{{.Config.Image}}' "$test_container")"
