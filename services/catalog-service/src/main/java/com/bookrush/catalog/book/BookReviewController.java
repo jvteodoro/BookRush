@@ -1,6 +1,7 @@
 package com.bookrush.catalog.book;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -57,7 +58,7 @@ public class BookReviewController {
                     rs.getObject("first_publication_year", Short.class),
                     rs.getString("description"),
                     rs.getString("status"),
-                    rs.getObject("updated_at", Instant.class),
+                    toInstant(rs.getObject("updated_at", OffsetDateTime.class)),
                     assets(rs.getObject("id", UUID.class))),
             size,
             offset);
@@ -108,7 +109,11 @@ public class BookReviewController {
                 rs.getString("availability_status"),
                 rs.getString("content_type"),
                 rs.getObject("size_bytes", Long.class)),
-        bookId);
+            bookId);
+  }
+
+  private static Instant toInstant(OffsetDateTime value) {
+    return value == null ? null : value.toInstant();
   }
 
   public record ReviewPage(

@@ -66,6 +66,25 @@ ausência ou rejeição do bearer retorna `401`, e ausência de capa retorna `40
 Uma capa com distribuição aprovada pode ser exibida enquanto o livro estiver
 `REVIEW_REQUIRED`; isso não libera o conteúdo textual nem os downloads do livro.
 A listagem de livros retorna `thumbnailUrl` apontando para essa rota.
+
+## Fila administrativa de revisão
+
+`GET /api/admin/books/review?page=0&size=25` lista livros em
+`REVIEW_REQUIRED`, incluindo o estado do asset e da versão física atual. A
+consulta exige `bookrush.catalog.read` (ou autoridade administrativa
+equivalente); `size` é limitado a 100.
+
+`POST /api/admin/books/{bookId}/approve` muda um livro de `REVIEW_REQUIRED`
+para `ACTIVE` e exige `bookrush.catalog.write` ou `bookrush.assets.write`.
+`POST /api/admin/books/{bookId}/assets/{assetId}/approve` aprova o asset e
+continua exigindo `bookrush.assets.write`. A aprovação do livro e a aprovação
+do thumbnail são deliberadamente separadas: reprocessar um livro apenas cria
+ou atualiza o asset, não libera a obra automaticamente.
+
+Os timestamps PostgreSQL `timestamptz` são convertidos de
+`OffsetDateTime` para `Instant` na resposta JSON; consumidores não devem
+inferir o fuso a partir do texto formatado.
+
 ## Reader chapters
 
 `GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted
