@@ -223,6 +223,11 @@ npm run build
 ```
 
 A configuração OIDC pode ser sobrescrita com `VITE_OIDC_AUTHORITY` e `VITE_OIDC_CLIENT_ID`. O cliente padrão é `bookrush-web`, provisionado em `infrastructure/keycloak/bookrush-realm.json`.
+Além dos scopes básicos (`openid profile email`), o frontend solicita
+`bookrush.catalog.read` para que o bearer emitido pelo Keycloak possa consultar
+o catálogo e as thumbnails protegidas. Tokens emitidos antes dessa alteração
+precisam ser renovados após novo login; um token já emitido não recebe scopes
+retroativamente.
 
 O Vite usa a porta fixa `18080`: abra `http://localhost:18080`, origem permitida
 no client Keycloak versionado. Se a porta estiver ocupada, o Vite informa erro

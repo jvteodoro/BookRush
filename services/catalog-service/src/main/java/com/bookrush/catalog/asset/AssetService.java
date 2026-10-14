@@ -441,6 +441,19 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
   }
 
   public DownloadLink link(UUID book, UUID id, boolean publicRequest) {
+    return link(book, id, publicRequest, true);
+  }
+
+  /**
+   * Creates a public signed link for a thumbnail. Thumbnails are safe to display for books still
+   * awaiting editorial activation, but the asset and its redistribution decision must still be
+   * approved.
+   */
+  public DownloadLink thumbnailLink(UUID book, UUID id) {
+    return link(book, id, true, false);
+  }
+
+  private DownloadLink link(UUID book, UUID id, boolean publicRequest, boolean requireActiveBook) {
     return tx.execute(
         s -> {
           BookAsset a = asset(book, id);
@@ -449,7 +462,7 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
               && (a.getStatus() != BookAssetStatus.ACTIVE
                   || (a.getAssetRole() != BookAssetAssetRole.PUBLIC
                       && a.getAssetRole() != BookAssetAssetRole.COVER)
-                  || em.find(Book.class, book).getStatus() != BookStatus.ACTIVE
+                  || (requireActiveBook && em.find(Book.class, book).getStatus() != BookStatus.ACTIVE)
                   || !distributionAllowed(a))) throw missing();
           var v = latest(id);
           if (storage.head(location(v)).isEmpty())

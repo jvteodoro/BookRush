@@ -44,6 +44,16 @@ Ao encerrar:
 
 ## Desenvolvimento e validação
 
+- Para qualquer tarefa que altere ou implante um serviço, API, frontend,
+  integração Keycloak, storage ou pipeline, leia integralmente o
+  [guia obrigatório de desenvolvimento e validação](docs/operations/service-development-checklist.md)
+  antes de editar arquivos. Use as etapas e o checklist desse guia como parte
+  deste fluxo de agentes, não como documentação opcional.
+- Antes de declarar a tarefa concluída, confirme as evidências exigidas pelo
+  guia no mesmo nível da mudança: contrato/OpenAPI, migration, autorização e
+  CORS, imagem/container, pipeline/deploy e smoke test pelo gateway público.
+  Se alguma etapa não puder ser executada, registre o impedimento no Beads e
+  não apresente a alteração como validada em produção.
 - React/TypeScript: `frontend/`; Java/Spring Boot: `services/catalog-service/`.
 - Execute o build do frontend e os testes Java quando esses componentes mudarem.
   Os Dockerfiles permitem validar sem instalar Node/Maven no host.

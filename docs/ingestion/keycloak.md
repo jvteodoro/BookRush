@@ -70,3 +70,17 @@ docker exec bookrush-keycloak-1 /opt/keycloak/bin/kcadm.sh get users \
 Nenhuma senha real deve ser commitada.
 Em produção, o segredo do administrador e credenciais de cliente devem vir do
 secret manager ou do ambiente protegido do Jenkins.
+
+## Leitura de catálogo pelo cliente web
+
+O cliente público `bookrush-web` usa o realm `bookrush`. As thumbnails protegidas
+exigem a authority `SCOPE_bookrush.catalog.read`; por isso o client scope
+`bookrush.catalog.read` deve existir no realm e estar associado ao cliente web.
+Depois de alterar essa configuração, o usuário precisa renovar a sessão para
+receber um token novo com a claim `bookrush.catalog.read`. Tokens emitidos antes
+da alteração continuam retornando HTTP 403.
+
+A definição do scope fica em `infrastructure/keycloak/bookrush-realm.json`. Em uma
+instalação persistente já existente, execute o reconcile do Keycloak ou associe o
+scope ao cliente `bookrush-web` pelo console administrativo; não altere a regra
+de segurança do catálogo para ignorar a autorização.

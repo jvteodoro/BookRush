@@ -1,5 +1,9 @@
 # Autenticação e autorização BookRush
 
+O checklist operacional que deve ser seguido ao adicionar uma rota, cliente,
+scope ou serviço está em
+[`service-development-checklist.md`](../operations/service-development-checklist.md).
+
 O Keycloak é o provedor central de identidade. O realm `bookrush` é a fronteira
 do produto e `bookrush-platform` é a fronteira de engenharia/administração.
 Provisionamento deve ser incremental e idempotente, sem importar um realm vazio

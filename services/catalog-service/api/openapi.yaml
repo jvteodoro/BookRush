@@ -210,6 +210,82 @@ paths:
           description: Fonte, obra ou proveniência incompatível
       security:
       - catalogService: []
+  /api/admin/books/review:
+    get:
+      tags:
+      - Revisão editorial
+      summary: Listar livros aguardando revisão
+      operationId: listReviewBooks
+      parameters:
+      - name: page
+        in: query
+        schema: {type: integer, format: int32, default: 0}
+      - name: size
+        in: query
+        schema: {type: integer, format: int32, default: 25, maximum: 100}
+      responses:
+        '200':
+          description: Fila paginada de livros e metadata dos assets atuais
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReviewPage'}
+      security:
+      - assetAdmin: []
+  /api/admin/books/approval-history:
+    get:
+      tags:
+      - Revisão editorial
+      summary: Listar histórico de aprovações e revogações
+      operationId: listApprovalHistory
+      parameters:
+      - name: page
+        in: query
+        schema: {type: integer, format: int32, default: 0}
+      - name: size
+        in: query
+        schema: {type: integer, format: int32, default: 25, maximum: 100}
+      responses:
+        '200':
+          description: Decisões editoriais paginadas, com ator e estado atual
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ApprovalHistoryPage'}
+      security:
+      - assetAdmin: []
+  /api/admin/books/{bookId}/approve:
+    post:
+      tags:
+      - Revisão editorial
+      summary: Aprovar livro
+      operationId: approveBook
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '204': {description: Livro aprovado}
+        '404': {description: Livro não encontrado}
+        '409': {description: Livro não está aguardando revisão}
+      security:
+      - assetAdmin: []
+  /api/admin/books/{bookId}/revoke-approval:
+    post:
+      tags:
+      - Revisão editorial
+      summary: Revogar aprovação de livro
+      operationId: revokeBookApproval
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      responses:
+        '204': {description: Aprovação revogada; livro retorna à fila de revisão}
+        '404': {description: Livro não encontrado}
+        '409': {description: Livro não possui aprovação editorial ativa}
+      security:
+      - assetAdmin: []
   /api/admin/books/{bookId}/assets:
     get:
       tags:
@@ -829,6 +905,69 @@ components:
         expiresAt:
           type: string
           format: date-time
+    ReviewPage:
+      type: object
+      required: [items, page, size, totalItems, last]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/BookReview'}
+        page: {type: integer}
+        size: {type: integer}
+        totalItems: {type: integer, format: int64}
+        last: {type: boolean}
+    BookReview:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        canonicalTitle: {type: string}
+        originalTitle: {type: string}
+        originalLanguage: {type: string}
+        firstPublicationYear: {type: integer}
+        description: {type: string}
+        status: {type: string}
+        updatedAt: {type: string, format: date-time}
+        assets:
+          type: array
+          items: {$ref: '#/components/schemas/ReviewAsset'}
+    ReviewAsset:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        assetType: {type: string}
+        assetRole: {type: string}
+        status: {type: string}
+        versionId: {type: string, format: uuid}
+        versionNumber: {type: integer}
+        versionStatus: {type: string}
+        availabilityStatus: {type: string}
+        contentType: {type: string}
+        sizeBytes: {type: integer, format: int64}
+    ApprovalHistoryPage:
+      type: object
+      required: [items, page, size, totalItems, last]
+      properties:
+        items:
+          type: array
+          items: {$ref: '#/components/schemas/ApprovalHistory'}
+        page: {type: integer}
+        size: {type: integer}
+        totalItems: {type: integer, format: int64}
+        last: {type: boolean}
+    ApprovalHistory:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        bookId: {type: string, format: uuid}
+        canonicalTitle: {type: string}
+        originalTitle: {type: string}
+        action: {type: string, enum: [APPROVED, REVOKED]}
+        previousStatus: {type: string}
+        newStatus: {type: string}
+        actorSubject: {type: string}
+        reason: {type: string}
+        createdAt: {type: string, format: date-time}
+        currentStatus: {type: string}
   securitySchemes:
     productUser:
       type: http

@@ -44,6 +44,7 @@ services:
     environment:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Set STORAGE_ACCESS_KEY in .env}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Set STORAGE_SECRET_KEY in .env}
+      STORAGE_ALLOWED_ORIGINS: ${STORAGE_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br}
     volumes:
       - seaweedfs_data:/data
     ulimits:
@@ -221,7 +222,9 @@ services:
       STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-300}
       STORAGE_MAX_UPLOAD_BYTES: ${STORAGE_MAX_UPLOAD_BYTES:-104857600}
       STORAGE_TIMEOUT: ${STORAGE_TIMEOUT:-30s}
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      # This endpoint is embedded in presigned URLs consumed by browsers. It
+      # must be an externally reachable HTTPS S3 endpoint, never localhost.
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-https://seaweedfs-s3-bookrush.jteodoro.tec.br}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       ASSET_ADMIN_TOKEN: ${ASSET_ADMIN_TOKEN:?Set ASSET_ADMIN_TOKEN in .env}
@@ -233,7 +236,7 @@ services:
       CATALOG_PRODUCT_OIDC_ISSUER: ${CATALOG_PRODUCT_OIDC_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       CATALOG_PRODUCT_OIDC_JWK_SET_URI: ${CATALOG_PRODUCT_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       CATALOG_PRODUCT_OIDC_AUDIENCE: ${CATALOG_PRODUCT_OIDC_AUDIENCE:-account}
-      CATALOG_CORS_ALLOWED_ORIGINS: ${CATALOG_CORS_ALLOWED_ORIGINS:-https://docs-bookrush.jteodoro.tec.br,https://doc-bookrush.jteodoro.tec.br}
+      CATALOG_CORS_ALLOWED_ORIGINS: ${CATALOG_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,https://docs-bookrush.jteodoro.tec.br,https://doc-bookrush.jteodoro.tec.br}
       CATALOG_SECURITY_LEGACY_STATIC_ENABLED: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:-false}
       CATALOG_READER_INTERNAL_TOKEN: ${CATALOG_READER_INTERNAL_TOKEN:-${CANONICAL_SERVICE_TOKEN:-}}
       CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
@@ -282,10 +285,13 @@ services:
       INGESTION_OIDC_TOKEN_URI: ${INGESTION_OIDC_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
       INGESTION_CANONICAL_CLIENT_ID: ${INGESTION_CANONICAL_CLIENT_ID:-}
       INGESTION_CANONICAL_CLIENT_SECRET: ${INGESTION_CANONICAL_CLIENT_SECRET:-}
-      INGESTION_CANONICAL_SCOPE: ${INGESTION_CANONICAL_SCOPE:-bookrush.catalog.write}
+      # The canonical client receives this scope as a Keycloak default client
+      # scope. Keep the override available, but do not request a scope that may
+      # be absent during a rolling Keycloak reconcile.
+      INGESTION_CANONICAL_SCOPE: ${INGESTION_CANONICAL_SCOPE:-}
       INGESTION_ASSET_CLIENT_ID: ${INGESTION_ASSET_CLIENT_ID:-}
       INGESTION_ASSET_CLIENT_SECRET: ${INGESTION_ASSET_CLIENT_SECRET:-}
-      INGESTION_ASSET_SCOPE: ${INGESTION_ASSET_SCOPE:-bookrush.assets.write}
+      INGESTION_ASSET_SCOPE: ${INGESTION_ASSET_SCOPE:-}
       INGESTION_PUBLISHER_CALLBACK_URL: ${INGESTION_PUBLISHER_CALLBACK_URL:-http://publisher-service:8099}
       PUBLISHER_INGESTION_CALLBACK_TOKEN: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:-}
       PUBLISHER_INGESTION_URL: ${PUBLISHER_INGESTION_URL:-http://book-ingestion-service:8090}
@@ -570,7 +576,7 @@ services:
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_ADMIN_SECURITY_AUDIENCE:-bookrush-ingestion}
       PUBLISHER_STORAGE_ENABLED: ${PUBLISHER_STORAGE_ENABLED:-false}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-https://seaweedfs-s3-bookrush.jteodoro.tec.br}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}

@@ -6,6 +6,12 @@ import { AnalyticsRun, BookCandidate, FeedEvent, FeedWeights, TrainingSession } 
 export type BookCatalogPage = { items: BookCandidate[]; page: number; totalItems?: number; hasNext: boolean };
 export type ImportJob = { id?: string; status: string; itemsDiscovered?: number; itemsProcessed?: number; itemsSucceeded?: number; itemsFailed?: number; errorMessage?: string; createdAt?: string; startedAt?: string; finishedAt?: string };
 export type AnnotationCampaign = { id:string; code:string; name:string; status:string; target_annotations_per_item:number; protocol_version?:string; sampling_config_hash?:string };
+export type ReviewAsset = { id:string; assetType:string; assetRole:string; status:string; versionId?:string; versionNumber?:number; versionStatus?:string; availabilityStatus?:string; contentType?:string; sizeBytes?:number };
+export type ReviewBook = { id:string; canonicalTitle?:string; originalTitle?:string; originalLanguage?:string; firstPublicationYear?:number; description?:string; status:string; updatedAt?:string; assets:ReviewAsset[] };
+export type ReviewBookPage = { items:ReviewBook[]; page:number; size:number; totalItems:number; last:boolean };
+export type AssetDownloadLink = { url:string; expiresAt:string };
+export type ApprovalHistory = { id:string; bookId:string; canonicalTitle?:string; originalTitle?:string; action:string; previousStatus:string; newStatus:string; actorSubject:string; reason?:string; createdAt:string; currentStatus:string };
+export type ApprovalHistoryPage = { items:ApprovalHistory[]; page:number; size:number; totalItems:number; last:boolean };
 
 const sleep = (ms = 250) => new Promise(resolve => setTimeout(resolve, ms));
 let mutableBooks = [...books];
@@ -56,6 +62,33 @@ export const services = {
     } catch (error) { throw problem(error, 'Não foi possível consultar o catálogo Gutenberg.'); }
   },
   async listBooks(query = '', page = 0, size = 50): Promise<BookCandidate[]> { return (await this.listBookPage(query, page, size)).items; },
+  async listReviewBooks(page = 0, size = 25): Promise<ReviewBookPage> {
+    if (config.useMocks) return { items: [], page, size, totalItems: 0, last: true };
+    try {
+      const { data } = await catalogHttp.get('/admin/books/review', { params: { page, size } });
+      return { items: data.items ?? [], page: Number(data.page ?? page), size: Number(data.size ?? size), totalItems: Number(data.totalItems ?? 0), last: Boolean(data.last) };
+    } catch (error) { throw problem(error, 'Não foi possível carregar a fila de revisão.'); }
+  },
+  async listApprovalHistory(page = 0, size = 25): Promise<ApprovalHistoryPage> {
+    if (config.useMocks) return { items: [], page, size, totalItems: 0, last: true };
+    try {
+      const { data } = await catalogHttp.get('/admin/books/approval-history', { params: { page, size } });
+      return { items: data.items ?? [], page: Number(data.page ?? page), size: Number(data.size ?? size), totalItems: Number(data.totalItems ?? 0), last: Boolean(data.last) };
+    } catch (error) { throw problem(error, 'Não foi possível carregar o histórico de aprovações.'); }
+  },
+  async getAssetDownloadUrl(bookId: string, assetId: string): Promise<AssetDownloadLink> {
+    try { const { data } = await catalogHttp.get(`/admin/books/${bookId}/assets/${assetId}/download-url`); return data; }
+    catch (error) { throw problem(error, 'Não foi possível abrir o asset para revisão.'); }
+  },
+  async approveBook(bookId: string): Promise<void> {
+    try { await catalogHttp.post(`/admin/books/${bookId}/approve`); } catch (error) { throw problem(error, 'Não foi possível aprovar o livro.'); }
+  },
+  async revokeBookApproval(bookId: string): Promise<void> {
+    try { await catalogHttp.post(`/admin/books/${bookId}/revoke-approval`); } catch (error) { throw problem(error, 'Não foi possível revogar a aprovação do livro.'); }
+  },
+  async approveAsset(bookId: string, assetId: string): Promise<void> {
+    try { await catalogHttp.post(`/admin/books/${bookId}/assets/${assetId}/approve`); } catch (error) { throw problem(error, 'Não foi possível aprovar o thumbnail.'); }
+  },
   async getBook(bookId: string) { if (config.useMocks) return mutableBooks.find(book => book.id === bookId); try { const { data } = await catalogHttp.get(`/internal/v1/catalog/books/${bookId}`); return mapBook(data); } catch (error) { throw problem(error, 'Não foi possível consultar a obra.'); } },
   async importBook(bookId: string, reprocess = false): Promise<ImportJob> {
     if (config.useMocks) { await sleep(500); mutableBooks = mutableBooks.map(book => book.id === bookId ? { ...book, status: 'IMPORTED' } : book); return { status: 'IMPORTED' }; }

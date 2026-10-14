@@ -112,7 +112,10 @@
       "defaultClientScopes": [
         "profile",
         "email",
-        "bookrush.analytics"
+        "bookrush.analytics",
+        "bookrush.catalog.read",
+        "bookrush.catalog.write",
+        "bookrush.assets.write"
       ],
       "optionalClientScopes": [],
       "protocolMappers": [
@@ -134,6 +137,17 @@
           "protocolMapper": "oidc-audience-mapper",
           "config": {
             "included.client.audience": "bookrush-ingestion",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "admin-web-catalog-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-catalog-admin",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "userinfo.token.claim": "false"

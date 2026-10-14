@@ -15,4 +15,5 @@
 | URL expirada | TTL/relógio | conferir expiresAt e relógios | Solicitar URL nova e sincronizar relógio |
 | Aprovação 409 | licença desconhecida, role não PUBLIC ou upload pendente | consultar asset/versões/licença | Revisar informação e concluir upload; não converter UNKNOWN em permissão |
 | Browser fetch bloqueado | CORS não configurado | console, GET por navegação funciona | Usar navegação/download ou configurar CORS restrito em etapa própria |
+| Thumbnail não aparece, mas o asset está AVAILABLE | URL assinada aponta para localhost ou para o Filer | conferir somente o hostname de STORAGE_PUBLIC_ENDPOINT e o Location do 302 | Usar `https://seaweedfs-s3-bookrush.jteodoro.tec.br` (S3 dedicado), configurar DNS/TLS/CORS e recriar o catálogo |
 | Jenkins recusa deploy | storage não provisionado | health do container bookrush-seaweedfs-1 | Procedimento inicial em operations.md |
