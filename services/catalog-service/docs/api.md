@@ -81,6 +81,17 @@ continua exigindo `bookrush.assets.write`. A aprovação do livro e a aprovaçã
 do thumbnail são deliberadamente separadas: reprocessar um livro apenas cria
 ou atualiza o asset, não libera a obra automaticamente.
 
+`GET /api/admin/books/{bookId}/assets/{assetId}/download-url` gera uma URL
+pré-assinada curta para inspeção administrativa do arquivo. O painel abre essa
+URL em uma nova aba; o objeto continua privado e a URL não deve ser persistida.
+
+`GET /api/admin/books/approval-history?page=0&size=25` lista as decisões de
+aprovação e revogação com livro, ator, horários, transição de status e estado
+atual. `POST /api/admin/books/{bookId}/revoke-approval` retorna um livro cuja
+aprovação editorial foi registrada para `REVIEW_REQUIRED`. A operação é
+idempotente para livros já nessa fila e não revoga livros `ACTIVE` que nunca
+foram aprovados pelo fluxo editorial.
+
 Os timestamps PostgreSQL `timestamptz` são convertidos de
 `OffsetDateTime` para `Instant` na resposta JSON; consumidores não devem
 inferir o fuso a partir do texto formatado.

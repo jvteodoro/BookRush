@@ -9,6 +9,9 @@ export type AnnotationCampaign = { id:string; code:string; name:string; status:s
 export type ReviewAsset = { id:string; assetType:string; assetRole:string; status:string; versionId?:string; versionNumber?:number; versionStatus?:string; availabilityStatus?:string; contentType?:string; sizeBytes?:number };
 export type ReviewBook = { id:string; canonicalTitle?:string; originalTitle?:string; originalLanguage?:string; firstPublicationYear?:number; description?:string; status:string; updatedAt?:string; assets:ReviewAsset[] };
 export type ReviewBookPage = { items:ReviewBook[]; page:number; size:number; totalItems:number; last:boolean };
+export type AssetDownloadLink = { url:string; expiresAt:string };
+export type ApprovalHistory = { id:string; bookId:string; canonicalTitle?:string; originalTitle?:string; action:string; previousStatus:string; newStatus:string; actorSubject:string; reason?:string; createdAt:string; currentStatus:string };
+export type ApprovalHistoryPage = { items:ApprovalHistory[]; page:number; size:number; totalItems:number; last:boolean };
 
 const sleep = (ms = 250) => new Promise(resolve => setTimeout(resolve, ms));
 let mutableBooks = [...books];
@@ -66,8 +69,22 @@ export const services = {
       return { items: data.items ?? [], page: Number(data.page ?? page), size: Number(data.size ?? size), totalItems: Number(data.totalItems ?? 0), last: Boolean(data.last) };
     } catch (error) { throw problem(error, 'Não foi possível carregar a fila de revisão.'); }
   },
+  async listApprovalHistory(page = 0, size = 25): Promise<ApprovalHistoryPage> {
+    if (config.useMocks) return { items: [], page, size, totalItems: 0, last: true };
+    try {
+      const { data } = await catalogHttp.get('/admin/books/approval-history', { params: { page, size } });
+      return { items: data.items ?? [], page: Number(data.page ?? page), size: Number(data.size ?? size), totalItems: Number(data.totalItems ?? 0), last: Boolean(data.last) };
+    } catch (error) { throw problem(error, 'Não foi possível carregar o histórico de aprovações.'); }
+  },
+  async getAssetDownloadUrl(bookId: string, assetId: string): Promise<AssetDownloadLink> {
+    try { const { data } = await catalogHttp.get(`/admin/books/${bookId}/assets/${assetId}/download-url`); return data; }
+    catch (error) { throw problem(error, 'Não foi possível abrir o asset para revisão.'); }
+  },
   async approveBook(bookId: string): Promise<void> {
     try { await catalogHttp.post(`/admin/books/${bookId}/approve`); } catch (error) { throw problem(error, 'Não foi possível aprovar o livro.'); }
+  },
+  async revokeBookApproval(bookId: string): Promise<void> {
+    try { await catalogHttp.post(`/admin/books/${bookId}/revoke-approval`); } catch (error) { throw problem(error, 'Não foi possível revogar a aprovação do livro.'); }
   },
   async approveAsset(bookId: string, assetId: string): Promise<void> {
     try { await catalogHttp.post(`/admin/books/${bookId}/assets/${assetId}/approve`); } catch (error) { throw problem(error, 'Não foi possível aprovar o thumbnail.'); }

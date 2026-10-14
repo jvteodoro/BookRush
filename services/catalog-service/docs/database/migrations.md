@@ -9,3 +9,9 @@ e os índices usam `public.gin_trgm_ops`, para que os schemas temporários usado
 pelos testes de upgrade encontrem o mesmo operador. O índice de texto usa uma
 concatenação com `coalesce`, em vez de `concat_ws`, porque expressões de índice
 no PostgreSQL precisam ser imutáveis.
+
+V17 cria `catalog.book_review_audit`, o ledger append-only das decisões
+editoriais de aprovação e revogação de livros. Cada evento guarda o livro, os
+estados anterior e novo, o subject autenticado, motivo opcional e timestamp;
+essa tabela sustenta o histórico administrativo e não deve ser apagada quando
+uma aprovação for revogada.

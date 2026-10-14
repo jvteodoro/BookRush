@@ -1,11 +1,13 @@
 package com.bookrush.catalog.book;
 
+import java.security.Principal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,14 +67,56 @@ public class BookReviewController {
     return new ReviewPage(items, page, size, total, offset + items.size() >= total);
   }
 
+  @GetMapping("/approval-history")
+  public ApprovalHistoryPage approvalHistory(
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "25") int size) {
+    validatePage(page, size);
+    Long totalResult =
+        jdbc.queryForObject("SELECT count(*) FROM catalog.book_review_audit", Long.class);
+    long total = totalResult == null ? 0L : totalResult;
+    int offset = Math.multiplyExact(page, size);
+    List<ApprovalHistory> items =
+        jdbc.query(
+            """
+            SELECT h.id, h.book_id, b.canonical_title, b.original_title, h.action,
+                   h.previous_status, h.new_status, h.actor_subject, h.reason,
+                   h.created_at, b.status AS current_status
+            FROM catalog.book_review_audit h
+            JOIN catalog.book b ON b.id=h.book_id
+            ORDER BY h.created_at DESC, h.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (rs, row) ->
+                new ApprovalHistory(
+                    rs.getObject("id", UUID.class),
+                    rs.getObject("book_id", UUID.class),
+                    rs.getString("canonical_title"),
+                    rs.getString("original_title"),
+                    rs.getString("action"),
+                    rs.getString("previous_status"),
+                    rs.getString("new_status"),
+                    rs.getString("actor_subject"),
+                    rs.getString("reason"),
+                    toInstant(rs.getObject("created_at", OffsetDateTime.class)),
+                    rs.getString("current_status")),
+            size,
+            offset);
+    return new ApprovalHistoryPage(items, page, size, total, offset + items.size() >= total);
+  }
+
   @PostMapping("/{bookId}/approve")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void approve(@PathVariable UUID bookId) {
+  @Transactional
+  public void approve(@PathVariable UUID bookId, Principal principal) {
     int changed =
         jdbc.update(
             "UPDATE catalog.book SET status='ACTIVE' WHERE id=? AND status='REVIEW_REQUIRED'",
             bookId);
-    if (changed > 0) return;
+    if (changed > 0) {
+      audit(bookId, "APPROVED", "REVIEW_REQUIRED", "ACTIVE", principal);
+      return;
+    }
     String status =
         jdbc.query(
                 "SELECT status FROM catalog.book WHERE id=?",
@@ -83,6 +127,61 @@ public class BookReviewController {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found"));
     if (!"ACTIVE".equals(status)) {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "Book is not awaiting review");
+    }
+  }
+
+  @PostMapping("/{bookId}/revoke-approval")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Transactional
+  public void revokeApproval(@PathVariable UUID bookId, Principal principal) {
+    int changed =
+        jdbc.update(
+            """
+            UPDATE catalog.book SET status='REVIEW_REQUIRED'
+            WHERE id=? AND status='ACTIVE'
+              AND EXISTS (
+                SELECT 1 FROM catalog.book_review_audit h
+                WHERE h.book_id=? AND h.action='APPROVED')
+            """,
+            bookId,
+            bookId);
+    if (changed > 0) {
+      audit(bookId, "REVOKED", "ACTIVE", "REVIEW_REQUIRED", principal);
+      return;
+    }
+    String status =
+        jdbc.query(
+                "SELECT status FROM catalog.book WHERE id=?",
+                (rs, row) -> rs.getString("status"),
+                bookId)
+            .stream()
+            .findFirst()
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Book not found"));
+    if ("REVIEW_REQUIRED".equals(status)) return;
+    throw new ResponseStatusException(HttpStatus.CONFLICT, "Book has no active review approval");
+  }
+
+  private void audit(
+      UUID bookId, String action, String previousStatus, String newStatus, Principal principal) {
+    String actor = principal == null ? "unknown" : principal.getName();
+    jdbc.update(
+        """
+        INSERT INTO catalog.book_review_audit
+          (id, book_id, action, previous_status, new_status, actor_subject)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        UUID.randomUUID(),
+        bookId,
+        action,
+        previousStatus,
+        newStatus,
+        actor);
+  }
+
+  private static void validatePage(int page, int size) {
+    if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+      throw new ResponseStatusException(
+          HttpStatus.BAD_REQUEST, "page must be >= 0 and size must be between 1 and 100");
     }
   }
 
@@ -118,6 +217,22 @@ public class BookReviewController {
 
   public record ReviewPage(
       List<BookReview> items, int page, int size, long totalItems, boolean last) {}
+
+  public record ApprovalHistoryPage(
+      List<ApprovalHistory> items, int page, int size, long totalItems, boolean last) {}
+
+  public record ApprovalHistory(
+      UUID id,
+      UUID bookId,
+      String canonicalTitle,
+      String originalTitle,
+      String action,
+      String previousStatus,
+      String newStatus,
+      String actorSubject,
+      String reason,
+      Instant createdAt,
+      String currentStatus) {}
 
   public record BookReview(
       UUID id,
