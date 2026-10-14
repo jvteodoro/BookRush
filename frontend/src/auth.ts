@@ -26,7 +26,7 @@ const manager = new UserManager({
   post_logout_redirect_uri: origin,
   silent_redirect_uri: `${origin}/auth/silent-callback`,
   response_type: 'code',
-  scope: 'openid profile email',
+  scope: 'openid profile email bookrush.catalog.read',
   // Tokens are deliberately not persisted. The protocol transaction state is
   // short-lived and kept by oidc-client-ts only until the callback completes.
   userStore: new WebStorageStateStore({ store: new MemoryStorage() }),
