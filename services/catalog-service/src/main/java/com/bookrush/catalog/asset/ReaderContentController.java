@@ -66,13 +66,13 @@ public class ReaderContentController {
   }
 
   @GetMapping(
-      value = "/text-versions/{versionId}/content", produces = MediaType.TEXT_PLAIN_VALUE)
+      value = "/text-versions/{versionId}/content", produces = "text/plain;charset=UTF-8")
   @Operation(summary = "Ler a versão textual exata para o content-service")
   public ResponseEntity<Resource> textVersionContent(
       @PathVariable UUID bookId, @PathVariable UUID versionId) {
     InputStream stream = service.downloadVersion(bookId, versionId);
     return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-        .contentType(MediaType.TEXT_PLAIN)
+        .contentType(MediaType.parseMediaType("text/plain;charset=UTF-8"))
         .body(new InputStreamResource(stream));
   }
 }
