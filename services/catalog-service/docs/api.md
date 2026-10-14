@@ -19,6 +19,10 @@ realm de produto `bookrush`. Ele redireciona para uma URL temporária assinada
 de um thumbnail aprovado. O frontend deve buscar a imagem com `Authorization`
 e usar uma URL de `Blob`; uma tag `<img src="...">` não envia bearer
 automaticamente.
+O bearer precisa conter o scope `bookrush.catalog.read`; a cadeia de segurança
+da rota converte explicitamente esse claim em `SCOPE_bookrush.catalog.read`
+antes de avaliar a autorização. Tokens emitidos antes da concessão do scope
+devem ser renovados com novo login.
 
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 

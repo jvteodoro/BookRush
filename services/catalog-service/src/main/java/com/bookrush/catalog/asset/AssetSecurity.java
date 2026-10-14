@@ -64,7 +64,11 @@ public class AssetSecurity {
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(a -> a.anyRequest().authenticated())
         .oauth2ResourceServer(
-            oauth -> oauth.jwt(jwt -> jwt.decoder(productJwtDecoder(productOidc))))
+            oauth ->
+                oauth.jwt(
+                    jwt ->
+                        jwt.decoder(productJwtDecoder(productOidc))
+                            .jwtAuthenticationConverter(catalogRolesConverter())))
         .build();
   }
 
