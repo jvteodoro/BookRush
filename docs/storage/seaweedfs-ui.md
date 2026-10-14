@@ -52,8 +52,8 @@ registro wildcard `*.jteodoro.tec.br` cobre esse hostname porque ele possui
 apenas um nível de subdomínio. É necessário um certificado que cubra
 `seaweedfs-bookrush.jteodoro.tec.br` e `seaweedfs-s3-bookrush.jteodoro.tec.br` (ou
 o wildcard `*.jteodoro.tec.br`). Os módulos versionados estão em
-`infrastructure/nginx/conf.d/bookrush-seaweedfs*.conf` e contêm somente o
-bootstrap HTTP. O S3 não deve ser colocado atrás do `oauth2-proxy`: a assinatura
+`infrastructure/nginx/conf.d/bookrush-seaweedfs*.conf` incluem o vhost HTTP para
+ACME e o vhost HTTPS do S3. O S3 não deve ser colocado atrás do `oauth2-proxy`: a assinatura
 presign é a autorização do objeto.
 
 Depois de instalar os módulos, emita/renove um certificado cobrindo os dois
@@ -66,14 +66,17 @@ STORAGE_ALLOWED_ORIGINS=https://bookrush.jteodoro.tec.br
 
 O deploy recusa `localhost`, HTTP ou endpoint ausente para impedir a geração de
 URLs assinadas inutilizáveis pelo navegador.
-O Certbot cria e gerencia o bloco HTTPS e os caminhos dos certificados; não adicione
-diretivas SSL ao arquivo versionado.
+O certificado do S3 fica em
+`/etc/letsencrypt/live/seaweedfs-s3-bookrush.jteodoro.tec.br/`; a renovação deve
+recarregar o Nginx após atualizar os arquivos. O bloco HTTPS versionado usa esses
+caminhos para que o vhost continue reproduzível no host de produção.
 
 Instalação no host:
 
 ```bash
 sudo bash infrastructure/nginx/install-bookrush-vhosts.sh
 sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 Para wildcard, use o plugin DNS do provedor do domínio. O desafio HTTP não valida
