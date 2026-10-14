@@ -63,6 +63,8 @@ continuam sujeitos às rotas de distribuição e às políticas de direitos.
 `COVER` em estado `ACTIVE` e responde com um redirecionamento para uma URL S3
 temporária. O serviço valida issuer e audience do token do realm de produto;
 ausência ou rejeição do bearer retorna `401`, e ausência de capa retorna `404`.
+Uma capa com distribuição aprovada pode ser exibida enquanto o livro estiver
+`REVIEW_REQUIRED`; isso não libera o conteúdo textual nem os downloads do livro.
 A listagem de livros retorna `thumbnailUrl` apontando para essa rota.
 ## Reader chapters
 
