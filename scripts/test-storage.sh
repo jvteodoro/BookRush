@@ -7,6 +7,9 @@ compose=(docker compose --project-name "$project" -f "$repo_dir/infrastructure/c
 cleanup() {
   local status=$?
   trap - EXIT
+  if [[ -n "${test_container:-}" ]]; then
+    docker rm -f "$test_container" >/dev/null 2>&1 || true
+  fi
   "${compose[@]}" down --volumes --remove-orphans || true
   if [[ -n "${backup_volume:-}" ]]; then docker volume rm "$backup_volume" || true; fi
   # Only known temporary artifacts from this invocation.
@@ -43,31 +46,6 @@ wait_for_healthy() {
   return 1
 }
 
-start_tests_with_runtime_retry() {
-  local attempt output status
-  for attempt in 1 2 3; do
-    set +e
-    output="$("${compose[@]}" start tests 2>&1)"
-    status=$?
-    set -e
-    printf '%s\n' "$output"
-    (( status == 0 )) && return 0
-
-    # Docker/containerd can transiently fail to create the systemd scope while
-    # other disposable containers are being torn down. Retry only this known
-    # runtime error; application/test failures must still fail immediately.
-    if ! grep -Fq 'unable to apply cgroup configuration' <<<"$output" ||
-       ! grep -Fq 'Argument list too long' <<<"$output"; then
-      return "$status"
-    fi
-    if (( attempt < 3 )); then
-      echo "Runtime cgroup indisponível ao iniciar tests; nova tentativa $((attempt + 1))/3." >&2
-      sleep 5
-    fi
-  done
-  return "$status"
-}
-
 "${compose[@]}" up -d --build postgres seaweedfs
 wait_for_healthy postgres 180
 wait_for_healthy seaweedfs 180
@@ -76,11 +54,14 @@ STORAGE_TEST_PORT="$("${compose[@]}" port seaweedfs 8333 | awk -F: '{print $NF}'
 export STORAGE_TEST_PORT
 export STORAGE_HOST_ENDPOINT="http://localhost:$STORAGE_TEST_PORT"
 "${compose[@]}" build tests
-"${compose[@]}" create tests
-test_container="$("${compose[@]}" ps -aq tests)"
-# docker cp works with Jenkins's host socket; no bind from an inaccessible workspace.
-docker cp "$repo_dir/docs/database/queries.sql" "$test_container:/workspace/documented-queries.sql"
-start_tests_with_runtime_retry
+test_container="${project}-tests-run"
+set +e
+"${compose[@]}" run --no-deps --detach --name "$test_container" tests
+start_status=$?
+set -e
+if (( start_status != 0 )); then
+  exit "$start_status"
+fi
 result="$(docker wait "$test_container")"
 docker logs "$test_container"
 test_image="$(docker inspect --format '{{.Config.Image}}' "$test_container")"
