@@ -37,6 +37,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Configuration
 @Import(StorageConfiguration.class)
@@ -47,6 +49,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
   CatalogCorsProperties.class
 })
 public class AssetSecurity {
+  private static final Logger log = LoggerFactory.getLogger(AssetSecurity.class);
+
   @Bean
   org.springframework.security.core.userdetails.UserDetailsService noPasswordUsers() {
     return new org.springframework.security.provisioning.InMemoryUserDetailsManager();
@@ -69,6 +73,21 @@ public class AssetSecurity {
                     jwt ->
                         jwt.decoder(productJwtDecoder(productOidc))
                             .jwtAuthenticationConverter(catalogRolesConverter())))
+        .exceptionHandling(
+            e ->
+                e.accessDeniedHandler(
+                    (request, response, error) -> {
+                      log.warn(
+                          "thumbnail authorization denied path={} principal={} authorities={}",
+                          request.getRequestURI(),
+                          request.getUserPrincipal() == null
+                              ? "anonymous"
+                              : request.getUserPrincipal().getName(),
+                          SecurityContextHolder.getContext().getAuthentication() == null
+                              ? List.of()
+                              : SecurityContextHolder.getContext().getAuthentication().getAuthorities());
+                      response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                    }))
         .build();
   }
 
@@ -85,6 +104,22 @@ public class AssetSecurity {
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(
                     new OAuth2Error("invalid_token", "product audience mismatch", null));
+    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuer, audience));
+    return decoder;
+  }
+
+  JwtDecoder catalogJwtDecoder(CatalogOidcProperties oidc) {
+    if (!oidc.enabled() || oidc.jwkSetUri().isBlank()) {
+      throw new IllegalStateException("Catalog OIDC must be configured");
+    }
+    var decoder = org.springframework.security.oauth2.jwt.NimbusJwtDecoder.withJwkSetUri(oidc.jwkSetUri()).build();
+    OAuth2TokenValidator<Jwt> issuer = JwtValidators.createDefaultWithIssuer(oidc.issuer());
+    OAuth2TokenValidator<Jwt> audience =
+        token ->
+            token.getAudience().contains(oidc.audience())
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(
+                    new OAuth2Error("invalid_token", "catalog audience mismatch", null));
     decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuer, audience));
     return decoder;
   }
@@ -155,7 +190,8 @@ public class AssetSecurity {
         .addFilterBefore(filter, AnonymousAuthenticationFilter.class)
         .authorizeHttpRequests(
             a ->
-                a.requestMatchers(
+                a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                    .requestMatchers(
                         HttpMethod.GET,
                         "/api/admin/**")
                     .hasAnyAuthority(
@@ -192,11 +228,34 @@ public class AssetSecurity {
                     .denyAll())
         .exceptionHandling(
             e ->
-                e.authenticationEntryPoint((req, res, error) -> res.sendError(401))
-                    .accessDeniedHandler((req, res, error) -> res.sendError(403)));
+                e.authenticationEntryPoint(
+                    (req, res, error) -> {
+                      log.warn(
+                          "catalog authentication rejected path={} error={}",
+                          req.getRequestURI(),
+                          error.getMessage());
+                      res.sendError(401);
+                    })
+                    .accessDeniedHandler(
+                        (req, res, error) -> {
+                          log.warn(
+                              "catalog authorization denied path={} principal={} authorities={}",
+                              req.getRequestURI(),
+                              req.getUserPrincipal() == null
+                                  ? "anonymous"
+                                  : req.getUserPrincipal().getName(),
+                              SecurityContextHolder.getContext().getAuthentication() == null
+                                  ? List.of()
+                                  : SecurityContextHolder.getContext().getAuthentication().getAuthorities());
+                          res.sendError(403);
+                        }));
     if (oidc.enabled()) {
       http.oauth2ResourceServer(
-          oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(catalogRolesConverter())));
+          oauth ->
+              oauth.jwt(
+                  jwt ->
+                      jwt.decoder(catalogJwtDecoder(oidc))
+                          .jwtAuthenticationConverter(catalogRolesConverter())));
     }
     return http.build();
   }

@@ -19,6 +19,8 @@ realm de produto `bookrush`. Ele redireciona para uma URL temporária assinada
 de um thumbnail aprovado. O frontend deve buscar a imagem com `Authorization`
 e usar uma URL de `Blob`; uma tag `<img src="...">` não envia bearer
 automaticamente.
+Quando não há asset aprovado, a API preserva o `404` original; ele não é
+convertido em `403` pelo dispatch de erro do Spring Security.
 O bearer precisa conter o scope `bookrush.catalog.read`; a cadeia de segurança
 da rota converte explicitamente esse claim em `SCOPE_bookrush.catalog.read`
 antes de avaliar a autorização. Tokens emitidos antes da concessão do scope

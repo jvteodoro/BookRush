@@ -41,6 +41,12 @@ Em `COMPLETED`, confirme `ingestion_item`, `source_record`, `book_asset`,
 nos buckets privados e ser identificados por `bucket`/`object_key`, com SHA-256
 coincidente; nunca publique um asset sem aprovação de direitos.
 
+Os clients S2S do ingestion recebem `bookrush.catalog.write` e
+`bookrush.assets.write` como default client scopes no Keycloak. Deixe
+`INGESTION_CANONICAL_SCOPE` e `INGESTION_ASSET_SCOPE` vazios no Compose para
+usar esses defaults; só informe valores quando o scope estiver explicitamente
+provisionado no realm.
+
 `PAUSED`, `RETRY_WAIT` e `FAILED` exigem consultar `error_code`, `reason_code`,
 `attempt_count` e `next_attempt_at`. Use `POST .../operations/requeue-expired`
 para leases expiradas ou `POST .../jobs/{jobId}/resume` para retomar. O

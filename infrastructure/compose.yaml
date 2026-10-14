@@ -285,10 +285,13 @@ services:
       INGESTION_OIDC_TOKEN_URI: ${INGESTION_OIDC_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
       INGESTION_CANONICAL_CLIENT_ID: ${INGESTION_CANONICAL_CLIENT_ID:-}
       INGESTION_CANONICAL_CLIENT_SECRET: ${INGESTION_CANONICAL_CLIENT_SECRET:-}
-      INGESTION_CANONICAL_SCOPE: ${INGESTION_CANONICAL_SCOPE:-bookrush.catalog.write}
+      # The canonical client receives this scope as a Keycloak default client
+      # scope. Keep the override available, but do not request a scope that may
+      # be absent during a rolling Keycloak reconcile.
+      INGESTION_CANONICAL_SCOPE: ${INGESTION_CANONICAL_SCOPE:-}
       INGESTION_ASSET_CLIENT_ID: ${INGESTION_ASSET_CLIENT_ID:-}
       INGESTION_ASSET_CLIENT_SECRET: ${INGESTION_ASSET_CLIENT_SECRET:-}
-      INGESTION_ASSET_SCOPE: ${INGESTION_ASSET_SCOPE:-bookrush.assets.write}
+      INGESTION_ASSET_SCOPE: ${INGESTION_ASSET_SCOPE:-}
       INGESTION_PUBLISHER_CALLBACK_URL: ${INGESTION_PUBLISHER_CALLBACK_URL:-http://publisher-service:8099}
       PUBLISHER_INGESTION_CALLBACK_TOKEN: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:-}
       PUBLISHER_INGESTION_URL: ${PUBLISHER_INGESTION_URL:-http://book-ingestion-service:8090}
