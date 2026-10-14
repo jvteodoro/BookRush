@@ -198,6 +198,9 @@ public class AssetSecurity {
                         "ROLE_ASSET_ADMIN",
                         "SCOPE_bookrush.catalog.read",
                         "SCOPE_bookrush.assets.write")
+                    .requestMatchers(HttpMethod.POST, "/api/admin/books/*/approve")
+                    .hasAnyAuthority(
+                        "SCOPE_bookrush.catalog.write", "SCOPE_bookrush.assets.write")
                     .requestMatchers("/api/admin/**", "/actuator/metrics", "/actuator/metrics/**")
                     .hasAnyAuthority("ROLE_ASSET_ADMIN", "SCOPE_bookrush.assets.write")
                     .requestMatchers("/api/v1/books/*/reader-assets/text-versions/**")

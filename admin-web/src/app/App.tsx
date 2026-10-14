@@ -7,6 +7,7 @@ import { FeedLabPage } from '../features/feedlab/FeedLabPage';
 import { useAuth } from '../auth/useAuth';
 import { config } from '../lib/config';
 import { TrainingPage } from '../features/training/TrainingPage';
+import { ReviewPage } from '../features/review/ReviewPage';
 
-const router=createBrowserRouter([{path:'/',element:<Layout/>,children:[{index:true,element:<Dashboard/>},{path:'catalog',element:<CatalogPage/>},{path:'analytics',element:<AnalyticsPage/>},{path:'feed-lab',element:<FeedLabPage/>},{path:'training',element:<TrainingPage/>}]}], { basename: config.basePath.replace(/\/$/, '') || undefined });
+const router=createBrowserRouter([{path:'/',element:<Layout/>,children:[{index:true,element:<Dashboard/>},{path:'catalog',element:<CatalogPage/>},{path:'review',element:<ReviewPage/>},{path:'analytics',element:<AnalyticsPage/>},{path:'feed-lab',element:<FeedLabPage/>},{path:'training',element:<TrainingPage/>}]}], { basename: config.basePath.replace(/\/$/, '') || undefined });
 export function App(){const a=useAuth();if(!a.ready)return <div className="center">Connecting to Keycloak…</div>;if(!a.authenticated)return <div className="center"><button onClick={a.login}>Sign in</button></div>;return <RouterProvider router={router}/>}

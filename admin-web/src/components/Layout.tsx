@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, BookOpen, FlaskConical, LayoutDashboard, LogOut, ShieldCheck, GraduationCap } from 'lucide-react';
+import { BarChart3, BookOpen, ClipboardCheck, FlaskConical, LayoutDashboard, LogOut, ShieldCheck, GraduationCap } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
 
 const items = [
   {to:'/', label:'Overview', icon:LayoutDashboard},
   {to:'/catalog', label:'Catalog & Import', icon:BookOpen},
+  {to:'/review', label:'Review Queue', icon:ClipboardCheck},
   {to:'/analytics', label:'Analytics', icon:BarChart3},
   {to:'/feed-lab', label:'Feed Lab', icon:FlaskConical},
   {to:'/training', label:'Training', icon:GraduationCap},
