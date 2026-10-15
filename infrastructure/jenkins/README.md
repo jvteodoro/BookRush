@@ -151,6 +151,8 @@ cria uma segunda execução lógica.
 
 O estágio declara Bash como o primeiro byte do script do agente, pois usa
 arrays, `[[ ]]` e here-strings para validar os IDs e o JSON.
+O agente Jenkins também inclui `jq` na imagem base; ele é usado para validar a
+resposta OIDC, montar o payload e acompanhar o job Gutenberg.
 
 Na instalação Compose, essa Secret Text é provisionada idempotentemente pelo
 `init.groovy.d/bookrush.groovy`, convertendo o valor para o tipo Secret do
