@@ -108,7 +108,7 @@ pipeline {
                   --data-urlencode 'grant_type=client_credentials' \
                   --data-urlencode 'client_id=bookrush-ingestion-admin' \
                   --data-urlencode "client_secret=$INGESTION_CLIENT_SECRET")
-                INGESTION_TOKEN=$(jq -er '.access_token' <<< "$token_response")
+                INGESTION_TOKEN=$(printf '%s\n' "$token_response" | jq -er '.access_token')
                 ids="${GUTENBERG_EXTERNAL_IDS//[[:space:]]/}"
                 test -n "$ids"
                 IFS=',' read -r -a id_array <<< "$ids"
@@ -139,7 +139,7 @@ pipeline {
                   now=$(date +%s); (( now < deadline )) || { jq '.status="TIMEOUT"' "$report" > "$report.tmp" && mv "$report.tmp" "$report"; exit 1; }
                   job=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
                     -H "Authorization: Bearer $INGESTION_TOKEN" "$base/api/admin/v1/ingestion/jobs/$job_id")
-                  state=$(jq -r '.status // "UNKNOWN"' <<< "$job")
+                  state=$(printf '%s\n' "$job" | jq -r '.status // "UNKNOWN"')
                   jq --arg state "$state" --argjson job "$job" '.lastPoll=$state | .job=$job' "$report" > "$report.tmp" && mv "$report.tmp" "$report"
                   case "$state" in
                     COMPLETED|COMPLETED_WITH_ERRORS|FAILED|CANCELLED)

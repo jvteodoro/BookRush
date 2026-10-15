@@ -149,6 +149,9 @@ execução e nunca grava o segredo ou o token no relatório. A chave de
 idempotência é derivada do commit, IDs, modo e URL, então repetir o build não
 cria uma segunda execução lógica.
 
+O estágio usa sintaxe POSIX compatível com o `/bin/sh` do agente Jenkins; não
+use here-string Bash (`<<<`) nesse trecho.
+
 Na instalação Compose, essa Secret Text é provisionada idempotentemente pelo
 `init.groovy.d/bookrush.groovy`, convertendo o valor para o tipo Secret do
 Jenkins e usando o mesmo segredo protegido do client
