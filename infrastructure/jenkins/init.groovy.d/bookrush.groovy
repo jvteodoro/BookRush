@@ -26,8 +26,17 @@ if (adminWebJob == null) {
 def adminWebScript = adminWebPipelineFile.text
 if (!(adminWebJob.getDefinition() instanceof CpsFlowDefinition) || adminWebJob.getDefinition().getScript() != adminWebScript) {
     adminWebJob.setDefinition(new CpsFlowDefinition(adminWebScript, true))
-    adminWebJob.save()
 }
+adminWebJob.removeProperty(ParametersDefinitionProperty.class)
+adminWebJob.addProperty(new ParametersDefinitionProperty([
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a validar e publicar.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git opcional para repositório privado.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
+    new BooleanParameterDefinition('PUBLISH', false, 'Publicar a imagem validada no registry.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Atualizar admin-web no Compose do host.')
+]))
+adminWebJob.save()
 def seaweedfsPipelineFile = new File('/opt/bookrush/seaweedfs.Jenkinsfile')
 def seaweedfsJob = instance.getItem('bookrush-seaweedfs')
 if (seaweedfsJob == null) {

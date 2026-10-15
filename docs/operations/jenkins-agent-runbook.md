@@ -138,6 +138,13 @@ usam `CpsFlowDefinition`: são pipelines inline, não Multibranch. Portanto:
   ou configure o job como **Pipeline script from SCM**;
 - sincronização não deve apagar o job, o histórico ou o volume `jenkins_home`.
 
+O bootstrap também deve atualizar a `ParametersDefinitionProperty` do
+`bookrush-admin-web` sempre que o Jenkinsfile ganhar parâmetros novos. Depois
+de uma alteração em `admin-web.Jenkinsfile`, confirme no endpoint
+`/job/bookrush-admin-web/api/json` que `PUBLISH`, `REGISTRY` e
+`REGISTRY_CREDENTIAL_ID` aparecem antes de disparar uma publicação; um job com
+somente `BRANCH`/`DEPLOY` ainda está usando a definição antiga.
+
 Quando a sincronização pelo Script Console for indispensável, fixe a URL no
 commit publicado, confirme o hash retornado e só então execute o build. Não
 busque `main` sem identificar a revisão, pois isso dificulta reproduzir o
