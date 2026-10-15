@@ -9,6 +9,7 @@ services:
     # Routing is loaded from a file so the proxy does not depend on the Docker
     # API version exposed by the production daemon.
     image: traefik:v3.5.3
+    restart: unless-stopped
     command:
       - --providers.docker=false
       - --providers.file.filename=/etc/traefik/dynamic.yaml
@@ -103,6 +104,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     command: ["postgres", "-c", "max_connections=150", "-c", "superuser_reserved_connections=5"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bookrush}
@@ -136,6 +138,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
     profiles: [auth]
+    restart: unless-stopped
     command: ["start-dev", "--http-port=8080", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
