@@ -2,6 +2,14 @@
 # Enable only after creating the client secret outside Git:
 #   CASC_JENKINS_CONFIG=/opt/bookrush/casc/jenkins-oidc.yaml
 jenkins:
+  credentials:
+    system:
+      domainCredentials:
+        - credentials:
+            - string:
+                id: "bookrush-ingestion-token"
+                description: "Segredo do client OIDC bookrush-ingestion-admin"
+                secret: "${JENKINS_OIDC_CLIENT_SECRET}"
   securityRealm:
     oic:
       clientId: "${JENKINS_OIDC_CLIENT_ID}"

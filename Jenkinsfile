@@ -94,7 +94,7 @@ pipeline {
       when { expression { return params.RUN_GUTENBERG_IMPORT } }
       steps {
         script {
-          withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_TOKEN')]) {
+          withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_CLIENT_SECRET')]) {
             try {
               sh '''
                 set -euo pipefail
@@ -102,6 +102,13 @@ pipeline {
                 mkdir -p artifacts
                 report=artifacts/gutenberg-import-report.json
                 base="${INGESTION_BASE_URL%/}"
+                token_url="https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/token"
+                token_response=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+                  -X POST "$token_url" \
+                  --data-urlencode 'grant_type=client_credentials' \
+                  --data-urlencode 'client_id=bookrush-ingestion-admin' \
+                  --data-urlencode "client_secret=$INGESTION_CLIENT_SECRET")
+                INGESTION_TOKEN=$(jq -er '.access_token' <<< "$token_response")
                 ids="${GUTENBERG_EXTERNAL_IDS//[[:space:]]/}"
                 test -n "$ids"
                 IFS=',' read -r -a id_array <<< "$ids"

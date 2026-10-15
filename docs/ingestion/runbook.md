@@ -55,7 +55,9 @@ para leases expiradas ou `POST .../jobs/{jobId}/resume` para retomar. O
 O estágio Jenkins **Importação Gutenberg (opt-in)** é desabilitado por padrão.
 Após um dry-run, marque `RUN_GUTENBERG_IMPORT`; o relatório sanitizado é
 arquivado como `gutenberg-import-report.json`. Pushes e deploys normais não
-iniciam ingestão.
+iniciam ingestão. A credencial `bookrush-ingestion-token` no Jenkins contém o
+segredo do client OIDC `bookrush-ingestion-admin`; a pipeline troca esse
+segredo por um access token temporário antes de chamar a API.
 
 Para reprocessar assets de um livro já existente, marque também
 `GUTENBERG_PROCESS_ASSETS` e desmarque `GUTENBERG_DRY_RUN`. A pipeline enviará

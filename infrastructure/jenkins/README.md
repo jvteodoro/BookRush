@@ -143,9 +143,11 @@ O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Pa
 executá-lo, marque `RUN_GUTENBERG_IMPORT`, informe apenas IDs numéricos em
 `GUTENBERG_EXTERNAL_IDS` e mantenha `GUTENBERG_DRY_RUN` marcado na primeira
 execução. O job usa a credential Jenkins Secret text indicada por
-`INGESTION_CREDENTIAL_ID` como Bearer token; o token nunca é gravado no
-relatório. A chave de idempotência é derivada do commit, IDs, modo e URL, então
-repetir o build não cria uma segunda execução lógica.
+`INGESTION_CREDENTIAL_ID` como segredo do client OIDC
+`bookrush-ingestion-admin`, solicita um access token de curta duração a cada
+execução e nunca grava o segredo ou o token no relatório. A chave de
+idempotência é derivada do commit, IDs, modo e URL, então repetir o build não
+cria uma segunda execução lógica.
 
 Para reprocessar um livro já importado e atualizar o EPUB, capítulos, TXT e
 thumbnail, desmarque `GUTENBERG_DRY_RUN` e mantenha
