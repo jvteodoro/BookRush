@@ -2403,6 +2403,310 @@ body[data-mode="app"] .analytics-book-row > *:nth-child(n + 5) {
     display: none;
   }
 }
+
+/* BookRush visual system for the legacy account and administration routes.
+   These routes are still rendered by pageloop.js, while the primary reading
+   tabs use the React reader shell. Keep the markup/API stable and make both
+   surfaces share the same visual language. */
+:root {
+  --bg: var(--br-cream, #f8f1dc);
+  --bg-2: var(--br-surface-2, #f1e9d2);
+  --panel: var(--br-surface, #fffdf6);
+  --panel-2: #f7f0dd;
+  --line: var(--br-outline-soft, #d8cdae);
+  --text: var(--br-ink, #10141a);
+  --muted: var(--br-content-dim, #6b6455);
+  --soft: #fffdf6;
+  --white: #fffdf6;
+  --ink: var(--br-ink, #10141a);
+  --paper: var(--br-cream, #f8f1dc);
+  --pink: var(--br-red, #e31a2e);
+  --cyan: var(--br-teal, #067b8e);
+  --violet: var(--br-teal-dark, #084256);
+  --green: var(--br-teal, #067b8e);
+  --amber: var(--br-gold, #fcab0f);
+  --danger: var(--br-red, #e31a2e);
+  --shadow: var(--br-shadow-soft, 5px 5px 0 #d8cdae);
+  --radius: var(--br-radius-card, 14px);
+  --radius-sm: 10px;
+  --font: var(--br-font-sans, "Plus Jakarta Sans", system-ui, sans-serif);
+  --serif: var(--br-font-reading, "Source Serif 4", Georgia, serif);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.app-shell {
+  background: var(--bg);
+}
+
+.sidebar {
+  background: var(--bg);
+  border-right: 2px solid var(--line);
+}
+
+.logo {
+  font-family: var(--br-font-display, "Bungee", sans-serif);
+  color: var(--text);
+}
+
+.brand-badge {
+  background: var(--pink);
+  color: #fff;
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.nav-item {
+  color: var(--muted);
+  border-radius: 12px;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background: var(--bg-2);
+  color: var(--text);
+}
+
+.nav-item.active {
+  box-shadow: inset 4px 0 var(--pink);
+}
+
+.nav-item.active .nav-icon-wrap {
+  color: var(--pink);
+}
+
+.nav-item.admin-link,
+.nav-item.publisher-link,
+.profile-mini {
+  border-color: var(--line);
+}
+
+.profile-mini .avatar,
+.avatar {
+  background: var(--amber);
+  color: var(--ink);
+}
+
+.topbar {
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.icon-btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--ink);
+}
+
+.icon-btn:hover {
+  background: var(--bg-2);
+  color: var(--pink);
+}
+
+.primary-btn,
+.secondary-btn,
+.ghost-btn,
+.danger-btn {
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.primary-btn {
+  background: var(--pink);
+  color: #fff;
+}
+
+.primary-btn:hover {
+  background: var(--br-orange, #fb6a14);
+}
+
+.secondary-btn {
+  background: var(--amber);
+  color: var(--ink);
+}
+
+.ghost-btn {
+  color: var(--text);
+  background: transparent;
+}
+
+.danger-btn {
+  background: #ffe0d6;
+  color: var(--pink);
+}
+
+.content {
+  background: var(--bg);
+}
+
+.page-heading h1,
+.page-heading h2,
+.content h1,
+.content h2,
+.content h3 {
+  font-family: var(--br-font-display, "Bungee", sans-serif);
+  letter-spacing: 0;
+}
+
+.page-heading p,
+.muted,
+.profile-mini span,
+.bookbody p,
+.metric-change,
+.description {
+  color: var(--muted);
+}
+
+.panel-card,
+.form-card,
+.setting-card,
+.panel,
+.metric-card,
+.table-wrap,
+.moderation-card,
+.plant-metric,
+.locked-profile,
+.profile-hero,
+.quick a,
+.launch-card {
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.panel-card,
+.form-card,
+.setting-card,
+.panel,
+.plant-metric,
+.locked-profile,
+.profile-hero {
+  padding: 1.5rem;
+}
+
+.metric-card {
+  padding: 1.25rem;
+}
+
+.metric-card strong,
+.metric-number {
+  color: var(--pink);
+  font-family: var(--br-font-display, "Bungee", sans-serif);
+}
+
+.pill,
+.genre-chip,
+.tag,
+.status-pill {
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.search-box,
+.search-bar,
+.field input,
+.field textarea,
+.field select,
+input,
+textarea,
+select {
+  background: var(--soft);
+  color: var(--text);
+  border-color: var(--ink);
+}
+
+.data-table th,
+.data-table td,
+.setting-row,
+.section-row,
+.history-row {
+  border-color: var(--line);
+}
+
+.tab-row,
+.view-tabs {
+  border-color: var(--line);
+}
+
+.tab-btn.active,
+.view-tabs button.active {
+  color: var(--pink);
+  border-color: var(--pink);
+}
+
+.notice {
+  background: #fff0d2;
+  border: 1px solid var(--amber);
+  color: var(--text);
+}
+
+.mobile-nav {
+  background: var(--panel);
+  border-color: var(--ink);
+}
+
+.mobile-nav button.active {
+  color: var(--pink);
+}
+
+.profile-avatar,
+.lock-orb {
+  background: var(--cyan);
+  color: #fff;
+  border: 2px solid var(--ink);
+}
+
+.profile-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.profile-actions,
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.plant-metric {
+  max-width: 720px;
+}
+
+.plant-metric .notice {
+  margin-top: 1.25rem;
+}
+
+.toast {
+  background: var(--ink);
+  color: var(--paper);
+  border: 2px solid var(--pink);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 760px) {
+  .profile-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-actions {
+    grid-column: 1 / -1;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;
