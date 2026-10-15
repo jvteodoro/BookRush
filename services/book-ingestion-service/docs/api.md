@@ -12,6 +12,9 @@ Readium.
 Os offsets de `chapters.json` são calculados depois da normalização final
 `NFC_LF`. Isso evita que a compactação de espaços e quebras de linha deixe os
 intervalos fora do texto persistido durante o reprocessamento de EPUBs.
+O serviço reaplica essa normalização ao materializar o TXT e remapeia novamente
+os offsets recebidos do extrator antes de escrever `chapters.json`; portanto o
+fluxo de processamento duplo permanece seguro para EPUBs já normalizados.
 
 Quando `processAssets=true`, o job baixa `pg{id}.cover.medium.jpg`, grava o
 snapshot RAW em `gutenberg/{id}/thumbnail.jpg` e registra no catalog-service um
