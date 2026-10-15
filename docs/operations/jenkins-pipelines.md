@@ -103,6 +103,13 @@ preenchido, autentica e executa `docker push` dessa mesma tag. Quando
 `DEPLOY=true`, passa essa tag explicitamente ao Compose e usa `--no-build`,
 garantindo que o container iniciado seja a imagem validada.
 
+Como o admin é servido sob `https://bookrush.jteodoro.tec.br/admin/`, o job
+também passa `VITE_BASE_PATH=/admin/` ao build. Os demais argumentos públicos
+fixam mocks desligados, Keycloak `bookrush-platform` e as bases `/api`,
+`/ingestion`, `/analytics` e `/feed`. Sem esses argumentos, os assets ficam em
+`/assets/*`; o gateway encaminha essa rota ao portal e devolve HTML no lugar do
+JavaScript, produzindo uma tela branca no admin.
+
 A definição usa blocos declarativos separados para `when` e `steps`, portanto
 deve ser validada com `scripts/validate-pipelines.sh` antes de ser publicada no
 Jenkins. Como o job é criado como Pipeline inline, seu estágio de checkout usa
