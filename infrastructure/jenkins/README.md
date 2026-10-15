@@ -146,8 +146,9 @@ execução. O job usa a credential Jenkins Secret text indicada por
 `INGESTION_CREDENTIAL_ID` como segredo do client OIDC
 `bookrush-ingestion-admin`, solicita um access token de curta duração a cada
 execução e nunca grava o segredo ou o token no relatório. A chave de
-idempotência é derivada do commit, IDs, modo e URL, então repetir o build não
-cria uma segunda execução lógica.
+idempotência inclui também o identificador da build Jenkins: uma mesma build
+continua idempotente, mas uma nova tentativa deliberada pode reprocessar o
+mesmo livro sem receber o resultado de uma tentativa anterior que falhou.
 
 O estágio declara Bash como o primeiro byte do script do agente, pois usa
 arrays, `[[ ]]` e here-strings para validar os IDs e o JSON.

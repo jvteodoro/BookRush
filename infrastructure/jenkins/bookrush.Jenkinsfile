@@ -120,7 +120,7 @@ pipeline {
                 process_assets=${GUTENBERG_PROCESS_ASSETS,,}
                 request=$(jq -cn --argjson ids "$ids_json" --argjson dry "$dry_run" --argjson assets "$process_assets" \
                   '{source:"GUTENBERG",externalIds:$ids,languages:[],maxItems:($ids|length),dryRun:$dry,processAssets:$assets,reprocess:$assets}')
-                idem=$(printf '%s|%s|%s|%s' "$GIT_COMMIT" "$ids" "$dry_run" "$base" | sha256sum | cut -d' ' -f1)
+                idem=$(printf '%s|%s|%s|%s|%s' "$GIT_COMMIT" "$BUILD_TAG" "$ids" "$dry_run" "$base" | sha256sum | cut -d' ' -f1)
                 response=$(mktemp)
                 status=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
                   -o "$response" -w '%{http_code}' -X POST "$base/api/admin/v1/ingestion/run" \
