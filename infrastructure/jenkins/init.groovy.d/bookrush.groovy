@@ -7,6 +7,7 @@ import com.cloudbees.plugins.credentials.CredentialsScope
 import com.cloudbees.plugins.credentials.domains.Domain
 import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl
 import com.cloudbees.plugins.credentials.SystemCredentialsProvider
+import hudson.util.Secret
 
 def ingestionSecret = System.getenv('JENKINS_OIDC_CLIENT_SECRET')
 if (ingestionSecret != null && !ingestionSecret.isBlank()) {
@@ -19,7 +20,7 @@ if (ingestionSecret != null && !ingestionSecret.isBlank()) {
             CredentialsScope.GLOBAL,
             credentialId,
             'Segredo do client OIDC bookrush-ingestion-admin',
-            ingestionSecret
+            Secret.fromString(ingestionSecret)
         ))
         credentialStore.save()
     }

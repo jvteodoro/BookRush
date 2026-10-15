@@ -150,7 +150,8 @@ idempotência é derivada do commit, IDs, modo e URL, então repetir o build nã
 cria uma segunda execução lógica.
 
 Na instalação Compose, essa Secret Text é provisionada idempotentemente pelo
-`init.groovy.d/bookrush.groovy`, usando o mesmo segredo protegido do client
+`init.groovy.d/bookrush.groovy`, convertendo o valor para o tipo Secret do
+Jenkins e usando o mesmo segredo protegido do client
 OIDC do Jenkins. O provisionamento ocorre somente no startup do Jenkins e não
 grava o segredo no repositório.
 
