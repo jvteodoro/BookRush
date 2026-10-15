@@ -143,9 +143,28 @@ O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Pa
 executá-lo, marque `RUN_GUTENBERG_IMPORT`, informe apenas IDs numéricos em
 `GUTENBERG_EXTERNAL_IDS` e mantenha `GUTENBERG_DRY_RUN` marcado na primeira
 execução. O job usa a credential Jenkins Secret text indicada por
-`INGESTION_CREDENTIAL_ID` como Bearer token; o token nunca é gravado no
-relatório. A chave de idempotência é derivada do commit, IDs, modo e URL, então
-repetir o build não cria uma segunda execução lógica.
+`INGESTION_CREDENTIAL_ID` como segredo do client OIDC
+`bookrush-ingestion-admin`, solicita um access token de curta duração a cada
+execução e nunca grava o segredo ou o token no relatório. A chave de
+idempotência inclui também o identificador da build Jenkins: uma mesma build
+continua idempotente, mas uma nova tentativa deliberada pode reprocessar o
+mesmo livro sem receber o resultado de uma tentativa anterior que falhou.
+
+O estágio declara Bash como o primeiro byte do script do agente, pois usa
+arrays, `[[ ]]` e here-strings para validar os IDs e o JSON.
+O agente Jenkins também inclui `jq` na imagem base; ele é usado para validar a
+resposta OIDC, montar o payload e acompanhar o job Gutenberg.
+
+Na instalação Compose, essa Secret Text é provisionada idempotentemente pelo
+`init.groovy.d/bookrush.groovy`, convertendo o valor para o tipo Secret do
+Jenkins e usando o mesmo segredo protegido do client
+OIDC do Jenkins. O provisionamento ocorre somente no startup do Jenkins e não
+grava o segredo no repositório.
+
+Para reprocessar um livro já importado e atualizar o EPUB, capítulos, TXT e
+thumbnail, desmarque `GUTENBERG_DRY_RUN` e mantenha
+`GUTENBERG_PROCESS_ASSETS` marcado. Esse modo envia `processAssets=true` e
+`reprocess=true`; ele é deliberado e não é executado em deploys normais.
 
 O estágio consulta o job até o limite escolhido em
 `GUTENBERG_TIMEOUT_MINUTES`, arquiva `gutenberg-import-report.json` e falha a

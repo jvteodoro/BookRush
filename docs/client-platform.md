@@ -112,7 +112,7 @@ usuários e denúncias retornados pela facade, e decisões são registradas por
 `POST /api/v1/admin/moderation`; não há bloqueios ou métricas simuladas no
 cliente.
 
-A tela do leitor mantém somente o `WebPubNavigator` do Readium: não há texto de exemplo, slider de paginação, controle manual de fonte/tema ou barra móvel paralela. O shell fornece apenas metadados do livro, progresso persistido e marcador; navegação, paginação e renderização pertencem à publicação Readium.
+A tela do leitor mantém o `WebPubNavigator` do Readium como fonte de renderização e navegação. O shell fornece sumário por capítulos, anterior/próximo, progresso persistido, marcador e controles de leitura: família da fonte, tamanho, espaçamento, cor do texto e cor de fundo. As preferências visuais são limitadas a valores seguros e persistidas no navegador; o frontend as injeta novamente no iframe sempre que o navigator troca o recurso HTML.
 
 O layout atual do leitor usa uma única coluna responsiva: um cabeçalho compacto para retorno e marcador, o `readium-host` centralizado para o WebPubNavigator e o progresso fixado na base. Os painéis laterais do protótipo antigo não participam da rota de leitura.
 
@@ -127,6 +127,8 @@ Ao sair da rota de leitura, o frontend destrói explicitamente o `WebPubNavigato
 
 
 O fetcher autenticado usa `cache: no-store` para manifesto e recursos da publicação, evitando que uma segunda montagem reutilize um blob/iframe inválido. A saída aguarda `unmount()` terminar antes de renderizar a rota anterior.
+
+O contrato do texto reader-ready declara explicitamente `text/plain;charset=UTF-8` no catálogo e `text/html;charset=UTF-8` no content-service. O HTML dos capítulos também declara `<meta charset="utf-8">`. Essa declaração precisa existir na resposta HTTP, pois o content-service converte o artifact em `String` antes de gerar a publicação; somente a meta tag não corrige uma decodificação anterior feita com charset incorreto.
 
 
 O host do Readium começa vazio; o frontend não deixa um texto de carregamento sobreposto ao iframe, e só renderiza uma mensagem quando a montagem falha.

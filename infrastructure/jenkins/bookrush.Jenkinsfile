@@ -11,6 +11,7 @@ pipeline {
     string(name: 'KUBECONFIG_CREDENTIAL_ID', defaultValue: 'bookrush-kubeconfig', description: 'Credential Jenkins do tipo Secret file.')
     booleanParam(name: 'RUN_GUTENBERG_IMPORT', defaultValue: false, description: 'Executar explicitamente a importação Gutenberg depois dos testes. Desmarcado: nenhuma importação.')
     booleanParam(name: 'GUTENBERG_DRY_RUN', defaultValue: true, description: 'Executar a importação Gutenberg em modo dry-run (recomendado).')
+    booleanParam(name: 'GUTENBERG_PROCESS_ASSETS', defaultValue: true, description: 'Baixar/reprocessar EPUB, capítulos, TXT e thumbnail quando a importação estiver habilitada.')
     string(name: 'GUTENBERG_EXTERNAL_IDS', defaultValue: '1342', description: 'IDs Gutenberg separados por vírgula; somente números.')
     string(name: 'INGESTION_BASE_URL', defaultValue: 'https://bookrush.jteodoro.tec.br/ingestion', description: 'Base externa do gateway para o ingestion-service.')
     string(name: 'INGESTION_CREDENTIAL_ID', defaultValue: 'bookrush-ingestion-token', description: 'Credential Jenkins Secret text com token OIDC do operador.')
@@ -93,14 +94,21 @@ pipeline {
       when { expression { return params.RUN_GUTENBERG_IMPORT } }
       steps {
         script {
-          withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_TOKEN')]) {
+          withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_CLIENT_SECRET')]) {
             try {
-              sh '''
+              sh '''#!/usr/bin/env bash
                 set -euo pipefail
                 set +x
                 mkdir -p artifacts
                 report=artifacts/gutenberg-import-report.json
                 base="${INGESTION_BASE_URL%/}"
+                token_url="https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/token"
+                token_response=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+                  -X POST "$token_url" \
+                  --data-urlencode 'grant_type=client_credentials' \
+                  --data-urlencode 'client_id=bookrush-ingestion-admin' \
+                  --data-urlencode "client_secret=$INGESTION_CLIENT_SECRET")
+                INGESTION_TOKEN=$(printf '%s\n' "$token_response" | jq -er '.access_token')
                 ids="${GUTENBERG_EXTERNAL_IDS//[[:space:]]/}"
                 test -n "$ids"
                 IFS=',' read -r -a id_array <<< "$ids"
@@ -109,9 +117,10 @@ pipeline {
                 done
                 ids_json=$(printf '%s\\n' "${id_array[@]}" | jq -R . | jq -s .)
                 dry_run=${GUTENBERG_DRY_RUN,,}
-                request=$(jq -cn --argjson ids "$ids_json" --argjson dry "$dry_run" \
-                  '{source:"GUTENBERG",externalIds:$ids,languages:[],maxItems:($ids|length),dryRun:$dry,processAssets:false}')
-                idem=$(printf '%s|%s|%s|%s' "$GIT_COMMIT" "$ids" "$dry_run" "$base" | sha256sum | cut -d' ' -f1)
+                process_assets=${GUTENBERG_PROCESS_ASSETS,,}
+                request=$(jq -cn --argjson ids "$ids_json" --argjson dry "$dry_run" --argjson assets "$process_assets" \
+                  '{source:"GUTENBERG",externalIds:$ids,languages:[],maxItems:($ids|length),dryRun:$dry,processAssets:$assets,reprocess:$assets}')
+                idem=$(printf '%s|%s|%s|%s|%s' "$GIT_COMMIT" "$BUILD_TAG" "$ids" "$dry_run" "$base" | sha256sum | cut -d' ' -f1)
                 response=$(mktemp)
                 status=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
                   -o "$response" -w '%{http_code}' -X POST "$base/api/admin/v1/ingestion/run" \
@@ -130,7 +139,7 @@ pipeline {
                   now=$(date +%s); (( now < deadline )) || { jq '.status="TIMEOUT"' "$report" > "$report.tmp" && mv "$report.tmp" "$report"; exit 1; }
                   job=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
                     -H "Authorization: Bearer $INGESTION_TOKEN" "$base/api/admin/v1/ingestion/jobs/$job_id")
-                  state=$(jq -r '.status // "UNKNOWN"' <<< "$job")
+                  state=$(printf '%s\n' "$job" | jq -r '.status // "UNKNOWN"')
                   jq --arg state "$state" --argjson job "$job" '.lastPoll=$state | .job=$job' "$report" > "$report.tmp" && mv "$report.tmp" "$report"
                   case "$state" in
                     COMPLETED|COMPLETED_WITH_ERRORS|FAILED|CANCELLED)

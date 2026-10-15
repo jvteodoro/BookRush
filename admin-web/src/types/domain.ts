@@ -1,8 +1,9 @@
-export type ImportStatus = 'AVAILABLE' | 'QUEUED' | 'IMPORTING' | 'IMPORTED' | 'FAILED';
+export type ImportStatus =
+  "AVAILABLE" | "QUEUED" | "IMPORTING" | "IMPORTED" | "FAILED";
 
 export interface BookCandidate {
   id: string;
-  source: 'GUTENBERG' | 'OPENLIBRARY' | 'MANUAL';
+  source: "GUTENBERG" | "OPENLIBRARY" | "MANUAL";
   title: string;
   author: string;
   language: string;
@@ -27,7 +28,7 @@ export interface AnalyticsMetric {
 export interface AnalyticsRun {
   id: string;
   bookId: string;
-  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
   modelVersion: string;
   startedAt: string;
   finishedAt?: string;
@@ -56,7 +57,8 @@ export interface FeedItem {
   features: Record<string, number>;
 }
 
-export type FeedEventType = 'IMPRESSION' | 'DWELL' | 'LIKE' | 'DISLIKE' | 'SAVE' | 'OPEN_BOOK' | 'SKIP';
+export type FeedEventType =
+  "IMPRESSION" | "DWELL" | "LIKE" | "DISLIKE" | "SAVE" | "OPEN_BOOK" | "SKIP";
 
 export interface FeedEvent {
   eventId?: string;
@@ -73,9 +75,9 @@ export interface TrainingSession {
   id: string;
   userId: string;
   startedAt: string;
-  status: 'ACTIVE' | 'COMPLETED';
+  status: "ACTIVE" | "COMPLETED";
   parameterVersion: string;
   weights: FeedWeights;
   eventCount: number;
-  population?: 'ADMIN_SEED' | 'END_USER';
+  population?: "ADMIN_SEED" | "END_USER";
 }

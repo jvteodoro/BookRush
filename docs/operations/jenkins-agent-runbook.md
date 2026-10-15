@@ -28,6 +28,12 @@ usuário do container Jenkins.
    executar jobs aprovados. `platform-admins` só deve ser concedido quando o
    agente precisar sincronizar definições inline pelo Script Console.
 
+5. O login OIDC do Jenkins depende de `postgres`, `keycloak` e `reverse-proxy`
+   no Compose principal. Esses serviços usam `restart: unless-stopped` e devem
+   permanecer saudáveis; não basta o container do Jenkins estar ativo. Após
+   uma reinicialização do host, confirme os quatro serviços antes de investigar
+   usuário, senha ou permissões.
+
 ## Ordem correta
 
 ### 1. Criar uma sessão OIDC nova
@@ -138,6 +144,13 @@ usam `CpsFlowDefinition`: são pipelines inline, não Multibranch. Portanto:
   ou configure o job como **Pipeline script from SCM**;
 - sincronização não deve apagar o job, o histórico ou o volume `jenkins_home`.
 
+O bootstrap também deve atualizar a `ParametersDefinitionProperty` do
+`bookrush-admin-web` sempre que o Jenkinsfile ganhar parâmetros novos. Depois
+de uma alteração em `admin-web.Jenkinsfile`, confirme no endpoint
+`/job/bookrush-admin-web/api/json` que `PUBLISH`, `REGISTRY` e
+`REGISTRY_CREDENTIAL_ID` aparecem antes de disparar uma publicação; um job com
+somente `BRANCH`/`DEPLOY` ainda está usando a definição antiga.
+
 Quando a sincronização pelo Script Console for indispensável, fixe a URL no
 commit publicado, confirme o hash retornado e só então execute o build. Não
 busque `main` sem identificar a revisão, pois isso dificulta reproduzir o
@@ -156,6 +169,7 @@ resultado.
 | `Bad substitution` | sintaxe Bash executada por `/bin/sh` | usar expansão POSIX ou `bash -lc` explicitamente |
 | build mostra Jenkinsfile antigo | definição inline não foi sincronizada | atualizar a definição do job e confirmar `config.xml`/console |
 | `invalid_code` no Keycloak | callback OIDC reutilizado | iniciar uma autorização nova; não repetir o callback antigo |
+| `Well known configuration could not be loaded` ou `HTTP 502` no discovery | Keycloak ou reverse proxy fora do ar | confirmar `docker compose ps`, restaurar somente `postgres`, `keycloak` e `reverse-proxy`, aguardar os healthchecks e repetir o redirect OIDC |
 
 ## Evidência mínima para o relatório
 

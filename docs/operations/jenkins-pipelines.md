@@ -94,17 +94,37 @@ marca a execução como falha.
 - `infrastructure/jenkins/init.groovy.d/bookrush.groovy`: cria/atualiza os 12 + 7 jobs e o job SeaweedFS.
 - `infrastructure/jenkins/Dockerfile`: embarca os Jenkinsfiles no bootstrap.
 
-O job `bookrush-admin-web` valida e empacota a console administrativa. Ele
-aceita `BRANCH` e `DEPLOY`; quando `DEPLOY=true`, recria somente o serviço
-`admin-web` no Compose. A definição usa blocos declarativos separados para
-`when` e `steps`, portanto deve ser validada com `scripts/validate-pipelines.sh`
-antes de ser publicada no Jenkins. Como o job é criado como Pipeline inline,
-seu estágio de checkout usa explicitamente o repositório e a branch informada;
-ele não depende de `checkout scm` de Multibranch. O build e o lint rodam em um
-container `node:22-alpine` por meio do `Dockerfile` do `admin-web`, pois o
-agente Jenkins e o daemon Docker podem ter filesystems diferentes; o build e o
-lint são executados no contexto enviado pelo `docker build`. A tag da imagem
-usa expansão POSIX compatível com o `sh` do Jenkins.
+O job `bookrush-admin-web` aceita `BRANCH`, `PUBLISH`, `REGISTRY`, a credential
+do registry e `DEPLOY`. O estágio `Build, testes e lint` roda dentro do
+`Dockerfile` do `admin-web`: `format:check`, `npm test`, `test:coverage`, build e
+lint. O job então cria a imagem versionada
+`bookrush/admin-web:<build>-<commit>`. Com `PUBLISH=true` e `REGISTRY`
+preenchido, autentica e executa `docker push` dessa mesma tag. Quando
+`DEPLOY=true`, passa essa tag explicitamente ao Compose e usa `--no-build`,
+garantindo que o container iniciado seja a imagem validada.
+
+Como o admin é servido sob `https://bookrush.jteodoro.tec.br/admin/`, o job
+também passa `VITE_BASE_PATH=/admin/` ao build. Os demais argumentos públicos
+fixam mocks desligados, Keycloak `bookrush-platform` e as bases `/api`,
+`/ingestion`, `/analytics` e `/feed`. Sem esses argumentos, os assets ficam em
+`/assets/*`; o gateway encaminha essa rota ao portal e devolve HTML no lugar do
+JavaScript, produzindo uma tela branca no admin.
+
+O `admin-web/Dockerfile` mantém os mesmos defaults seguros para que uma
+definição inline antiga do Jenkins, ainda sem esses argumentos, não publique
+uma SPA na raiz nem ative mocks acidentalmente.
+
+A definição usa blocos declarativos separados para `when` e `steps`, portanto
+deve ser validada com `scripts/validate-pipelines.sh` antes de ser publicada no
+Jenkins. Como o job é criado como Pipeline inline, seu estágio de checkout usa
+explicitamente o repositório e a branch informada; ele não depende de
+`checkout scm` de Multibranch. O agente Jenkins e o daemon Docker podem ter
+filesystems diferentes; por isso todas as verificações rodam no contexto
+enviado pelo `docker build`.
+
+O `frontend/Dockerfile` aplica a mesma sequência de validação. Assim, a
+pipeline `bookrush-deploy`, que constrói a imagem principal, não depende apenas
+do `test-portal.sh` do Backstage para validar o frontend.
 
 Publicação e deploy são opt-in nas pipelines isoladas. Para publicar, use
 `PUBLISH=true`, `REGISTRY` e a credential correspondente. Para Compose, use

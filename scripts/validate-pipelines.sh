@@ -12,6 +12,7 @@ test -f infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline dedicada 
 test -f infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço ausente'
 test -f infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical ausente'
 test -f infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline do SeaweedFS ausente'
+test -f infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline do admin-web ausente'
 
 for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-microservice.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
   test -f "$file" || fail "script referenciado não existe: $file"
@@ -30,4 +31,7 @@ grep -Fq 'scripts/deploy-kubernetes-service.sh' infrastructure/jenkins/microserv
 grep -Fq 'scripts/deploy-compose-service.sh' infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical sem deploy Compose'
 grep -Fq 'bash scripts/test-storage.sh' infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline SeaweedFS sem teste de storage'
 grep -Fq 'deploy-seaweedfs.sh' infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline SeaweedFS sem deploy dedicado'
+grep -Fq 'docker build --target build' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem build validado'
+grep -Fq 'docker push "$ADMIN_WEB_IMAGE"' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem publicação da imagem'
+grep -Fq 'PUBLISH exige REGISTRY' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem guarda de publicação'
 echo 'Pipeline contracts: OK'

@@ -57,6 +57,25 @@ paths:
         '401': {description: Token interno ausente ou inválido.}
         '404': {description: "Livro, asset ou versão não encontrada."}
         '409': {description: Objeto ausente; reconciliação de storage necessária.}
+  /api/v1/books/{bookId}/reader-assets/{assetId}/content:
+    get:
+      tags: [Conteúdo reader]
+      summary: Transmitir asset EPUB ao content-service
+      description: Boundary interno autenticado pelo token de conteúdo; o navegador deve usar o manifesto do content-service.
+      operationId: streamEpubAsset
+      parameters:
+        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: assetId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: X-Content-Service-Token, in: header, required: true, schema: {type: string, format: password}}
+      responses:
+        '200':
+          description: Bytes do EPUB original.
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '401': {description: Token interno ausente ou inválido.}
+        '404': {description: Livro ou asset EPUB não encontrado.}
+        '409': {description: Objeto ausente; reconciliação de storage necessária.}
   /api/internal/v1/catalog/books:
     get:
       tags: [Catálogo interno]

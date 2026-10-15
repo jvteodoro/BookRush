@@ -13,16 +13,23 @@ short-lived URL generation to catalog-service, so it never exposes permanent
 object-store URLs or copies catalog tables.
 
 `GET /api/v1/content/books/{bookId}/publication.json` emits a Readium Web
-Publication Manifest whose reading order is the persisted chapter projection.
-Each chapter is served as HTML by
+Publication Manifest from the original EPUB whenever an EPUB source asset is
+available. The OPF `spine` becomes the reading order and the EPUB NCX or
+`nav.xhtml` becomes the hierarchical `toc` (including nested `children`). The
+original XHTML, CSS, images and fonts are served through
+`/api/v1/content/books/{bookId}/resources/{resource}`. Relative links remain
+inside the EPUB namespace and are not converted into permanent storage URLs.
+
+Books without a readable EPUB keep the legacy persisted chapter projection.
+Each fallback chapter is served as HTML by
 `/api/v1/content/books/{bookId}/chapters/{chapterId}/content`; the service
 resolves the exact normalized text version and slices Unicode code-point
 offsets. Storage URLs remain short-lived capabilities and are never returned
 as permanent links.
 
-The web client mounts Readium's `WebPubNavigator`. Books without a projected
-text version return an empty reading order and the UI reports that reader-ready
-content is unavailable; it never substitutes sample paragraphs.
+The web client mounts Readium's `WebPubNavigator` directly on this publication.
+TXT and `chapters.json` remain processing artifacts for search, analytics and
+fallback compatibility; they are not the primary source for EPUB rendering.
 
 When S3-compatible storage credentials are configured, each manifest snapshot
 is also written to `reader-ready/{bookId}/manifest-{sha256}.json` in the public

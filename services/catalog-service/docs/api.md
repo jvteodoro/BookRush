@@ -41,6 +41,11 @@ resultados são ordenados por relevância textual e depois por título. `size` �
 limitado a 100. A aba Buscar usa esta API diretamente e solicita somente a
 página atual.
 
+O endpoint reader de capítulos seleciona somente a projeção da versão TXT
+`AVAILABLE` mais recente, mesmo quando o asset lógico anterior já foi marcado
+`INACTIVE` durante um reprocessamento. Projeções antigas continuam no banco
+para rastreabilidade, mas não aparecem na navegação do leitor.
+
 Consumidores como ingestão e analytics consultam o catálogo pelas rotas internas,
 sem credenciais ou conexão direta ao PostgreSQL:
 
@@ -99,6 +104,11 @@ Os timestamps PostgreSQL `timestamptz` são convertidos de
 inferir o fuso a partir do texto formatado.
 
 ## Reader chapters
+
+`GET /api/v1/books/{bookId}/reader-assets/{assetId}/content` é uma fronteira
+interna autenticada por `X-Content-Service-Token` usada pelo
+`book-content-service` para ler o EPUB SOURCE. Não deve ser chamada pelo
+navegador e não retorna URL permanente de storage.
 
 `GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted
 chapter projection for the book, including the exact text asset version,

@@ -3,7 +3,11 @@ WORKDIR /app
 COPY package.json .
 RUN npm install
 COPY . .
-RUN npm run build
+RUN npm run format:check \
+ && npm test \
+ && npm run test:coverage \
+ && npm run lint \
+ && npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
