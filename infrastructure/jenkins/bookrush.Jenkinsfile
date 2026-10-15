@@ -97,6 +97,7 @@ pipeline {
           withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_CLIENT_SECRET')]) {
             try {
               sh '''
+                #!/usr/bin/env bash
                 set -euo pipefail
                 set +x
                 mkdir -p artifacts
