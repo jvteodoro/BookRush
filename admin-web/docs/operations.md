@@ -22,7 +22,8 @@ O serviço escuta somente em `127.0.0.1:18084`. O gateway publica a console em
 raiz; não exponha o container diretamente na Internet. O job Jenkins `bookrush-admin-web` executa
 build, lint e imagem, e só faz deploy quando o parâmetro `DEPLOY` é marcado.
 
-O build publicado precisa usar `VITE_BASE_PATH=/admin/`. Sem esse valor, o
+O build publicado usa `VITE_BASE_PATH=/admin/` por padrão e a pipeline também o
+passa explicitamente. Sem esse valor, o
 Vite gera referências como `/assets/index.js`; o gateway encaminha essa URL ao
 portal principal, que devolve HTML no lugar de JavaScript e deixa o admin em
 branco. A pipeline fixa esse caminho, desativa `VITE_USE_MOCKS` e injeta as

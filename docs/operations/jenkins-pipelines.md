@@ -110,6 +110,10 @@ fixam mocks desligados, Keycloak `bookrush-platform` e as bases `/api`,
 `/assets/*`; o gateway encaminha essa rota ao portal e devolve HTML no lugar do
 JavaScript, produzindo uma tela branca no admin.
 
+O `admin-web/Dockerfile` mantém os mesmos defaults seguros para que uma
+definição inline antiga do Jenkins, ainda sem esses argumentos, não publique
+uma SPA na raiz nem ative mocks acidentalmente.
+
 A definição usa blocos declarativos separados para `when` e `steps`, portanto
 deve ser validada com `scripts/validate-pipelines.sh` antes de ser publicada no
 Jenkins. Como o job é criado como Pipeline inline, seu estágio de checkout usa
