@@ -25,7 +25,13 @@ public final class TextProcessingService {
       List<ChapterStructureWriter.Chapter> structure)
       throws Exception {
     String normalizedInput = normalizer.normalize(input);
-    String normalized = normalizer.removeKnownGutenbergDelimiters(normalizedInput);
+    // EPUB chapter offsets refer to the complete publication text. Some EPUBs
+    // include Gutenberg START/END markers in the license chapter; stripping
+    // that range would invalidate every following chapter interval.
+    String normalized =
+        structure == null || structure.isEmpty()
+            ? normalizer.removeKnownGutenbergDelimiters(normalizedInput)
+            : normalizedInput;
     String hash = sha256(normalized);
     byte[] chapterJson =
         chapters.write(

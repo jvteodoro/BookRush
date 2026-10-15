@@ -8,6 +8,10 @@ capítulos e relações pai/filho; essa estrutura é materializada em
 `chapters.json` com offsets Unicode para busca, analytics e compatibilidade.
 O TXT normalizado é um artefato auxiliar e não substitui o XHTML original no
 Readium.
+Quando a entrada possui estrutura EPUB, os marcadores textuais de Gutenberg são
+preservados: alguns livros os incluem no capítulo de licença, e removê-los
+alteraria os offsets dos capítulos seguintes. A remoção de delimitadores fica
+restrita ao fluxo TXT sem estrutura.
 
 Os offsets de `chapters.json` são calculados depois da normalização final
 `NFC_LF`. Isso evita que a compactação de espaços e quebras de linha deixe os

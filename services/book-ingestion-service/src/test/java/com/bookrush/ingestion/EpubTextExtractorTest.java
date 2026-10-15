@@ -95,6 +95,21 @@ class EpubTextExtractorTest {
     }
   }
 
+  @Test
+  void realGutenbergFixtureCanBeProcessedWhenPresent() throws Exception {
+    Path epub = Path.of("/tmp/2641.epub");
+    org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(epub));
+    var extracted = new EpubTextExtractor().extractStructured(epub);
+    var service = new TextProcessingService(new ObjectMapper());
+    var chapters = extracted.chapters().stream()
+        .map(c -> new com.bookrush.ingestion.processing.ChapterStructureWriter.Chapter(
+            c.key(), c.parent(), c.position(), c.title(), c.start(), c.end(), c.sourceHref(), c.confidence()))
+        .toList();
+    var first = service.process(UUID.randomUUID(), UUID.randomUUID(), extracted.text(), chapters);
+    service.process(UUID.randomUUID(), UUID.randomUUID(),
+        new String(first.normalizedTxt(), java.nio.charset.StandardCharsets.UTF_8), chapters);
+  }
+
   private static void put(ZipOutputStream output, String name, String value) throws Exception {
     output.putNextEntry(new ZipEntry(name));
     output.write(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
