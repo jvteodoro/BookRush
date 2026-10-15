@@ -51,7 +51,7 @@ public class ReaderContentController {
             + "SELECT v.id FROM catalog.book_asset_version v "
             + "JOIN catalog.book_asset a ON a.id=v.book_asset_id "
             + "WHERE a.book_id=c.book_id AND a.asset_type='TXT' "
-            + "AND a.status='ACTIVE' AND v.status='AVAILABLE' "
+            + "AND v.status='AVAILABLE' "
             + "ORDER BY v.created_at DESC LIMIT 1) "
             + "ORDER BY c.position, c.start_offset",
         bookId);
