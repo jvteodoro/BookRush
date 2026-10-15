@@ -147,6 +147,11 @@ execução. O job usa a credential Jenkins Secret text indicada por
 relatório. A chave de idempotência é derivada do commit, IDs, modo e URL, então
 repetir o build não cria uma segunda execução lógica.
 
+Para reprocessar um livro já importado e atualizar o EPUB, capítulos, TXT e
+thumbnail, desmarque `GUTENBERG_DRY_RUN` e mantenha
+`GUTENBERG_PROCESS_ASSETS` marcado. Esse modo envia `processAssets=true` e
+`reprocess=true`; ele é deliberado e não é executado em deploys normais.
+
 O estágio consulta o job até o limite escolhido em
 `GUTENBERG_TIMEOUT_MINUTES`, arquiva `gutenberg-import-report.json` e falha a
 pipeline para estados `FAILED`, `COMPLETED_WITH_ERRORS`, `CANCELLED` ou timeout.

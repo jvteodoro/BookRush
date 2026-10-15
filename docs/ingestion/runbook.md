@@ -57,5 +57,10 @@ Após um dry-run, marque `RUN_GUTENBERG_IMPORT`; o relatório sanitizado é
 arquivado como `gutenberg-import-report.json`. Pushes e deploys normais não
 iniciam ingestão.
 
+Para reprocessar assets de um livro já existente, marque também
+`GUTENBERG_PROCESS_ASSETS` e desmarque `GUTENBERG_DRY_RUN`. A pipeline enviará
+`processAssets=true` e `reprocess=true`, preservando o livro canônico e criando
+novas versões imutáveis do EPUB/TXT/chapters.json conforme necessário.
+
 Não execute `docker compose down --volumes` no projeto de produção. Em falha
 pós-upload, preserve `storage_intent` e `book_asset_version` para reconciliação.

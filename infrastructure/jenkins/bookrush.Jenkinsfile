@@ -11,6 +11,7 @@ pipeline {
     string(name: 'KUBECONFIG_CREDENTIAL_ID', defaultValue: 'bookrush-kubeconfig', description: 'Credential Jenkins do tipo Secret file.')
     booleanParam(name: 'RUN_GUTENBERG_IMPORT', defaultValue: false, description: 'Executar explicitamente a importação Gutenberg depois dos testes. Desmarcado: nenhuma importação.')
     booleanParam(name: 'GUTENBERG_DRY_RUN', defaultValue: true, description: 'Executar a importação Gutenberg em modo dry-run (recomendado).')
+    booleanParam(name: 'GUTENBERG_PROCESS_ASSETS', defaultValue: true, description: 'Baixar/reprocessar EPUB, capítulos, TXT e thumbnail quando a importação estiver habilitada.')
     string(name: 'GUTENBERG_EXTERNAL_IDS', defaultValue: '1342', description: 'IDs Gutenberg separados por vírgula; somente números.')
     string(name: 'INGESTION_BASE_URL', defaultValue: 'https://bookrush.jteodoro.tec.br/ingestion', description: 'Base externa do gateway para o ingestion-service.')
     string(name: 'INGESTION_CREDENTIAL_ID', defaultValue: 'bookrush-ingestion-token', description: 'Credential Jenkins Secret text com token OIDC do operador.')
@@ -109,8 +110,9 @@ pipeline {
                 done
                 ids_json=$(printf '%s\\n' "${id_array[@]}" | jq -R . | jq -s .)
                 dry_run=${GUTENBERG_DRY_RUN,,}
-                request=$(jq -cn --argjson ids "$ids_json" --argjson dry "$dry_run" \
-                  '{source:"GUTENBERG",externalIds:$ids,languages:[],maxItems:($ids|length),dryRun:$dry,processAssets:false}')
+                process_assets=${GUTENBERG_PROCESS_ASSETS,,}
+                request=$(jq -cn --argjson ids "$ids_json" --argjson dry "$dry_run" --argjson assets "$process_assets" \
+                  '{source:"GUTENBERG",externalIds:$ids,languages:[],maxItems:($ids|length),dryRun:$dry,processAssets:$assets,reprocess:$assets}')
                 idem=$(printf '%s|%s|%s|%s' "$GIT_COMMIT" "$ids" "$dry_run" "$base" | sha256sum | cut -d' ' -f1)
                 response=$(mktemp)
                 status=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
