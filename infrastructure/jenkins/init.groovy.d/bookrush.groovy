@@ -3,6 +3,27 @@ import jenkins.model.JenkinsLocationConfiguration
 import hudson.model.*
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
+import com.cloudbees.plugins.credentials.CredentialsScope
+import com.cloudbees.plugins.credentials.domains.Domain
+import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl
+import com.cloudbees.plugins.credentials.SystemCredentialsProvider
+
+def ingestionSecret = System.getenv('JENKINS_OIDC_CLIENT_SECRET')
+if (ingestionSecret != null && !ingestionSecret.isBlank()) {
+    def credentialStore = SystemCredentialsProvider.getInstance().getStore()
+    def globalDomain = Domain.global()
+    def credentialId = 'bookrush-ingestion-token'
+    def exists = credentialStore.getCredentials(globalDomain).any { it.id == credentialId }
+    if (!exists) {
+        credentialStore.addCredentials(globalDomain, new StringCredentialsImpl(
+            CredentialsScope.GLOBAL,
+            credentialId,
+            'Segredo do client OIDC bookrush-ingestion-admin',
+            ingestionSecret
+        ))
+        credentialStore.save()
+    }
+}
 
 def instance = Jenkins.get()
 JenkinsLocationConfiguration.get().setUrl('https://jenkins-bookrush.jteodoro.tec.br/')
