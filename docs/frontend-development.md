@@ -32,3 +32,24 @@ verificação do harness; módulos TypeScript compilados por esbuild em `data:` 
 ainda não são mapeados para as linhas dos arquivos-fonte. Não use o percentual
 retornado como um limite de cobertura de produção até migrar esses testes para
 um runner com source maps, como Vitest.
+
+## Shell autenticado e migração do legado
+
+As abas autenticadas devem ser renderizadas pelo shell React em
+`src/components/layout/AppShell.tsx`. `src/reader/LiveReader.tsx` compõe as
+abas de feed, recomendações, busca, biblioteca e as áreas de conta. As telas
+de planta, perfil, privacidade, administração e publicador ficam em
+`src/reader/AccountPages.tsx` e usam `Card`, `Button`, `Switch` e os tokens
+`--br-*` do design system.
+
+`public/pageloop.js` permanece somente como ponte temporária para o leitor de
+livro legado e integrações que ainda dependem dele. Não adicione novas telas
+ou navegação ao pageloop: uma rota nova deve ser um componente React dentro do
+`AppShell`, com loading, erro e ações autenticadas explícitos.
+
+O `admin-web` é uma aplicação React separada, implantada pelo job
+`bookrush-admin-web`. Ela deve manter a inicialização do Keycloak protegida por
+tratamento de rejeição, renderizando uma mensagem acionável em vez de deixar o
+root vazio quando a sessão não puder ser restaurada. Alterações visuais devem
+reutilizar os tokens BookRush definidos em `admin-web/src/styles/app.css` e
+validar o build do admin separadamente do frontend principal.

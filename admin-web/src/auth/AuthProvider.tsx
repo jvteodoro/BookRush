@@ -28,19 +28,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
       onLoad: "login-required",
       pkceMethod: "S256",
       checkLoginIframe: false,
-    }).then(async (authenticated) => {
-      if (!mounted) return;
-      const parsed = kc.tokenParsed as Record<string, unknown> | undefined;
-      const realmAccess =
-        (parsed?.realm_access as { roles?: string[] } | undefined)?.roles ?? [];
-      setProfile({
-        userId: (parsed?.sub as string) ?? "unknown",
-        username: (parsed?.preferred_username as string) ?? "admin",
-        roles: realmAccess,
+    })
+      .then(async (authenticated) => {
+        if (!mounted) return;
+        const parsed = kc.tokenParsed as Record<string, unknown> | undefined;
+        const realmAccess =
+          (parsed?.realm_access as { roles?: string[] } | undefined)?.roles ??
+          [];
+        setProfile({
+          userId: (parsed?.sub as string) ?? "unknown",
+          username: (parsed?.preferred_username as string) ?? "admin",
+          roles: realmAccess,
+        });
+        setAccessToken(kc.token);
+        setState({ ready: true, authenticated });
+      })
+      .catch((error: unknown) => {
+        if (!mounted) return;
+        console.error("admin-web Keycloak initialization failed", error);
+        setAccessToken(undefined);
+        setState({ ready: true, authenticated: false });
       });
-      setAccessToken(kc.token);
-      setState({ ready: true, authenticated });
-    });
     const timer = window.setInterval(
       () =>
         kc
