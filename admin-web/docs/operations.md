@@ -28,6 +28,9 @@ Vite gera referências como `/assets/index.js`; o gateway encaminha essa URL ao
 portal principal, que devolve HTML no lugar de JavaScript e deixa o admin em
 branco. A pipeline fixa esse caminho, desativa `VITE_USE_MOCKS` e injeta as
 configurações públicas de Keycloak e das APIs antes de construir a imagem.
+Os defaults do `Dockerfile` também preenchem essas configurações: valores
+vazios não podem chegar ao bundle, pois produziriam `/realms//` e
+`client_id=` no redirecionamento OIDC.
 
 ## Diagnóstico
 
