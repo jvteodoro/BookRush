@@ -9,6 +9,10 @@ capítulos e relações pai/filho; essa estrutura é materializada em
 O TXT normalizado é um artefato auxiliar e não substitui o XHTML original no
 Readium.
 
+Os offsets de `chapters.json` são calculados depois da normalização final
+`NFC_LF`. Isso evita que a compactação de espaços e quebras de linha deixe os
+intervalos fora do texto persistido durante o reprocessamento de EPUBs.
+
 Quando `processAssets=true`, o job baixa `pg{id}.cover.medium.jpg`, grava o
 snapshot RAW em `gutenberg/{id}/thumbnail.jpg` e registra no catalog-service um
 asset `THUMBNAIL` com papel `COVER`. Para direitos explicitamente identificados

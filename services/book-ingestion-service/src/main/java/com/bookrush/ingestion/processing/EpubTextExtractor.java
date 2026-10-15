@@ -58,11 +58,54 @@ public final class EpubTextExtractor {
         chunks.add(new Chunk(item.href(), source, start, offset));
       }
 
-      String text = String.join("", parts);
-      var chapters = chapters(entries, chunks, text);
-      if (chapters.isEmpty()) chapters = fallbackChapters(chunks, text);
+      String extractedText = String.join("", parts);
+      String text = normalizer.normalize(extractedText);
+      var chapters = chapters(entries, chunks, extractedText);
+      if (chapters.isEmpty()) chapters = fallbackChapters(chunks, extractedText);
+      chapters = remapOffsets(chapters, extractedText, text);
       return new ExtractedEpub(text, chapters);
     }
+  }
+
+  private List<Chapter> remapOffsets(List<Chapter> chapters, String source, String normalized) {
+    int normalizedLength = normalized.codePointCount(0, normalized.length());
+    return chapters.stream()
+        .map(
+            chapter ->
+                new Chapter(
+                    chapter.key(),
+                    chapter.parent(),
+                    chapter.position(),
+                    chapter.title(),
+                    remapOffset(source, normalized, chapter.start()),
+                    remapOffset(source, normalized, chapter.end()),
+                    chapter.sourceHref(),
+                    chapter.confidence()))
+        .map(
+            chapter ->
+                chapter.end() < chapter.start()
+                    ? new Chapter(
+                        chapter.key(),
+                        chapter.parent(),
+                        chapter.position(),
+                        chapter.title(),
+                        chapter.start(),
+                        Math.min(normalizedLength, chapter.start()),
+                        chapter.sourceHref(),
+                        chapter.confidence())
+                    : chapter)
+        .toList();
+  }
+
+  private int remapOffset(String source, String normalized, int codePointOffset) {
+    int sourceLength = source.codePointCount(0, source.length());
+    int bounded = Math.max(0, Math.min(codePointOffset, sourceLength));
+    if (bounded == sourceLength) return normalized.codePointCount(0, normalized.length());
+    int charOffset = source.offsetByCodePoints(0, bounded);
+    String normalizedPrefix = normalizer.normalize(source.substring(0, charOffset));
+    return Math.min(
+        normalized.codePointCount(0, normalized.length()),
+        normalizedPrefix.codePointCount(0, normalizedPrefix.length()));
   }
 
   private List<Chapter> chapters(List<NavEntry> entries, List<Chunk> chunks, String text) {

@@ -45,6 +45,8 @@ class EpubTextExtractorTest {
       assertEquals("toc-1", extracted.chapters().get(1).parent());
       assertTrue(extracted.chapters().get(0).end() <= extracted.chapters().get(1).start());
       assertTrue(extracted.text().contains("Text with structure."));
+      int length = extracted.text().codePointCount(0, extracted.text().length());
+      assertTrue(extracted.chapters().stream().allMatch(c -> c.start() >= 0 && c.end() <= length));
     } finally {
       Files.deleteIfExists(epub);
     }
