@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import { URL } from 'node:url';
 
 const source = await readFile(new URL('../public/pageloop.js', import.meta.url), 'utf8');
-const searchCode = source.slice(source.indexOf('const pendingSearchSaves='), source.indexOf('async function openBook('));
+const searchCode = source.slice(source.indexOf('const pendingSearchSaves'), source.indexOf('async function openBook('));
 
 function setup(save, initiallySaved = false) {
   const button = { dataset: { save: 'book-id' }, disabled: false };
@@ -16,7 +16,8 @@ function setup(save, initiallySaved = false) {
     document: { getElementById: () => ({}), querySelectorAll: selector => selector === '[data-save]' ? [button] : [] },
     shell: () => {}, save: () => {}, toast: text => messages.push(text), icon: () => '', esc: String,
   };
-  runInNewContext(`${searchCode}\nrenderSearch();`, context);
+  runInNewContext(`${searchCode}\nglobalThis.__renderSearch = renderSearch;`, context);
+  context.__renderSearch();
   return { button, state, messages };
 }
 

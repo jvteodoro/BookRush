@@ -2,8 +2,6 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { authClient, type AuthState } from "./auth";
 import { createTelemetry } from "./telemetry";
-import { HttpFetcher, Manifest, Publication } from "@readium/shared";
-import { WebPubNavigator } from "@readium/navigator";
 import "./styles.css";
 import "./styles/design-system.css";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -14,330 +12,26 @@ import "./styles/reader-refinements.css";
 import "./styles/search.css";
 import "./styles/recommendations.css";
 import "./styles/comments.css";
-import { LiveReader } from "./reader/LiveReader";
-
-type ReadiumBridge = {
-  mount: (
-    bookId: string,
-    container: HTMLElement,
-    onLocatorChanged?: (progression: number) => void,
-  ) => Promise<void>;
-  unmount: () => Promise<void>;
-  goToChapter: (chapterId: string) => Promise<boolean>;
-  next: () => Promise<boolean>;
-  previous: () => Promise<boolean>;
-  applyPreferences: (preferences: ReaderPreferences) => void;
-};
-
-export type ReaderPreferences = {
-  fontFamily: "serif" | "sans" | "dyslexic";
-  fontSize: number;
-  lineHeight: number;
-  foreground: string;
-  background: string;
-};
-
-let readiumNavigator: any;
-let readiumManifest: any;
-let readiumPublication: any;
-let readiumContainer: HTMLElement | undefined;
-let readiumFrame: HTMLIFrameElement | undefined;
-let readiumPreferences: ReaderPreferences = {
-  fontFamily: "serif",
-  fontSize: 100,
-  lineHeight: 1.8,
-  foreground: "#29261f",
-  background: "#f7f4ee",
-};
-
-function applyReadiumPreferences(preferences: ReaderPreferences) {
-  readiumPreferences = preferences;
-  const frame = readiumFrame ?? readiumContainer?.querySelector("iframe");
-  const document = frame?.contentDocument;
-  if (!document) return;
-  const previous = document.getElementById("bookrush-reader-preferences");
-  previous?.remove();
-  const style = document.createElement("style");
-  style.id = "bookrush-reader-preferences";
-  const fonts = {
-    serif: 'Georgia, "Times New Roman", serif',
-    sans: "Arial, Helvetica, sans-serif",
-    dyslexic: "OpenDyslexic, Arial, sans-serif",
-  };
-  style.textContent = `
-    html, body {
-      background: ${preferences.background} !important;
-      color: ${preferences.foreground} !important;
-    }
-    body, body * {
-      font-family: ${fonts[preferences.fontFamily]} !important;
-    }
-    body {
-      font-size: ${preferences.fontSize}% !important;
-      line-height: ${preferences.lineHeight} !important;
-    }
-    p, li, blockquote {
-      color: ${preferences.foreground} !important;
-      line-height: ${preferences.lineHeight} !important;
-    }
-    h1, h2, h3, h4, h5, h6 {
-      color: ${preferences.foreground} !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-const readiumBridge: ReadiumBridge = {
-  async mount(bookId, container, onLocatorChanged) {
-    await this.unmount();
-    readiumContainer = container;
-    const response = await authClient.fetch(
-      `/api/v1/content/books/${encodeURIComponent(bookId)}/publication.json`,
-    );
-    if (!response.ok)
-      throw new Error(`Publicação indisponível (HTTP ${response.status}).`);
-    const raw = await response.json();
-    readiumManifest = raw;
-    const manifest = Manifest.deserialize(raw);
-    if (!manifest || !manifest.readingOrder?.items?.length) {
-      throw new Error("Este livro ainda não possui conteúdo reader-ready.");
-    }
-    // Readium does not provide an HTTP fetcher by default. Without an
-    // authenticated fetcher it falls back to EmptyFetcher and fails as soon
-    // as it tries to load the first chapter. Route every publication resource
-    // through the same PKCE-aware client used by the rest of the application.
-    const fetcher = new HttpFetcher(
-      (input, init) =>
-        authClient.fetch(String(input), { ...init, cache: "no-store" }),
-      window.location.origin,
-    );
-    const publication = new Publication({ manifest, fetcher });
-    readiumPublication = publication;
-    readiumNavigator = new WebPubNavigator(container, publication, {
-      frameLoaded: (frame: HTMLIFrameElement) => {
-        readiumFrame = frame ?? container.querySelector("iframe") ?? undefined;
-        applyReadiumPreferences(readiumPreferences);
-      },
-      positionChanged: (locator: any) =>
-        onLocatorChanged?.(
-          locator.locations?.totalProgression ??
-            locator.locations?.progression ??
-            0,
-        ),
-      timelineItemChanged: () => undefined,
-      tap: () => false,
-      click: () => false,
-      zoom: () => undefined,
-      scroll: () => undefined,
-      customEvent: () => undefined,
-      handleLocator: () => false,
-      textSelected: () => undefined,
-      contentProtection: () => undefined,
-      contextMenu: () => undefined,
-      peripheral: () => undefined,
-    } as any);
-    await readiumNavigator.load();
-    applyReadiumPreferences(readiumPreferences);
-  },
-  async unmount() {
-    if (readiumNavigator) {
-      await readiumNavigator.destroy();
-      readiumNavigator = undefined;
-    }
-    readiumManifest = undefined;
-    readiumPublication = undefined;
-    readiumFrame = undefined;
-    readiumContainer = undefined;
-  },
-  async goToChapter(chapterId) {
-    const links =
-      readiumPublication?.readingOrder?.items ??
-      readiumManifest?.readingOrder ??
-      [];
-    const link = [...links].find((item: any) =>
-      String(item.href).includes(`/chapters/${chapterId}/content`),
-    );
-    if (!link || typeof readiumNavigator?.goTo !== "function") return false;
-    return Boolean(await readiumNavigator.goTo(link));
-  },
-  async next() {
-    if (typeof readiumNavigator?.goForward !== "function") return false;
-    return Boolean(await readiumNavigator.goForward());
-  },
-  async previous() {
-    if (typeof readiumNavigator?.goBackward !== "function") return false;
-    return Boolean(await readiumNavigator.goBackward());
-  },
-  applyPreferences(preferences) {
-    applyReadiumPreferences(preferences);
-  },
-};
-
-type CatalogBook = {
-  id: string;
-  canonicalTitle: string;
-  originalLanguage?: string | null;
-  description?: string | null;
-  thumbnailUrl?: string | null;
-};
-type FeedExcerpt = {
-  id: string;
-  text: string;
-  sourceAssetVersionId: string;
-  textSha256: string;
-  startCodepoint: number;
-  endCodepoint: number;
-  generationMethod: string;
-  generatorVersion: string;
-  rank?: { version?: string; score?: number | null } | null;
-};
-
-type PageLoopBook = {
-  id: string;
-  title: string;
-  author: string;
-  genre: string;
-  keywords: string[];
-  match: number;
-  a: string;
-  b: string;
-  quote: string;
-  excerpt?: FeedExcerpt | null;
-  likes: number;
-  comments: number;
-  shares: number;
-  pages: number;
-  progress: number;
-  thumbnailUrl?: string | null;
-  recommendationRequestId?: string;
-  impressionId?: string;
-  modelVersion?: string;
-  rank?: number;
-};
-
-type RecommendationItem = {
-  book?: CatalogBook;
-  impressionId?: string;
-  recommendationRequestId?: string;
-  modelVersion?: string;
-  rank?: number;
-  excerpt?: FeedExcerpt | null;
-};
-
-async function loadCatalog(): Promise<CatalogBook[]> {
-  // O catálogo de leitura possui uma rota pública própria; a rota internal é
-  // reservada para operadores e devolve 401 ao leitor autenticado.
-  // Esta é uma leitura pública. Não anexe um token possivelmente expirado:
-  // um Bearer inválido transforma uma leitura pública em 401 no resource server.
-  const response = await fetch("/api/v1/books?page=0&size=50", {
-    credentials: "same-origin",
-  });
-  if (!response.ok)
-    throw new Error(
-      response.status === 401
-        ? "Sua sessão expirou. Entre novamente."
-        : `Catálogo indisponível (HTTP ${response.status}).`,
-    );
-  const page = (await response.json()) as { items: CatalogBook[] };
-  return page.items;
-}
-
-async function loadLibrary(): Promise<string[]> {
-  const response = await authClient.fetch("/api/v1/reader/library");
-  if (!response.ok) return [];
-  const rows = (await response.json()) as Array<{
-    book_id?: string;
-    bookId?: string;
-  }>;
-  return rows
-    .map((row) => row.book_id ?? row.bookId)
-    .filter((id): id is string => Boolean(id));
-}
-
-async function loadRecent(): Promise<string[]> {
-  const response = await authClient.fetch("/api/v1/reader/recent");
-  if (!response.ok) return [];
-  const rows = (await response.json()) as Array<{
-    book_id?: string;
-    bookId?: string;
-  }>;
-  return rows
-    .map((row) => row.book_id ?? row.bookId)
-    .filter((id): id is string => Boolean(id));
-}
-
-async function loadRecommendationFeed(): Promise<RecommendationItem[]> {
-  const response = await authClient.fetch("/api/v1/reader/feed?size=50");
-  if (!response.ok) return [];
-  const payload = (await response.json()) as { items?: RecommendationItem[] };
-  return payload.items ?? [];
-}
-
-async function loadSocialCounts(
-  bookId: string,
-): Promise<{ likes: number; comments: number; liked: boolean }> {
-  const [likesResponse, commentsResponse] = await Promise.all([
-    authClient.fetch(
-      `/api/v1/social/books/${encodeURIComponent(bookId)}/likes`,
-    ),
-    authClient.fetch(
-      `/api/v1/social/books/${encodeURIComponent(bookId)}/comments`,
-    ),
-  ]);
-  let likes = 0;
-  let liked = false;
-  if (likesResponse.ok) {
-    const payload = (await likesResponse.json()) as {
-      count?: number;
-      liked?: boolean;
-    };
-    likes = Number(payload.count ?? 0);
-    liked = payload.liked === true;
-  }
-  const commentsPayload = commentsResponse.ok
-    ? await commentsResponse.json()
-    : [];
-  const comments = Array.isArray(commentsPayload) ? commentsPayload.length : 0;
-  return { likes, comments, liked };
-}
+import { readiumBridge } from "./reader/readiumBridge";
+import { AuthenticatedShell } from "./app/AuthenticatedShell";
+import { AuthLanding } from "./app/AuthLanding";
+import {
+  loadCatalog,
+  loadLibrary,
+  loadRecent,
+  loadRecommendationFeed,
+  loadSocialCounts,
+} from "./app/catalogApi";
+import type { CatalogBook, FeedExcerpt, PageLoopBook } from "./app/types";
+import type { ReadiumBridge } from "./app/types";
+import { useLegacyNavigation } from "./app/useLegacyNavigation";
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [error, setError] = useState("");
   const [feedReady, setFeedReady] = useState(false);
-  const [readerTab, setReaderTab] = useState<
-    "feed" | "library" | "search" | "recommendations"
-  >("feed");
-  const [legacyQuery, setLegacyQuery] = useState("");
-  const [legacyVisible, setLegacyVisible] = useState(
-    window.location.pathname.startsWith("/usuarios/"),
-  );
-  useEffect(() => {
-    const handler = (event: Event) => {
-      const route = (event as CustomEvent<string>).detail;
-      if (
-        route === "feed" ||
-        route === "library" ||
-        route === "search" ||
-        route === "recommendations"
-      )
-        setReaderTab(route);
-      setLegacyVisible(
-        route !== "feed" &&
-          route !== "library" &&
-          route !== "search" &&
-          route !== "recommendations",
-      );
-    };
-    window.addEventListener("bookrush:legacy-route", handler);
-    const queryHandler = (event: Event) =>
-      setLegacyQuery((event as CustomEvent<string>).detail);
-    window.addEventListener("bookrush:legacy-search", queryHandler);
-    return () => {
-      window.removeEventListener("bookrush:legacy-route", handler);
-      window.removeEventListener("bookrush:legacy-search", queryHandler);
-    };
-  }, []);
+  const { legacyQuery, legacyVisible, readerTab, showLegacy } =
+    useLegacyNavigation();
   useEffect(() => {
     let active = true;
     async function restore() {
@@ -921,42 +615,17 @@ function App() {
     }
   }
   if (auth.status === "authenticated")
-    return error ? (
-      <main className="landing">
-        <span className="eyebrow">BOOKRUSH</span>
-        <h1>Não conseguimos abrir seu feed.</h1>
-        <p>{error}</p>
-        <button
-          className="primary-button"
-          onClick={() => window.location.reload()}
-        >
-          Tentar novamente
-        </button>
-      </main>
-    ) : (
-      <>
-        <div id="app" hidden={!legacyVisible} />
-        {!feedReady && (
-          <div className="splash">
-            <p>Preparando seu feed…</p>
-          </div>
-        )}
-        {feedReady && (
-          <div hidden={legacyVisible}>
-            <LiveReader
-              visible={!legacyVisible}
-              initialTab={readerTab}
-              legacyQuery={legacyQuery}
-              userName={String(
-                auth.user?.profile.name ??
-                  auth.user?.profile.preferred_username ??
-                  "Leitor",
-              )}
-              onLegacy={() => setLegacyVisible(true)}
-            />
-          </div>
-        )}
-      </>
+    return (
+      <AuthenticatedShell
+        error={error}
+        feedReady={feedReady}
+        legacyQuery={legacyQuery}
+        legacyVisible={legacyVisible}
+        onRetry={() => window.location.reload()}
+        onShowLegacy={showLegacy}
+        readerTab={readerTab}
+        user={auth.user}
+      />
     );
   if (auth.status === "loading")
     return (
@@ -965,35 +634,7 @@ function App() {
         <p>Preparando seu feed…</p>
       </div>
     );
-  return (
-    <main className="landing">
-      <div className="landing-art">
-        <span className="brand-mark large">B</span>
-        <div className="floating-word">
-          READ
-          <br />
-          <em>MORE</em>
-        </div>
-      </div>
-      <span className="eyebrow">UM UNIVERSO DE HISTÓRIAS</span>
-      <h1>
-        Seu próximo
-        <br />
-        <em>capítulo</em> começa aqui.
-      </h1>
-      <p>Descubra trechos, livros e leitores que combinam com você.</p>
-      {auth.status === "error" && (
-        <div className="notice error">{auth.error}</div>
-      )}
-      <button className="primary-button" onClick={() => void login()}>
-        Entrar com Keycloak <span>→</span>
-      </button>
-      <a className="register-link" href={authClient.registrationUrl()}>
-        Ainda não tem conta? <strong>Cadastre-se</strong>
-      </a>
-      <small>Login seguro · Seus dados ficam protegidos</small>
-    </main>
-  );
+  return <AuthLanding auth={auth} onLogin={() => void login()} />;
 }
 
 createRoot(document.getElementById("root")!).render(
