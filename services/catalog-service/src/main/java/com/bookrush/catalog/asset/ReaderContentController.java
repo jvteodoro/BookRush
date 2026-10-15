@@ -75,4 +75,14 @@ public class ReaderContentController {
         .contentType(MediaType.parseMediaType("text/plain;charset=UTF-8"))
         .body(new InputStreamResource(stream));
   }
+
+  @GetMapping(value = "/{assetId}/content", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
+  @Operation(summary = "Ler asset EPUB para o content-service")
+  public ResponseEntity<Resource> assetContent(
+      @PathVariable UUID bookId, @PathVariable UUID assetId) {
+    InputStream stream = service.downloadLatest(bookId, assetId);
+    return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .body(new InputStreamResource(stream));
+  }
 }

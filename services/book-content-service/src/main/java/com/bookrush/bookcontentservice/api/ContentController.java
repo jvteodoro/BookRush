@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 import com.bookrush.bookcontentservice.storage.ReaderArtifactStore;
+import com.bookrush.bookcontentservice.epub.EpubPublicationService;
 
 @RestController
 @RequestMapping("/api/v1/content")
@@ -14,13 +15,15 @@ public class ContentController {
   private final RestClient catalog;
   private final String catalogServiceToken;
   private final ReaderArtifactStore artifactStore;
+  private final EpubPublicationService epub;
   public ContentController(
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
       @Value("${bookrush.catalog-service-token:}") String catalogServiceToken,
-      ReaderArtifactStore artifactStore) {
+      ReaderArtifactStore artifactStore, EpubPublicationService epub) {
     catalog=RestClient.builder().baseUrl(url).build();
     this.catalogServiceToken = catalogServiceToken;
     this.artifactStore = artifactStore;
+    this.epub = epub;
   }
   @GetMapping("/books/{bookId}")
   public Map<String,Object> book(@PathVariable UUID bookId) {
@@ -47,6 +50,8 @@ public class ContentController {
   /** Web Publication Manifest consumed by the Readium navigator in the web client. */
   @GetMapping("/books/{bookId}/publication.json")
   public Map<String, Object> publication(@PathVariable UUID bookId) {
+    var original = epub.load(bookId);
+    if (original.isPresent()) return publicationFromEpub(original.get());
     List<Map<String, Object>> chapters = chaptersFor(bookId);
     var readingOrder = new ArrayList<Map<String, Object>>();
     var toc = new ArrayList<Map<String, Object>>();
@@ -67,6 +72,55 @@ public class ContentController {
     String artifactKey = artifactStore.persist(bookId.toString(), manifest);
     if (artifactKey != null) manifest.put("bookrushArtifactKey", artifactKey);
     return manifest;
+  }
+
+  private Map<String, Object> publicationFromEpub(EpubPublicationService.Publication publication) {
+    var readingOrder = new ArrayList<Map<String, Object>>();
+    for (var item : publication.spine()) {
+      var link = new LinkedHashMap<String, Object>();
+      link.put("href", EpubPublicationService.resourceHref(publication.bookId(), item.href()));
+      link.put("type", item.mediaType());
+      readingOrder.add(link);
+    }
+    var links = new LinkedHashMap<String, Map<String, Object>>();
+    for (var nav : publication.toc()) {
+      var link = new LinkedHashMap<String, Object>();
+      String href = EpubPublicationService.resourceHref(publication.bookId(), nav.href());
+      if (nav.fragment() != null && !nav.fragment().isBlank()) href += "#" + nav.fragment();
+      link.put("href", href); link.put("title", nav.title());
+      links.put(nav.key(), link);
+    }
+    var roots = new ArrayList<Map<String, Object>>();
+    for (var nav : publication.toc()) {
+      var link = links.get(nav.key());
+      if (nav.parent() == null) roots.add(link);
+      else links.getOrDefault(nav.parent(), link).computeIfAbsent("children", ignored -> new ArrayList<Map<String, Object>>());
+      if (nav.parent() != null) {
+        Object children = links.get(nav.parent()).get("children");
+        if (children instanceof List<?> list) ((List<Map<String, Object>>) list).add(link);
+      }
+    }
+    var manifest = new LinkedHashMap<String, Object>();
+    manifest.put("@context", "http://readium.org/webpub-manifest/context.json");
+    manifest.put("metadata", metadata(publication.bookId()));
+    manifest.put("readingOrder", readingOrder);
+    manifest.put("toc", roots);
+    String artifactKey = artifactStore.persist(publication.bookId().toString(), manifest);
+    if (artifactKey != null) manifest.put("bookrushArtifactKey", artifactKey);
+    return manifest;
+  }
+
+  @GetMapping("/books/{bookId}/resources/{*resource}")
+  public ResponseEntity<byte[]> resource(@PathVariable UUID bookId, @PathVariable String resource) {
+    var publication = epub.load(bookId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EPUB not available"));
+    try {
+      byte[] bytes = epub.resource(publication, resource);
+      var type = java.nio.file.Files.probeContentType(java.nio.file.Path.of(resource));
+      MediaType mediaType = type == null ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(type);
+      return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(mediaType).body(bytes);
+    } catch (Exception ignored) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "EPUB resource not found");
+    }
   }
 
   @GetMapping(value = "/books/{bookId}/chapters/{chapterId}/content", produces = "text/html;charset=UTF-8")

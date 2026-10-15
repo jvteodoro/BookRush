@@ -206,7 +206,8 @@ public class AssetSecurity {
                         "SCOPE_bookrush.catalog.write", "SCOPE_bookrush.assets.write")
                     .requestMatchers("/api/admin/**", "/actuator/metrics", "/actuator/metrics/**")
                     .hasAnyAuthority("ROLE_ASSET_ADMIN", "SCOPE_bookrush.assets.write")
-                    .requestMatchers("/api/v1/books/*/reader-assets/text-versions/**")
+                    .requestMatchers("/api/v1/books/*/reader-assets/text-versions/**",
+                        "/api/v1/books/*/reader-assets/*/content")
                     .hasAnyAuthority("ROLE_CATALOG_SERVICE", "SCOPE_bookrush.catalog.read")
                     .requestMatchers("/api/internal/v1/catalog/**")
                     .hasAnyAuthority(

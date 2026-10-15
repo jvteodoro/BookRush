@@ -67,3 +67,10 @@ A navegação estrutural vem do `toc` do manifesto Readium, com fallback para a
 capítulos do backend permanece apenas como compatibilidade para publicações
 antigas que ainda não possuem TOC no manifesto; não se deve inventar uma lista
 paralela de capítulos no frontend.
+
+Para EPUBs, o manifesto é construído pelo `book-content-service` a partir do
+arquivo original: o `spine` define a ordem de leitura e o NCX ou `nav.xhtml`
+define a árvore de capítulos. O Readium recebe XHTML, CSS, imagens e fontes
+pelas rotas autenticadas de recursos do EPUB. TXT e `chapters.json` são usados
+para busca, analytics e fallback, nunca como substitutos da estrutura editorial
+quando o EPUB está disponível.

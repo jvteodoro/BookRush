@@ -187,9 +187,10 @@ public class GutenbergImportService {
           sourceResult.get("version") instanceof Map<?, ?> version && version.get("id") != null
               ? UUID.fromString(String.valueOf(version.get("id")))
               : UUID.randomUUID();
+      var extracted = new EpubTextExtractor().extractStructured(epub);
       var normalized =
           processing.process(
-              editionId, UUID.randomUUID(), new EpubTextExtractor().extract(epub), null);
+              editionId, UUID.randomUUID(), extracted.text(), toChapterStructure(extracted.chapters()));
       var normalizedFile = staging.resolve("gutenberg-" + id + ".normalized.txt");
       var chaptersFile = staging.resolve("gutenberg-" + id + ".chapters.json");
       Files.write(normalizedFile, normalized.normalizedTxt());
@@ -206,7 +207,7 @@ public class GutenbergImportService {
               editionId,
               textVersionId,
               new String(normalized.normalizedTxt(), java.nio.charset.StandardCharsets.UTF_8),
-              null);
+              toChapterStructure(extracted.chapters()));
       Files.write(chaptersFile, finalProcessing.chaptersJson());
       var chaptersResult =
           assets.uploadDerived(bookId, editionId, sourceId, chaptersFile, "chapters.json", "JSON");
@@ -243,6 +244,23 @@ public class GutenbergImportService {
         bookId,
         editionId,
         task.get("ingestion_item_id"));
+  }
+
+  private static java.util.List<com.bookrush.ingestion.processing.ChapterStructureWriter.Chapter>
+      toChapterStructure(java.util.List<EpubTextExtractor.Chapter> chapters) {
+    return chapters.stream()
+        .map(
+            chapter ->
+                new com.bookrush.ingestion.processing.ChapterStructureWriter.Chapter(
+                    chapter.key(),
+                    chapter.parent(),
+                    chapter.position(),
+                    chapter.title(),
+                    chapter.start(),
+                    chapter.end(),
+                    chapter.sourceHref(),
+                    chapter.confidence()))
+        .toList();
   }
 
   private UUID publisherSubmissionId(Object parameters) {

@@ -147,11 +147,12 @@ export const readiumBridge: ReadiumBridge = {
     const chapter = toChapters(toc).find(
       (item) => item.id === chapterId || item.href === chapterId,
     );
-    const link = [...links].find((item: any) =>
-      chapter
-        ? String(item.href).split("#")[0] === chapter.href.split("#")[0]
-        : String(item.href).includes(`/chapters/${chapterId}/content`),
-    );
+    const link =
+      [...links].find((item: any) =>
+        chapter
+          ? String(item.href).split("#")[0] === chapter.href.split("#")[0]
+          : String(item.href).includes(`/chapters/${chapterId}/content`),
+      ) ?? (chapter ? { href: chapter.href, title: chapter.title } : undefined);
     if (!link || !navigator) return false;
     if (typeof navigator.goLink === "function") {
       return new Promise<boolean>((resolve) =>

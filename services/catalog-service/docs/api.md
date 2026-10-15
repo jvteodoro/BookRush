@@ -100,6 +100,11 @@ inferir o fuso a partir do texto formatado.
 
 ## Reader chapters
 
+`GET /api/v1/books/{bookId}/reader-assets/{assetId}/content` é uma fronteira
+interna autenticada por `X-Content-Service-Token` usada pelo
+`book-content-service` para ler o EPUB SOURCE. Não deve ser chamada pelo
+navegador e não retorna URL permanente de storage.
+
 `GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted
 chapter projection for the book, including the exact text asset version,
 Unicode code-point offsets, hierarchy and projection confidence. The endpoint

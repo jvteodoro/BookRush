@@ -507,6 +507,15 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
     return storage.download(location);
   }
 
+  /** Streams the latest available version for an internal reader projection. */
+  public InputStream downloadLatest(UUID book, UUID assetId) {
+    return downloadVersion(book, latest(assetId).getId());
+  }
+
+  public String contentType(UUID book, UUID assetId) {
+    return latest(assetId).getContentType();
+  }
+
   public void delete(UUID book, UUID id) {
     List<VersionView> versions =
         tx.execute(
