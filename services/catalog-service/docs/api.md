@@ -41,6 +41,10 @@ resultados são ordenados por relevância textual e depois por título. `size` �
 limitado a 100. A aba Buscar usa esta API diretamente e solicita somente a
 página atual.
 
+O endpoint reader de capítulos seleciona somente a projeção da versão TXT
+disponível mais recente. Ao reprocessar um livro, projeções antigas continuam
+no banco para rastreabilidade, mas não aparecem na navegação do leitor.
+
 Consumidores como ingestão e analytics consultam o catálogo pelas rotas internas,
 sem credenciais ou conexão direta ao PostgreSQL:
 

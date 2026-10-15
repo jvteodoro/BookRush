@@ -43,7 +43,18 @@ public class ReaderContentController {
   @GetMapping("/chapters")
   @Operation(summary = "Listar capítulos reader-ready")
   public List<?> chapters(@PathVariable UUID bookId) {
-    return jdbc.queryForList("SELECT id, edition_id, text_asset_version_id, chapter_key, parent_chapter_id, position, title, start_offset, end_offset, confidence FROM catalog.book_chapter WHERE book_id=? ORDER BY position, start_offset", bookId);
+    return jdbc.queryForList(
+        "SELECT c.id, c.edition_id, c.text_asset_version_id, c.chapter_key, "
+            + "c.parent_chapter_id, c.position, c.title, c.start_offset, c.end_offset, c.confidence "
+            + "FROM catalog.book_chapter c "
+            + "WHERE c.book_id=? AND c.text_asset_version_id=("
+            + "SELECT v.id FROM catalog.book_asset_version v "
+            + "JOIN catalog.book_asset a ON a.id=v.book_asset_id "
+            + "WHERE a.book_id=c.book_id AND a.asset_type='TXT' "
+            + "AND a.status='ACTIVE' AND v.status='AVAILABLE' "
+            + "ORDER BY v.created_at DESC LIMIT 1) "
+            + "ORDER BY c.position, c.start_offset",
+        bookId);
   }
 
   /**
