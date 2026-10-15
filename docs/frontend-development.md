@@ -53,3 +53,17 @@ tratamento de rejeição, renderizando uma mensagem acionável em vez de deixar 
 root vazio quando a sessão não puder ser restaurada. Alterações visuais devem
 reutilizar os tokens BookRush definidos em `admin-web/src/styles/app.css` e
 validar o build do admin separadamente do frontend principal.
+
+## Leitor EPUB e Readium
+
+O leitor usa `src/reader/readiumBridge.ts` para montar a publicação protegida
+em `publication.json`. As preferências de fonte, tamanho, espaçamento, cor do
+texto e cor do fundo devem ser aplicadas ao documento do iframe e submetidas ao
+`WebPubNavigator`; alterar somente o estado do menu não é suficiente.
+
+A navegação estrutural vem do `toc` do manifesto Readium, com fallback para a
+`readingOrder`. O bridge expõe essa estrutura ao PageLoop e navega por `goLink`,
+`goForward` e `goBackward` usando os callbacks da API do Readium. A API de
+capítulos do backend permanece apenas como compatibilidade para publicações
+antigas que ainda não possuem TOC no manifesto; não se deve inventar uma lista
+paralela de capítulos no frontend.

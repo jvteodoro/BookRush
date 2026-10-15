@@ -6,6 +6,13 @@ export type ReaderPreferences = {
   background: string;
 };
 
+export type ReaderChapter = {
+  id: string;
+  href: string;
+  title: string;
+  depth?: number;
+};
+
 export type ReadiumBridge = {
   mount: (
     bookId: string,
@@ -14,6 +21,7 @@ export type ReadiumBridge = {
   ) => Promise<void>;
   unmount: () => Promise<void>;
   goToChapter: (chapterId: string) => Promise<boolean>;
+  chapters: () => Promise<ReaderChapter[]>;
   next: () => Promise<boolean>;
   previous: () => Promise<boolean>;
   applyPreferences: (preferences: ReaderPreferences) => void;

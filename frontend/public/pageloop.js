@@ -839,8 +839,8 @@
     const chapters = Array.isArray(window.__BOOKRUSH_CHAPTERS__)
       ? window.__BOOKRUSH_CHAPTERS__
       : [];
-    const chapterItems =
-      chapters
+    const chapterItems = (items) =>
+      items
         .map(
           (chapter, index) => `
       <button class="reader-chapter" data-reader-chapter="${esc(chapter.id)}">
@@ -849,13 +849,14 @@
       </button>
     `,
         )
-        .join("") ||
+        .join("");
+    const emptyChapterItems =
       '<p class="reader-panel-empty">Este livro ainda não possui sumário.</p>';
     const content = `<div class="reader-shell" id="readerShell">
       <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${getMode() === "app" ? "feed" : "library"}" aria-label="Voltar">${icon("chevron", "icon-sm")}<span>Voltar</span></button></div>
       <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
       <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir configurações">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
-      <aside class="reader-panel reader-toc" id="tocPanel" hidden><div class="reader-panel-heading"><strong>Sumário</strong><button class="reader-panel-close" data-reader-close="tocPanel" aria-label="Fechar">×</button></div><nav>${chapterItems}</nav></aside>
+      <aside class="reader-panel reader-toc" id="tocPanel" hidden><div class="reader-panel-heading"><strong>Sumário</strong><button class="reader-panel-close" data-reader-close="tocPanel" aria-label="Fechar">×</button></div><nav>${chapterItems(chapters) || emptyChapterItems}</nav></aside>
       <aside class="reader-panel reader-settings" id="settingsPanel" hidden><div class="reader-panel-heading"><strong>Aparência</strong><button class="reader-panel-close" data-reader-close="settingsPanel" aria-label="Fechar">×</button></div>
         <label>Fonte<select data-reader-pref="fontFamily"><option value="serif">Serifada</option><option value="sans">Sem serifa</option><option value="dyslexic">Acessível</option></select></label>
         <label>Tamanho<input data-reader-pref="fontSize" type="range" min="85" max="170" step="5"><output data-reader-output="fontSize"></output></label>
@@ -905,15 +906,20 @@
         document.getElementById(button.dataset.readerClose).hidden = true;
       });
     });
-    document.querySelectorAll("[data-reader-chapter]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const ok = await window.__BOOKRUSH_READIUM__?.goToChapter?.(
-          button.dataset.readerChapter,
-        );
-        if (!ok) toast("Não foi possível abrir este capítulo.");
-        else document.getElementById("tocPanel").hidden = true;
+    const bindChapterButtons = () => {
+      document.querySelectorAll("[data-reader-chapter]").forEach((button) => {
+        if (button.dataset.readerBound) return;
+        button.dataset.readerBound = "true";
+        button.addEventListener("click", async () => {
+          const ok = await window.__BOOKRUSH_READIUM__?.goToChapter?.(
+            button.dataset.readerChapter,
+          );
+          if (!ok) toast("Não foi possível abrir este capítulo.");
+          else document.getElementById("tocPanel").hidden = true;
+        });
       });
-    });
+    };
+    bindChapterButtons();
     document.querySelectorAll("[data-reader-pref]").forEach((input) => {
       input.addEventListener("input", () => {
         state.readerPreferences = {
@@ -954,6 +960,15 @@
               ?.progress?.(state.readerBook, percent, percent)
               .catch(() => {});
           }
+        })
+        .then(async () => {
+          const structuredChapters =
+            (await window.__BOOKRUSH_READIUM__?.chapters?.()) || [];
+          if (!structuredChapters.length) return;
+          window.__BOOKRUSH_CHAPTERS__ = structuredChapters;
+          const nav = document.querySelector("#tocPanel nav");
+          if (nav) nav.innerHTML = chapterItems(structuredChapters);
+          bindChapterButtons();
         })
         .catch((e) => {
           host.innerHTML = `<p class="notice error">${esc(e.message || "Não foi possível abrir a publicação Readium.")}</p>`;
