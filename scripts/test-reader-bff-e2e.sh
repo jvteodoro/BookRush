@@ -186,6 +186,8 @@ for endpoint in feed library recent streak; do
   status=$(status_without_body "$tmp_dir/$endpoint" "$base_url$path" -H "$auth_header")
   assert_status "authenticated_$endpoint" 200 "$status"
 done
+status=$(status_without_body "$tmp_dir/plant" "$base_url/api/v1/reader/plant" -H "$auth_header")
+assert_status authenticated_plant 200 "$status"
 for endpoint in progress bookmarks; do
   status=$(status_without_body "$tmp_dir/$endpoint" "$base_url/api/v1/reader/books/$E2E_BOOK_ID/$endpoint" -H "$auth_header")
   assert_status "authenticated_$endpoint" 200 "$status"
