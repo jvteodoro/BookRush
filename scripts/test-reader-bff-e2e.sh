@@ -82,7 +82,7 @@ post_status=$(curl -fsS -D "$post_headers" -o "$post_body" -w '%{http_code}' -c 
   --data-urlencode "password=$E2E_OIDC_PASSWORD" \
   --data-urlencode 'credentialId=' \
   --data-urlencode 'login=Entrar')
-callback=$(awk 'BEGIN{IGNORECASE=1} /^Location:/{sub(/\r$/,""); sub(/^[[:space:]]*Location:[[:space:]]*/,""); print; exit}' "$post_headers")
+callback=$(awk 'tolower($0) ~ /^location:/{sub(/\r$/,""); sub(/^[^:]*:[[:space:]]*/,""); print; exit}' "$post_headers")
 if [[ -z "$callback" ]]; then
   redirect_path=$(python3 - "$post_headers" <<'PY'
 import sys
@@ -136,7 +136,7 @@ PY
     --data-urlencode "email=${E2E_OIDC_EMAIL:-$E2E_OIDC_USERNAME@bookrush.invalid}" \
     --data-urlencode 'firstName=Codex' \
     --data-urlencode 'lastName=Product Agent'
-  callback=$(awk 'BEGIN{IGNORECASE=1} /^Location:/{sub(/\r$/,""); sub(/^[[:space:]]*Location:[[:space:]]*/,""); print; exit}' "$required_headers")
+  callback=$(awk 'tolower($0) ~ /^location:/{sub(/\r$/,""); sub(/^[^:]*:[[:space:]]*/,""); print; exit}' "$required_headers")
 fi
 code_and_state=$(python3 - "$callback" <<'PY'
 import sys
