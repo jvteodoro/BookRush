@@ -75,6 +75,12 @@ remota participam do build. Alterações locais deste diretório não são impla
 O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
+O estágio `Validação Mobile` executa `npm ci`, `npm run typecheck` e
+`EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export` em `mobile/` usando
+`node:20-bookworm`. O bundle Android em `mobile/dist/` é arquivado como
+artefato; a dependência `expo-asset` fica fixada no lockfile para o export do
+Expo SDK 52. Isso valida o aplicativo, mas não publica APK nem substitui um
+job de distribuição mobile.
 
 Antes dos builds, as pipelines executam `scripts/validate-change.sh --ci`.
 Esse gate exige documentação ou contrato para mudanças de código, infraestrutura
