@@ -259,8 +259,22 @@
             "included.client.audience": "bookrush-ingestion",
             "access.token.claim": "true",
             "id.token.claim": "false"
-          }
-        }
+      }
+    },
+    {
+      "name": "admin-service-management-roles",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-client-role-mapper",
+      "config": {
+        "usermodel.clientRoleMapping.clientId": "realm-management",
+        "claim.name": "resource_access.realm-management.roles",
+        "jsonType.label": "String",
+        "multivalued": "true",
+        "access.token.claim": "true",
+        "id.token.claim": "false",
+        "userinfo.token.claim": "false"
+      }
+    }
       ]
     },
     {

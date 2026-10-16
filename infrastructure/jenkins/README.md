@@ -267,3 +267,16 @@ construir as imagens correspondentes depois de uma alteração. O admin-web usa
 ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
 quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
 cliente possui `query-users`/`manage-users` no realm-management.
+
+Na primeira ativação do `admin-service`, provisionar e validar o cliente sem
+exibir ou versionar o segredo:
+
+```bash
+infrastructure/keycloak/provision-admin-service-client.sh --env-file .env
+infrastructure/keycloak/reconcile.sh --env-file .env
+bash scripts/test-keycloak-admin-service-client.sh .env
+```
+
+O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
+e concede apenas `query-users` e `manage-users` à conta de serviço. O teste
+valida token, roles e acesso à API de usuários sem imprimir credenciais.
