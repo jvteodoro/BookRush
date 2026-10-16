@@ -47,7 +47,7 @@ pipeline {
     }
     stage('Change gate e contratos') {
       steps {
-        sh 'bash scripts/validate-change.sh --ci'
+        sh 'docker run --rm --volumes-from "$HOSTNAME" -w "$PWD" python:3.12-slim bash -lc "python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema && git config --global --add safe.directory \"$PWD\" && bash scripts/validate-change.sh --ci"'
         sh 'bash scripts/test-microservice.sh "$SELECTED_SERVICE"'
       }
     }
