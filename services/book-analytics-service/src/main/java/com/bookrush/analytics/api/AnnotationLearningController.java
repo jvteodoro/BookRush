@@ -1,5 +1,6 @@
 package com.bookrush.analytics.api;
 
+import com.bookrush.analytics.quality.OrdinalAgreement;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -544,20 +545,13 @@ public class AnnotationLearningController {
         + "FROM analytics.annotation a JOIN analytics.annotation_campaign_item i ON i.id=a.campaign_item_id "
         + "JOIN analytics.annotation_dimension_value d ON d.annotation_id=a.id "
         + "WHERE i.campaign_id=? AND a.status='SUBMITTED' AND d.stage='FULL_EXCERPT'", campaignId);
-    if (values.size() < 2) return 0.0;
-    double disagreement = 0.0; long pairs = 0;
-    for (int left = 0; left < values.size(); left++) {
-      for (int right = left + 1; right < values.size(); right++) {
-        var a = values.get(left); var b = values.get(right);
-        if (a.get("campaign_item_id").equals(b.get("campaign_item_id"))
-            && a.get("dimension_code").equals(b.get("dimension_code"))) {
-          double distance = Math.abs(((Number) a.get("ordinal_value")).doubleValue()
-              - ((Number) b.get("ordinal_value")).doubleValue()) / 4.0;
-          disagreement += distance * distance; pairs++;
-        }
-      }
-    }
-    return pairs == 0 ? 0.0 : Math.max(-1.0, 1.0 - disagreement / pairs);
+    var ratings = values.stream()
+        .map(value -> new OrdinalAgreement.Rating(
+            String.valueOf(value.get("campaign_item_id")),
+            String.valueOf(value.get("dimension_code")),
+            ((Number) value.get("ordinal_value")).intValue()))
+        .toList();
+    return OrdinalAgreement.agreement(ratings);
   }
 
   public record Adjudication(String dimensionCode, Integer ordinalValue, String rationale) {}

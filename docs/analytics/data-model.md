@@ -70,6 +70,13 @@ erDiagram
 
 As APIs administrativas já suportam criar/amostrar/iniciar campanhas, claim, first-screen lock, submissão, métricas, fila de adjudicação e exportação de versões. A autorização exige papéis de operador, anotador ou revisor; não é uma API pública de leitores.
 
+Na política `quality-v1`, a fila considera uma discordância quando o intervalo ordinal
+(`max - min`) por item/dimensão atinge o `disagreement_threshold` persistido na campanha
+(padrão 2). A métrica exposta como `krippendorffAlphaOrdinal` mantém compatibilidade de
+contrato, mas o método atual é explicitamente uma aproximação de concordância ordinal
+pareada; o código puro e seus testes vivem em `OrdinalAgreement`. Isso evita apresentar a
+aproximação como alpha formal e mantém a substituição futura isolada do controller.
+
 ## Consumidores e isolamento
 
 ```mermaid
