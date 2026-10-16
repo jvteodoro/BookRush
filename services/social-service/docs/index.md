@@ -15,3 +15,5 @@ As rotas de moderação `GET /api/v1/social/moderation/reports` e
 `PUT /api/v1/social/moderation/comments/{commentId}` exigem os grupos
 `operators` ou `platform-admins` do realm `bookrush-platform`. A política CORS
 aceita somente as origens configuradas em `BOOKRUSH_CORS_ALLOWED_ORIGINS`.
+The service validates the `bookrush-platform` issuer/JWK set and maps the
+Keycloak `groups` claim to `ROLE_*` authorities for moderation operations.

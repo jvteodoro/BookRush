@@ -9,6 +9,12 @@ spring:
     password: ${DB_PASSWORD:bookrush}
   flyway:
     schemas: publisher
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${BOOKRUSH_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+          jwk-set-uri: ${BOOKRUSH_SECURITY_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
 management:
   endpoints.web.exposure.include: health,info,metrics
 bookrush:

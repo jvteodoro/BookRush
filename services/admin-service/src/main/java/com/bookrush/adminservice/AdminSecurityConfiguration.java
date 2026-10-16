@@ -9,6 +9,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -23,8 +26,17 @@ public class AdminSecurityConfiguration {
             .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .anyRequest().authenticated())
-        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> {}));
+        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(groupsConverter())));
     return http.build();
+  }
+
+  private JwtAuthenticationConverter groupsConverter() {
+    var converter = new JwtAuthenticationConverter();
+    converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+      var groups = jwt.getClaimAsStringList("groups");
+      return groups == null ? List.<GrantedAuthority>of() : groups.stream().map(group -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + group)).toList();
+    });
+    return converter;
   }
 
   @Bean(name = "corsConfigurationSource")

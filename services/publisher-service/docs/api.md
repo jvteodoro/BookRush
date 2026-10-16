@@ -60,3 +60,5 @@ do próprio publicador. Depois de publicada, `POST
 subject, marca `published_work` como `WITHDRAWN` e emite um evento de domínio.
 As rotas administrativas de revisão continuam restritas aos grupos de
 operadores e usam CORS explícito.
+Authentication uses the `bookrush-platform` issuer/JWK set; Keycloak groups
+are mapped to `ROLE_*` authorities for operator-only workflow actions.

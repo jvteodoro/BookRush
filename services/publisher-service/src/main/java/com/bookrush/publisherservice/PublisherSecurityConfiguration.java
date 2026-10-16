@@ -7,6 +7,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.beans.factory.annotation.Value;
 import java.util.Arrays;
 import java.util.List;
@@ -29,8 +32,17 @@ public class PublisherSecurityConfiguration {
                 auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                     .requestMatchers("/api/internal/v1/publisher/submissions/**").permitAll()
                     .anyRequest().authenticated())
-        .oauth2ResourceServer(oauth -> oauth.jwt());
+        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(groupsConverter())));
     return http.build();
+  }
+
+  private JwtAuthenticationConverter groupsConverter() {
+    var converter = new JwtAuthenticationConverter();
+    converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+      var groups = jwt.getClaimAsStringList("groups");
+      return groups == null ? List.<GrantedAuthority>of() : groups.stream().map(group -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + group)).toList();
+    });
+    return converter;
   }
 
   @Bean(name = "corsConfigurationSource")
