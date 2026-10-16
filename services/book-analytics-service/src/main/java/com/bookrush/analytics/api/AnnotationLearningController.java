@@ -592,16 +592,27 @@ public class AnnotationLearningController {
                 + " WHERE campaign_id=?",
             Integer.class,
             id);
-    String manifest = hash(List.of(id, version, Instant.now().toString()));
+    String samplingConfigHash = db.queryForObject(
+        "SELECT sampling_config_hash FROM analytics.annotation_campaign WHERE id=?",
+        String.class, id);
+    var lineage = db.queryForList(
+        "SELECT DISTINCT e.source_asset_version_id FROM analytics.annotation_campaign_item i "
+            + "JOIN analytics.excerpt e ON e.id=i.excerpt_id WHERE i.campaign_id=? "
+            + "ORDER BY e.source_asset_version_id",
+        id).stream().map(row -> String.valueOf(row.get("source_asset_version_id"))).toList();
+    String lineageHash = hash(lineage);
+    String manifest = hash(List.of(id, version, samplingConfigHash, lineageHash, Instant.now().toString()));
     UUID did = UUID.randomUUID();
     db.update(
         "INSERT INTO"
-            + " analytics.annotation_dataset_version(id,campaign_id,version_number,manifest_sha256,created_by_subject)"
-            + " VALUES (?,?,?,?,?)",
+            + " analytics.annotation_dataset_version(id,campaign_id,version_number,manifest_sha256,sampling_config_hash,lineage_sha256,created_by_subject)"
+            + " VALUES (?,?,?,?,?,?,?)",
         did,
         id,
         version,
         manifest,
+        samplingConfigHash,
+        lineageHash,
         subject(auth));
     db.update(
         "INSERT INTO"
@@ -619,7 +630,13 @@ public class AnnotationLearningController {
         did,
         id);
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(Map.of("id", did, "version", version, "manifestSha256", manifest, "immutable", true));
+        .body(Map.of(
+            "id", did,
+            "version", version,
+            "manifestSha256", manifest,
+            "samplingConfigHash", samplingConfigHash,
+            "lineageSha256", lineageHash,
+            "immutable", true));
   }
 
   @GetMapping("/campaigns/{id}/datasets/{version}/export")
@@ -628,7 +645,8 @@ public class AnnotationLearningController {
     var rows =
         db.queryForList(
             "SELECT"
-                + " d.id,d.version_number,d.manifest_sha256,i.campaign_item_id,i.raw_labels,i.adjudicated_labels"
+                + " d.id,d.version_number,d.manifest_sha256,d.sampling_config_hash,d.lineage_sha256,"
+                + "i.campaign_item_id,i.raw_labels,i.adjudicated_labels"
                 + " FROM analytics.annotation_dataset_version d JOIN"
                 + " analytics.annotation_dataset_item i ON i.dataset_version_id=d.id WHERE"
                 + " d.campaign_id=? AND d.version_number=? AND d.status='PUBLISHED'",
