@@ -37,16 +37,26 @@
   os containers.
 - `git diff --check` passou e os Jenkinsfiles permanecem idênticos.
 
+### Validação integrada Jenkins — 2026-10-16
+
+- A autenticação OIDC foi validada com uma sessão nova como
+  `codex-jenkins-agent`; o build não usou acesso anônimo.
+- `bookrush-microservice-book-ingestion-service #8` executou na branch
+  `feature/close-small-beads` com `DEPLOY=true` e terminou `SUCCESS`.
+- `bookrush-deploy #97` executou a validação integrada e o deploy Compose da
+  mesma branch com `DEPLOY=true`, terminando `SUCCESS`.
+- Após o deploy, os serviços efetivos foram confirmados saudáveis: catálogo,
+  ingestão, analytics, reader-profile, social, Keycloak, reverse-proxy,
+  frontend e SeaweedFS. As imagens dos serviços publicados carregavam a
+  revisão `3990e7a`.
+- Smoke test pelo gateway público `GET /api/status` retornou HTTP 200 e
+  `{"status":"ok","service":"catalog-service"}`.
+
 ## Limitações explícitas
 
-- O Jenkins remoto não foi disparado nesta sessão; as imagens foram construídas
-  localmente com Docker e os containers de catálogo/ingestão foram recriados e
-  ficaram saudáveis. A pipeline foi validada por
-  `bash -n` e comparação dos dois arquivos. O disparo deve ser feito pelo
-  operador após publicar a branch.
 - O teste Testcontainers que exigiria montar o socket Docker não foi executado
   por segurança. O mesmo cenário foi validado pelo Compose descartável sem
-  compartilhar o socket.
+  compartilhar o socket e pelo deploy integrado do Jenkins.
 - O benchmark sintético de 100 mil registros foi executado e passou; ele é uma
   medição do harness local, não um SLA de produção.
 
