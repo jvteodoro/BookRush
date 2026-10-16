@@ -15,14 +15,17 @@ public class BehaviorOutboxDispatcher {
   private final JdbcTemplate jdbc;
   private final RestClient http;
   private final String sinkUrl;
+  private final String sinkToken;
   private final int batchSize;
 
   public BehaviorOutboxDispatcher(JdbcTemplate jdbc,
       @Value("${bookrush.behavior.outbox-sink-url:}") String sinkUrl,
+      @Value("${bookrush.behavior.outbox-sink-token:}") String sinkToken,
       @Value("${bookrush.behavior.outbox-batch-size:100}") int batchSize) {
     this.jdbc = jdbc;
     this.http = RestClient.builder().build();
     this.sinkUrl = sinkUrl == null ? "" : sinkUrl.trim();
+    this.sinkToken = sinkToken == null ? "" : sinkToken.trim();
     this.batchSize = Math.max(1, batchSize);
   }
 
@@ -35,7 +38,9 @@ public class BehaviorOutboxDispatcher {
     for (Map<String, Object> row : rows) {
       UUID id = (UUID) row.get("id");
       try {
-        http.post().uri(sinkUrl).body(row).retrieve().toBodilessEntity();
+        http.post().uri(sinkUrl).headers(headers -> {
+          if (!sinkToken.isBlank()) headers.set("X-Behavior-Outbox-Token", sinkToken);
+        }).body(row).retrieve().toBodilessEntity();
         jdbc.update("UPDATE behavior.outbox SET published_at=now(), attempts=attempts+1, last_error=NULL WHERE id=?", id);
       } catch (RuntimeException error) {
         jdbc.update("UPDATE behavior.outbox SET attempts=attempts+1, last_error=? WHERE id=?",

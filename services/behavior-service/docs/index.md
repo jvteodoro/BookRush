@@ -33,3 +33,10 @@ principal and ignores identity fields supplied in the event body. Batches are
 limited to 100 events and payloads to 16 KiB; retries remain idempotent through
 the unique `event_key` constraint. This prevents a browser from attributing an
 event to another user.
+## Outbox downstream
+
+Eventos aceitos entram na outbox e são enviados pelo dispatcher para
+`BEHAVIOR_OUTBOX_SINK_URL`. O ambiente Compose usa o consumidor interno do
+`book-analytics-service` em `/api/internal/v1/behavior/events`; a autenticação
+entre os serviços usa `BEHAVIOR_OUTBOX_SINK_TOKEN`, mantido somente no `.env`
+protegido. A linha só recebe `published_at` depois de uma resposta 2xx.

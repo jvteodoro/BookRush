@@ -12,7 +12,9 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,30 @@ public class AnalyticsController {
       @NotBlank String operationKey,
       @NotEmpty java.util.List<UUID> inputAssetVersionIds,
       Map<String, Object> configuration) {}
+
+  @PostMapping("/internal/v1/behavior/events")
+  @Transactional
+  public ResponseEntity<Void> behaviorEvent(
+      @RequestHeader(value = "X-Behavior-Outbox-Token", required = false) String token,
+      @Value("${bookrush.behavior-outbox-token:}") String expectedToken,
+      @RequestBody Map<String, Object> event) {
+    if (expectedToken == null || expectedToken.isBlank() || !expectedToken.equals(token)) {
+      return ResponseEntity.status(401).build();
+    }
+    UUID eventId;
+    try {
+      eventId = UUID.fromString(String.valueOf(event.get("event_id")));
+      var type = String.valueOf(event.get("event_type"));
+      var occurred = OffsetDateTime.parse(String.valueOf(event.get("occurred_at")));
+      var payload = mapper.writeValueAsString(event.getOrDefault("payload", Map.of()));
+      jdbc.update("INSERT INTO analytics.behavior_event(event_id,event_type,payload,occurred_at) "
+          + "VALUES (?,?,?::jsonb,?) ON CONFLICT (event_id) DO NOTHING",
+          eventId, type, payload, occurred);
+      return ResponseEntity.accepted().build();
+    } catch (Exception ex) {
+      return ResponseEntity.badRequest().build();
+    }
+  }
 
   @PostMapping({"/admin/v1/analytics/jobs", "/admin/v1/content-analytics/jobs"})
   @Transactional

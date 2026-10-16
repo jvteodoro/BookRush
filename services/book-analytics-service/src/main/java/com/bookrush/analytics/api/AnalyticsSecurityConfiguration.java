@@ -39,6 +39,7 @@ public class AnalyticsSecurityConfiguration {
                       "/swagger-ui/**",
                       "/swagger-ui.html")
                   .permitAll();
+              auth.requestMatchers("/api/internal/v1/behavior/events").permitAll();
               if (enabled) {
                 auth.requestMatchers("/api/admin/v1/annotation/campaigns/**")
                     .hasAnyRole("ANALYTICS_OPERATOR", "EXCERPT_REVIEWER");
