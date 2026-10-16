@@ -33,6 +33,25 @@ default. O procedimento de recuperação é:
 4. rotacionar a credencial e revisar sessões imediatamente após o uso;
 5. reconciliar a configuração declarativa sem apagar usuários ou clients.
 
+O ciclo operacional está em `infrastructure/keycloak/break-glass.sh`. Ele
+exige um `.env` protegido e `BREAK_GLASS_CONFIRM=I_UNDERSTAND` explícito:
+
+```bash
+BREAK_GLASS_CONFIRM=I_UNDERSTAND infrastructure/keycloak/break-glass.sh \
+  --env-file /run/bookrush.env prepare
+BREAK_GLASS_CONFIRM=I_UNDERSTAND infrastructure/keycloak/break-glass.sh \
+  --env-file /run/bookrush.env arm
+BREAK_GLASS_CONFIRM=I_UNDERSTAND infrastructure/keycloak/break-glass.sh \
+  --env-file /run/bookrush.env revoke
+```
+
+`prepare` cria ou atualiza a conta desabilitada, associa `platform-admins` e
+exige `CONFIGURE_TOTP`; `arm` habilita uma conta previamente preparada; e
+`revoke` desabilita a conta e encerra as sessões. `BREAK_GLASS_PASSWORD` só é
+exigida em `prepare`, deve ser diferente da senha administrativa e vem do
+cofre. O seed OTP é cadastrado por procedimento independente. O script não é
+executado pela pipeline Jenkins para evitar habilitação acidental.
+
 Desabilitar uma conta impede novos tokens, mas não revoga instantaneamente um
 JWT já emitido. O prazo efetivo é limitado pelo TTL/access token e pela sessão
 local de cada aplicação; o ensaio deve medir esse prazo antes de anunciar um
