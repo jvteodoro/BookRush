@@ -77,13 +77,20 @@ if not match:
 print(html.unescape(match.group(1)))
 PY
 )
-curl -fsS -D "$post_headers" -o "$post_body" -c "$cookie" -b "$cookie" "$action" \
+post_status=$(curl -fsS -D "$post_headers" -o "$post_body" -w '%{http_code}' -c "$cookie" -b "$cookie" "$action" \
   --data-urlencode "username=$E2E_OIDC_USERNAME" \
   --data-urlencode "password=$E2E_OIDC_PASSWORD" \
   --data-urlencode 'credentialId=' \
-  --data-urlencode 'login=Entrar'
+  --data-urlencode 'login=Entrar')
 callback=$(awk 'BEGIN{IGNORECASE=1} /^Location:/{sub(/\r$/,""); sub(/^[^:]*:[[:space:]]*/,""); print; exit}' "$post_headers")
-test -n "$callback" || { echo 'reader-bff-e2e: OIDC não retornou callback' >&2; exit 1; }
+if [[ -z "$callback" ]]; then
+  if grep -qiE 'invalid username|invalid password|credenciais inválidas' "$post_body"; then
+    echo 'reader-bff-e2e: Keycloak rejeitou username/password da credential' >&2
+  else
+    echo "reader-bff-e2e: OIDC não retornou callback (login HTTP $post_status)" >&2
+  fi
+  exit 1
+fi
 if [[ "$callback" != *'code='* ]]; then
   required_action=$(curl -fsS -c "$cookie" -b "$cookie" "$callback" -o "$required_body" >/dev/null; python3 - "$required_body" <<'PY'
 import html, re, sys

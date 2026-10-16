@@ -132,7 +132,8 @@ instância deve cadastrar o mesmo par como uma credential global do tipo
 `Username with password`, com o ID `bookrush-product-e2e`; o usuário
 `platform-operators` pode executar o job, mas não deve receber permissão de
 criar ou ler credentials. Verifique a existência pelo job antes de habilitar
-`RUN_PUBLIC_E2E`.
+`RUN_PUBLIC_E2E`; se o login falhar, o harness informa separadamente rejeição
+de username/password e ausência de callback OIDC.
 
 ### 4. Acompanhar fila e build
 
