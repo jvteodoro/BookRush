@@ -1,0 +1,66 @@
+openapi: 3.0.3
+info:
+  title: reader-profile-service
+  version: 0.1.0
+paths:
+  /api/v1/profile:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Authenticated profile }
+        '401': { description: Authentication required }
+    put:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Updated authenticated profile }
+        '401': { description: Authentication required }
+  /api/v1/profile/privacy:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Authenticated privacy policy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Privacy' }
+        '401': { description: Authentication required }
+    put:
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Privacy' }
+      responses:
+        '200':
+          description: Updated privacy policy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Privacy' }
+        '400': { description: Invalid visibility value }
+        '401': { description: Authentication required }
+  /api/v1/profile/public:
+    get:
+      parameters:
+        - name: subject
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Public profile or an empty profile response }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Privacy:
+      type: object
+      required: [profileVisibility, activityVisibility, libraryVisibility, recentVisibility, socialGraphVisibility]
+      properties:
+        profileVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        activityVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        libraryVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        recentVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        socialGraphVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }

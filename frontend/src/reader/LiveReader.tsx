@@ -3,6 +3,7 @@ import { AppShell, type ReaderTab } from "../components/layout/AppShell";
 import { ExcerptFeed } from "../components/book/ExcerptFeed";
 import { Card } from "../components/ui/Card";
 import { authClient } from "../auth";
+import { apiRoutes } from "../app/apiRoutes";
 import { LibraryPage } from "./LibraryPage";
 import type { LibraryBook } from "./library";
 import { SearchPage } from "./SearchPage";
@@ -163,7 +164,7 @@ export function LiveReader({
     let active = true;
     const revision = saveRevision.current;
     void authClient
-      .fetch("/api/v1/reader/library")
+      .fetch(apiRoutes.reader.library())
       .then(async (response) => {
         if (!response.ok)
           throw new Error("Não foi possível atualizar sua biblioteca.");
