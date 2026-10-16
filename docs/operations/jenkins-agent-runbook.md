@@ -109,6 +109,23 @@ microserviço ou todos os serviços da vertical. Para Kubernetes, use
 `DEPLOY_TARGET=kubernetes`, `PUBLISH=true`, `REGISTRY` e
 `KUBECONFIG_CREDENTIAL_ID`; a imagem precisa estar acessível pelo cluster.
 
+### Smoke automatizado do reader BFF
+
+O job `bookrush-microservice-reader-bff-service` possui o parâmetro opt-in
+`RUN_PUBLIC_E2E`. Quando marcado, ele exige `DEPLOY=true`, `E2E_BOOK_ID` e a
+credential Jenkins `E2E_CREDENTIAL_ID` do tipo username/password para um
+usuário de teste do realm de produto `bookrush`. O estágio executa
+`scripts/test-reader-bff-e2e.sh`, que faz Authorization Code + PKCE sem
+interação manual, valida claims não sensíveis (`iss`, `aud`, `scope`, `exp`),
+exercita respostas 401/200, o manifesto EPUB e o preflight CORS. Senhas,
+tokens, cookies e corpos de resposta nunca são impressos.
+
+O usuário de teste precisa estar no realm `bookrush`, ter o cliente
+`bookrush-web` e o scope `bookrush.catalog.read`; o usuário administrativo do
+Jenkins no realm `bookrush-platform` não substitui essa credencial. O parâmetro
+fica desmarcado por padrão para que builds normais não dependam de uma conta
+humana. A ausência da credential deve falhar somente quando o opt-in for usado.
+
 ### 4. Acompanhar fila e build
 
 O `POST` bem-sucedido retorna `201` e um header `Location` apontando para
