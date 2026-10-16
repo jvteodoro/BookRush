@@ -3,13 +3,13 @@ package com.bookrush.recommendationservice.api;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import jakarta.servlet.http.HttpServletRequest;
 import com.bookrush.recommendationservice.BehaviorEventPublisher;
+import com.bookrush.recommendationservice.RecommendationHeuristic;
+import com.bookrush.recommendationservice.RecommendationHeuristic.Strategy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -58,11 +58,12 @@ public class RecommendationController {
     long previousImpressions = jdbc.queryForObject(
         "SELECT count(*) FROM recommendation.impression i JOIN recommendation.request r ON r.id=i.request_id WHERE r.subject_key=?",
         Long.class, subject);
-    String strategy = previousImpressions == 0 ? "COLD_START" : (previousImpressions % 7 == 0 ? "LUCKY" : "DIVERSE");
+    Strategy selectedStrategy = RecommendationHeuristic.strategyFor(previousImpressions);
+    String strategy = selectedStrategy.name();
     Map<?, ?> result = catalog.get().uri("/api/v1/books?page=0&size=" + Math.min(100, Math.max(limit * 3, 20)))
         .retrieve().body(Map.class);
     List<?> books = result != null && result.get("items") instanceof List<?> list ? list : List.of();
-    List<?> rankedBooks = rankCandidates(books, subject, limit, strategy);
+    List<?> rankedBooks = RecommendationHeuristic.rank(books, subject, limit, selectedStrategy);
     UUID requestId = UUID.randomUUID();
     jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
         requestId, subject, MODEL_VERSION, strategy, subject.hashCode(), "{}");
@@ -74,7 +75,8 @@ public class RecommendationController {
       UUID parsedBookId = UUID.fromString(String.valueOf(bookId));
       UUID itemId = UUID.randomUUID();
       int currentRank = rank;
-      String reason = strategy.equals("COLD_START") ? "popular-cold-start" : strategy.equals("LUCKY") ? "lucky-exploration" : "diversity-heuristic";
+      String reason = selectedStrategy == Strategy.COLD_START ? "popular-cold-start"
+          : selectedStrategy == Strategy.LUCKY ? "lucky-exploration" : "diversity-heuristic";
       jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
           itemId, requestId, parsedBookId, currentRank, 1.0 / currentRank,
           "{\"strategy\":\"" + reason + "\"}");
@@ -96,32 +98,6 @@ public class RecommendationController {
     excerptEnrichment.enrich(items);
     return Map.of("requestId", requestId, "modelVersion", MODEL_VERSION, "strategy", strategy,
         "generatedAt", Instant.now(), "items", items);
-  }
-
-  private List<?> rankCandidates(List<?> books, String subject, int limit, String strategy) {
-    var candidates = new ArrayList<>(books);
-    candidates.sort(Comparator.comparingLong(book -> candidateScore(book, subject, strategy)));
-    var selected = new ArrayList<Object>();
-    var seenKeys = new HashSet<String>();
-    for (Object candidate : candidates) {
-      String key = diversityKey(candidate);
-      if (seenKeys.add(key) || selected.size() >= Math.max(1, limit / 2)) selected.add(candidate);
-      if (selected.size() == limit) break;
-    }
-    return selected;
-  }
-
-  private long candidateScore(Object book, String subject, String strategy) {
-    Object id = book instanceof Map<?, ?> map ? map.get("id") : book;
-    long score = (subject + ":" + id).hashCode();
-    return strategy.equals("COLD_START") ? Math.abs(score) : score;
-  }
-
-  private String diversityKey(Object book) {
-    if (!(book instanceof Map<?, ?> map)) return String.valueOf(book);
-    Object language = map.get("originalLanguage");
-    if (language == null) language = map.get("language");
-    return language == null ? String.valueOf(map.get("id")) : String.valueOf(language);
   }
 
   @PostMapping("/impressions/{impressionId}/viewable")
