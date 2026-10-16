@@ -22,3 +22,8 @@ The upsert keeps the service's canonical SQL contract in lowercase compact
 form (`insert into ... on conflict ...`). This representation is covered by
 the unit test so refactors cannot silently change the statement used by the
 reader-state adapter.
+
+Eventos `BOOK_OPEN`, `READ_PROGRESS` e `READ_SESSION` são enviados ao
+behavior-service com o bearer do cliente, chave idempotente e até três
+tentativas; o behavior-service persiste o evento e seu outbox na mesma
+transação.

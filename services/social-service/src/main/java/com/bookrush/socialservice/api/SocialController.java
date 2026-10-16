@@ -22,16 +22,20 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.client.RestClient;
 import org.springframework.http.HttpHeaders;
+import com.bookrush.socialservice.BehaviorEventPublisher;
 
 @RestController
 @RequestMapping("/api/v1/social")
 public class SocialController {
   private final JdbcTemplate jdbc;
   private final RestClient profiles;
+  private final BehaviorEventPublisher behavior;
 
   public SocialController(JdbcTemplate jdbc,
+      BehaviorEventPublisher behavior,
       @org.springframework.beans.factory.annotation.Value("${PROFILE_URL:http://reader-profile-service:8095}") String profileUrl) {
     this.jdbc = jdbc;
+    this.behavior = behavior;
     this.profiles = RestClient.builder().baseUrl(profileUrl).build();
   }
 
@@ -71,26 +75,29 @@ public class SocialController {
   }
 
   @PutMapping("/books/{bookId}/like")
-  public Map<String, Object> like(@PathVariable UUID bookId, Principal principal) {
+  public Map<String, Object> like(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     jdbc.update("INSERT INTO social.likes(subject_key, book_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
         subject(principal), bookId);
+    behavior.publish("BOOK_LIKE", bookId, Map.of(), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("bookId", bookId, "liked", true);
   }
 
   @DeleteMapping("/books/{bookId}/like")
-  public void unlike(@PathVariable UUID bookId, Principal principal) {
+  public void unlike(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     jdbc.update("DELETE FROM social.likes WHERE subject_key = ? AND book_id = ?",
         subject(principal), bookId);
+    behavior.publish("BOOK_UNLIKE", bookId, Map.of(), request.getHeader(HttpHeaders.AUTHORIZATION));
   }
 
   @PutMapping("/follow")
-  public Map<String, Object> follow(@RequestParam String user, Principal principal) {
+  public Map<String, Object> follow(@RequestParam String user, Principal principal, HttpServletRequest request) {
     String current = subject(principal);
     if (current.equals(user)) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot follow self");
     }
     jdbc.update("INSERT INTO social.follows(follower, followed) VALUES (?, ?) ON CONFLICT DO NOTHING",
         current, user);
+    behavior.publish("FOLLOW", null, Map.of("followed", user), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("user", user, "following", true);
   }
 
@@ -103,29 +110,32 @@ public class SocialController {
   }
 
   @DeleteMapping("/follow")
-  public void unfollow(@RequestParam String user, Principal principal) {
+  public void unfollow(@RequestParam String user, Principal principal, HttpServletRequest request) {
     jdbc.update("DELETE FROM social.follows WHERE follower = ? AND followed = ?",
         subject(principal), user);
+    behavior.publish("UNFOLLOW", null, Map.of("followed", user), request.getHeader(HttpHeaders.AUTHORIZATION));
   }
 
   public record Report(UUID bookId, UUID commentId, @NotBlank @Size(max = 120) String reason) {}
 
   @PostMapping("/reports")
-  public Object report(@Valid @RequestBody Report report, Principal principal) {
+  public Object report(@Valid @RequestBody Report report, Principal principal, HttpServletRequest request) {
     UUID id = UUID.randomUUID();
     jdbc.update("INSERT INTO social.reports(id, reporter, book_id, comment_id, reason) "
         + "VALUES (?, ?, ?, ?, ?)", id, subject(principal), report.bookId(), report.commentId(),
         report.reason());
+    behavior.publish("BOOK_REPORT", report.bookId(), Map.of("reason", report.reason()), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("id", id, "status", "OPEN");
   }
 
   public record Share(@NotBlank @Size(max = 40) String channel) {}
 
   @PostMapping("/books/{bookId}/share")
-  public Object share(@PathVariable UUID bookId, @Valid @RequestBody Share share, Principal principal) {
+  public Object share(@PathVariable UUID bookId, @Valid @RequestBody Share share, Principal principal, HttpServletRequest request) {
     UUID id = UUID.randomUUID();
     jdbc.update("INSERT INTO social.shares(id, subject_key, book_id, channel) VALUES (?, ?, ?, ?)",
         id, subject(principal), bookId, share.channel());
+    behavior.publish("BOOK_SHARE", bookId, Map.of("channel", share.channel()), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("id", id, "bookId", bookId, "channel", share.channel(), "recorded", true);
   }
 
@@ -150,6 +160,7 @@ public class SocialController {
     jdbc.update("INSERT INTO social.comments(id, subject_key, author_display_name, book_id, body) "
         + "VALUES (?, ?, ?, ?, ?)", id, identity, author == null ? displayName(principal) : author, bookId,
         comment.body());
+    behavior.publish("BOOK_COMMENT", bookId, Map.of(), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("id", id, "bookId", bookId, "body", comment.body());
   }
 

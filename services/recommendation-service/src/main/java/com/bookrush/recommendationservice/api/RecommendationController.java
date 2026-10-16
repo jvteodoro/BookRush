@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import jakarta.servlet.http.HttpServletRequest;
+import com.bookrush.recommendationservice.BehaviorEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,14 +28,17 @@ public class RecommendationController {
   private final RestClient catalog;
   private final JdbcTemplate jdbc;
   private final ExcerptEnrichmentService excerptEnrichment;
+  private final BehaviorEventPublisher behavior;
 
   public RecommendationController(
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
       JdbcTemplate jdbc,
-      ExcerptEnrichmentService excerptEnrichment) {
+      ExcerptEnrichmentService excerptEnrichment,
+      BehaviorEventPublisher behavior) {
     catalog = RestClient.builder().baseUrl(url).build();
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
+    this.behavior = behavior;
   }
 
   private String subject(Principal principal) {
@@ -44,7 +49,8 @@ public class RecommendationController {
   }
 
   @GetMapping("/feed")
-  public Map<String, Object> feed(@RequestParam(defaultValue = "20") int size, Principal principal) {
+  public Map<String, Object> feed(@RequestParam(defaultValue = "20") int size, Principal principal,
+      HttpServletRequest request) {
     String subject = subject(principal);
     int limit = Math.max(1, Math.min(size, 100));
     Map<?, ?> result = catalog.get().uri("/api/v1/books?page=0&size=" + limit)
@@ -69,13 +75,16 @@ public class RecommendationController {
       item.put("rank", rank++);
       items.add(item);
     }
+    behavior.publish("RECOMMENDATION_REQUEST", null, Map.of("size", limit, "modelVersion", MODEL_VERSION),
+        request.getHeader("Authorization"));
     excerptEnrichment.enrich(items);
     return Map.of("requestId", requestId, "modelVersion", MODEL_VERSION,
         "generatedAt", Instant.now(), "items", items);
   }
 
   @PostMapping("/impressions/{impressionId}/viewable")
-  public Map<String, Object> viewable(@PathVariable UUID impressionId, Principal principal) {
+  public Map<String, Object> viewable(@PathVariable UUID impressionId, Principal principal,
+      HttpServletRequest request) {
     String subject = subject(principal);
     int updated = jdbc.update("UPDATE recommendation.impression i SET viewable = true "
         + "WHERE i.id = ? AND EXISTS (SELECT 1 FROM recommendation.request r "
@@ -83,6 +92,8 @@ public class RecommendationController {
     if (updated == 0) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "impression not found");
     }
+    behavior.publish("EXCERPT_IMPRESSION", null, Map.of("impressionId", impressionId),
+        request.getHeader("Authorization"));
     return Map.of("impressionId", impressionId, "viewable", true);
   }
 }

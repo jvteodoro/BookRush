@@ -2,6 +2,8 @@ package com.bookrush.readerstateservice.api;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.servlet.http.HttpServletRequest;
+import com.bookrush.readerstateservice.BehaviorEventPublisher;
 import java.security.Principal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -26,14 +28,22 @@ public class ReaderStateController {
   private static final String PLANT_FORMULA_VERSION = "reading-minutes-v1";
   private static final int MAX_PLANT_STAGE = 5;
   private final JdbcTemplate jdbc;
+  private final BehaviorEventPublisher behavior;
 
-  public ReaderStateController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+  public ReaderStateController(JdbcTemplate jdbc, BehaviorEventPublisher behavior) {
+    this.jdbc = jdbc;
+    this.behavior = behavior;
+  }
 
   private String subject(Principal principal) {
     if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
     }
     return principal.getName();
+  }
+
+  private String authorization(HttpServletRequest request) {
+    return request == null ? null : request.getHeader("Authorization");
   }
 
   private int integerValue(Map<String, Object> body, String key) {
@@ -44,10 +54,12 @@ public class ReaderStateController {
   public record Progress(@NotNull Long positionCodepoint, @NotNull Double percent) {}
 
   @PostMapping("/books/{bookId}/opened")
-  public Map<String, Object> opened(@PathVariable UUID bookId, Principal principal) {
+  public Map<String, Object> opened(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
+    String subject = subject(principal);
     jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?) "
         + "on conflict(subject_key,book_id) do update set last_opened_at=now()",
-        subject(principal), bookId);
+        subject, bookId);
+    behavior.publish("BOOK_OPEN", bookId, Map.of(), authorization(request));
     return Map.of("bookId", bookId, "recorded", true);
   }
 
@@ -68,7 +80,7 @@ public class ReaderStateController {
   @Transactional
   @PostMapping("/sessions/{id}/end")
   public Object endSession(@PathVariable UUID id, @RequestBody Map<String, Object> body,
-      Principal principal) {
+      Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
     int seconds = integerValue(body, "activeSeconds");
     int updated = jdbc.update("UPDATE reader_state.session SET ended_at = now(), active_seconds = ? "
@@ -78,6 +90,7 @@ public class ReaderStateController {
     jdbc.update("INSERT INTO reader_state.reading_day(subject_key, day, minutes) VALUES (?, CURRENT_DATE, ?) "
         + "ON CONFLICT (subject_key, day) DO UPDATE SET minutes = "
         + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, seconds / 60);
+    behavior.publish("READ_SESSION", null, Map.of("activeSeconds", seconds), authorization(request));
     return Map.of("id", id, "activeSeconds", seconds, "plant", refreshPlant(subject));
   }
 
@@ -148,11 +161,12 @@ public class ReaderStateController {
 
   @PutMapping("/books/{bookId}/progress")
   public Map<String, Object> progress(@PathVariable UUID bookId, @Valid @RequestBody Progress value,
-      Principal principal) {
+      Principal principal, HttpServletRequest request) {
     jdbc.update("INSERT INTO reader_state.progress(subject_key, book_id, position_codepoint, percent) "
         + "VALUES (?, ?, ?, ?) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
         + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, updated_at = now()",
         subject(principal), bookId, value.positionCodepoint(), value.percent());
+    behavior.publish("READ_PROGRESS", bookId, Map.of("percent", value.percent()), authorization(request));
     return Map.of("bookId", bookId, "percent", value.percent());
   }
 
