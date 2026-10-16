@@ -17,6 +17,12 @@ usuário do container Jenkins.
 
 1. Publique o commit na branch remota antes de disparar o job. O Jenkins não
    executa alterações que existem somente no checkout local.
+
+O job `bookrush-backstage` compartilha o workspace com o container de validação
+usando `--volumes-from "$HOSTNAME"`; não substitua isso por um bind mount de
+`$PWD`, pois o caminho do workspace existe no daemon Docker e não no processo
+do agente. Um bind mount incorreto faz o gate receber um `/repo` vazio e falhar
+com `scripts/validate-change.sh: No such file or directory`.
 2. Confirme que `https://jenkins-bookrush.jteodoro.tec.br` resolve e responde.
    HTTP 403 sem sessão é esperado; falha de DNS ou HTTP 5xx indica problema de
    infraestrutura, não de pipeline.
