@@ -15,6 +15,7 @@ Git é a fonte canônica. Backstage é o portal oficial de descoberta e consulta
 - [OIDC do Jenkins com Keycloak](auth/jenkins-oidc.md)
 - [Matriz de migração de realms](auth/realm-migration.md)
 - [Ciclo de acesso administrativo](auth/access-lifecycle.md)
+- [Operação, rollout e rollback da plataforma](auth/operations.md)
 - [Inventário de interfaces](auth/interface-inventory.md)
 - [Consulta do catálogo por serviços](catalog-consumption.md)
 - [Lifecycle e IaC das aplicações](platform/lifecycle.md)
