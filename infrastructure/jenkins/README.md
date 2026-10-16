@@ -280,3 +280,7 @@ bash scripts/test-keycloak-admin-service-client.sh .env
 O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
 e concede apenas `query-users` e `manage-users` à conta de serviço. O teste
 valida token, roles e acesso à API de usuários sem imprimir credenciais.
+
+O usuário permanente `codex-jenkins-agent` também permanece nos grupos
+`operators` e `platform-operators`; a associação é reconciliada no realm e é
+necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.

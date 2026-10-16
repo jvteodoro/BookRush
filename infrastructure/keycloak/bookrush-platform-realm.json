@@ -42,6 +42,12 @@
       ]
     },
     {
+      "name": "platform-operators",
+      "realmRoles": [
+        "platform-operator"
+      ]
+    },
+    {
       "name": "platform-admins",
       "realmRoles": [
         "platform-admin"
