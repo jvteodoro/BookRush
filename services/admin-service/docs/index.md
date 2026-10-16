@@ -36,4 +36,5 @@ client from being accepted accidentally.
 
 Os logs de autenticação OAuth2 podem ser elevados temporariamente durante um
 incidente operacional; o nível padrão de produção permanece sem payloads de
-tokens.
+tokens. O tracing de filtros e roteamento é reservado para diagnóstico e deve
+ser removido ao concluir a investigação.
