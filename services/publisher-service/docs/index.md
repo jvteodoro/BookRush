@@ -13,8 +13,6 @@ changes the caller's own submission.
 The service validates the `bookrush-platform` issuer/JWK set and requires the
 `bookrush-ingestion` audience. OAuth scopes and Keycloak groups are converted
 to `SCOPE_*` and `ROLE_*` authorities before publisher/operator actions run.
-Logs detalhados de OAuth2 são apenas uma ferramenta temporária de diagnóstico;
-tokens não devem ser registrados.
 
 Criação e submissão de publicação emitem fatos server-side ao behavior-service
 com o bearer autenticado, chave idempotente e retry limitado. A telemetria é

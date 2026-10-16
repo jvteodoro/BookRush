@@ -1,11 +1,5 @@
 server:
   port: ${SERVER_PORT:8100}
-logging:
-  level:
-    org.springframework.security.oauth2.server.resource: DEBUG
-    org.springframework.security.oauth2.jwt: DEBUG
-    org.springframework.security.web: TRACE
-    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE
 spring:
   application:
     name: admin-service

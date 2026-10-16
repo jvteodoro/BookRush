@@ -33,8 +33,3 @@ The service validates the `bookrush-platform` issuer/JWK set and requires the
 `groups` claim to `SCOPE_*`/`ROLE_*` authorities before enforcing operator
 actions. This explicit decoder prevents a token issued for another platform
 client from being accepted accidentally.
-
-Os logs de autenticação OAuth2 podem ser elevados temporariamente durante um
-incidente operacional; o nível padrão de produção permanece sem payloads de
-tokens. O tracing de filtros e roteamento é reservado para diagnóstico e deve
-ser removido ao concluir a investigação.

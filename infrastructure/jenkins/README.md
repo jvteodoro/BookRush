@@ -286,6 +286,10 @@ O usuário permanente `codex-jenkins-agent` também permanece nos grupos
 necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.
 O cliente `bookrush-jenkins` também publica a audience `bookrush-ingestion`,
 mantendo os tokens emitidos para smoke tests compatíveis com os serviços
+de plataforma. O mapper `jenkins-subject` e o client scope `profile` também
+emitem a claim OIDC `sub`, necessária para associar o actor autenticado às
+ações administrativas; após alterar o realm, gere token novo e valide `iss`,
+`aud`, `sub` e `groups` antes do smoke.
 protegidos.
 
 O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
