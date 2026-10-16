@@ -10,6 +10,14 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.cors.CorsConfiguration;
@@ -20,21 +28,41 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @ConditionalOnProperty(name = "bookrush.security.enabled", havingValue = "true")
 public class SocialSecurityConfiguration {
   @Bean
-  SecurityFilterChain socialSecurity(HttpSecurity http) throws Exception {
+  SecurityFilterChain socialSecurity(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
     http.csrf(csrf -> csrf.disable()).cors(cors -> {})
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .anyRequest().authenticated())
-        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(groupsConverter())));
+        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(groupsConverter())));
     return http.build();
+  }
+
+  @Bean
+  JwtDecoder jwtDecoder(
+      @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}") String jwkSetUri,
+      @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
+      @Value("${bookrush.security.audience}") String audience) {
+    NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+    OAuth2TokenValidator<Jwt> issuerValidator = new JwtIssuerValidator(issuer);
+    OAuth2TokenValidator<Jwt> audienceValidator = token ->
+        token.getAudience().contains(audience)
+            ? OAuth2TokenValidatorResult.success()
+            : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "required audience is missing", null));
+    decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuerValidator, audienceValidator));
+    return decoder;
   }
 
   private JwtAuthenticationConverter groupsConverter() {
     var converter = new JwtAuthenticationConverter();
     converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+      var authorities = new java.util.ArrayList<GrantedAuthority>();
+      var scopes = jwt.getClaimAsString("scope");
+      if (scopes != null) for (String scope : scopes.split("\\s+"))
+        if (!scope.isBlank()) authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope));
       var groups = jwt.getClaimAsStringList("groups");
-      return groups == null ? List.<GrantedAuthority>of() : groups.stream().map(group -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + group)).toList();
+      if (groups != null) groups.forEach(group -> authorities.add(new SimpleGrantedAuthority("ROLE_" + group)));
+      return authorities;
     });
     return converter;
   }

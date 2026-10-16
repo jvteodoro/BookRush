@@ -28,6 +28,8 @@ exigem token do realm `bookrush-platform` com grupo `operators` ou
 O endpoint `/users/{subjectKey}/disable|enable` grava auditoria e uma linha de
 restrição após a confirmação do Keycloak. Sem a configuração do cliente, a API
 responde `503` em vez de fingir que a alteração foi aplicada.
-The service validates the `bookrush-platform` issuer/JWK set and maps the
-Keycloak `groups` claim to `ROLE_*` authorities before enforcing operator
-actions.
+The service validates the `bookrush-platform` issuer/JWK set and requires the
+`bookrush-ingestion` audience. It maps both OAuth scopes and the Keycloak
+`groups` claim to `SCOPE_*`/`ROLE_*` authorities before enforcing operator
+actions. This explicit decoder prevents a token issued for another platform
+client from being accepted accidentally.

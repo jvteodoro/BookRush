@@ -18,6 +18,8 @@ spring:
 management:
   endpoints.web.exposure.include: health,info,metrics
 bookrush:
+  security:
+    audience: ${BOOKRUSH_SECURITY_AUDIENCE:bookrush-ingestion}
   cors:
     allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
 publisher:
