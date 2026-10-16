@@ -638,6 +638,7 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
     depends_on:
       postgres:
         condition: service_healthy

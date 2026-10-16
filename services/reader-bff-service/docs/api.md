@@ -25,6 +25,13 @@ O BFF repassa `Authorization: Bearer` ao serviço dono. Falhas de dependência
 retornam `502 Bad Gateway` para que o cliente diferencie indisponibilidade de
 uma resposta vazia válida.
 
+As chamadas de navegador aceitam somente as origens configuradas em
+`BOOKRUSH_CORS_ALLOWED_ORIGINS`. O preflight `OPTIONS` é permitido sem bearer,
+mas todas as operações de negócio continuam exigindo um JWT válido com a
+audience e o scope do produto. A configuração inclui `Authorization`,
+`Content-Type`, `Idempotency-Key` e `X-Admin-Client` para que o browser não
+transforme uma rejeição de CORS em um erro de rede genérico.
+
 O frontend concentra essas rotas em `frontend/src/app/apiRoutes.ts`. Assim,
 uma mudança de ownership ou prefixo é feita no mapa, sem espalhar URLs pelos
 componentes. O `readiumBridge` também remapeia os `href` de conteúdo EPUB

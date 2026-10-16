@@ -126,6 +126,14 @@ Jenkins no realm `bookrush-platform` não substitui essa credencial. O parâmetr
 fica desmarcado por padrão para que builds normais não dependam de uma conta
 humana. A ausência da credential deve falhar somente quando o opt-in for usado.
 
+As credenciais locais de operação devem ser mantidas fora do Git, por exemplo
+em um arquivo do host com permissão `0600`. Para o Jenkins, o administrador da
+instância deve cadastrar o mesmo par como uma credential global do tipo
+`Username with password`, com o ID `bookrush-product-e2e`; o usuário
+`platform-operators` pode executar o job, mas não deve receber permissão de
+criar ou ler credentials. Verifique a existência pelo job antes de habilitar
+`RUN_PUBLIC_E2E`.
+
 ### 4. Acompanhar fila e build
 
 O `POST` bem-sucedido retorna `201` e um header `Location` apontando para
