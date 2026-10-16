@@ -82,8 +82,8 @@
             "userinfo.token.claim": "true"
           }
         },
-        {
-          "name": "jenkins-groups",
+    {
+      "name": "jenkins-groups",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-group-membership-mapper",
           "config": {
@@ -91,9 +91,20 @@
             "claim.name": "groups",
             "id.token.claim": "true",
             "access.token.claim": "true",
-            "userinfo.token.claim": "true"
-          }
-        }
+        "userinfo.token.claim": "true"
+      }
+    },
+    {
+      "name": "jenkins-audience",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-audience-mapper",
+      "config": {
+        "included.client.audience": "bookrush-ingestion",
+        "access.token.claim": "true",
+        "id.token.claim": "false",
+        "userinfo.token.claim": "false"
+      }
+    }
       ],
       "defaultClientScopes": [],
       "optionalClientScopes": []

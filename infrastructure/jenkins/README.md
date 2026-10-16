@@ -284,6 +284,9 @@ valida token, roles e acesso à API de usuários sem imprimir credenciais.
 O usuário permanente `codex-jenkins-agent` também permanece nos grupos
 `operators` e `platform-operators`; a associação é reconciliada no realm e é
 necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.
+O cliente `bookrush-jenkins` também publica a audience `bookrush-ingestion`,
+mantendo os tokens emitidos para smoke tests compatíveis com os serviços
+protegidos.
 
 O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
 Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh
