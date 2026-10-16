@@ -2,6 +2,16 @@
 
 ## Evidências executadas
 
+### Revalidação do harness — 2026-10-16
+
+- `scripts/benchmark-ingestion.sh 100000`: passou com 100.000 registros
+  sintéticos em 0,067 s (1.488.766 registros/s).
+- `scripts/test-bibliographic-e2e.sh`: passou em ambiente descartável; a suíte
+  de ingestão executou 30 testes (1 skip) sem falhas e o catálogo executou 44
+  testes (7 skips) sem falhas, com Flyway fresh/upgrade até V17.
+- O gate do harness deixou de exigir contagens fixas obsoletas (26/43); ele
+  agora exige resultado sem falhas e permite o crescimento das suítes.
+
 - `mvn -q test` em containers Maven para `book-ingestion-service` e
   `catalog-service`: passou.
 - Compose descartável com PostgreSQL, Redis, SeaweedFS, catálogo e ingestão:
@@ -37,8 +47,8 @@
 - O teste Testcontainers que exigiria montar o socket Docker não foi executado
   por segurança. O mesmo cenário foi validado pelo Compose descartável sem
   compartilhar o socket.
-- Não foi executado benchmark de 100 mil registros; o fluxo foi validado com
-  fixture unitária, lote parcial e uma importação online limitada.
+- O benchmark sintético de 100 mil registros foi executado e passou; ele é uma
+  medição do harness local, não um SLA de produção.
 
 O teste controlado alterou deliberadamente o banco persistente de desenvolvimento
 no servidor para registrar Gutenberg 1342. Nenhum segredo foi versionado; os
