@@ -191,7 +191,13 @@ for endpoint in progress bookmarks; do
   assert_status "authenticated_$endpoint" 200 "$status"
 done
 
-echo '[4/5] publicação EPUB encaminhada ao content-service'
+echo '[4/6] perfil e preferências de privacidade autenticados'
+status=$(status_without_body "$tmp_dir/profile" "$base_url/api/v1/profile" -H "$auth_header")
+assert_status authenticated_profile 200 "$status"
+status=$(status_without_body "$tmp_dir/privacy" "$base_url/api/v1/profile/privacy" -H "$auth_header")
+assert_status authenticated_privacy 200 "$status"
+
+echo '[5/6] publicação EPUB encaminhada ao content-service'
 status=$(status_without_body "$tmp_dir/publication" "$base_url/api/v1/reader/books/$E2E_BOOK_ID/publication.json" -H "$auth_header")
 if [[ "$status" == 200 ]]; then
   printf 'authenticated_publication=%s\n' "$status"
@@ -202,7 +208,7 @@ else
   exit 1
 fi
 
-echo '[5/5] preflight CORS da origem do cliente'
+echo '[6/6] preflight CORS da origem do cliente'
 status=$(curl -fsS -D "$tmp_dir/cors.headers" -o "$tmp_dir/cors.body" -w '%{http_code}' -X OPTIONS "$base_url/api/v1/reader/feed" \
   -H "Origin: $origin" -H 'Access-Control-Request-Method: GET' \
   -H 'Access-Control-Request-Headers: authorization')
