@@ -14,9 +14,11 @@ ANNOTATION_TEST_SUBJECT='sub do token' \
 bash infrastructure/tests/annotation-lock-smoke.sh
 ```
 
-Ele registra a primeira impressão, bloqueia as seis dimensões, consulta o
-PostgreSQL para confirmar as seis linhas `FULL_EXCERPT` do mesmo subject e
-repete a operação para verificar o conflito `409 PRIMARY_ALREADY_LOCKED`.
+Ele confirma que o item cego não contém scores, que o contexto é recusado antes
+do lock, registra a primeira impressão, bloqueia as seis dimensões, consulta o
+PostgreSQL para confirmar as seis linhas `FULL_EXCERPT` do mesmo subject,
+verifica contexto anterior/seguinte e progresso da campanha, repete a operação
+para verificar o conflito `409 PRIMARY_ALREADY_LOCKED` e submete o diagnóstico.
 O item usado é mutado; mantenha uma campanha de teste separada da campanha de
 produção.
 

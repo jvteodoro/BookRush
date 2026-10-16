@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Database,
@@ -197,6 +197,7 @@ const dimensionHelp: Record<string, string> = {
   PACING: "O ritmo e a progressão das frases funcionam para este trecho?",
   SELF_CONTAINMENT:
     "O trecho mantém sentido suficiente quando lido isoladamente?",
+  CONFIDENCE: "Quão segura é sua avaliação deste trecho?",
 };
 const dimensionLabels: Record<string, string> = {
   HOOK: "Gancho",
@@ -205,6 +206,7 @@ const dimensionLabels: Record<string, string> = {
   IMPACT: "Impacto",
   PACING: "Ritmo",
   SELF_CONTAINMENT: "Autossuficiência",
+  CONFIDENCE: "Confiança",
 };
 function RatingControl({
   code,
@@ -238,6 +240,13 @@ function RatingControl({
             aria-label={`${n} de 5`}
             disabled={disabled}
             className={value === n ? "selected" : ""}
+            data-rating-code={code}
+            onKeyDown={(event) => {
+              if (!disabled && /^[1-5]$/.test(event.key)) {
+                event.preventDefault();
+                onChange(Number(event.key));
+              }
+            }}
             onClick={() => onChange(n)}
           >
             {n}
@@ -260,11 +269,14 @@ function BlindStudio() {
   const [item, setItem] = useState<any>();
   const [hook, setHook] = useState(0);
   const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [confidence, setConfidence] = useState(0);
+  const [failureTags, setFailureTags] = useState<string[]>([]);
   const [locked, setLocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [studioError, setStudioError] = useState("");
   const [context, setContext] = useState(false);
   const [contextData, setContextData] = useState<any>();
+  const [restored, setRestored] = useState(false);
   const dims = [
     "HOOK",
     "CLARITY",
@@ -273,6 +285,73 @@ function BlindStudio() {
     "PACING",
     "SELF_CONTAINMENT",
   ];
+  const progress = useQuery({
+    queryKey: ["annotation-progress", campaign],
+    queryFn: () => services.annotationProgress(campaign),
+    enabled: Boolean(campaign),
+  });
+  useEffect(() => {
+    const raw = sessionStorage.getItem("bookrush.annotation-studio.pending");
+    if (!raw) {
+      setRestored(true);
+      return;
+    }
+    try {
+      const saved = JSON.parse(raw);
+      setCampaign(saved.campaign ?? "");
+      setHook(saved.hook ?? 0);
+      setRatings(saved.ratings ?? {});
+      setConfidence(saved.confidence ?? 0);
+      setFailureTags(saved.failureTags ?? []);
+      setLocked(Boolean(saved.locked));
+      setContext(Boolean(saved.context));
+      setContextData(saved.contextData);
+      if (saved.item?.campaignItemId) {
+        void services
+          .annotationItem(saved.item.campaignItemId)
+          .then(setItem)
+          .catch(() =>
+            sessionStorage.removeItem("bookrush.annotation-studio.pending"),
+          );
+      }
+    } catch {
+      sessionStorage.removeItem("bookrush.annotation-studio.pending");
+    } finally {
+      setRestored(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (!restored) return;
+    if (!item) {
+      sessionStorage.removeItem("bookrush.annotation-studio.pending");
+      return;
+    }
+    sessionStorage.setItem(
+      "bookrush.annotation-studio.pending",
+      JSON.stringify({
+        campaign,
+        item,
+        hook,
+        ratings,
+        confidence,
+        failureTags,
+        locked,
+        context,
+        contextData,
+      }),
+    );
+  }, [
+    campaign,
+    confidence,
+    context,
+    contextData,
+    failureTags,
+    hook,
+    item,
+    locked,
+    ratings,
+    restored,
+  ]);
   const claim = async () => {
     if (!campaign) return;
     setStudioError("");
@@ -297,19 +376,28 @@ function BlindStudio() {
     setItem(undefined);
     setHook(0);
     setRatings({});
+    setConfidence(0);
+    setFailureTags([]);
     setLocked(false);
     setContext(false);
     setContextData(undefined);
     await claim();
   };
   const lock = async () => {
-    if (!item || hook < 1 || Object.keys(ratings).length < 6) return;
+    if (!item || hook < 1 || Object.keys(ratings).length < 6 || !confidence)
+      return;
     setStudioError("");
     setBusy(true);
     try {
       await services.rateFirstScreen(item.campaignItemId, hook);
-      await services.lockAnnotation(item.campaignItemId, ratings, 3);
+      await services.lockAnnotation(
+        item.campaignItemId,
+        ratings,
+        confidence,
+        failureTags,
+      );
       setLocked(true);
+      await progress.refetch();
     } catch (e: any) {
       setStudioError(
         e?.response?.data?.code ||
@@ -331,6 +419,21 @@ function BlindStudio() {
       );
     }
   };
+  const submitDiagnostic = async () => {
+    if (!item) return;
+    setBusy(true);
+    setStudioError("");
+    try {
+      await services.submitAnnotation(item.campaignItemId, true, 3);
+      await nextExcerpt();
+    } catch (e: any) {
+      setStudioError(
+        e?.response?.data?.code || "Não foi possível submeter o diagnóstico.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="panel blind-studio">
       <h2>Annotation Studio</h2>
@@ -342,6 +445,16 @@ function BlindStudio() {
         <LockKeyhole size={18} /> Modo cego ativo — previsões e scores
         permanecem ocultos até o lock
       </div>
+      {campaign && (
+        <div className="studio-progress" aria-live="polite">
+          <strong>Progresso</strong>
+          <span>
+            {progress.data?.completed ?? 0} de {progress.data?.total ?? "—"}{" "}
+            itens concluídos
+          </span>
+          <small>{progress.data?.remaining ?? "—"} restantes</small>
+        </div>
+      )}
       {studioError && (
         <div className="error-box" role="alert">
           {studioError}
@@ -379,6 +492,10 @@ function BlindStudio() {
           <p>
             Item <code>{item.campaignItemId}</code> · avaliação cega
           </p>
+          <p className="keyboard-hint">
+            Dica: use Tab para navegar e as teclas 1–5 para avaliar o campo
+            focado.
+          </p>
           <blockquote>
             {item.excerpt_text || "Texto indisponível para este item."}
           </blockquote>
@@ -399,10 +516,41 @@ function BlindStudio() {
               />
             ))}
           </div>
+          <RatingControl
+            code="CONFIDENCE"
+            value={confidence}
+            disabled={locked || busy}
+            onChange={setConfidence}
+          />
+          <fieldset className="failure-tags" disabled={locked || busy}>
+            <legend>Failure tags (opcional)</legend>
+            {["NOT_ENOUGH_CONTEXT", "UNCLEAR", "LOW_IMPACT", "OTHER"].map(
+              (tag) => (
+                <label key={tag}>
+                  <input
+                    type="checkbox"
+                    checked={failureTags.includes(tag)}
+                    onChange={(event) =>
+                      setFailureTags((current) =>
+                        event.target.checked
+                          ? [...current, tag]
+                          : current.filter((value) => value !== tag),
+                      )
+                    }
+                  />
+                  {tag.replace(/_/g, " ")}
+                </label>
+              ),
+            )}
+          </fieldset>
           <button
             className="primary-action"
             disabled={
-              locked || busy || Object.keys(ratings).length < 6 || !hook
+              locked ||
+              busy ||
+              Object.keys(ratings).length < 6 ||
+              !hook ||
+              !confidence
             }
             onClick={() => void lock()}
           >
@@ -433,6 +581,22 @@ function BlindStudio() {
                 Agora compare o trecho com o contexto. Os labels primários
                 continuam somente leitura.
               </p>
+              <div className="context-neighbors">
+                <div>
+                  <small>Trecho anterior</small>
+                  <p>
+                    {contextData?.previousContext?.text ||
+                      "Não há trecho anterior."}
+                  </p>
+                </div>
+                <div>
+                  <small>Trecho seguinte</small>
+                  <p>
+                    {contextData?.nextContext?.text ||
+                      "Não há trecho seguinte."}
+                  </p>
+                </div>
+              </div>
               {contextData?.rankers?.length > 0 && (
                 <>
                   <h3>Rankers</h3>
@@ -469,11 +633,10 @@ function BlindStudio() {
               )}
               <button
                 className="primary-action"
-                onClick={() =>
-                  void services.submitAnnotation(item.campaignItemId, true, 3)
-                }
+                disabled={busy}
+                onClick={() => void submitDiagnostic()}
               >
-                Submit diagnostic
+                {busy ? "Salvando…" : "Submit diagnostic e próximo excerpt"}
               </button>
             </div>
           )}

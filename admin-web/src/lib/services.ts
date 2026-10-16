@@ -686,6 +686,18 @@ export const services = {
     );
     return { ...data, ...item.data };
   },
+  async annotationItem(itemId: string) {
+    const { data } = await analyticsHttp.get(
+      `/api/admin/v1/annotation/items/${itemId}`,
+    );
+    return data;
+  },
+  async annotationProgress(id: string) {
+    const { data } = await analyticsHttp.get(
+      `/api/admin/v1/annotation/campaigns/${id}/progress`,
+    );
+    return data;
+  },
   async rateFirstScreen(itemId: string, hook: number) {
     const { data } = await analyticsHttp.post(
       `/api/admin/v1/annotation/items/${itemId}/first-screen`,
@@ -697,10 +709,11 @@ export const services = {
     itemId: string,
     dimensions: Record<string, number>,
     confidence: number,
+    failureTags: string[] = [],
   ) {
     const { data } = await analyticsHttp.post(
       `/api/admin/v1/annotation/items/${itemId}/lock`,
-      { dimensions, confidence, failureTags: [] },
+      { dimensions, confidence, failureTags },
     );
     return data;
   },

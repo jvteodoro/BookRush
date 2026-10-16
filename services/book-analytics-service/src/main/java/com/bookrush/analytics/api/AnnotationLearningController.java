@@ -90,42 +90,78 @@ public class AnnotationLearningController {
   @Operation(summary = "Materializar amostra estratificada")
   public ResponseEntity<?> sample(
       @PathVariable UUID id, @RequestBody(required = false) Map<String, Object> config) {
-    var campaign =
+    var campaigns =
         db.queryForList(
-            "SELECT target_annotations_per_item FROM analytics.annotation_campaign WHERE id=?", id);
-    if (campaign.isEmpty()) return ResponseEntity.notFound().build();
-    int limit =
-        config != null && config.get("items") instanceof Number n
-            ? Math.min(1000, Math.max(1, n.intValue()))
-            : 100;
-    int inserted =
-        db.update(
-            "INSERT INTO"
-                + " analytics.annotation_campaign_item(id,campaign_id,excerpt_id,sampling_stratum,sampling_reason,priority,target_annotations)"
-                + " SELECT"
-                + " gen_random_uuid(),?,e.id,COALESCE(b.original_language,'und')||':position',"
-                + " 'seeded deterministic sample', (row_number() over())::int,"
-                + " c.target_annotations_per_item FROM analytics.excerpt e JOIN"
-                + " catalog.book_asset_version v ON v.id=e.source_asset_version_id JOIN"
-                + " catalog.book_asset a ON a.id=v.book_asset_id JOIN catalog.book b ON"
-                + " b.id=a.book_id CROSS JOIN analytics.annotation_campaign c WHERE c.id=? AND NOT"
-                + " EXISTS (SELECT 1 FROM analytics.annotation_campaign_item x WHERE"
-                + " x.campaign_id=c.id AND x.excerpt_id=e.id) ORDER BY md5(e.id::text||?) LIMIT ?"
-                + " ON CONFLICT (campaign_id,excerpt_id) DO NOTHING",
-            id,
-            id,
-            String.valueOf(config == null ? 1337 : config.getOrDefault("seed", 1337)),
-            limit);
+            "SELECT target_annotations_per_item,sampling_config::text,sampling_config_hash,language_policy::text"
+                + " FROM analytics.annotation_campaign WHERE id=?",
+            id);
+    if (campaigns.isEmpty()) return ResponseEntity.notFound().build();
+
+    var campaign = campaigns.getFirst();
+    int targetAnnotations = ((Number) campaign.get("target_annotations_per_item")).intValue();
+    Map<String, Object> sampling = jsonMap(campaign.get("sampling_config"));
+    Map<String, Object> languagePolicy = jsonMap(campaign.get("language_policy"));
+    int requested = number(config, "items", number(sampling, "items", 100));
+    int seed = number(config, "seed", number(sampling, "seed", 1337));
+
+    List<String> languages = new ArrayList<>();
+    Object configuredLanguages = languagePolicy.get("languages");
+    if (configuredLanguages instanceof Collection<?> values) {
+      for (Object value : values) {
+        languages.add(String.valueOf(value).toLowerCase(Locale.ROOT));
+      }
+    }
+    if (languages.isEmpty()) languages = List.of("en", "pt");
+    int perLanguage = number(languagePolicy, "targetPerLanguage", requested / languages.size());
+    int inserted = 0;
+    for (String language : languages) {
+      int quota = Math.min(perLanguage, requested - inserted);
+      if (quota <= 0) break;
+      inserted +=
+          db.update(
+              "INSERT INTO analytics.annotation_campaign_item"
+                  + "(id,campaign_id,excerpt_id,sampling_stratum,sampling_reason,priority,target_annotations)"
+                  + " SELECT gen_random_uuid(),?,e.id,LOWER(COALESCE(b.original_language,'und'))||':position',"
+                  + " ?,ROW_NUMBER() OVER (ORDER BY md5(e.id::text||?))::int,?"
+                  + " FROM analytics.excerpt e JOIN catalog.book_asset_version v ON v.id=e.source_asset_version_id"
+                  + " JOIN catalog.book_asset a ON a.id=v.book_asset_id JOIN catalog.book b ON b.id=a.book_id"
+                  + " WHERE LOWER(COALESCE(b.original_language,'und'))=? AND NOT EXISTS"
+                  + " (SELECT 1 FROM analytics.annotation_campaign_item x WHERE x.campaign_id=? AND x.excerpt_id=e.id)"
+                  + " ORDER BY md5(e.id::text||?) LIMIT ? ON CONFLICT (campaign_id,excerpt_id) DO NOTHING",
+              id,
+              "pilot language=" + language + " seed=" + seed,
+              seed,
+              targetAnnotations,
+              language,
+              id,
+              seed,
+              quota);
+    }
     return ResponseEntity.ok(
         Map.of(
-            "campaignId",
-            id,
-            "inserted",
-            inserted,
-            "requested",
-            limit,
-            "samplingConfigHash",
-            hash(config == null ? Map.of() : config)));
+            "campaignId", id,
+            "inserted", inserted,
+            "requested", requested,
+            "samplingConfigHash", campaign.get("sampling_config_hash"),
+            "languages", languages,
+            "seed", seed));
+  }
+
+  private int number(Map<String, Object> values, String key, int fallback) {
+    Object value = values == null ? null : values.get(key);
+    return value instanceof Number n ? Math.min(1000, Math.max(1, n.intValue())) : fallback;
+  }
+
+  private Map<String, Object> jsonMap(Object value) {
+    try {
+      if (value == null) return Map.of();
+      if (value instanceof String text) {
+        return json.readValue(text, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+      }
+      return json.convertValue(value, new com.fasterxml.jackson.core.type.TypeReference<>() {});
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Invalid campaign JSON configuration", e);
+    }
   }
 
   @GetMapping("/campaigns")
@@ -214,6 +250,29 @@ public class AnnotationLearningController {
             item.get("excerpt_id"),
             "expiresInSeconds",
             ttl));
+  }
+
+  @GetMapping("/campaigns/{id}/progress")
+  @Operation(summary = "Consultar progresso do annotator na campanha")
+  public ResponseEntity<?> progress(@PathVariable UUID id, Authentication auth) {
+    String who = subject(auth);
+    var rows =
+        db.queryForList(
+            "SELECT count(*) total, count(*) FILTER (WHERE i.state='COMPLETE' OR EXISTS ("
+                + "SELECT 1 FROM analytics.annotation a WHERE a.campaign_item_id=i.id AND"
+                + " a.annotator_subject=? AND a.status='SUBMITTED')) completed FROM"
+                + " analytics.annotation_campaign_item i WHERE i.campaign_id=?",
+            who,
+            id);
+    if (rows.isEmpty()) return ResponseEntity.notFound().build();
+    Number total = (Number) rows.getFirst().get("total");
+    Number completed = (Number) rows.getFirst().get("completed");
+    return ResponseEntity.ok(
+        Map.of(
+            "campaignId", id,
+            "total", total.longValue(),
+            "completed", completed.longValue(),
+            "remaining", Math.max(0L, total.longValue() - completed.longValue())));
   }
 
   @GetMapping("/items/{itemId}")
@@ -326,12 +385,32 @@ public class AnnotationLearningController {
     var rows =
         db.queryForList(
             "SELECT"
-                + " e.id,e.text,e.start_codepoint,e.end_codepoint,e.text_sha256,e.word_count,e.sentence_count"
+                + " e.id,e.source_asset_version_id,e.chapter_id,e.text,e.start_codepoint,e.end_codepoint,e.text_sha256,e.word_count,e.sentence_count"
                 + " FROM analytics.annotation_campaign_item i JOIN analytics.excerpt e ON"
                 + " e.id=i.excerpt_id WHERE i.id=?",
             itemId);
     if (rows.isEmpty()) return ResponseEntity.notFound().build();
+    var current = rows.getFirst();
     UUID excerptId = (UUID) rows.getFirst().get("id");
+    UUID sourceVersion = (UUID) current.get("source_asset_version_id");
+    UUID chapterId = (UUID) current.get("chapter_id");
+    Integer start = ((Number) current.get("start_codepoint")).intValue();
+    var previous =
+        db.queryForList(
+            "SELECT e.id,e.text,e.start_codepoint,e.end_codepoint,e.text_sha256,e.word_count,e.sentence_count"
+                + " FROM analytics.excerpt e WHERE e.source_asset_version_id=? AND e.chapter_id IS NOT DISTINCT FROM ?"
+                + " AND e.start_codepoint<? ORDER BY e.start_codepoint DESC LIMIT 1",
+            sourceVersion,
+            chapterId,
+            start);
+    var next =
+        db.queryForList(
+            "SELECT e.id,e.text,e.start_codepoint,e.end_codepoint,e.text_sha256,e.word_count,e.sentence_count"
+                + " FROM analytics.excerpt e WHERE e.source_asset_version_id=? AND e.chapter_id IS NOT DISTINCT FROM ?"
+                + " AND e.start_codepoint>? ORDER BY e.start_codepoint LIMIT 1",
+            sourceVersion,
+            chapterId,
+            start);
     var features =
         db.queryForList(
             "SELECT"
@@ -349,6 +428,8 @@ public class AnnotationLearningController {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("itemId", itemId);
     result.put("context", rows);
+    result.put("previousContext", previous.isEmpty() ? null : previous.getFirst());
+    result.put("nextContext", next.isEmpty() ? null : next.getFirst());
     result.put("modelFeatures", features);
     result.put("rankers", ranks);
     result.put("primaryReadOnly", true);

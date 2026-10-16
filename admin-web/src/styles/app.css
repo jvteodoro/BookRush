@@ -764,6 +764,27 @@ input {
   padding: 12px;
   margin: 16px 0;
 }
+.studio-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid #2a3b59;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #cbd7e8;
+  background: #101b2d;
+}
+.studio-progress strong {
+  color: #78e9c7;
+}
+.studio-progress small,
+.keyboard-hint {
+  color: #8492a8;
+}
+.keyboard-hint {
+  font-size: 12px;
+}
 .blind-studio blockquote {
   font: 500 25px/1.4 "Space Grotesk";
   border-left: 3px solid #78e9c7;
@@ -785,6 +806,27 @@ input {
   border: 1px solid #35506a;
   border-radius: 10px;
   color: #b9c7da;
+}
+.context-neighbors {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+.context-neighbors > div {
+  border: 1px solid #253b54;
+  border-radius: 8px;
+  padding: 10px;
+  background: #0d1524;
+}
+.context-neighbors small {
+  color: #78e9c7;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.context-neighbors p {
+  margin: 8px 0 0;
+  color: #d7e0ed;
 }
 .panel pre {
   white-space: pre-wrap;
@@ -885,6 +927,27 @@ input {
 .rating-options button:focus-visible {
   border-color: #78e9c7;
   color: #78e9c7;
+}
+.failure-tags {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  border: 1px solid #1e2d46;
+  border-radius: 12px;
+  margin: 14px 0;
+  padding: 12px;
+  color: #b9c7da;
+}
+.failure-tags legend {
+  color: #78e9c7;
+  padding: 0 6px;
+}
+.failure-tags label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: capitalize;
 }
 .rating-options button.selected {
   background: #78e9c7;
