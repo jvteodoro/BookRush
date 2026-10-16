@@ -84,10 +84,19 @@ post_status=$(curl -fsS -D "$post_headers" -o "$post_body" -w '%{http_code}' -c 
   --data-urlencode 'login=Entrar')
 callback=$(awk 'BEGIN{IGNORECASE=1} /^Location:/{sub(/\r$/,""); sub(/^[^:]*:[[:space:]]*/,""); print; exit}' "$post_headers")
 if [[ -z "$callback" ]]; then
+  redirect_path=$(python3 - "$post_headers" <<'PY'
+import sys
+from urllib.parse import urlsplit
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    if line.lower().startswith("location:"):
+        print(urlsplit(line.split(":", 1)[1].strip()).path)
+        break
+PY
+  )
   if grep -qiE 'invalid username|invalid password|credenciais inválidas' "$post_body"; then
     echo 'reader-bff-e2e: Keycloak rejeitou username/password da credential' >&2
   else
-    echo "reader-bff-e2e: OIDC não retornou callback (login HTTP $post_status)" >&2
+    echo "reader-bff-e2e: OIDC não retornou callback (login HTTP $post_status, redirect=${redirect_path:-none})" >&2
   fi
   exit 1
 fi
