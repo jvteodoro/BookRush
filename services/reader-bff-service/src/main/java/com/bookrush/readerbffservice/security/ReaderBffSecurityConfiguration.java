@@ -34,7 +34,7 @@ public class ReaderBffSecurityConfiguration {
     return http.build();
   }
 
-  @Bean
+  @Bean(name = "corsConfigurationSource")
   CorsConfigurationSource readerBffCorsConfigurationSource(
       @Value("${bookrush.cors.allowed-origins}") String allowedOrigins) {
     var configuration = new CorsConfiguration();
