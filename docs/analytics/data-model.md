@@ -68,7 +68,7 @@ erDiagram
 
 `annotation_campaign` fixa protocolo, política de idioma, configuração e hash de amostragem. Um item é único por campanha/excerpt; uma pessoa pode ter no máximo uma assignment e uma annotation por item. Valores ordinais são 1–5 e distinguem `FIRST_SCREEN` de `FULL_EXCERPT`. A versão de dataset guarda manifest SHA-256 e snapshot de rótulos brutos/adjudicados, de modo que exportações futuras não dependem de mutar uma anotação antiga.
 
-As APIs administrativas já suportam criar/amostrar/iniciar campanhas, claim, first-screen lock, submissão, métricas, fila de adjudicação e exportação de versões. A autorização exige papéis de operador, anotador ou revisor; não é uma API pública de leitores.
+As APIs administrativas já suportam criar/amostrar/iniciar campanhas, claim, first-screen lock, submissão, métricas, fila de adjudicação e exportação de versões. A autorização exige papéis de operador, anotador ou revisor; não é uma API pública de leitores. O mapper do serviço concede `ROLE_EXCERPT_REVIEWER` somente aos grupos Keycloak `excerpt-reviewers` e `platform-admins`; `excerpt-annotators` e `developers` recebem apenas o papel de anotador. Assim, a rota de adjudicação permanece separada das rotas de coleta cega.
 
 Na política `quality-v1`, a fila considera uma discordância quando o intervalo ordinal
 (`max - min`) por item/dimensão atinge o `disagreement_threshold` persistido na campanha
