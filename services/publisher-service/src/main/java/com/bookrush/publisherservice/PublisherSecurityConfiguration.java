@@ -7,6 +7,13 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.beans.factory.annotation.Value;
+import java.util.Arrays;
+import java.util.List;
+import org.springframework.http.HttpMethod;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /** Keeps the ingestion callback private to its shared-secret controller check. */
 @Configuration
@@ -15,7 +22,7 @@ public class PublisherSecurityConfiguration {
   @Bean
   @Order(1)
   SecurityFilterChain publisherSecurity(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.disable())
+    http.csrf(csrf -> csrf.disable()).cors(cors -> {})
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
@@ -24,5 +31,17 @@ public class PublisherSecurityConfiguration {
                     .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.jwt());
     return http.build();
+  }
+
+  @Bean(name = "corsConfigurationSource")
+  CorsConfigurationSource cors(@Value("${bookrush.cors.allowed-origins}") String origins) {
+    var configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).filter(s -> !s.isBlank()).toList());
+    configuration.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.POST.name(), HttpMethod.PUT.name(), HttpMethod.PATCH.name(), HttpMethod.DELETE.name(), HttpMethod.OPTIONS.name()));
+    configuration.setAllowedHeaders(List.of("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client"));
+    configuration.setAllowCredentials(false);
+    var source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
   }
 }

@@ -53,3 +53,10 @@ de direitos antes do envio. Operadores consultam `GET
 /api/v1/publisher/review` e decidem uma submissão com `POST
 /api/v1/publisher/submissions/{id}/review`, usando `APPROVED`, `REJECTED` ou
 `CHANGES_REQUESTED`. Aprovação cria o registro de `published_work`.
+
+`GET /api/v1/publisher/submissions/{id}/reviews` lista o histórico de decisões
+do próprio publicador. Depois de publicada, `POST
+/api/v1/publisher/submissions/{id}/withdraw` revoga a publicação do mesmo
+subject, marca `published_work` como `WITHDRAWN` e emite um evento de domínio.
+As rotas administrativas de revisão continuam restritas aos grupos de
+operadores e usam CORS explícito.

@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Rebuilds derived metrics and closes the durable local outbox watermark. */
+/** Rebuilds derived metrics and applies retention. Outbox delivery is owned by the dispatcher. */
 @Component
 public class BehaviorMaintenance {
   private final JdbcTemplate jdbc;
@@ -29,8 +29,6 @@ public class BehaviorMaintenance {
   public void run() {
     if (!enabled) return;
     rebuildAggregates();
-    jdbc.update("UPDATE behavior.outbox SET published_at = now(), attempts = attempts + 1 "
-        + "WHERE published_at IS NULL");
     Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
     jdbc.update("DELETE FROM behavior.rejects WHERE received_at < ?", cutoff);
     jdbc.update("DELETE FROM behavior.outbox WHERE published_at IS NOT NULL AND created_at < ?", cutoff);

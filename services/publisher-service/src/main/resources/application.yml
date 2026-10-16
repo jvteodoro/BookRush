@@ -11,6 +11,9 @@ spring:
     schemas: publisher
 management:
   endpoints.web.exposure.include: health,info,metrics
+bookrush:
+  cors:
+    allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
 publisher:
   ingestion-callback-token: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:}
   ingestion:

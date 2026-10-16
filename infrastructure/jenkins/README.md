@@ -260,3 +260,10 @@ O deploy Compose exige as imagens `BACKEND_IMAGE`, `INGESTION_IMAGE`,
 constrói/publica todas elas antes de executar o script de deploy. Essa matriz
 também é refletida em `infrastructure/compose.yaml`, evitando que uma imagem
 obrigatória fique apenas com o fallback `:local`.
+
+Os jobs de social, publisher, behavior e admin devem executar `mvn verify` e
+construir as imagens correspondentes depois de uma alteração. O admin-web usa
+`VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for
+ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
+quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
+cliente possui `query-users`/`manage-users` no realm-management.

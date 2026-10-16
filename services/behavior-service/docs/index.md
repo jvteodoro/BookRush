@@ -1,5 +1,11 @@
 # behavior-service
 
+Accepted events are written transactionally with a durable outbox. The
+maintenance job rebuilds derived aggregates and retention only. Set
+`BEHAVIOR_OUTBOX_SINK_URL` to an internal authenticated event sink to enable
+delivery; failed deliveries remain pending and increment `attempts` with an
+error, rather than being marked as published.
+
 Append-only behavioral events and aggregates. Este serviço é um bounded context independente; contratos e ownership estão no ADR 0034.
 
 Migrations V2/V3 store idempotent append-only events and rebuildable daily book aggregates.

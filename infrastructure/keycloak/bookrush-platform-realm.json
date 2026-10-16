@@ -264,6 +264,28 @@
       ]
     },
     {
+      "clientId": "bookrush-admin-service",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "protocolMappers": [
+        {
+          "name": "admin-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-ingestion",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "bookrush-canonical-service-s2s",
       "enabled": true,
       "publicClient": false,

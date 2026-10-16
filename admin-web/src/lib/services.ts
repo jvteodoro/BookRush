@@ -92,6 +92,32 @@ export type ApprovalHistoryPage = {
   totalItems: number;
   last: boolean;
 };
+export type AdminUser = {
+  subjectKey: string;
+  displayName?: string;
+  bio?: string;
+  isPublic?: boolean;
+  enabled?: boolean;
+  updatedAt?: string;
+};
+export type AdminReport = {
+  id: string;
+  reporter: string;
+  bookId?: string;
+  commentId?: string;
+  reason: string;
+  status: string;
+  createdAt?: string;
+};
+export type AdminComment = {
+  id: string;
+  bookId: string;
+  subjectKey: string;
+  body: string;
+  visibility: string;
+  reasonCode?: string;
+  createdAt?: string;
+};
 
 const sleep = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 let mutableBooks = [...books];
@@ -101,6 +127,7 @@ const catalogHttp = createHttp(config.apis.catalog, () => undefined);
 const ingestionHttp = createHttp(config.apis.ingestion, () => undefined);
 const analyticsHttp = createHttp(config.apis.analytics, () => undefined);
 const feedHttp = createHttp(config.apis.feed, () => undefined);
+const adminHttp = createHttp(config.apis.admin, () => undefined);
 
 function idempotencyKey(prefix: string, id: string) {
   return `${prefix}-${id}-${crypto.randomUUID()}`;
@@ -142,6 +169,59 @@ function mapBook(raw: Record<string, unknown>): BookCandidate {
 }
 
 export const services = {
+  async listAdminUsers(): Promise<AdminUser[]> {
+    const { data } = await adminHttp.get("/api/v1/admin/users");
+    return (data.items ?? data).map((item: Record<string, unknown>) => ({
+      subjectKey: String(item.subjectKey ?? item.subject_key),
+      displayName: item.displayName ?? item.display_name,
+      bio: item.bio,
+      isPublic: item.isPublic ?? item.is_public,
+      enabled: item.enabled !== false,
+      updatedAt: item.updatedAt ?? item.updated_at,
+    }));
+  },
+  async setUserEnabled(subjectKey: string, enabled: boolean) {
+    const { data } = await adminHttp.post(
+      `/api/v1/admin/users/${encodeURIComponent(subjectKey)}/${enabled ? "enable" : "disable"}`,
+    );
+    return data;
+  },
+  async listAdminReports(): Promise<AdminReport[]> {
+    const { data } = await adminHttp.get("/api/v1/admin/reports");
+    return (data.items ?? data).map((item: Record<string, unknown>) => ({
+      id: String(item.id),
+      reporter: String(item.reporter),
+      bookId: item.bookId ?? item.book_id,
+      commentId: item.commentId ?? item.comment_id,
+      reason: String(item.reason),
+      status: String(item.status),
+      createdAt: item.createdAt ?? item.created_at,
+    }));
+  },
+  async listAdminComments(): Promise<AdminComment[]> {
+    const { data } = await adminHttp.get("/api/v1/admin/moderation/comments");
+    return (data.items ?? data).map((item: Record<string, unknown>) => ({
+      id: String(item.id),
+      bookId: String(item.bookId ?? item.book_id),
+      subjectKey: String(item.subjectKey ?? item.subject_key),
+      body: String(item.body),
+      visibility: String(item.visibility ?? "VISIBLE"),
+      reasonCode: item.reasonCode ?? item.reason_code,
+      createdAt: item.createdAt ?? item.created_at,
+    }));
+  },
+  async moderateAdminComment(commentId: string, visibility: string) {
+    const { data } = await adminHttp.post("/api/v1/admin/moderation/comments", {
+      commentId,
+      visibility,
+      reasonCode: "ADMIN_REVIEW",
+    });
+    return data;
+  },
+  async adminKpis() {
+    const { data } = await adminHttp.get("/api/v1/admin/kpis");
+    return data;
+  },
   async listBookPage(
     query = "",
     page = 0,
