@@ -109,6 +109,22 @@ o fluxo autenticado requer validação no navegador com a conta do usuário.
 - layout responsivo para desktop e telas pequenas;
 - estados explícitos de carregamento, catálogo vazio, sessão expirada e erro da API.
 
+## Telemetria web e mobile
+
+`src/telemetry.ts` e `mobile/src/telemetry.ts` implementam o mesmo contrato
+de eventos em memória. O cliente agrupa no máximo 20 eventos por envio,
+mantém no máximo 100 eventos pendentes e repete falhas com backoff exponencial
+limitado a 60 segundos. A fila é perdida ao encerrar a sessão ou o processo;
+nenhum token, e-mail ou texto do livro entra nela.
+
+O web registra impressões somente quando o elemento atinge o limiar de
+visibilidade (`IntersectionObserver`) e mede `DWELL` com duração não negativa.
+O mobile expõe os mesmos eventos por `impression` e `dwell`, pois não possui
+um DOM; `BOOK_OPEN`, `BOOK_SAVED` e `BOOK_UNSAVED` são enfileirados pelo app.
+O envio chama `POST /api/v1/behavior/events` com o bearer apenas no cabeçalho.
+Os testes estão em `tests/telemetry.test.mjs` e cobrem sanitização, batching,
+retry, viewability e dwell.
+
 A API continua sendo a fronteira de autorização. O navegador não persiste access tokens; a implementação usa memória e estado transitório de protocolo.
 
 ## Desenvolvimento
