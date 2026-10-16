@@ -93,10 +93,22 @@ for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
         break
 PY
   )
+  redirect_query_keys=$(python3 - "$callback" <<'PY'
+import sys
+from urllib.parse import parse_qs, urlsplit
+print(",".join(sorted(parse_qs(urlsplit(sys.argv[1]).query).keys())))
+PY
+  )
+  redirect_error=$(python3 - "$callback" <<'PY'
+import sys
+from urllib.parse import parse_qs, urlsplit
+print(parse_qs(urlsplit(sys.argv[1]).query).get("error", [""])[0])
+PY
+  )
   if grep -qiE 'invalid username|invalid password|credenciais inválidas' "$post_body"; then
     echo 'reader-bff-e2e: Keycloak rejeitou username/password da credential' >&2
   else
-    echo "reader-bff-e2e: OIDC não retornou callback (login HTTP $post_status, redirect=${redirect_path:-none})" >&2
+    echo "reader-bff-e2e: OIDC não retornou callback (login HTTP $post_status, redirect=${redirect_path:-none}, query_keys=${redirect_query_keys:-none}, error=${redirect_error:-none})" >&2
   fi
   exit 1
 fi
