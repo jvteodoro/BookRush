@@ -20,3 +20,7 @@ management:
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
+  behavior:
+    maintenance-enabled: ${BEHAVIOR_MAINTENANCE_ENABLED:true}
+    retention-days: ${BEHAVIOR_RETENTION_DAYS:365}
+    maintenance-delay-ms: ${BEHAVIOR_MAINTENANCE_DELAY_MS:300000}

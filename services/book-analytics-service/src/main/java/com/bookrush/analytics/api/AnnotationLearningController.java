@@ -505,6 +505,7 @@ public class AnnotationLearningController {
                 + " JOIN analytics.annotation_campaign_item i ON i.id=a.campaign_item_id WHERE"
                 + " i.campaign_id=?",
             id);
+    double alpha = ordinalAgreement(id);
     return Map.of(
         "campaignId",
         id,
@@ -512,6 +513,8 @@ public class AnnotationLearningController {
         dist,
         "counts",
         counts,
+        "krippendorffAlphaOrdinal",
+        alpha,
         "qaStatus",
         dist.isEmpty() ? "INSUFFICIENT_SAMPLE" : "AVAILABLE");
   }
@@ -519,6 +522,9 @@ public class AnnotationLearningController {
   @GetMapping("/campaigns/{id}/adjudication-queue")
   @Operation(summary = "Listar discordâncias")
   public Map<String, Object> disagreement(@PathVariable UUID id) {
+    Integer configuredThreshold = db.queryForObject(
+        "SELECT disagreement_threshold FROM analytics.annotation_campaign WHERE id=?", Integer.class, id);
+    int threshold = configuredThreshold == null ? 2 : configuredThreshold;
     var rows =
         db.queryForList(
             "SELECT i.id campaign_item_id,d.dimension_code,min(d.ordinal_value)"
@@ -526,10 +532,32 @@ public class AnnotationLearningController {
                 + " analytics.annotation_campaign_item i JOIN analytics.annotation a ON"
                 + " a.campaign_item_id=i.id JOIN analytics.annotation_dimension_value d ON"
                 + " d.annotation_id=a.id WHERE i.campaign_id=? GROUP BY i.id,d.dimension_code"
-                + " HAVING max(d.ordinal_value)-min(d.ordinal_value)>=2 ORDER BY"
+                + " HAVING max(d.ordinal_value)-min(d.ordinal_value)>=? ORDER BY"
                 + " i.id,d.dimension_code",
-            id);
-    return Map.of("campaignId", id, "items", rows, "threshold", 2, "total", rows.size());
+            id, threshold);
+    return Map.of("campaignId", id, "items", rows, "threshold", threshold,
+        "thresholdVersion", "quality-v1", "total", rows.size());
+  }
+
+  private double ordinalAgreement(UUID campaignId) {
+    var values = db.queryForList("SELECT a.campaign_item_id,d.dimension_code,d.ordinal_value "
+        + "FROM analytics.annotation a JOIN analytics.annotation_campaign_item i ON i.id=a.campaign_item_id "
+        + "JOIN analytics.annotation_dimension_value d ON d.annotation_id=a.id "
+        + "WHERE i.campaign_id=? AND a.status='SUBMITTED' AND d.stage='FULL_EXCERPT'", campaignId);
+    if (values.size() < 2) return 0.0;
+    double disagreement = 0.0; long pairs = 0;
+    for (int left = 0; left < values.size(); left++) {
+      for (int right = left + 1; right < values.size(); right++) {
+        var a = values.get(left); var b = values.get(right);
+        if (a.get("campaign_item_id").equals(b.get("campaign_item_id"))
+            && a.get("dimension_code").equals(b.get("dimension_code"))) {
+          double distance = Math.abs(((Number) a.get("ordinal_value")).doubleValue()
+              - ((Number) b.get("ordinal_value")).doubleValue()) / 4.0;
+          disagreement += distance * distance; pairs++;
+        }
+      }
+    }
+    return pairs == 0 ? 0.0 : Math.max(-1.0, 1.0 - disagreement / pairs);
   }
 
   public record Adjudication(String dimensionCode, Integer ordinalValue, String rationale) {}

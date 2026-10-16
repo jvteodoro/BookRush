@@ -29,8 +29,17 @@ Cada serviço tem Dockerfile, health endpoint, Flyway owner, `catalog-info.yaml`
 - `GET /api/v1/recommendations/feed`: feed `heuristic-v1` com `recommendationRequestId`, `impressionId`, `modelVersion` e `rank`.
 - `PUT/DELETE /api/v1/reader/library/{bookId}` e `PUT /api/v1/reader/books/{bookId}/progress`: estado persistente por identidade JWT.
 - `POST /api/v1/behavior/events`: lote idempotente por `eventKey`; não armazena tokens ou texto livre por padrão.
+- `GET /api/v1/behavior/operations/metrics`: métricas operacionais de ingestão, rejeições e outbox; a rotina de manutenção reconstrói projeções diárias e aplica retenção configurável.
 - `PUT /api/v1/social/books/{bookId}/like`, `POST /api/v1/social/books/{bookId}/comments`: interação persistente.
+- `GET /api/v1/social/moderation/reports` e `PUT /api/v1/social/moderation/comments/{commentId}`: fila e decisão de moderação, restritas a operadores.
+- `GET /api/v1/recommendations/feed`: seleciona `COLD_START`, `DIVERSE` ou `LUCKY` e registra request/impression no ledger.
+- `GET /api/v1/publisher/review`, `POST /api/v1/publisher/submissions/{id}/review` e `GET /api/v1/publisher/memberships`: workflow de revisão e membership do publicador.
+- `GET /api/v1/admin/moderation/comments` e `POST /api/v1/admin/moderation/comments`: consulta e decisão administrativa sobre comentários.
 - `GET/PUT /api/v1/profile`: perfil por `(iss, sub)` exposto pela camada de segurança.
+
+As migrations de behavior criam tentativas/reprocessamento de outbox, índices
+de projeção e atribuição de resultados. As migrations de publisher criam a
+membership explícita (`PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`).
 
 ## Execução
 

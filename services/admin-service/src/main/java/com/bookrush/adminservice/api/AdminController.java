@@ -2,6 +2,7 @@ package com.bookrush.adminservice.api;
 
 import java.security.Principal;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -70,8 +71,36 @@ public class AdminController {
   public Object reports(Principal principal, Authentication authentication) {
     requireOperator(authentication);
     actor(principal);
-    return jdbc.queryForList("SELECT id, reporter, book_id, comment_id, reason, created_at "
+    return jdbc.queryForList("SELECT id, reporter, book_id, comment_id, reason, status, created_at "
         + "FROM social.reports ORDER BY created_at DESC LIMIT 100");
+  }
+
+  @GetMapping("/moderation/comments")
+  public Object comments(Principal principal, Authentication authentication) {
+    requireOperator(authentication);
+    actor(principal);
+    return jdbc.queryForList("SELECT c.id, c.book_id, c.subject_key, c.body, c.created_at, "
+        + "COALESCE(m.visibility, 'VISIBLE') AS visibility, m.reason_code, m.updated_by_subject, m.updated_at "
+        + "FROM social.comments c LEFT JOIN social.comment_moderation_state m ON m.comment_id=c.id "
+        + "ORDER BY c.created_at DESC LIMIT 250");
+  }
+
+  @PostMapping("/moderation/comments")
+  public Object moderateComment(@RequestBody Map<String, Object> body, Principal principal,
+      Authentication authentication) {
+    requireOperator(authentication);
+    String commentId = String.valueOf(body.get("commentId"));
+    String visibility = String.valueOf(body.getOrDefault("visibility", "VISIBLE"));
+    if (!Set.of("VISIBLE", "HIDDEN", "REMOVED").contains(visibility)) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported visibility");
+    }
+    UUID id;
+    try { id = UUID.fromString(commentId); }
+    catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid commentId"); }
+    int updated = jdbc.update("UPDATE social.comment_moderation_state SET visibility=?, reason_code=?, updated_by_subject=?, updated_at=now() WHERE comment_id=?",
+        visibility, String.valueOf(body.getOrDefault("reasonCode", "ADMIN_DECISION")), actor(principal), id);
+    if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "comment not found");
+    return Map.of("commentId", id, "visibility", visibility, "updated", true);
   }
 
   @GetMapping("/users")

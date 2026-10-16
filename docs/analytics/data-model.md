@@ -1,6 +1,6 @@
 # Modelo de dados de Content Analytics
 
-O schema PostgreSQL `analytics` pertence ao `book-analytics-service`. As migrations V1–V14 estão em `services/book-analytics-service/src/main/resources/db/migration`; Flyway as executa no ciclo do próprio serviço. Este documento descreve o modelo implementado no DDL e no código. Ter uma tabela ou definição de feature não prova que o dado tenha sido calculado em todos os ambientes.
+O schema PostgreSQL `analytics` pertence ao `book-analytics-service`. As migrations V1–V15 estão em `services/book-analytics-service/src/main/resources/db/migration`; Flyway as executa no ciclo do próprio serviço. Este documento descreve o modelo implementado no DDL e no código. Ter uma tabela ou definição de feature não prova que o dado tenha sido calculado em todos os ambientes.
 
 ## Fronteira, ownership e linhagem
 
@@ -95,5 +95,6 @@ Telemetria de impressão/abertura vai para `behavior`, não para `analytics`: `b
 | V11–V12 | Definições NLI e similaridade com protótipos. |
 | V13 | Campanhas, anotações, adjudicação e versões de dataset. |
 | V14 | Elegibilidade estrutural persistida para excerpts. |
+| V15 | Threshold/hash de qualidade da campanha e imutabilidade de versões de dataset publicadas e seus itens. |
 
 Para rotas, configuração e evidências de execução controlada, veja o [relatório operacional](report.md). Para a integração com o feed, veja [excerpts no feed](excerpt-feed-integration.md).

@@ -1,6 +1,7 @@
 package com.bookrush.behaviorservice.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.bookrush.behaviorservice.BehaviorMaintenance;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,8 +20,10 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/behavior")
 public class BehaviorController {
   private final JdbcTemplate jdbc;
-  public BehaviorController(JdbcTemplate jdbc) {
+  private final BehaviorMaintenance maintenance;
+  public BehaviorController(JdbcTemplate jdbc, BehaviorMaintenance maintenance) {
     this.jdbc = jdbc;
+    this.maintenance = maintenance;
   }
   public record Event(@NotBlank String eventKey, @NotBlank String eventType, String issuer,
       String subject, UUID bookId, @NotNull Instant occurredAt, JsonNode payload) {}
@@ -111,5 +114,9 @@ public class BehaviorController {
  @GetMapping("/events/count")
   public Map<String, Object> count() {
     return Map.of("events", jdbc.queryForObject("select count(*) from behavior.events", Long.class));
+  }
+  @GetMapping("/operations/metrics")
+  public Map<String, Object> operationsMetrics() {
+    return maintenance.snapshot();
   }
 }
