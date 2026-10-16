@@ -57,6 +57,7 @@ pipeline {
           bash scripts/validate-pipelines.sh
           bash scripts/test-keycloak-realms.sh
           bash scripts/test-keycloak-reconcile.sh
+          bash scripts/test-keycloak-access-lifecycle.sh
         '''
       }
     }

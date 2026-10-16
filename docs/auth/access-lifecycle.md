@@ -46,3 +46,20 @@ membership de usuários. A autenticação real, teste de fator ausente, retirada
 de grant e recuperação break-glass precisam ser executados com Keycloak
 descartável e segredo fornecido em runtime. Não foram executados nesta sessão
 porque o daemon Docker não está acessível; não há credencial real versionada.
+
+## Ensaio automatizado
+
+O fluxo descartável de MFA, grupo privilegiado e revogação é executado por:
+
+```bash
+bash scripts/test-keycloak-access-lifecycle.sh
+```
+
+O script importa somente `bookrush-platform` em um Keycloak temporário, cria
+usuários e cliente sintéticos, confirma que `CONFIGURE_TOTP` impede a emissão
+de token antes do fator, verifica a emissão para um usuário sem ações pendentes
+e desabilita esse usuário para confirmar a rejeição de novos tokens. Todos os
+usuários, cliente, containers e volumes são removidos no `EXIT`. A pipeline
+principal executa o mesmo ensaio junto às validações declarativas dos realms.
+Esse teste não simula nem altera a conta break-glass operacional, que deve
+continuar fora do Git e ser ensaiada sob procedimento controlado.
