@@ -93,16 +93,22 @@ for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
         break
 PY
   )
-  redirect_query_keys=$(python3 - "$callback" <<'PY'
+  redirect_query_keys=$(python3 - "$post_headers" <<'PY'
 import sys
 from urllib.parse import parse_qs, urlsplit
-print(",".join(sorted(parse_qs(urlsplit(sys.argv[1]).query).keys())))
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    if line.lower().startswith("location:"):
+        print(",".join(sorted(parse_qs(urlsplit(line.split(":", 1)[1].strip()).query).keys())))
+        break
 PY
   )
-  redirect_error=$(python3 - "$callback" <<'PY'
+  redirect_error=$(python3 - "$post_headers" <<'PY'
 import sys
 from urllib.parse import parse_qs, urlsplit
-print(parse_qs(urlsplit(sys.argv[1]).query).get("error", [""])[0])
+for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
+    if line.lower().startswith("location:"):
+        print(parse_qs(urlsplit(line.split(":", 1)[1].strip()).query).get("error", [""])[0])
+        break
 PY
   )
   if grep -qiE 'invalid username|invalid password|credenciais inválidas' "$post_body"; then
