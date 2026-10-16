@@ -30,6 +30,13 @@ type Runtime = {
   __BOOKRUSH_BOOKS__: SourceBook[];
   __BOOKRUSH_LIKES__: Record<string, boolean>;
   __BOOKRUSH_STREAK__?: { currentDays?: number };
+  __BOOKRUSH_PLANT__?: {
+    formulaVersion?: string;
+    stage?: number;
+    streakDays?: number;
+    totalReadingMinutes?: number;
+    measuredUntil?: string;
+  } | null;
   __BOOKRUSH_API__: {
     saved: Set<string>;
     save: (id: string, enabled: boolean) => Promise<void>;
@@ -264,6 +271,7 @@ export function LiveReader({
     setTab(nextTab);
   };
   const streak = runtime().__BOOKRUSH_STREAK__?.currentDays;
+  const plant = runtime().__BOOKRUSH_PLANT__;
   const openCatalogBook = (book: LibraryBook) =>
     void action(book.id, async () => {
       // The existing reader resolves IDs from its catalog array. Register books
@@ -352,6 +360,7 @@ export function LiveReader({
           userName={userName}
           savedCount={saved.length}
           streak={streak}
+          plant={plant}
           onNavigate={navigate}
         />
       ) : (

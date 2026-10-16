@@ -14,6 +14,7 @@ export const apiRoutes = {
     libraryBook: (bookId: string) => `/api/v1/reader/library/${id(bookId)}`,
     recent: () => "/api/v1/reader/recent",
     streak: () => "/api/v1/reader/streak",
+    plant: () => "/api/v1/reader/plant",
     book: (bookId: string) => `/api/v1/reader/books/${id(bookId)}`,
     progress: (bookId: string) => `${apiRoutes.reader.book(bookId)}/progress`,
     bookmarks: (bookId: string) => `${apiRoutes.reader.book(bookId)}/bookmarks`,

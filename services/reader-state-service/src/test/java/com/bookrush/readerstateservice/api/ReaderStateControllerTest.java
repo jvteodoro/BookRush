@@ -2,9 +2,16 @@ package com.bookrush.readerstateservice.api;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 import java.security.Principal;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,5 +34,21 @@ class ReaderStateControllerTest {
   @Test
   void stateCannotBeWrittenWithoutAnAuthenticatedPrincipal() {
     assertThrows(ResponseStatusException.class, () -> controller.recent(null));
+  }
+
+  @Test
+  void plantProjectionIsVersionedAndDerivedFromReadingDays() {
+    when(jdbc.queryForList(anyString(), eq("iss:subject-1")))
+        .thenReturn(List.of(Map.of("day", Date.valueOf(LocalDate.now()))));
+    when(jdbc.queryForObject(anyString(), eq(Number.class), any(Object[].class))).thenReturn(125L);
+
+    var plant = controller.plant(user);
+
+    org.junit.jupiter.api.Assertions.assertEquals("reading-minutes-v1", plant.get("formulaVersion"));
+    org.junit.jupiter.api.Assertions.assertEquals(2, plant.get("stage"));
+    org.junit.jupiter.api.Assertions.assertEquals(1, plant.get("streakDays"));
+    org.junit.jupiter.api.Assertions.assertEquals(125L, plant.get("totalReadingMinutes"));
+    verify(jdbc).update(anyString(), eq("iss:subject-1"), eq("reading-minutes-v1"), eq(2), eq(1),
+        eq(125L), any(LocalDate.class));
   }
 }

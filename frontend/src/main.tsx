@@ -227,6 +227,20 @@ function App() {
             window as Window & { __BOOKRUSH_STREAK__?: unknown }
           ).__BOOKRUSH_STREAK__ = null;
         }
+        try {
+          const plantResponse = await authClient.fetch(
+            apiRoutes.reader.plant(),
+          );
+          (
+            window as Window & { __BOOKRUSH_PLANT__?: unknown }
+          ).__BOOKRUSH_PLANT__ = plantResponse.ok
+            ? await plantResponse.json()
+            : null;
+        } catch {
+          (
+            window as Window & { __BOOKRUSH_PLANT__?: unknown }
+          ).__BOOKRUSH_PLANT__ = null;
+        }
         (
           window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }
         ).__BOOKRUSH_API__ = {

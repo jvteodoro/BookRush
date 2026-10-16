@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,6 +23,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1/reader")
 public class ReaderStateController {
+  private static final String PLANT_FORMULA_VERSION = "reading-minutes-v1";
+  private static final int MAX_PLANT_STAGE = 5;
   private final JdbcTemplate jdbc;
 
   public ReaderStateController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -62,6 +65,7 @@ public class ReaderStateController {
     return Map.of("id", id, "startedAt", Instant.now());
   }
 
+  @Transactional
   @PostMapping("/sessions/{id}/end")
   public Object endSession(@PathVariable UUID id, @RequestBody Map<String, Object> body,
       Principal principal) {
@@ -74,22 +78,53 @@ public class ReaderStateController {
     jdbc.update("INSERT INTO reader_state.reading_day(subject_key, day, minutes) VALUES (?, CURRENT_DATE, ?) "
         + "ON CONFLICT (subject_key, day) DO UPDATE SET minutes = "
         + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, seconds / 60);
-    return Map.of("id", id, "activeSeconds", seconds);
+    return Map.of("id", id, "activeSeconds", seconds, "plant", refreshPlant(subject));
   }
 
   @GetMapping("/streak")
   public Map<String, Object> streak(Principal principal) {
     String subject = subject(principal);
+    return Map.of("currentDays", currentStreak(subject), "measuredUntil", LocalDate.now());
+  }
+
+  @GetMapping("/plant")
+  public Map<String, Object> plant(Principal principal) {
+    return refreshPlant(subject(principal));
+  }
+
+  private Map<String, Object> refreshPlant(String subject) {
+    Number totalMinutesValue = jdbc.queryForObject(
+        "SELECT COALESCE(SUM(minutes), 0) FROM reader_state.reading_day WHERE subject_key = ?",
+        Number.class, subject);
+    long totalMinutes = totalMinutesValue == null ? 0 : Math.max(0, totalMinutesValue.longValue());
+    int streakDays = currentStreak(subject);
+    int stage = (int) Math.min(MAX_PLANT_STAGE, totalMinutes / 60);
+    LocalDate measuredUntil = LocalDate.now();
+    jdbc.update("INSERT INTO reader_state.plant_state(subject_key, formula_version, stage, streak_days, "
+            + "total_reading_minutes, measured_until) VALUES (?, ?, ?, ?, ?, ?) "
+            + "ON CONFLICT (subject_key) DO UPDATE SET formula_version = EXCLUDED.formula_version, "
+            + "stage = EXCLUDED.stage, streak_days = EXCLUDED.streak_days, "
+            + "total_reading_minutes = EXCLUDED.total_reading_minutes, "
+            + "measured_until = EXCLUDED.measured_until, updated_at = now()",
+        subject, PLANT_FORMULA_VERSION, stage, streakDays, totalMinutes, measuredUntil);
+    return Map.of("formulaVersion", PLANT_FORMULA_VERSION, "stage", stage,
+        "streakDays", streakDays, "totalReadingMinutes", totalMinutes,
+        "measuredUntil", measuredUntil);
+  }
+
+  private int currentStreak(String subject) {
     var days = jdbc.queryForList("SELECT day FROM reader_state.reading_day WHERE subject_key = ? "
         + "AND minutes > 0 ORDER BY day DESC LIMIT 366", subject);
     int current = 0;
     LocalDate expected = LocalDate.now();
     for (var row : days) {
-      LocalDate day = ((java.sql.Date) row.get("day")).toLocalDate();
+      Object rawDay = row.get("day");
+      LocalDate day = rawDay instanceof java.sql.Date sqlDate
+          ? sqlDate.toLocalDate() : LocalDate.parse(String.valueOf(rawDay));
       if (day.equals(expected)) { current++; expected = expected.minusDays(1); }
       else if (day.isBefore(expected)) break;
     }
-    return Map.of("currentDays", current, "measuredUntil", LocalDate.now());
+    return current;
   }
 
   @GetMapping("/library")
