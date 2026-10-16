@@ -40,6 +40,9 @@ Cada serviço tem Dockerfile, health endpoint, Flyway owner, `catalog-info.yaml`
 As migrations de behavior criam tentativas/reprocessamento de outbox, índices
 de projeção e atribuição de resultados. As migrations de publisher criam a
 membership explícita (`PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`).
+O job agendado de behavior reconstrói as projeções e aplica retenção; o
+watermark local da outbox não representa publicação em broker externo, que
+continua sendo uma etapa operacional separada.
 
 ## Execução
 
