@@ -1,5 +1,9 @@
 server:
   port: ${SERVER_PORT:8100}
+logging:
+  level:
+    org.springframework.security.oauth2.server.resource: DEBUG
+    org.springframework.security.oauth2.jwt: DEBUG
 spring:
   application:
     name: admin-service

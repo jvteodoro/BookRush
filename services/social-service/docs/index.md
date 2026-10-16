@@ -18,3 +18,5 @@ aceita somente as origens configuradas em `BOOKRUSH_CORS_ALLOWED_ORIGINS`.
 The service validates the `bookrush-platform` issuer/JWK set and requires the
 `bookrush-ingestion` audience. It maps OAuth scopes and the Keycloak `groups`
 claim to `SCOPE_*`/`ROLE_*` authorities for moderation operations.
+Os logs detalhados do decoder só devem ser habilitados temporariamente durante
+diagnóstico operacional e nunca devem registrar tokens.
