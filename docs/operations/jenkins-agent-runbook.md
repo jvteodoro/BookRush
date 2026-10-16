@@ -126,6 +126,12 @@ interação manual, valida claims não sensíveis (`iss`, `aud`, `scope`, `exp`)
 exercita respostas 401/200, o manifesto EPUB e o preflight CORS. Senhas,
 tokens, cookies e corpos de resposta nunca são impressos.
 
+O mesmo smoke percorre a estrutura do livro (`book`/`chapters`), operações
+sociais autenticadas de teste (like, contagem, share, comentário e unlike),
+um evento autenticado no behavior-service e logout OIDC usando o
+`id_token_hint` apenas em memória. O `E2E_BOOK_ID` deve existir no catálogo;
+os registros criados são marcados como teste de integração.
+
 O usuário de teste precisa estar no realm `bookrush`, ter o cliente
 `bookrush-web` e o scope `bookrush.catalog.read`; o usuário administrativo do
 Jenkins no realm `bookrush-platform` não substitui essa credencial. O parâmetro

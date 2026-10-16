@@ -157,6 +157,7 @@ token=$(curl -fsS -X POST "$authority/protocol/openid-connect/token" \
   --data-urlencode "code=$code" \
   --data-urlencode "code_verifier=$verifier")
 access_token=$(jq -er '.access_token' <<<"$token")
+id_token=$(jq -er '.id_token' <<<"$token")
 
 python3 - "$access_token" "$authority" <<'PY'
 import base64, json, sys, time
@@ -192,6 +193,10 @@ for endpoint in progress bookmarks; do
   status=$(status_without_body "$tmp_dir/$endpoint" "$base_url/api/v1/reader/books/$E2E_BOOK_ID/$endpoint" -H "$auth_header")
   assert_status "authenticated_$endpoint" 200 "$status"
 done
+status=$(status_without_body "$tmp_dir/book" "$base_url/api/v1/reader/books/$E2E_BOOK_ID" -H "$auth_header")
+assert_status authenticated_book 200 "$status"
+status=$(status_without_body "$tmp_dir/chapters" "$base_url/api/v1/reader/books/$E2E_BOOK_ID/chapters" -H "$auth_header")
+assert_status authenticated_chapters 200 "$status"
 
 echo '[4/6] perfil e preferências de privacidade autenticados'
 status=$(status_without_body "$tmp_dir/profile" "$base_url/api/v1/profile" -H "$auth_header")
@@ -199,7 +204,27 @@ assert_status authenticated_profile 200 "$status"
 status=$(status_without_body "$tmp_dir/privacy" "$base_url/api/v1/profile/privacy" -H "$auth_header")
 assert_status authenticated_privacy 200 "$status"
 
-echo '[5/6] publicação EPUB encaminhada ao content-service'
+echo '[5/7] social e telemetria autenticados'
+status=$(status_without_body "$tmp_dir/like" -X PUT "$base_url/api/v1/social/books/$E2E_BOOK_ID/like" -H "$auth_header")
+assert_status social_like 200 "$status"
+status=$(status_without_body "$tmp_dir/likes" "$base_url/api/v1/social/books/$E2E_BOOK_ID/likes" -H "$auth_header")
+assert_status social_likes 200 "$status"
+status=$(status_without_body "$tmp_dir/share" -X POST "$base_url/api/v1/social/books/$E2E_BOOK_ID/share" \
+  -H "$auth_header" -H 'Content-Type: application/json' --data '{"channel":"e2e"}')
+assert_status social_share 200 "$status"
+status=$(status_without_body "$tmp_dir/comment" -X POST "$base_url/api/v1/social/books/$E2E_BOOK_ID/comments" \
+  -H "$auth_header" -H 'Content-Type: application/json' --data '{"body":"BookRush automated integration test"}')
+assert_status social_comment 200 "$status"
+event_key="E2E_READER_BFF:${E2E_BOOK_ID}:$(date +%s%N)"
+event_payload=$(jq -cn --arg key "$event_key" --arg book "$E2E_BOOK_ID" \
+  '{events:[{eventKey:$key,eventType:"E2E_READER_BFF",bookId:$book,occurredAt:(now|todateiso8601),payload:{source:"jenkins"}}]}')
+status=$(status_without_body "$tmp_dir/behavior" -X POST "$base_url/api/v1/behavior/events" \
+  -H "$auth_header" -H 'Content-Type: application/json' --data "$event_payload")
+assert_status behavior_event 202 "$status"
+status=$(status_without_body "$tmp_dir/unlike" -X DELETE "$base_url/api/v1/social/books/$E2E_BOOK_ID/like" -H "$auth_header")
+assert_status social_unlike 200 "$status"
+
+echo '[6/7] publicação EPUB encaminhada ao content-service'
 status=$(status_without_body "$tmp_dir/publication" "$base_url/api/v1/reader/books/$E2E_BOOK_ID/publication.json" -H "$auth_header")
 if [[ "$status" == 200 ]]; then
   printf 'authenticated_publication=%s\n' "$status"
@@ -210,7 +235,17 @@ else
   exit 1
 fi
 
-echo '[6/6] preflight CORS da origem do cliente'
+echo '[7/7] logout OIDC e preflight CORS da origem do cliente'
+logout_endpoint=$(curl -fsS "$authority/.well-known/openid-configuration" | jq -er '.end_session_endpoint')
+status=$(status_without_body "$tmp_dir/logout" -G "$logout_endpoint" \
+  --data-urlencode "id_token_hint=$id_token" \
+  --data-urlencode "client_id=$client_id" \
+  --data-urlencode "post_logout_redirect_uri=$redirect_uri")
+if [[ "$status" != 2* && "$status" != 3* ]]; then
+  echo "reader-bff-e2e: logout OIDC esperado 2xx/3xx, recebido $status" >&2
+  exit 1
+fi
+printf 'oidc_logout=%s\n' "$status"
 status=$(curl -fsS -D "$tmp_dir/cors.headers" -o "$tmp_dir/cors.body" -w '%{http_code}' -X OPTIONS "$base_url/api/v1/reader/feed" \
   -H "Origin: $origin" -H 'Access-Control-Request-Method: GET' \
   -H 'Access-Control-Request-Headers: authorization')
