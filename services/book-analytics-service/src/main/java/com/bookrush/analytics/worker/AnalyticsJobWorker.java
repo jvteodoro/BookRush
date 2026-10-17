@@ -5,6 +5,7 @@ import com.bookrush.analytics.excerpts.CandidatePruner;
 import com.bookrush.analytics.excerpts.ExcerptCandidateGenerator;
 import com.bookrush.analytics.features.LinguisticRuntimeClient;
 import com.bookrush.analytics.features.TextFeatureCalculator;
+import com.bookrush.analytics.llm.TopNliCandidateSelector;
 import com.bookrush.analytics.observability.AnalyticsMetrics;
 import com.bookrush.analytics.storage.TextAssetReader;
 import java.io.IOException;
@@ -175,7 +176,7 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
       persistChapterAndDocumentEmbeddings(
           item.inputVersion(), text, chapters, generatorConfig.version());
       persistRanks(run, excerptIds);
-      persistNli(run, excerptIds, language);
+      persistNli(run, excerptIds, candidates, excerptVectors, language);
       jdbc.update(
           "UPDATE analytics.analysis_run SET status='COMPLETED', finished_at=clock_timestamp()"
               + " WHERE id=?",
@@ -278,13 +279,21 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
   private record FeatureSnapshot(
       Map<String, Double> features, Map<String, String> statuses) {}
 
-  private void persistNli(UUID run, List<UUID> excerptIds, String language) {
+  private void persistNli(
+      UUID run,
+      List<UUID> excerptIds,
+      List<ExcerptCandidateGenerator.V2Candidate> candidates,
+      Map<UUID, List<Double>> embeddings,
+      String language) {
     if (!Boolean.parseBoolean(System.getenv().getOrDefault("ANALYTICS_NLI_ENABLED", "false"))
         || excerptIds.isEmpty()) return;
     int limit =
         Math.max(
             1, Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_NLI_MAX_EXCERPTS", "50")));
-    var selected = excerptIds.size() <= limit ? excerptIds : excerptIds.subList(0, limit);
+    var selected =
+        TopNliCandidateSelector.select(candidates, excerptIds, embeddings, limit).stream()
+            .map(TopNliCandidateSelector.Selection::excerptId)
+            .toList();
     var hypotheses = nliHypotheses(language);
     for (UUID excerptId : selected) {
       String text =

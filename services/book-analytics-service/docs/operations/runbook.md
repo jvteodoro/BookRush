@@ -82,8 +82,11 @@ versão física de entrada. Os vetores são objetos privados em `books-ml`, com
 metadados e hashes nas tabelas `chapter_embedding` e `document_embedding`.
 
 `ANALYTICS_NLI_ENABLED=false` mantém NLI desligado por padrão. Ao habilitar,
-até `ANALYTICS_NLI_MAX_EXCERPTS` candidatos por execução recebem as hipóteses
-versionadas de narrativa e emoção. Cada observação grava entailment, neutral,
+até `ANALYTICS_NLI_MAX_EXCERPTS` candidatos por execução (limitado a 50) recebem
+as hipóteses versionadas de narrativa e emoção. A seleção é determinística e
+combina qualidade estrutural/lexical com embeddings BGE, aplicando MMR para
+evitar que um único capítulo ou grupo de trechos semelhantes domine o lote.
+Cada observação grava entailment, neutral,
 contradiction, support e confidence como scores de modelo; nenhum deles é uma
 probabilidade comportamental. A migration V11 cria as definições tipadas.
 
