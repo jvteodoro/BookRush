@@ -299,10 +299,23 @@
             "included.client.audience": "bookrush-ingestion",
             "access.token.claim": "true",
             "id.token.claim": "false"
-      }
-    },
-    {
-      "name": "admin-service-management-roles",
+          }
+        },
+        {
+          "name": "ingestion-realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "admin-service-management-roles",
       "protocol": "openid-connect",
       "protocolMapper": "oidc-usermodel-client-role-mapper",
       "config": {
