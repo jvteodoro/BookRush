@@ -18,8 +18,8 @@ if [[ "$storage_health" != healthy ]]; then
   echo 'SeaweedFS não está provisionado/saudável. Execute o procedimento inicial de infraestrutura antes do deploy.' >&2
   exit 1
 fi
-old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1)"
-old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1)"
+old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1 2>/dev/null || true)"
+old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1 2>/dev/null || true)"
 old_ingestion="$(docker inspect --format '{{.Config.Image}}' bookrush-book-ingestion-service-1 2>/dev/null || true)"
 old_analytics="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analytics-service-1 2>/dev/null || true)"
 old_reader_profile="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-profile-service-1 2>/dev/null || true)"
@@ -43,8 +43,11 @@ rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
   if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_reader_profile" && -n "$old_social" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
-  else
+  elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
+  else
+    echo 'Não há imagens anteriores completas para rollback; mantendo a revisão solicitada para recuperar o stack.' >&2
+    "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
   fi
 }
 
