@@ -118,13 +118,22 @@ pipeline {
     stage('Reconciliar Keycloak Compose') {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
       steps {
-        sh '''
+        script {
+          withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_ADMIN_CLIENT_SECRET')]) {
+            sh '''
           set -euo pipefail
+          # Jenkins launches shell steps with xtrace enabled. Disable it before
+          # sourcing the protected runtime file so credentials never enter the
+          # build log.
+          set +x
           set -a
           . /run/bookrush.env
           set +a
+          set -x
           bash scripts/reconcile-keycloak-agent.sh
-        '''
+            '''
+          }
+        }
       }
     }
 
