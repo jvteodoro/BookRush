@@ -149,6 +149,12 @@ desse client deve possuir a role `platform-operator` no realm
 `RUN_INGESTION_S2S_E2E`, `INGESTION_S2S_CREDENTIAL_ID` e
 `INGESTION_S2S_BASE_URL`.
 
+Quando `DEPLOY=true` e `DEPLOY_TARGET=compose`, a pipeline executa antes da
+ingestão o reconcile declarativo do Keycloak usando `/run/bookrush.env`, o
+mesmo arquivo protegido do deploy. Isso é necessário porque o realm persistente
+não reaplica automaticamente alterações de roles durante a recriação das
+imagens; o estágio não é executado em builds de validação sem deploy.
+
 O estágio de contratos também executa `scripts/test-keycloak-jwks-rotation.sh`
 em um Keycloak descartável. Ele cria um provider `rsa-generated` de prioridade
 maior pelo Admin API, confirma a troca do `kid` e verifica que o JWKS continua

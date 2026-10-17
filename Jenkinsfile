@@ -115,6 +115,13 @@ pipeline {
       }
     }
 
+    stage('Reconciliar Keycloak Compose') {
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
+      steps {
+        sh 'bash infrastructure/keycloak/reconcile.sh --env-file /run/bookrush.env'
+      }
+    }
+
     stage('Importação Gutenberg (opt-in)') {
       when { expression { return params.RUN_GUTENBERG_IMPORT } }
       steps {
