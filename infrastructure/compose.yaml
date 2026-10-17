@@ -152,10 +152,10 @@ services:
       KC_HTTP_ENABLED: "true"
     volumes:
       - keycloak_data:/opt/keycloak/data
-      # This path is resolved by the Docker daemon, not by the Jenkins
-      # container that invokes Compose through the Docker socket.
-      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
-      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-platform-realm.json:/opt/keycloak/data/import/bookrush-platform-realm.json:ro
+      # Realm JSON is applied by the idempotent keycloak-config-cli reconcile
+      # step. Do not bind-mount files from the Jenkins workspace here: Compose
+      # may be invoked inside a Jenkins container through the host Docker
+      # socket, in which case the daemon cannot see that workspace path.
     ports:
       - "127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}:8080"
     healthcheck:
