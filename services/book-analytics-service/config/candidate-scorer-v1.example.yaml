@@ -1,10 +1,15 @@
 code: EXCERPT_SUPERVISED_SCORER_V1
-version: 1.0.0
+version: 1.1.0
 status: EXPERIMENTAL
 validated: false
-warning: "Plumbing artifact only; promotion requires reviewed labels and evaluation."
-split: work_id
+warning: "Promotion requires reviewed labels and evaluation; this artifact is not production truth."
+split: author_id::work_id
 seed: 42
+models:
+  baseline: per-label mean
+  gbdt: deterministic depth-1 residual stumps
+  learning_rate: 0.1
+  rounds: 8
 features:
   - narrative.hook
   - narrative.curiosity
