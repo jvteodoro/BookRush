@@ -39,6 +39,7 @@ analytics:
   worker:
     enabled: ${ANALYTICS_WORKER_ENABLED:false}
     poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}
+    stale-after-seconds: ${ANALYTICS_WORKER_STALE_AFTER_SECONDS:900}
     v2:
       version: ${ANALYTICS_V2_GENERATOR_VERSION:sentence-window-v2}
       min-words: ${ANALYTICS_V2_MIN_WORDS:60}

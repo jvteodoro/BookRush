@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -38,18 +39,21 @@ public final class AnalyticsJobWorker {
   private final AnalyticsMetrics metrics;
   private final AnalyticsV2GeneratorProperties generatorProperties;
   private final LinguisticRuntimeClient linguisticRuntime;
+  private final int staleAfterSeconds;
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
       S3Client s3,
       AnalyticsMetrics metrics,
       AnalyticsV2GeneratorProperties generatorProperties,
-      com.bookrush.analytics.config.AnalyticsRuntimeProperties runtimeProperties) {
+      com.bookrush.analytics.config.AnalyticsRuntimeProperties runtimeProperties,
+      @Value("${analytics.worker.stale-after-seconds:900}") int staleAfterSeconds) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
     this.generatorProperties = generatorProperties;
     this.linguisticRuntime = new LinguisticRuntimeClient(runtimeProperties);
+    this.staleAfterSeconds = normalizeStaleAfterSeconds(staleAfterSeconds);
   }
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
@@ -65,6 +69,7 @@ public final class AnalyticsJobWorker {
   }
 
   private Item claimOne() {
+    recoverStaleItems();
     return jdbc.query(
         """
 WITH next_item AS (
@@ -85,6 +90,34 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
                     rs.getObject("job_id", UUID.class),
                     rs.getObject("input_asset_version_id", UUID.class))
                 : null);
+  }
+
+  /**
+   * Returns items abandoned by a worker/container restart to the durable queue.
+   *
+   * <p>The worker has no heartbeat because processing is bounded by the runtime timeout. A
+   * conservative lease prevents a crashed worker from permanently blocking a job while leaving
+   * genuinely active work enough time to finish. Only active, non-cancelled jobs are recovered.
+   */
+  int recoverStaleItems() {
+    return jdbc.update(staleLeaseRecoverySql(), staleAfterSeconds);
+  }
+
+  static int normalizeStaleAfterSeconds(int seconds) {
+    return Math.max(1, seconds);
+  }
+
+  static String staleLeaseRecoverySql() {
+    return """
+UPDATE analytics.analysis_job_item i
+   SET status='PENDING', started_at=NULL, finished_at=NULL, analysis_run_id=NULL
+  FROM analytics.analysis_job j
+ WHERE i.job_id=j.id
+   AND i.status='RUNNING'
+   AND j.cancel_requested=false
+   AND j.status IN ('PENDING','RUNNING')
+   AND i.started_at < clock_timestamp() - (? * INTERVAL '1 second')
+""";
   }
 
   private void process(Item item) throws IOException {

@@ -42,6 +42,15 @@ Ele requer `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY` e `STORAGE_SECRET_KEY`, alé
 de bucket/key/hash/size registrados no catálogo. Para uma execução local sem
 object storage, mantenha a variável em `false`; jobs permanecerão `PENDING`.
 
+O worker usa uma lease lógica para evitar que uma interrupção deixe itens
+permanentemente em `RUNNING`. Itens de jobs ativos, não cancelados, sem
+atualização por `ANALYTICS_WORKER_STALE_AFTER_SECONDS` (900 segundos por
+padrão) são devolvidos a `PENDING` antes do próximo claim. O limite deve ser
+maior que o pior tempo esperado de uma análise; ele não remove itens, jobs,
+execuções ou objetos do storage. Depois de um restart, acompanhe o endpoint de
+itens do job e confirme que os itens recuperados voltaram a `COMPLETED` ou
+`FAILED` com uma nova tentativa.
+
 IDs de livro, hashes, operation keys e texto nunca são tags. Para investigar um
 job, consulte primeiro `GET /api/admin/v1/analytics/jobs/{id}` e depois
 `/items`; use `resume` somente após corrigir o erro persistido. O cache/provider
