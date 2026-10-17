@@ -498,6 +498,22 @@ public class AnnotationLearningController {
                 + " analytics.annotation_campaign_item i ON i.id=a.campaign_item_id WHERE"
                 + " i.campaign_id=? GROUP BY dv.dimension_code ORDER BY dv.dimension_code",
             id);
+    var languageSlices =
+        db.queryForList(
+            "SELECT COALESCE(ed.language,b.original_language,'unknown') language,"
+                + " dv.dimension_code,avg(dv.ordinal_value) mean,percentile_cont(.5) within"
+                + " group(order by dv.ordinal_value) median,percentile_cont(.75) within group(order"
+                + " by dv.ordinal_value)-percentile_cont(.25) within group(order by"
+                + " dv.ordinal_value) iqr,count(*) count FROM analytics.annotation_dimension_value dv"
+                + " JOIN analytics.annotation a ON a.id=dv.annotation_id JOIN"
+                + " analytics.annotation_campaign_item i ON i.id=a.campaign_item_id JOIN"
+                + " analytics.excerpt ex ON ex.id=i.excerpt_id JOIN catalog.book_asset_version av"
+                + " ON av.id=ex.source_asset_version_id JOIN catalog.book_asset ba ON"
+                + " ba.id=av.book_asset_id JOIN catalog.book b ON b.id=ba.book_id LEFT JOIN"
+                + " catalog.edition ed ON ed.id=ba.edition_id WHERE i.campaign_id=? GROUP BY"
+                + " COALESCE(ed.language,b.original_language,'unknown'),dv.dimension_code ORDER BY"
+                + " language,dv.dimension_code",
+            id);
     var counts =
         db.queryForMap(
             "SELECT count(*) total,count(*) FILTER(WHERE a.status='SUBMITTED')"
@@ -506,12 +522,14 @@ public class AnnotationLearningController {
                 + " JOIN analytics.annotation_campaign_item i ON i.id=a.campaign_item_id WHERE"
                 + " i.campaign_id=?",
             id);
-    double alpha = ordinalAgreement(id);
+    double alpha = ordinalKrippendorffAlpha(id);
     return Map.of(
         "campaignId",
         id,
         "dimensions",
         dist,
+        "languageSlices",
+        languageSlices,
         "counts",
         counts,
         "krippendorffAlphaOrdinal",
@@ -540,7 +558,7 @@ public class AnnotationLearningController {
         "thresholdVersion", "quality-v1", "total", rows.size());
   }
 
-  private double ordinalAgreement(UUID campaignId) {
+  private double ordinalKrippendorffAlpha(UUID campaignId) {
     var values = db.queryForList("SELECT a.campaign_item_id,d.dimension_code,d.ordinal_value "
         + "FROM analytics.annotation a JOIN analytics.annotation_campaign_item i ON i.id=a.campaign_item_id "
         + "JOIN analytics.annotation_dimension_value d ON d.annotation_id=a.id "
@@ -551,7 +569,7 @@ public class AnnotationLearningController {
             String.valueOf(value.get("dimension_code")),
             ((Number) value.get("ordinal_value")).intValue()))
         .toList();
-    return OrdinalAgreement.agreement(ratings);
+    return OrdinalAgreement.krippendorffAlphaOrdinal(ratings);
   }
 
   public record Adjudication(String dimensionCode, Integer ordinalValue, String rationale) {}

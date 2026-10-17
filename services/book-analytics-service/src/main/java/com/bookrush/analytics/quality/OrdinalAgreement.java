@@ -1,7 +1,9 @@
 package com.bookrush.analytics.quality;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -39,6 +41,57 @@ public final class OrdinalAgreement {
       }
     }
     return pairs == 0 ? 0.0 : Math.max(-1.0, 1.0 - disagreement / pairs);
+  }
+
+  /**
+   * Computes Krippendorff's alpha for ordinal ratings using squared normalized distance.
+   *
+   * <p>Ratings are grouped by item and dimension. A value of {@code 0.0} means either insufficient
+   * data or agreement no better than chance; a value of {@code 1.0} means perfect agreement on
+   * comparable ratings.
+   */
+  public static double krippendorffAlphaOrdinal(List<Rating> ratings) {
+    Map<String, List<Integer>> units = new HashMap<>();
+    Map<Integer, Integer> valueCounts = new HashMap<>();
+    int totalRatings = 0;
+    for (Rating rating : ratings) {
+      units.computeIfAbsent(rating.itemId() + "\u0000" + rating.dimension(), ignored -> new java.util.ArrayList<>())
+          .add(rating.value());
+      valueCounts.merge(rating.value(), 1, Integer::sum);
+      totalRatings++;
+    }
+
+    double observedDistance = 0.0;
+    long observedPairs = 0;
+    for (List<Integer> unit : units.values()) {
+      for (int left = 0; left < unit.size(); left++) {
+        for (int right = left + 1; right < unit.size(); right++) {
+          observedDistance += squaredDistance(unit.get(left), unit.get(right));
+          observedPairs++;
+        }
+      }
+    }
+    if (observedPairs == 0 || totalRatings < 2) return 0.0;
+
+    double expectedDistance = 0.0;
+    long expectedPairs = 0;
+    for (Map.Entry<Integer, Integer> left : valueCounts.entrySet()) {
+      for (Map.Entry<Integer, Integer> right : valueCounts.entrySet()) {
+        int available = left.getValue() * right.getValue();
+        if (left.getKey().equals(right.getKey())) available -= left.getValue();
+        if (available <= 0) continue;
+        expectedDistance += available * squaredDistance(left.getKey(), right.getKey());
+        expectedPairs += available;
+      }
+    }
+    if (expectedPairs == 0 || expectedDistance == 0.0) return 1.0;
+    double alpha = 1.0 - (observedDistance / observedPairs) / (expectedDistance / expectedPairs);
+    return Math.max(-1.0, Math.min(1.0, alpha));
+  }
+
+  private static double squaredDistance(int left, int right) {
+    double distance = Math.abs(left - right) / MAX_DISTANCE;
+    return distance * distance;
   }
 
   /** Returns whether the range for one item/dimension is at or above the configured threshold. */

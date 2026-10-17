@@ -39,4 +39,23 @@ class OrdinalAgreementTest {
     assertFalse(OrdinalAgreement.disagrees(ratings, 3));
     assertThrows(IllegalArgumentException.class, () -> OrdinalAgreement.disagrees(ratings, 0));
   }
+
+  @Test
+  void krippendorffAlphaIsPerfectForIdenticalRatings() {
+    assertEquals(1.0, OrdinalAgreement.krippendorffAlphaOrdinal(List.of(
+        new OrdinalAgreement.Rating("item-a", "tone", 3),
+        new OrdinalAgreement.Rating("item-a", "tone", 3))), 0.000001);
+  }
+
+  @Test
+  void krippendorffAlphaUsesOrdinalDistanceAndReturnsInsufficientForSingleRating() {
+    assertEquals(0.0, OrdinalAgreement.krippendorffAlphaOrdinal(List.of(
+        new OrdinalAgreement.Rating("item-a", "tone", 3))), 0.000001);
+    double alpha = OrdinalAgreement.krippendorffAlphaOrdinal(List.of(
+        new OrdinalAgreement.Rating("item-a", "tone", 1),
+        new OrdinalAgreement.Rating("item-a", "tone", 2),
+        new OrdinalAgreement.Rating("item-b", "tone", 1),
+        new OrdinalAgreement.Rating("item-b", "tone", 1)));
+    assertEquals(0.0, alpha, 0.000001);
+  }
 }
