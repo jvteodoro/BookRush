@@ -5,6 +5,10 @@
 **Escopo:** estado implementado e dados persistidos; este documento não declara
 prontidão para processamento em massa ou validação científica de modelos.
 
+As decisões de arquitetura para processamento de lotes pesados, recuperação de
+leases, persistência em lote e poda de candidatos estão em
+[Arquitetura de processamento em lote](batch-processing-architecture.md).
+
 ## Situação atual
 
 A pipeline barata está operacional no ambiente atual. O serviço Spring Boot é o
@@ -195,9 +199,19 @@ criam e controlam jobs; as internas leem dados ligados ao catálogo.
 | GET | `/api/internal/v1/content-analytics/excerpts/{excerptId}` | Excerpt, hash e linhagem. |
 
 O namespace administrativo `/api/admin/v1/annotation` implementa campanhas de
-anotação: criação/amostragem, claim, first-screen lock, submissão, métricas,
-adjudicação e exportação de dataset. Ele é reservado a operadores, anotadores e
-revisores; detalhes do modelo estão em [data-model.md](data-model.md).
+anotação: criação/amostragem, claim, progresso por anotador, item cego,
+first-screen lock, contexto anterior/seguinte após o lock, submissão, métricas,
+adjudicação e exportação de dataset. O item cego não expõe scores; o contexto e
+os scores só são liberados após o lock primário. Ele é reservado a operadores,
+anotadores e revisores; detalhes do modelo estão em [data-model.md](data-model.md).
+
+A amostragem de uma campanha usa o `sampling_config` e o
+`sampling_config_hash` persistidos na criação. Para o piloto EQL, a política
+`languages: ["en", "pt"]` com `targetPerLanguage: 50` materializa até 50
+excerpts determinísticos por idioma, ordenados por `md5(excerpt_id || seed)`.
+Cada item registra o estrato (`en:position`/`pt:position`) e a razão com o
+idioma e a seed; a restrição única `(campaign_id, excerpt_id)` impede duplicatas.
+Executar a amostragem novamente é seguro e retorna o mesmo hash da campanha.
 
 `Idempotency-Key`, quando presente, deve ser igual a `operationKey`. A API
 rejeita a mesma chave com corpo diferente. O contrato OpenAPI do serviço é a

@@ -12,3 +12,11 @@ property name during startup.
 The feed endpoint requires the caller principal and forwards the bearer token
 to the recommendation service. A request is therefore ledgered under the
 authenticated subject rather than an anonymous shared identity.
+
+The BFF also exposes authenticated composition routes for recommendations,
+library, recent books, streak, progress, bookmarks, opened events,
+recommendation impressions, publication manifests and EPUB resources. It
+forwards the caller's bearer token to the owning service and returns `502` when
+an upstream dependency is unavailable; it never falls back to anonymous or
+mock data. Upstream URLs are configured with `READER_STATE_URL` and
+`BOOK_CONTENT_URL`.

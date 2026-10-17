@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Activity, CheckCircle2, Eye, Play, RefreshCw } from "lucide-react";
 import { services } from "../../lib/services";
-import { AnalyticsRun } from "../../types/domain";
+import { AnalyticsJob, AnalyticsRun } from "../../types/domain";
 
 const terminal = new Set(["SUCCEEDED", "FAILED"]);
 const statusLabel: Record<string, string> = {
@@ -21,6 +21,11 @@ export function AnalyticsPage() {
   const runs = useQuery({
     queryKey: ["analytics"],
     queryFn: services.listAnalytics,
+  });
+  const jobs = useQuery({
+    queryKey: ["analytics-jobs"],
+    queryFn: services.listAnalyticsJobs,
+    refetchInterval: 5000,
   });
   const [localRuns, setLocalRuns] = useState<AnalyticsRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string>();
@@ -128,6 +133,12 @@ export function AnalyticsPage() {
           {runs.isFetching ? "Atualizando…" : "Atualizar métricas"}
         </button>
       </header>
+      <JobQueue
+        jobs={jobs.data ?? []}
+        isLoading={jobs.isLoading}
+        isError={jobs.isError}
+        onRefresh={() => void jobs.refetch()}
+      />
       <div className="panel">
         <div className="panelhead">
           <div>
@@ -283,5 +294,82 @@ export function AnalyticsPage() {
         ))}
       </div>
     </section>
+  );
+}
+
+function JobQueue({
+  jobs,
+  isLoading,
+  isError,
+  onRefresh,
+}: {
+  jobs: AnalyticsJob[];
+  isLoading: boolean;
+  isError: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="panel analytics-job-queue">
+      <div className="panelhead">
+        <div>
+          <h2>Fila de processamento</h2>
+          <span>
+            Jobs persistidos, inclusive execuções iniciadas por pipelines.
+          </span>
+        </div>
+        <button className="button-action" onClick={onRefresh}>
+          Atualizar fila
+        </button>
+      </div>
+      {isLoading && <p>Consultando jobs…</p>}
+      {isError && (
+        <p className="error-text">
+          Não foi possível consultar a fila de analytics.
+        </p>
+      )}
+      {!isLoading && !isError && jobs.length === 0 && (
+        <p>Nenhum job persistido encontrado.</p>
+      )}
+      {jobs.map((job) => {
+        const progress = job.totalItems
+          ? Math.round((job.processedItems / job.totalItems) * 100)
+          : 0;
+        return (
+          <div className="analytics-job" key={job.id}>
+            <div className="analytics-job-heading">
+              <div>
+                <strong>{job.operationKey || job.id}</strong>
+                <small>{job.id}</small>
+              </div>
+              <span
+                className={`job-status job-status-${job.status.toLowerCase()}`}
+              >
+                {statusLabel[job.status] ?? job.status}
+              </span>
+            </div>
+            <div className="progress">
+              <span style={{ width: `${Math.min(100, progress)}%` }} />
+            </div>
+            <div className="analytics-job-meta">
+              <span>
+                {job.processedItems}/{job.totalItems} processados ({progress}%)
+              </span>
+              <span>
+                {job.runningItems} ativos · {job.pendingItems} pendentes ·{" "}
+                {job.failedItems} falhas
+              </span>
+            </div>
+            {(job.progressStage || job.lastProgressAt) && (
+              <small>
+                Etapa: {job.progressStage ?? "não informada"}
+                {job.lastProgressAt
+                  ? ` · último avanço: ${new Date(job.lastProgressAt).toLocaleString()}`
+                  : ""}
+              </small>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

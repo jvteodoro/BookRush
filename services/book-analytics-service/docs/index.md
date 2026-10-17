@@ -84,3 +84,9 @@ O benchmark de latência e projeção de custo do NLI local está em
 
 A milestone [Excerpt Quality Learning V1](annotation-quality-learning-v1.md)
 adiciona campanhas, anotação cega, leases, métricas QA e datasets imutáveis.
+## Behavior outbox sink
+
+O endpoint interno `/api/internal/v1/behavior/events` recebe linhas idempotentes
+da outbox do behavior-service e persiste `event_id`, tipo, payload e timestamps
+em `analytics.behavior_event`. Ele exige `X-Behavior-Outbox-Token`; o valor não
+deve ser versionado nem aparecer em logs.

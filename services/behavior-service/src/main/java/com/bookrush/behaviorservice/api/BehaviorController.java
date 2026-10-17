@@ -1,6 +1,7 @@
 package com.bookrush.behaviorservice.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.bookrush.behaviorservice.BehaviorMaintenance;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,8 +20,10 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/behavior")
 public class BehaviorController {
   private final JdbcTemplate jdbc;
-  public BehaviorController(JdbcTemplate jdbc) {
+  private final BehaviorMaintenance maintenance;
+  public BehaviorController(JdbcTemplate jdbc, BehaviorMaintenance maintenance) {
     this.jdbc = jdbc;
+    this.maintenance = maintenance;
   }
   public record Event(@NotBlank String eventKey, @NotBlank String eventType, String issuer,
       String subject, UUID bookId, @NotNull Instant occurredAt, JsonNode payload) {}
@@ -49,18 +52,21 @@ public class BehaviorController {
   @PostMapping("/aggregates/rebuild")
   public Map<String, Object> rebuild() {
     jdbc.update("""
-        INSERT INTO behavior.daily_book(day, book_id, impressions, opens, likes, reads)
+        INSERT INTO behavior.daily_book(day, book_id, impressions, opens, likes, reads, shares, comments)
         SELECT occurred_at::date, book_id,
           count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
           count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
           count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
-          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE'))
+          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE')),
+          count(*) FILTER (WHERE event_type = 'BOOK_SHARE'),
+          count(*) FILTER (WHERE event_type = 'BOOK_COMMENT')
         FROM behavior.events
         WHERE book_id IS NOT NULL
         GROUP BY occurred_at::date, book_id
         ON CONFLICT (day, book_id) DO UPDATE SET
           impressions = excluded.impressions, opens = excluded.opens,
-          likes = excluded.likes, reads = excluded.reads
+          likes = excluded.likes, reads = excluded.reads,
+          shares = excluded.shares, comments = excluded.comments
         """);
     jdbc.update("""
         INSERT INTO behavior.daily_user_book
@@ -88,13 +94,27 @@ public class BehaviorController {
   @GetMapping("/aggregates")
   public Object aggregates() {
     return jdbc.queryForList("""
-        SELECT day, book_id, impressions, opens, likes, reads
+        SELECT day, book_id, impressions, opens, likes, reads, shares, comments
         FROM behavior.daily_book ORDER BY day DESC LIMIT 500
         """);
   }
   @GetMapping("/aggregates/books/{bookId}")
   public Object bookAggregates(@PathVariable UUID bookId) {
-    return jdbc.queryForList("SELECT day, book_id, impressions, opens, likes, reads FROM behavior.daily_book WHERE book_id=? ORDER BY day DESC LIMIT 365", bookId);
+    return jdbc.queryForList("SELECT day, book_id, impressions, opens, likes, reads, shares, comments FROM behavior.daily_book WHERE book_id=? ORDER BY day DESC LIMIT 365", bookId);
+  }
+
+  @GetMapping("/aggregates/dashboard")
+  public Map<String, Object> dashboardAggregates(
+      @RequestParam(defaultValue = "30") int days) {
+    int window = Math.max(1, Math.min(days, 365));
+    var rows = jdbc.queryForList("""
+        SELECT day, sum(impressions) impressions, sum(opens) opens, sum(likes) likes,
+          sum(reads) reads, sum(shares) shares, sum(comments) comments
+        FROM behavior.daily_book
+        WHERE day >= current_date - (? - 1)
+        GROUP BY day ORDER BY day DESC
+        """, window);
+    return Map.of("days", window, "rows", rows);
   }
 
   @GetMapping("/aggregates/me")
@@ -111,5 +131,9 @@ public class BehaviorController {
  @GetMapping("/events/count")
   public Map<String, Object> count() {
     return Map.of("events", jdbc.queryForObject("select count(*) from behavior.events", Long.class));
+  }
+  @GetMapping("/operations/metrics")
+  public Map<String, Object> operationsMetrics() {
+    return maintenance.snapshot();
   }
 }

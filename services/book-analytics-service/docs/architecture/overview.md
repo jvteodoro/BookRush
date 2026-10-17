@@ -1,5 +1,9 @@
 # Arquitetura
 
+Para a arquitetura operacional do processamento de lotes pesados, incluindo
+leases, persistência em `batchUpdate`, poda de candidatos e limites atuais do
+runtime, consulte [Arquitetura de processamento em lote](../../../../docs/analytics/batch-processing-architecture.md).
+
 ```mermaid
 graph LR
   C[catalog.book_asset_version] --> R[analytics.analysis_run]

@@ -25,6 +25,7 @@ import {
 import type { CatalogBook, FeedExcerpt, PageLoopBook } from "./app/types";
 import type { ReadiumBridge } from "./app/types";
 import { useLegacyNavigation } from "./app/useLegacyNavigation";
+import { apiRoutes } from "./app/apiRoutes";
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
@@ -73,7 +74,7 @@ function App() {
     async function startPrototype() {
       try {
         const telemetry = createTelemetry(async (events) => {
-          const response = await authClient.fetch("/api/v1/behavior/events", {
+          const response = await authClient.fetch(apiRoutes.behavior(), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ events }),
@@ -153,7 +154,7 @@ function App() {
         let submissions: unknown[] = [];
         try {
           const response = await authClient.fetch(
-            "/api/v1/publisher/submissions",
+            apiRoutes.publisher.submissions(),
           );
           if (response.ok) submissions = (await response.json()) as unknown[];
         } catch {
@@ -176,7 +177,9 @@ function App() {
           window as Window & { __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[] }
         ).__BOOKRUSH_PUBLISHER_SUBMISSIONS__ = submissions;
         try {
-          const profileResponse = await authClient.fetch("/api/v1/profile");
+          const profileResponse = await authClient.fetch(
+            apiRoutes.profile.self(),
+          );
           (
             window as Window & { __BOOKRUSH_PROFILE__?: unknown }
           ).__BOOKRUSH_PROFILE__ = profileResponse.ok
@@ -189,8 +192,8 @@ function App() {
         }
         try {
           const [usersResponse, reportsResponse] = await Promise.all([
-            authClient.fetch("/api/v1/admin/users"),
-            authClient.fetch("/api/v1/admin/reports"),
+            authClient.fetch(apiRoutes.admin.users()),
+            authClient.fetch(apiRoutes.admin.reports()),
           ]);
           (
             window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }
@@ -212,7 +215,7 @@ function App() {
         }
         try {
           const streakResponse = await authClient.fetch(
-            "/api/v1/reader/streak",
+            apiRoutes.reader.streak(),
           );
           (
             window as Window & { __BOOKRUSH_STREAK__?: unknown }
@@ -224,6 +227,20 @@ function App() {
             window as Window & { __BOOKRUSH_STREAK__?: unknown }
           ).__BOOKRUSH_STREAK__ = null;
         }
+        try {
+          const plantResponse = await authClient.fetch(
+            apiRoutes.reader.plant(),
+          );
+          (
+            window as Window & { __BOOKRUSH_PLANT__?: unknown }
+          ).__BOOKRUSH_PLANT__ = plantResponse.ok
+            ? await plantResponse.json()
+            : null;
+        } catch {
+          (
+            window as Window & { __BOOKRUSH_PLANT__?: unknown }
+          ).__BOOKRUSH_PLANT__ = null;
+        }
         (
           window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }
         ).__BOOKRUSH_API__ = {
@@ -232,7 +249,7 @@ function App() {
           saved,
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(
-              `/api/v1/reader/library/${encodeURIComponent(id)}`,
+              apiRoutes.reader.libraryBook(id),
               { method: enabled ? "PUT" : "DELETE" },
             );
             if (!response.ok)
@@ -241,16 +258,15 @@ function App() {
             else saved.delete(id);
           },
           like: async (id: string, enabled: boolean) => {
-            const response = await authClient.fetch(
-              `/api/v1/social/books/${encodeURIComponent(id)}/like`,
-              { method: enabled ? "PUT" : "DELETE" },
-            );
+            const response = await authClient.fetch(apiRoutes.social.like(id), {
+              method: enabled ? "PUT" : "DELETE",
+            });
             if (!response.ok)
               throw new Error("Não foi possível atualizar a curtida.");
           },
           share: async (id: string) => {
             const response = await authClient.fetch(
-              `/api/v1/social/books/${encodeURIComponent(id)}/share`,
+              apiRoutes.social.share(id),
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -262,13 +278,13 @@ function App() {
           },
           comments: async (id: string) => {
             const response = await authClient.fetch(
-              `/api/v1/social/books/${encodeURIComponent(id)}/comments`,
+              apiRoutes.social.comments(id),
             );
             return response.ok ? response.json() : [];
           },
           comment: async (id: string, text: string) => {
             const response = await authClient.fetch(
-              `/api/v1/social/books/${encodeURIComponent(id)}/comments`,
+              apiRoutes.social.comments(id),
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -302,12 +318,12 @@ function App() {
             return counts;
           },
           profile: async () => {
-            const response = await authClient.fetch("/api/v1/profile");
+            const response = await authClient.fetch(apiRoutes.profile.self());
             return response.ok ? response.json() : null;
           },
           publicProfile: async (subject: string) => {
             const response = await authClient.fetch(
-              `/api/v1/profile/public?subject=${encodeURIComponent(subject)}`,
+              apiRoutes.profile.public(subject),
             );
             if (!response.ok)
               throw new Error("Não foi possível carregar este perfil.");
@@ -323,7 +339,7 @@ function App() {
             bio?: string;
             isPublic?: boolean;
           }) => {
-            const response = await authClient.fetch("/api/v1/profile", {
+            const response = await authClient.fetch(apiRoutes.profile.self(), {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(profile),
@@ -332,9 +348,36 @@ function App() {
               throw new Error("Não foi possível salvar o perfil.");
             return response.json();
           },
+          privacy: async () => {
+            const response = await authClient.fetch(
+              apiRoutes.profile.privacy(),
+            );
+            if (!response.ok)
+              throw new Error("Não foi possível carregar a privacidade.");
+            return response.json();
+          },
+          updatePrivacy: async (privacy: {
+            profileVisibility: string;
+            activityVisibility: string;
+            libraryVisibility: string;
+            recentVisibility: string;
+            socialGraphVisibility: string;
+          }) => {
+            const response = await authClient.fetch(
+              apiRoutes.profile.privacy(),
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(privacy),
+              },
+            );
+            if (!response.ok)
+              throw new Error("Não foi possível salvar a privacidade.");
+            return response.json();
+          },
           follow: async (subject: string, enabled: boolean) => {
             const response = await authClient.fetch(
-              `/api/v1/social/follow?user=${encodeURIComponent(subject)}`,
+              apiRoutes.social.follow(subject),
               { method: enabled ? "PUT" : "DELETE" },
             );
             if (!response.ok)
@@ -342,7 +385,7 @@ function App() {
           },
           followStatus: async (subject: string) => {
             const response = await authClient.fetch(
-              `/api/v1/social/follow?user=${encodeURIComponent(subject)}`,
+              apiRoutes.social.follow(subject),
             );
             if (!response.ok)
               throw new Error("Não foi possível consultar o acompanhamento.");
@@ -350,19 +393,19 @@ function App() {
               .following;
           },
           adminUsers: async () => {
-            const response = await authClient.fetch("/api/v1/admin/users");
+            const response = await authClient.fetch(apiRoutes.admin.users());
             if (!response.ok)
               throw new Error("Não foi possível carregar os usuários.");
             return response.json();
           },
           adminReports: async () => {
-            const response = await authClient.fetch("/api/v1/admin/reports");
+            const response = await authClient.fetch(apiRoutes.admin.reports());
             if (!response.ok)
               throw new Error("Não foi possível carregar as denúncias.");
             return response.json();
           },
           adminAudit: async (action: string, target: string) => {
-            const response = await authClient.fetch("/api/v1/admin/audit", {
+            const response = await authClient.fetch(apiRoutes.admin.audit(), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ action, target }),
@@ -375,7 +418,7 @@ function App() {
           },
           adminModerate: async (target: string, decision: string) => {
             const response = await authClient.fetch(
-              "/api/v1/admin/moderation",
+              apiRoutes.admin.moderation(),
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -390,7 +433,7 @@ function App() {
           },
           publisherSubmissions: async () => {
             const response = await authClient.fetch(
-              "/api/v1/publisher/submissions",
+              apiRoutes.publisher.submissions(),
             );
             if (!response.ok)
               throw new Error("Não foi possível carregar suas publicações.");
@@ -398,7 +441,7 @@ function App() {
           },
           createSubmission: async (title: string) => {
             const response = await authClient.fetch(
-              "/api/v1/publisher/submissions",
+              apiRoutes.publisher.submissions(),
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -411,7 +454,7 @@ function App() {
           },
           submitSubmission: async (id: string) => {
             const response = await authClient.fetch(
-              `/api/v1/publisher/submissions/${encodeURIComponent(id)}/submit`,
+              apiRoutes.publisher.submit(id),
               { method: "POST" },
             );
             if (!response.ok)
@@ -422,7 +465,7 @@ function App() {
           },
           publisherMetrics: async (id: string) => {
             const response = await authClient.fetch(
-              `/api/v1/publisher/submissions/${encodeURIComponent(id)}/metrics`,
+              apiRoutes.publisher.metrics(id),
             );
             if (!response.ok)
               throw new Error("Não foi possível carregar as métricas.");
@@ -430,7 +473,7 @@ function App() {
           },
           uploadSubmissionFile: async (submissionId: string, file: File) => {
             const request = await authClient.fetch(
-              `/api/v1/publisher/submissions/${encodeURIComponent(submissionId)}/upload`,
+              apiRoutes.publisher.upload(submissionId),
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -462,7 +505,7 @@ function App() {
               byte.toString(16).padStart(2, "0"),
             ).join("");
             const complete = await authClient.fetch(
-              `/api/v1/publisher/submissions/${encodeURIComponent(submissionId)}/upload/${encodeURIComponent(reservation.uploadId)}/finalize`,
+              apiRoutes.publisher.finalize(submissionId, reservation.uploadId),
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -478,31 +521,24 @@ function App() {
             percent: number,
             positionCodepoint: number,
           ) => {
-            await authClient.fetch(
-              `/api/v1/reader/books/${encodeURIComponent(id)}/progress`,
-              {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ percent, positionCodepoint }),
-              },
-            );
+            await authClient.fetch(apiRoutes.reader.progress(id), {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ percent, positionCodepoint }),
+            });
           },
           bookmark: async (id: string, positionCodepoint: number) => {
-            await authClient.fetch(
-              `/api/v1/reader/books/${encodeURIComponent(id)}/bookmarks`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ positionCodepoint }),
-              },
-            );
+            await authClient.fetch(apiRoutes.reader.bookmarks(id), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ positionCodepoint }),
+            });
           },
           open: async (id: string) => {
-            await authClient.fetch(
-              `/api/v1/reader/books/${encodeURIComponent(id)}/opened`,
-              { method: "POST" },
-            );
-            await authClient.fetch("/api/v1/behavior/events", {
+            await authClient.fetch(apiRoutes.reader.opened(id), {
+              method: "POST",
+            });
+            await authClient.fetch(apiRoutes.behavior(), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -520,7 +556,7 @@ function App() {
           },
           chapters: async (id: string) => {
             const response = await authClient.fetch(
-              `/api/v1/content/books/${encodeURIComponent(id)}/chapters`,
+              apiRoutes.reader.chapters(id),
             );
             return response.ok ? response.json() : [];
           },
@@ -530,7 +566,7 @@ function App() {
             );
             if (item?.impressionId) {
               const response = await authClient.fetch(
-                `/api/v1/recommendations/impressions/${encodeURIComponent(item.impressionId)}/viewable`,
+                apiRoutes.reader.impressionViewable(item.impressionId),
                 { method: "POST" },
               );
               if (!response.ok)

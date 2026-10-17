@@ -12,13 +12,17 @@ const kc = new Keycloak({
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState({
-    ready: config.useMocks,
-    authenticated: config.useMocks,
+    ready: false,
+    authenticated: false,
   });
-  const [profile, setProfile] = useState({
-    userId: "mock-admin-001",
-    username: "admin.labsoft",
-    roles: ["admin", "analytics", "trainer"],
+  const [profile, setProfile] = useState<{
+    userId: string;
+    username: string;
+    roles: string[];
+  }>({
+    userId: "unknown",
+    username: "admin",
+    roles: [],
   });
 
   useEffect(() => {

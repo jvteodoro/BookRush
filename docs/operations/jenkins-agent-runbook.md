@@ -9,7 +9,8 @@ materializados.
 
 O estágio de validação do `bookrush-deploy` executa
 `scripts/validate-change.sh --ci` dentro da imagem `python:3.12-slim`,
-instalando o `git` no container efêmero antes do gate. Assim, o agente Jenkins
+instalando o `git`, `PyYAML` e `jsonschema` no container efêmero antes do gate.
+As pipelines isoladas usam o mesmo container para o gate do analytics. Assim, o agente Jenkins
 precisa apenas do Docker CLI/daemon acessível; ele não precisa ter `python3` ou
 `git` instalados diretamente no container do agente. O gate também registra
 `/repo` como `safe.directory`, pois o workspace montado pode pertencer ao
@@ -17,6 +18,12 @@ usuário do container Jenkins.
 
 1. Publique o commit na branch remota antes de disparar o job. O Jenkins não
    executa alterações que existem somente no checkout local.
+
+O job `bookrush-backstage` compartilha o workspace com o container de validação
+usando `--volumes-from "$HOSTNAME"`; não substitua isso por um bind mount de
+`$PWD`, pois o caminho do workspace existe no daemon Docker e não no processo
+do agente. Um bind mount incorreto faz o gate receber um `/repo` vazio e falhar
+com `scripts/validate-change.sh: No such file or directory`.
 2. Confirme que `https://jenkins-bookrush.jteodoro.tec.br` resolve e responde.
    HTTP 403 sem sessão é esperado; falha de DNS ou HTTP 5xx indica problema de
    infraestrutura, não de pipeline.
@@ -109,6 +116,74 @@ microserviço ou todos os serviços da vertical. Para Kubernetes, use
 `DEPLOY_TARGET=kubernetes`, `PUBLISH=true`, `REGISTRY` e
 `KUBECONFIG_CREDENTIAL_ID`; a imagem precisa estar acessível pelo cluster.
 
+### Smoke automatizado do reader BFF
+
+O job `bookrush-microservice-reader-bff-service` possui o parâmetro opt-in
+`RUN_PUBLIC_E2E`. Quando marcado, ele exige `DEPLOY=true`, `E2E_BOOK_ID` e a
+credential Jenkins `E2E_CREDENTIAL_ID` do tipo username/password para um
+usuário de teste do realm de produto `bookrush`. O estágio executa
+`scripts/test-reader-bff-e2e.sh`, que faz Authorization Code + PKCE sem
+interação manual, valida claims não sensíveis (`iss`, `aud`, `scope`, `exp`),
+renova o access token com refresh token, exercita respostas 401/403/200,
+verifica que um token do realm de produto não entra na administração do realm
+de plataforma, o manifesto EPUB e o preflight CORS. Senhas,
+tokens, cookies e corpos de resposta nunca são impressos.
+
+O mesmo smoke percorre a estrutura do livro (`book`/`chapters`), operações
+sociais autenticadas de teste (like, contagem, share, comentário e unlike),
+um evento autenticado no behavior-service e logout OIDC usando o
+`id_token_hint` apenas em memória. O `E2E_BOOK_ID` deve existir no catálogo;
+os registros criados são marcados como teste de integração.
+
+Para validar integrações técnicas da ingestão, o job `bookrush-deploy` aceita
+`RUN_INGESTION_S2S_E2E=true` junto com `DEPLOY=true` e
+`DEPLOY_TARGET=compose`. O estágio usa a credential Secret text
+`bookrush-ingestion-token` como segredo do client `bookrush-ingestion-admin`,
+confere `aud=bookrush-ingestion` sem registrar o token e chama somente
+`POST /api/admin/v1/ingestion/run` com `dryRun=true`, `processAssets=false` e
+uma chave de idempotência nova. O resultado esperado é HTTP 202 (ou 200 em
+replay); nenhum livro, asset ou fonte externa é importado. O service account
+desse client deve possuir a role `platform-operator` no realm
+`bookrush-platform`; audience sem role resulta em HTTP 403. O job individual de
+`book-ingestion-service` oferece o mesmo teste com os parâmetros
+`RUN_INGESTION_S2S_E2E`, `INGESTION_S2S_CREDENTIAL_ID` e
+`INGESTION_S2S_BASE_URL`.
+
+Quando `DEPLOY=true` e `DEPLOY_TARGET=compose`, a pipeline executa antes da
+ingestão o reconcile declarativo do Keycloak usando `/run/bookrush.env`, o
+mesmo arquivo protegido do deploy, através de containers que compartilham o
+volume do workspace do agente. Isso é necessário porque o realm persistente
+não reaplica automaticamente alterações de roles durante a recriação das
+imagens; o estágio não é executado em builds de validação sem deploy.
+
+O reconcile executado pelo agente injeta somente a credencial S2S de ingestão
+que pertence à pipeline. O segredo já provisionado do client
+`bookrush-admin-service` permanece no volume persistente do Keycloak e não é
+rotacionado nem exigido pelo job. Se esse client precisar de rotação, ela deve
+ser uma operação explícita de manutenção, com atualização coordenada do
+ambiente protegido e dos serviços consumidores; nunca deve ser criada como
+parâmetro implícito do deploy.
+
+O estágio de contratos também executa `scripts/test-keycloak-jwks-rotation.sh`
+em um Keycloak descartável. Ele cria um provider `rsa-generated` de prioridade
+maior pelo Admin API, confirma a troca do `kid` e verifica que o JWKS continua
+publicado. O teste não usa o volume `keycloak_data` persistente.
+
+O usuário de teste precisa estar no realm `bookrush`, ter o cliente
+`bookrush-web` e o scope `bookrush.catalog.read`; o usuário administrativo do
+Jenkins no realm `bookrush-platform` não substitui essa credencial. O parâmetro
+fica desmarcado por padrão para que builds normais não dependam de uma conta
+humana. A ausência da credential deve falhar somente quando o opt-in for usado.
+
+As credenciais locais de operação devem ser mantidas fora do Git, por exemplo
+em um arquivo do host com permissão `0600`. Para o Jenkins, o administrador da
+instância deve cadastrar o mesmo par como uma credential global do tipo
+`Username with password`, com o ID `bookrush-product-e2e`; o usuário
+`platform-operators` pode executar o job, mas não deve receber permissão de
+criar ou ler credentials. Verifique a existência pelo job antes de habilitar
+`RUN_PUBLIC_E2E`; se o login falhar, o harness informa separadamente rejeição
+de username/password e ausência de callback OIDC.
+
 ### 4. Acompanhar fila e build
 
 O `POST` bem-sucedido retorna `201` e um header `Location` apontando para
@@ -166,6 +241,7 @@ resultado.
 | `npm: not found` | agente não tem Node instalado | executar build dentro do Dockerfile/container Node |
 | `npm ci` sem lockfile | workspace/contexto não contém `package-lock.json` | validar o checkout; usar o comando definido pela pipeline |
 | `No such file or directory /app/package.json` | bind mount do workspace do container Jenkins não existe no daemon Docker | usar `docker build` com contexto, não bind mount |
+| `Validação Mobile` encontra `/workspace/mobile` vazio ou deixa arquivos root-owned | bind mount do caminho do agente não é visível para o daemon Docker, ou o Node roda como root no volume compartilhado | usar `--volumes-from "$HOSTNAME" -w "$PWD/mobile" --user "$(id -u):$(id -g)"`; antes de `deleteDir`, corrigir a posse somente de `mobile/node_modules` e `mobile/dist` gerados pelo gate |
 | `Bad substitution` | sintaxe Bash executada por `/bin/sh` | usar expansão POSIX ou `bash -lc` explicitamente |
 | build mostra Jenkinsfile antigo | definição inline não foi sincronizada | atualizar a definição do job e confirmar `config.xml`/console |
 | `invalid_code` no Keycloak | callback OIDC reutilizado | iniciar uma autorização nova; não repetir o callback antigo |

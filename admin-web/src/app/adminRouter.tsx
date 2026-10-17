@@ -4,6 +4,7 @@ import { CatalogPage } from "../features/catalog/CatalogPage";
 import { FeedLabPage } from "../features/feedlab/FeedLabPage";
 import { ReviewPage } from "../features/review/ReviewPage";
 import { TrainingPage } from "../features/training/TrainingPage";
+import { OperationsPage } from "../features/operations/OperationsPage";
 import { Layout } from "../components/Layout";
 import { config } from "../lib/config";
 import { Dashboard } from "./Dashboard";
@@ -21,6 +22,7 @@ export function createAdminRouter() {
           { path: "analytics", element: <AnalyticsPage /> },
           { path: "feed-lab", element: <FeedLabPage /> },
           { path: "training", element: <TrainingPage /> },
+          { path: "operations", element: <OperationsPage /> },
         ],
       },
     ],

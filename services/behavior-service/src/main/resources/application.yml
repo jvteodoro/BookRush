@@ -20,3 +20,13 @@ management:
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
+  cors:
+    allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
+  behavior:
+    maintenance-enabled: ${BEHAVIOR_MAINTENANCE_ENABLED:true}
+    retention-days: ${BEHAVIOR_RETENTION_DAYS:365}
+    maintenance-delay-ms: ${BEHAVIOR_MAINTENANCE_DELAY_MS:300000}
+    outbox-sink-url: ${BEHAVIOR_OUTBOX_SINK_URL:}
+    outbox-sink-token: ${BEHAVIOR_OUTBOX_SINK_TOKEN:}
+    outbox-delay-ms: ${BEHAVIOR_OUTBOX_DELAY_MS:5000}
+    outbox-batch-size: ${BEHAVIOR_OUTBOX_BATCH_SIZE:100}
