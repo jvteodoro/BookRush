@@ -3,6 +3,7 @@ package com.bookrush.analytics.worker;
 import com.bookrush.analytics.config.AnalyticsV2GeneratorProperties;
 import com.bookrush.analytics.excerpts.CandidatePruner;
 import com.bookrush.analytics.excerpts.ExcerptCandidateGenerator;
+import com.bookrush.analytics.features.EmbeddingMath;
 import com.bookrush.analytics.features.LinguisticRuntimeClient;
 import com.bookrush.analytics.features.TextFeatureCalculator;
 import com.bookrush.analytics.llm.TopNliCandidateSelector;
@@ -172,9 +173,9 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
         if (id != null) excerptIds.add(id);
       }
       var excerptVectors = persistEmbeddings(item.inputVersion(), excerptIds, candidates);
-      persistPrototypeScores(run, excerptIds, candidates, excerptVectors, language);
-      persistChapterAndDocumentEmbeddings(
+      var scopeEmbeddings = persistChapterAndDocumentEmbeddings(
           item.inputVersion(), text, chapters, generatorConfig.version());
+      persistPrototypeScores(run, excerptIds, candidates, excerptVectors, scopeEmbeddings, language);
       persistRanks(run, excerptIds);
       persistNli(run, excerptIds, candidates, excerptVectors, language);
       jdbc.update(
@@ -613,8 +614,11 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
       List<UUID> excerptIds,
       List<ExcerptCandidateGenerator.V2Candidate> candidates,
       Map<UUID, List<Double>> vectors,
+      ScopeEmbeddings scopeEmbeddings,
       String language) {
-    if (vectors.isEmpty()) return;
+    if (vectors.isEmpty()
+        && scopeEmbeddings.chapterVectors().isEmpty()
+        && scopeEmbeddings.documentVector() == null) return;
     var examples = new java.util.LinkedHashMap<String, String>();
     boolean pt = "pt".equalsIgnoreCase(language);
     if (pt) {
@@ -658,13 +662,48 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
             "semantic.prototype." + examples.keySet().toArray()[i] + ".raw_cosine");
       }
     }
+    for (var entry : scopeEmbeddings.chapterVectors().entrySet()) {
+      persistScopePrototypeScores(run, "chapter", entry.getKey(), entry.getValue(), result.vectors(), examples.keySet());
+    }
+    if (scopeEmbeddings.documentVector() != null) {
+      persistScopePrototypeScores(run, "document", null, scopeEmbeddings.documentVector(), result.vectors(), examples.keySet());
+    }
+  }
+
+  private void persistScopePrototypeScores(
+      UUID run,
+      String scope,
+      UUID scopeId,
+      List<Double> vector,
+      List<List<Double>> prototypes,
+      java.util.Set<String> concepts) {
+    int index = 0;
+    for (String concept : concepts) {
+      double score = cosine(vector, prototypes.get(index++));
+      String code = "semantic.prototype." + concept + ".raw_cosine." + scope;
+      if ("chapter".equals(scope)) {
+        jdbc.update(
+            """
+INSERT INTO analytics.chapter_feature(analysis_run_id,feature_definition_id,chapter_id,numeric_value,value_status,computed_at)
+SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition fd
+ WHERE fd.code=? ON CONFLICT DO NOTHING
+""",
+            run, scopeId, score, code);
+      } else {
+        jdbc.update(
+            """
+INSERT INTO analytics.document_feature(analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,computed_at)
+SELECT ?,fd.id,ar.input_asset_version_id,?,?, 'VALID',clock_timestamp()
+ FROM analytics.feature_definition fd JOIN analytics.analysis_run ar ON ar.id=?
+ WHERE fd.code=? ON CONFLICT DO NOTHING
+""",
+            run, score, run, code);
+      }
+    }
   }
 
   private static double cosine(List<Double> left, List<Double> right) {
-    if (left.size() != right.size() || left.isEmpty()) return 0d;
-    double value = 0;
-    for (int i = 0; i < left.size(); i++) value += left.get(i) * right.get(i);
-    return value;
+    return EmbeddingMath.cosine(left, right);
   }
 
   /**
@@ -672,20 +711,22 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
    * code-point chunks and aggregated with a weighted mean, so a whole book is never silently
    * truncated to a model context.
    */
-  private void persistChapterAndDocumentEmbeddings(
+  private ScopeEmbeddings persistChapterAndDocumentEmbeddings(
       UUID version,
       String text,
       List<ExcerptCandidateGenerator.ChapterBoundary> chapters,
       String generatorVersion) {
     if (!Boolean.parseBoolean(
-        System.getenv().getOrDefault("ANALYTICS_SCOPE_EMBEDDINGS_ENABLED", "true"))) return;
+        System.getenv().getOrDefault("ANALYTICS_SCOPE_EMBEDDINGS_ENABLED", "true")))
+      return ScopeEmbeddings.empty();
     String bucket = System.getenv().getOrDefault("STORAGE_BUCKET_ML", "books-ml");
     UUID modelId =
         jdbc.query(
             "SELECT id FROM analytics.embedding_model WHERE code='bge-m3-dense-v1'",
             rs -> rs.next() ? rs.getObject(1, UUID.class) : null);
-    if (modelId == null) return;
+    if (modelId == null) return ScopeEmbeddings.empty();
     var chapterVectors = new java.util.ArrayList<WeightedVector>();
+    var chapterEmbeddings = new java.util.LinkedHashMap<UUID, List<Double>>();
     for (var chapter : chapters) {
       if (chapter.endCodepoint() <= chapter.startCodepoint()) continue;
       String chapterText = codePointSlice(text, chapter.startCodepoint(), chapter.endCodepoint());
@@ -708,6 +749,7 @@ VALUES (?,?,?,?,?,'weighted-codepoint-chunks','S3',?,?) ON CONFLICT DO NOTHING
           key);
       chapterVectors.add(
           new WeightedVector(embedded.vector(), Math.max(1, codePointLength(chapterText))));
+      chapterEmbeddings.put(chapter.chapterId(), embedded.vector());
     }
     List<Double> document;
     if (chapterVectors.isEmpty()) {
@@ -715,7 +757,7 @@ VALUES (?,?,?,?,?,'weighted-codepoint-chunks','S3',?,?) ON CONFLICT DO NOTHING
       // document still requires a complete embedding, so aggregate chunks of
       // the whole normalized text instead of silently omitting it.
       var embedded = embedWholeText(text);
-      if (embedded == null) return;
+      if (embedded == null) return new ScopeEmbeddings(chapterEmbeddings, null);
       document = embedded.vector();
     } else {
       document = weightedMean(chapterVectors);
@@ -735,6 +777,14 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
         document.size(),
         bucket,
         key);
+    return new ScopeEmbeddings(chapterEmbeddings, document);
+  }
+
+  private record ScopeEmbeddings(
+      Map<UUID, List<Double>> chapterVectors, List<Double> documentVector) {
+    private static ScopeEmbeddings empty() {
+      return new ScopeEmbeddings(Map.of(), null);
+    }
   }
 
   private EmbeddedVector embedWholeText(String value) {
