@@ -5,7 +5,7 @@ set -Eeuo pipefail
 : "${INGESTION_IMAGE:?Imagem ingestion ausente}"
 : "${ANALYTICS_IMAGE:?Imagem analytics ausente}"
 if [[ -z "${ANALYTICS_RUNTIME_IMAGE:-}" ]]; then
-  ANALYTICS_RUNTIME_IMAGE="${ANALYTICS_IMAGE/book-analytics-service/book-analytics-runtime}"
+  export ANALYTICS_RUNTIME_IMAGE="${ANALYTICS_IMAGE/book-analytics-service/book-analytics-runtime}"
 fi
 : "${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}"
 : "${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}"
