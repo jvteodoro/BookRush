@@ -142,7 +142,9 @@ Para validar integrações técnicas da ingestão, o job `bookrush-deploy` aceit
 confere `aud=bookrush-ingestion` sem registrar o token e chama somente
 `POST /api/admin/v1/ingestion/run` com `dryRun=true`, `processAssets=false` e
 uma chave de idempotência nova. O resultado esperado é HTTP 202 (ou 200 em
-replay); nenhum livro, asset ou fonte externa é importado. O job individual de
+replay); nenhum livro, asset ou fonte externa é importado. O service account
+desse client deve possuir a role `platform-operator` no realm
+`bookrush-platform`; audience sem role resulta em HTTP 403. O job individual de
 `book-ingestion-service` oferece o mesmo teste com os parâmetros
 `RUN_INGESTION_S2S_E2E`, `INGESTION_S2S_CREDENTIAL_ID` e
 `INGESTION_S2S_BASE_URL`.

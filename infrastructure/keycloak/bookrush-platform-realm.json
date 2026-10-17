@@ -54,6 +54,16 @@
       ]
     }
   ],
+  "users": [
+    {
+      "username": "service-account-bookrush-ingestion-admin",
+      "enabled": true,
+      "serviceAccountClientId": "bookrush-ingestion-admin",
+      "realmRoles": [
+        "platform-operator"
+      ]
+    }
+  ],
   "clients": [
     {
       "clientId": "bookrush-jenkins",
