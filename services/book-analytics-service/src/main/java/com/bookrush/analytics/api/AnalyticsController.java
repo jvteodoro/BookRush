@@ -201,7 +201,7 @@ public class AnalyticsController {
                count(i.id) FILTER (WHERE i.status='FAILED') AS failed_items
           FROM analytics.analysis_job j
           LEFT JOIN analytics.analysis_job_item i ON i.job_id=j.id
-         WHERE (? IS NULL OR ? = '' OR j.status = ?)
+         WHERE (CAST(? AS text) IS NULL OR CAST(? AS text) = '' OR j.status = CAST(? AS text))
          GROUP BY j.id
          ORDER BY j.created_at DESC, j.id DESC
          LIMIT ? OFFSET ?
