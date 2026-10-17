@@ -36,6 +36,7 @@ analytics:
   runtime:
     url: ${ANALYTICS_RUNTIME_URL:http://book-analytics-runtime:8092}
     timeout-seconds: ${ANALYTICS_RUNTIME_TIMEOUT_SECONDS:10}
+    language-sample-chars: ${ANALYTICS_RUNTIME_LANGUAGE_SAMPLE_CHARS:90000}
   worker:
     enabled: ${ANALYTICS_WORKER_ENABLED:false}
     poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}
