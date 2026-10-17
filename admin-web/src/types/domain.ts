@@ -38,6 +38,23 @@ export interface AnalyticsRun {
   processedItems?: number;
 }
 
+export interface AnalyticsJob {
+  id: string;
+  operationKey: string;
+  status: string;
+  totalItems: number;
+  processedItems: number;
+  succeededItems: number;
+  failedItems: number;
+  pendingItems: number;
+  runningItems: number;
+  completedItems: number;
+  cancelRequested: boolean;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
 export interface FeedWeights {
   hook: number;
   novelty: number;

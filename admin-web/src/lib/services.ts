@@ -7,6 +7,7 @@ import {
   feedItems,
 } from "../mocks/data";
 import {
+  AnalyticsJob,
   AnalyticsRun,
   BookCandidate,
   FeedEvent,
@@ -501,6 +502,35 @@ export const services = {
         error,
         "Não foi possível consultar as métricas persistidas.",
       );
+    }
+  },
+  async listAnalyticsJobs(): Promise<AnalyticsJob[]> {
+    if (config.useMocks) return [];
+    try {
+      const { data } = await analyticsHttp.get(
+        "/api/admin/v1/content-analytics/jobs",
+        {
+          params: { limit: 100 },
+        },
+      );
+      return (data.items ?? []).map((raw: Record<string, unknown>) => ({
+        id: String(raw.id),
+        operationKey: String(raw.operation_key ?? raw.operationKey ?? ""),
+        status: String(raw.status ?? "UNKNOWN"),
+        totalItems: Number(raw.total_items ?? raw.totalItems ?? 0),
+        processedItems: Number(raw.processed_items ?? raw.processedItems ?? 0),
+        succeededItems: Number(raw.succeeded_items ?? raw.succeededItems ?? 0),
+        failedItems: Number(raw.failed_items ?? raw.failedItems ?? 0),
+        pendingItems: Number(raw.pending_items ?? raw.pendingItems ?? 0),
+        runningItems: Number(raw.running_items ?? raw.runningItems ?? 0),
+        completedItems: Number(raw.completed_items ?? raw.completedItems ?? 0),
+        cancelRequested: Boolean(raw.cancel_requested ?? raw.cancelRequested),
+        createdAt: raw.created_at ? String(raw.created_at) : undefined,
+        startedAt: raw.started_at ? String(raw.started_at) : undefined,
+        finishedAt: raw.finished_at ? String(raw.finished_at) : undefined,
+      }));
+    } catch (error) {
+      throw problem(error, "Não foi possível listar os jobs de analytics.");
     }
   },
   async runAnalytics(

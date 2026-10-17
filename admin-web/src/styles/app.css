@@ -128,6 +128,41 @@ input {
   justify-content: space-between;
   margin-bottom: 32px;
 }
+.analytics-job-queue {
+  margin-bottom: 24px;
+}
+.analytics-job {
+  padding: 14px 0;
+  border-top: 1px solid #20283a;
+}
+.analytics-job-heading,
+.analytics-job-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+.analytics-job-heading small,
+.analytics-job-meta {
+  display: block;
+  color: #7f8da4;
+  font-size: 12px;
+}
+.analytics-job-heading small {
+  margin-top: 4px;
+}
+.analytics-job-meta {
+  margin-top: 8px;
+}
+.job-status {
+  font-size: 12px;
+  font-weight: 700;
+  color: #8cf0d2;
+}
+.job-status-failed,
+.job-status-completed_with_errors {
+  color: #ff9a9a;
+}
 .pagehead h1 {
   font: 600 38px "Space Grotesk";
   margin: 5px 0 8px;

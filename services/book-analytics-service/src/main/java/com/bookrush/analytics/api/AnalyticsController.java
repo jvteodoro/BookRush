@@ -173,6 +173,47 @@ public class AnalyticsController {
     return rows.isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(rows.getFirst());
   }
 
+  @GetMapping({"/admin/v1/analytics/jobs", "/admin/v1/content-analytics/jobs"})
+  @Operation(
+      summary = "Listar jobs de analytics",
+      description = "Lista jobs persistidos para acompanhamento operacional, inclusive jobs criados por outro cliente.")
+  public ResponseEntity<Map<String, Object>> jobs(
+      @RequestParam(defaultValue = "50") int limit,
+      @RequestParam(defaultValue = "0") int offset,
+      @RequestParam(required = false) String status) {
+    if (limit < 1 || limit > 200 || offset < 0) {
+      return ResponseEntity.badRequest()
+          .body(Map.of("code", "INVALID_PAGE", "message", "limit must be 1..200 and offset must be non-negative"));
+    }
+    var allowedStatuses = java.util.Set.of("PENDING", "RUNNING", "COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED", "CANCELLED");
+    if (status != null && !status.isBlank() && !allowedStatuses.contains(status)) {
+      return ResponseEntity.badRequest()
+          .body(Map.of("code", "INVALID_STATUS", "message", "unsupported job status"));
+    }
+    var rows = jdbc.queryForList(
+        """
+        SELECT j.id, j.operation_key, j.status, j.total_items, j.processed_items,
+               j.succeeded_items, j.failed_items, j.cancel_requested, j.created_at,
+               j.started_at, j.finished_at,
+               count(i.id) FILTER (WHERE i.status='PENDING') AS pending_items,
+               count(i.id) FILTER (WHERE i.status='RUNNING') AS running_items,
+               count(i.id) FILTER (WHERE i.status='COMPLETED') AS completed_items,
+               count(i.id) FILTER (WHERE i.status='FAILED') AS failed_items
+          FROM analytics.analysis_job j
+          LEFT JOIN analytics.analysis_job_item i ON i.job_id=j.id
+         WHERE (? IS NULL OR ? = '' OR j.status = ?)
+         GROUP BY j.id
+         ORDER BY j.created_at DESC, j.id DESC
+         LIMIT ? OFFSET ?
+        """,
+        status,
+        status,
+        status,
+        limit,
+        offset);
+    return ResponseEntity.ok(Map.of("items", rows, "limit", limit, "offset", offset));
+  }
+
   @PostMapping({
     "/admin/v1/analytics/jobs/{jobId}/cancel",
     "/admin/v1/content-analytics/jobs/{jobId}/cancel"
