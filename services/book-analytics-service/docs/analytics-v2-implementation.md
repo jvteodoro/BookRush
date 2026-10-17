@@ -10,6 +10,7 @@ O serviço continua sendo o único dono do schema `analytics`. O worker Java coo
 - bridge spaCy PT/EN local-only, com extração segura de wheels preparadas;
 - endpoint BGE-M3 local-only com lote, hash SHA-256, pooling mean e normalização L2;
 - gates técnicos, ranking experimental, protocolo NLI limitado e seleção MMR determinística;
+- pipeline de seleção que aplica gates antes do MMR e rejeita embeddings ausentes ou de modelo diferente;
 - script de artefato de scorer supervisionado experimental com split por
   `author_id::work_id`, seed, baseline por dimensão, GBDT determinístico de
   stumps residuais, métricas holdout, importância explicável e hash;
