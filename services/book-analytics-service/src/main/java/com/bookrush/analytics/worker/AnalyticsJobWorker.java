@@ -201,7 +201,7 @@ UPDATE analytics.analysis_job_item i
                       generatorConfig.minWords(), generatorConfig.maxWords(), "cheap-v2"))
               .accepted();
       int pilotLimit =
-          Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_MAX_EXCERPTS_PER_ITEM", "0"));
+          Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_MAX_EXCERPTS_PER_ITEM", "500"));
       if (pilotLimit > 0 && candidates.size() > pilotLimit) {
         candidates = candidates.subList(0, pilotLimit);
       }
