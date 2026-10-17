@@ -39,7 +39,10 @@ if [[ -n "$keycloak_state" ]]; then
   fi
   keycloak_networked="$(docker network inspect bookrush_bookrush --format '{{range .Containers}}{{if eq .Name \"bookrush-keycloak-1\"}}yes{{end}}{{end}}' 2>/dev/null || true)"
   if [[ -z "$keycloak_networked" ]]; then
-    docker network connect bookrush_bookrush bookrush-keycloak-1
+    # A stale Compose view can race with the daemon's endpoint list. If the
+    # endpoint already exists, the container is effectively connected and the
+    # deploy must continue without trying to recreate Keycloak.
+    docker network connect bookrush_bookrush bookrush-keycloak-1 2>&1 || true
   fi
   echo 'Keycloak persistente existente detectado; preservando o container durante este deploy.' >&2
 else
