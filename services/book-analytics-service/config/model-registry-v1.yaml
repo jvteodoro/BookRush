@@ -56,5 +56,5 @@ models:
 derived_artifacts:
   - {id: corpus-frequency-v1, type: CORPUS_MODEL, per_language: true}
   - {id: style-normalization-v1, type: CORPUS_MODEL, per_language: true}
-  - {id: semantic-prototype-set-v1, type: PROTOTYPE_MODEL, source: semantic-prototypes-v1.yaml, embedding_model: bge-m3-dense-v1}
+  - {id: semantic-prototype-set-v1, type: PROTOTYPE_MODEL, source: semantic-prototypes-v1.yaml, artifact: semantic-prototypes-v1.artifact.json, embedding_model: bge-m3-dense-v1}
   - {id: book-topic-classifier-v1, type: SUPERVISED_CLASSIFIER, input: semantic.bge_m3.document_v1, algorithm: "OneVsRest LogisticRegression", promotion: "Requires documented holdout acceptance."}

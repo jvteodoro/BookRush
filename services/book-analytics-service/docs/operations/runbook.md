@@ -102,3 +102,12 @@ calcula SHA-256, publica no bucket privado `books-ml` e imprime os metadados par
 registro em `analytics.corpus_frequency_model`. A normalização de estilo é
 registrada com ordem de features, médias, desvios padrão e checksum; os valores
 ausentes continuam sendo `UNSUPPORTED`, nunca zero.
+
+Para materializar o conjunto semântico real, prepare o cache BGE-M3 validado e
+execute `python3 scripts/materialize-semantic-prototypes.py --endpoint
+http://book-analytics-runtime:8092 --output
+services/book-analytics-service/config/semantic-prototypes-v1.artifact.json`.
+O comando exige o modelo `bge-m3-dense-v1`, dimensão 1024, verifica os hashes de
+entrada, normaliza cada embedding, calcula centroides EN/PT/multilíngues e grava
+um checksum SHA-256 canônico. O validador de contratos rejeita artefatos ausentes,
+alterados ou não normalizados; o serviço nunca baixa modelos durante o boot.

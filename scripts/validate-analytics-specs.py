@@ -23,6 +23,24 @@ for model_id in ('fasttext-lid176-v1','spacy-en-core-web-sm-v1','spacy-pt-core-n
 bge = models['bge-m3-dense-v1']
 if bge.get('dimension') != 1024 or bge.get('mode') != 'dense' or bge.get('sparse') or bge.get('colbert'):
     raise SystemExit('BGE-M3 contract must be dense 1024 without sparse/colbert outputs')
+prototype_artifact_path = ROOT / 'semantic-prototypes-v1.artifact.json'
+if not prototype_artifact_path.is_file():
+    raise SystemExit('materialized semantic prototype artifact is missing')
+prototype_artifact = json.loads(prototype_artifact_path.read_text())
+artifact_checksum = prototype_artifact.pop('artifact_sha256', '')
+canonical = json.dumps(prototype_artifact, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+if len(artifact_checksum) != 64 or hashlib.sha256(canonical).hexdigest() != artifact_checksum:
+    raise SystemExit('semantic prototype artifact checksum is invalid')
+if (prototype_artifact.get('artifact_type') != 'bookrush.semantic-prototype-set'
+        or prototype_artifact.get('embedding_model') != 'bge-m3-dense-v1'
+        or prototype_artifact.get('dimension') != 1024
+        or len(prototype_artifact.get('examples', [])) != 72
+        or len(prototype_artifact.get('prototypes', [])) != 36):
+    raise SystemExit('semantic prototype artifact contract is incomplete')
+for prototype in prototype_artifact['prototypes']:
+    norm = sum(float(value) ** 2 for value in prototype['vector'])
+    if len(prototype['vector']) != 1024 or abs(norm - 1.0) > 1e-5:
+        raise SystemExit('semantic prototype vectors must be normalized 1024-dimensional vectors')
 artifact_lock = json.loads((ROOT/'model-artifacts-v1.json').read_text())
 if artifact_lock.get('schemaVersion') != 'bookrush.analytics.model-artifacts.v1':
     raise SystemExit('unsupported model artifact lock schema')
