@@ -224,6 +224,7 @@ resultado.
 | `npm: not found` | agente não tem Node instalado | executar build dentro do Dockerfile/container Node |
 | `npm ci` sem lockfile | workspace/contexto não contém `package-lock.json` | validar o checkout; usar o comando definido pela pipeline |
 | `No such file or directory /app/package.json` | bind mount do workspace do container Jenkins não existe no daemon Docker | usar `docker build` com contexto, não bind mount |
+| `Validação Mobile` encontra `/workspace/mobile` vazio | bind mount do caminho do agente não é visível para o daemon Docker | usar `--volumes-from "$HOSTNAME" -w "$PWD/mobile"`, como nos demais gates do agente |
 | `Bad substitution` | sintaxe Bash executada por `/bin/sh` | usar expansão POSIX ou `bash -lc` explicitamente |
 | build mostra Jenkinsfile antigo | definição inline não foi sincronizada | atualizar a definição do job e confirmar `config.xml`/console |
 | `invalid_code` no Keycloak | callback OIDC reutilizado | iniciar uma autorização nova; não repetir o callback antigo |

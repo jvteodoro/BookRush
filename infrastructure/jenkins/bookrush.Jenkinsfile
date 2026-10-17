@@ -53,7 +53,7 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          docker run --rm -v "$PWD:/workspace" -w /workspace/mobile node:20-bookworm bash -lc '
+          docker run --rm --volumes-from "$HOSTNAME" -w "$PWD/mobile" node:20-bookworm bash -lc '
             npm ci --no-audit --no-fund
             EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run typecheck
             EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export
