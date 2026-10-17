@@ -54,9 +54,9 @@ grep -q '6' <<<"$otp_policy"
 
 client_uuid="$(admin create clients -r bookrush-platform -s clientId="$client_id" -s enabled=true -s publicClient=true -s directAccessGrantsEnabled=true -s standardFlowEnabled=false -i)"
 admin create users -r bookrush-platform -s username="$user_name" -s enabled=true -s emailVerified=true >/dev/null
-user_id="$(admin get users -r bookrush-platform -q username="$user_name" --fields id --format csv --noquotes | head -n1)"
+user_id="$(admin get users -r bookrush-platform -q username="$user_name" --fields id --format csv --noquotes | awk 'NR == 1 { first = $0 } END { print first }')"
 test -n "$user_id"
-group_id="$(admin get groups -r bookrush-platform -q search=operators --fields id --format csv --noquotes | head -n1)"
+group_id="$(admin get groups -r bookrush-platform -q search=operators --fields id --format csv --noquotes | awk 'NR == 1 { first = $0 } END { print first }')"
 test -n "$group_id"
 admin update "users/$user_id/groups/$group_id" -r bookrush-platform >/dev/null
 admin update "users/$user_id" -r bookrush-platform \
@@ -74,7 +74,7 @@ grep -Eq '^(400|401)$' <<<"$mfa_response"
 grep -qi 'not fully set up\|required action' <<<"$mfa_response"
 
 admin create users -r bookrush-platform -s username="$token_user_name" -s firstName=Codex -s lastName=Lifecycle -s enabled=true -s email='codex-token@bookrush.test' -s emailVerified=true >/dev/null
-token_user_id="$(admin get users -r bookrush-platform -q username="$token_user_name" --fields id --format csv --noquotes | head -n1)"
+token_user_id="$(admin get users -r bookrush-platform -q username="$token_user_name" --fields id --format csv --noquotes | awk 'NR == 1 { first = $0 } END { print first }')"
 test -n "$token_user_id"
 admin update "users/$token_user_id" -r bookrush-platform -s firstName=Codex -s lastName=Lifecycle -s enabled=true -s email='codex-token@bookrush.test' -s emailVerified=true -s 'requiredActions=[]' >/dev/null
 token_user_state="$(admin get "users/$token_user_id" -r bookrush-platform --fields enabled,emailVerified,requiredActions --format csv --noquotes)"
