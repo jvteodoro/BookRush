@@ -33,8 +33,15 @@ diagnose() {
   done
 }
 compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-service reader-profile-service social-service frontend)
-if [[ "$keycloak_state" == running && -n "$(docker network inspect bookrush_bookrush --format '{{range .Containers}}{{if eq .Name \"bookrush-keycloak-1\"}}yes{{end}}{{end}}' 2>/dev/null || true)" ]]; then
-  echo 'Keycloak existente e ativo detectado; preservando o container persistente durante este deploy.' >&2
+if [[ -n "$keycloak_state" ]]; then
+  if [[ "$keycloak_state" != running ]]; then
+    docker start bookrush-keycloak-1 >/dev/null
+  fi
+  keycloak_networked="$(docker network inspect bookrush_bookrush --format '{{range .Containers}}{{if eq .Name \"bookrush-keycloak-1\"}}yes{{end}}{{end}}' 2>/dev/null || true)"
+  if [[ -z "$keycloak_networked" ]]; then
+    docker network connect bookrush_bookrush bookrush-keycloak-1
+  fi
+  echo 'Keycloak persistente existente detectado; preservando o container durante este deploy.' >&2
 else
   compose_services=(keycloak "${compose_services[@]}")
 fi
