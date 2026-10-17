@@ -14,7 +14,10 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 config_dir="$(mktemp -d "$repo_dir/.keycloak-config.XXXXXX")"
 cleanup() { rm -rf -- "$config_dir"; }
 trap cleanup EXIT
-chmod 700 "$config_dir"
+# keycloak-config-cli runs as an unprivileged user in the helper container;
+# the directory contains rendered JSON with secrets injected at runtime and
+# is removed by the trap after the reconcile.
+chmod 755 "$config_dir"
 
 # Keep secrets already provisioned in the persistent realm. The agent owns
 # the ingestion credential, but must not require or replace the existing
