@@ -150,3 +150,32 @@ Execução de 2026-10-17: `GO_RUNTIME_CAPACITY`, 500/500 embeddings válidos,
 334,358 s e 1,495 livros/s. Esse resultado prova capacidade e integridade dos
 adaptadores, mas não é GO de qualidade editorial: ainda são necessários corpus
 real, revisão humana, comparação PT/EN e calibração do ranker/classificador.
+
+### Piloto com livros reais do catálogo
+
+`scripts/run-analytics-production-pilot.sh` executa uma amostra somente leitura
+dos livros Gutenberg já cadastrados. Consulta apenas IDs, idioma e proveniência
+no PostgreSQL, baixa temporariamente a fonte pública correspondente e envia o
+texto somente ao runtime offline. O relatório contém contagens e hash do
+corpus; texto completo, JSONL e credenciais não entram no repositório.
+
+```bash
+ANALYTICS_PILOT_OUTPUT=/tmp/bookrush-analytics-production-pilot.json \
+bash scripts/run-analytics-production-pilot.sh
+```
+
+O comando não chama ingestão, não cria job e não grava em catálogo ou storage.
+Quando o gateway/SeaweedFS estiverem indisponíveis, o resultado deve declarar
+que usou o snapshot local de proveniência e a fonte pública Gutenberg; isso
+valida o runtime com obras reais, mas não substitui o gate de produção nem a
+aprovação editorial.
+
+Execução controlada em 2026-10-17: 8 obras reais (todas EN) do snapshot foram
+processadas com janela de 2.000 caracteres e lotes de 4; embeddings 8/8,
+language 8/8, linguistic 8/8 e NLI 8/8 válidos em 20,367 s (24,55 obras/s),
+`GO_RUNTIME_CAPACITY`, hash
+`5a26cfe8c922932997f80783e154abb7f48547cb27bf95b0245a967ad5b98529`.
+O gateway público estava em HTTP 502 e o SeaweedFS local parado, portanto a
+fonte textual foi Gutenberg público a partir da proveniência do snapshot; o
+resultado não é um gate de produção nem cobre qualidade humana, PT ou escrita
+de analytics.

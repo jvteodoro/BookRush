@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a reproducible 500-book Analytics V1 runtime pilot.
+"""Run a reproducible Analytics V1 runtime pilot.
 
 This is a model/runtime and pipeline-capacity gate. It intentionally does not
 write to PostgreSQL, object storage, or production data.
@@ -35,6 +35,23 @@ def fixture(index: int, language: str) -> str:
     return f"Book fixture {index}. " + " ".join([sentence] * 8)
 
 
+def load_jsonl(path: Path) -> list[tuple[str, str, str]]:
+    books = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        book_id = str(row.get("book_id", "")).strip()
+        language = str(row.get("language", "")).strip().lower()
+        text = str(row.get("text", "")).strip()
+        if not book_id or language not in {"en", "pt"} or len(text) < 200:
+            raise SystemExit(f"invalid JSONL record at line {line_number}")
+        books.append((book_id, language, text))
+    if not books:
+        raise SystemExit("the input JSONL contains no usable books")
+    return books
+
+
 def codepoint_candidates(text: str) -> int:
     return max(0, len(text.split()) // 20)
 
@@ -44,20 +61,29 @@ def main() -> None:
     parser.add_argument("--base-url", default="http://127.0.0.1:18093")
     parser.add_argument("--books", type=int, default=500)
     parser.add_argument("--seed", type=int, default=1337)
+    parser.add_argument("--input-jsonl", type=Path,
+                        help="sanitized records {book_id, language, text}; bypasses synthetic minimum")
+    parser.add_argument("--source", default="synthetic-fixture")
+    parser.add_argument("--embedding-batch-size", type=int, default=32)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if args.books < 500:
+    if not args.input_jsonl and args.books < 500:
         raise SystemExit("the V1 pilot requires at least 500 books")
 
     started = time.perf_counter()
-    books = [(i, "en" if i % 2 == 0 else "pt", fixture(i, "en" if i % 2 == 0 else "pt"))
-             for i in range(args.books)]
+    if args.input_jsonl:
+        books = load_jsonl(args.input_jsonl)
+    else:
+        books = [(str(i), "en" if i % 2 == 0 else "pt", fixture(i, "en" if i % 2 == 0 else "pt"))
+                 for i in range(args.books)]
     structural_candidates = sum(codepoint_candidates(text) for _, _, text in books)
     embedding_valid = 0
     embedding_failures = []
     embedding_seconds = 0.0
-    for offset in range(0, len(books), 32):
-        batch = books[offset:offset + 32]
+    if args.embedding_batch_size < 1:
+        raise SystemExit("embedding batch size must be positive")
+    for offset in range(0, len(books), args.embedding_batch_size):
+        batch = books[offset:offset + args.embedding_batch_size]
         batch_started = time.perf_counter()
         result = request_json(args.base_url, "/v1/embeddings",
                               {"texts": [text for _, _, text in batch], "max_tokens": 8192})
@@ -73,7 +99,7 @@ def main() -> None:
             else:
                 embedding_valid += 1
 
-    sample = books[:20] + books[len(books) // 2:len(books) // 2 + 20]
+    sample = books[:min(40, len(books))]
     language_rows, linguistic_rows, nli_rows = [], [], []
     for _, language, text in sample:
         language_rows.append(request_json(args.base_url, "/v1/language", {"text": text}))
@@ -95,10 +121,11 @@ def main() -> None:
     duration = time.perf_counter() - started
     result = {
         "pilot": "analytics-v1-runtime",
-        "status": "GO_RUNTIME_CAPACITY" if embedding_valid == args.books and language_valid == len(sample) and linguistic_valid == len(sample) and nli_valid == len(sample) else "NO_GO",
+        "status": "GO_RUNTIME_CAPACITY" if embedding_valid == len(books) and language_valid == len(sample) and linguistic_valid == len(sample) and nli_valid == len(sample) else "NO_GO",
         "quality_gate": "NOT_ASSESSED",
         "seed": args.seed,
-        "books": args.books,
+        "source": args.source,
+        "books": len(books),
         "languages": {"en": sum(language == "en" for _, language, _ in books), "pt": sum(language == "pt" for _, language, _ in books)},
         "structural_candidates": structural_candidates,
         "embedding_valid": embedding_valid,
