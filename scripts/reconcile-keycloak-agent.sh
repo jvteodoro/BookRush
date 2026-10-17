@@ -35,6 +35,11 @@ docker run --rm --volumes-from "$HOSTNAME" -w "$repo_dir" \
   python:3.12-slim python3 infrastructure/keycloak/render-config.py \
   infrastructure/keycloak "$config_dir"
 
+# The renderer intentionally writes 0600 files. The config-cli container runs
+# as an unprivileged user, so grant temporary read access inside the isolated
+# workspace volume; cleanup removes the rendered secrets on exit.
+chmod 644 "$config_dir"/*.json
+
 docker run --rm --volumes-from "$HOSTNAME" --network "$BOOKRUSH_NETWORK_NAME" \
   -e KEYCLOAK_URL=http://keycloak:8080 \
   -e KEYCLOAK_USER="${KEYCLOAK_CONFIG_CLI_ADMIN_USER:-admin}" \
