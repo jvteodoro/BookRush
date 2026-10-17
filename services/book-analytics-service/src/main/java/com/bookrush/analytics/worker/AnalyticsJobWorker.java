@@ -849,8 +849,11 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
   }
 
   private static String codePointSlice(String value, int start, int end) {
-    int begin = value.offsetByCodePoints(0, start);
-    int finish = value.offsetByCodePoints(begin, end - start);
+    int length = codePointLength(value);
+    int safeStart = Math.max(0, Math.min(start, length));
+    int safeEnd = Math.max(safeStart, Math.min(end, length));
+    int begin = value.offsetByCodePoints(0, safeStart);
+    int finish = value.offsetByCodePoints(begin, safeEnd - safeStart);
     return value.substring(begin, finish);
   }
 
