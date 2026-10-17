@@ -40,6 +40,12 @@ containers irmãos. O volume é removido pelo `trap` ao terminar; os JSONs nunca
 são gravados no Git, no volume persistente do Keycloak ou no log. A imagem
 fixada do reconciliador é `adorsys/keycloak-config-cli:6.3.0-18.0.2`.
 
+Após o reconcile, o agente reaplica de forma idempotente a role de realm
+`platform-operator` ao service account `bookrush-ingestion-admin` pela Admin
+API. Essa etapa corrige instalações persistentes nas quais o
+`keycloak-config-cli` não atualiza mappings de um service account já existente;
+ela não lê, substitui ou rotaciona segredos de clients.
+
 Para validar a configuração sem tocar no ambiente persistente, execute:
 
 ```bash
