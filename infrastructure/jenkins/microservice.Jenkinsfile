@@ -56,6 +56,10 @@ pipeline {
         sh 'bash scripts/test-microservice.sh "$SELECTED_SERVICE"'
       }
     }
+    stage('Runtime de modelos analytics') {
+      when { expression { return env.SELECTED_SERVICE == 'book-analytics-service' } }
+      steps { sh 'bash scripts/test-analytics-models.sh' }
+    }
     stage('Preparar imagem') {
       steps {
         script { env.SERVICE_IMAGE = "bookrush/${env.SELECTED_SERVICE}:${env.BUILD_NUMBER}" }

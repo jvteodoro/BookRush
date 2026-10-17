@@ -111,3 +111,20 @@ O comando exige o modelo `bge-m3-dense-v1`, dimensão 1024, verifica os hashes d
 entrada, normaliza cada embedding, calcula centroides EN/PT/multilíngues e grava
 um checksum SHA-256 canônico. O validador de contratos rejeita artefatos ausentes,
 alterados ou não normalizados; o serviço nunca baixa modelos durante o boot.
+
+## Validação dos artefatos reais
+
+O E2E determinístico não prova que o cache de modelos está utilizável. Execute
+`bash scripts/test-analytics-models.sh` com o volume de modelos montado em
+somente leitura. O harness constrói a imagem pinned do runtime e verifica
+respostas `VALID` reais de fastText EN/PT, spaCy EN/PT, BGE-M3 (1024 dimensões
+normalizadas) e mDeBERTa NLI (scores que somam 1). Ele não baixa modelos, não
+altera o volume, não inicia jobs de analytics e não imprime credenciais.
+
+```bash
+ANALYTICS_MODEL_VOLUME=bookrush_analytics_models bash scripts/test-analytics-models.sh
+```
+
+Falha nessa validação é NO-GO para os gates do V1. `MODEL_UNAVAILABLE` não pode
+ser convertido em valores zero nem usado como evidência para fechar os beads de
+bulk-readiness.
