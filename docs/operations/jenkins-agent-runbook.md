@@ -156,6 +156,14 @@ volume do workspace do agente. Isso é necessário porque o realm persistente
 não reaplica automaticamente alterações de roles durante a recriação das
 imagens; o estágio não é executado em builds de validação sem deploy.
 
+O reconcile executado pelo agente injeta somente a credencial S2S de ingestão
+que pertence à pipeline. O segredo já provisionado do client
+`bookrush-admin-service` permanece no volume persistente do Keycloak e não é
+rotacionado nem exigido pelo job. Se esse client precisar de rotação, ela deve
+ser uma operação explícita de manutenção, com atualização coordenada do
+ambiente protegido e dos serviços consumidores; nunca deve ser criada como
+parâmetro implícito do deploy.
+
 O estágio de contratos também executa `scripts/test-keycloak-jwks-rotation.sh`
 em um Keycloak descartável. Ele cria um provider `rsa-generated` de prioridade
 maior pelo Admin API, confirma a troca do `kid` e verifica que o JWKS continua

@@ -16,6 +16,9 @@ cleanup() { rm -rf -- "$config_dir"; }
 trap cleanup EXIT
 chmod 700 "$config_dir"
 
+# Keep secrets already provisioned in the persistent realm. The agent owns
+# the ingestion credential, but must not require or replace the existing
+# admin-service secret when it is intentionally unavailable to Jenkins.
 docker run --rm --volumes-from "$HOSTNAME" -w "$repo_dir" \
   -e JENKINS_OIDC_CLIENT_SECRET \
   -e BACKSTAGE_OIDC_CLIENT_SECRET \
@@ -25,7 +28,7 @@ docker run --rm --volumes-from "$HOSTNAME" -w "$repo_dir" \
   -e SEAWEEDFS_OIDC_CLIENT_SECRET \
   -e FEED_EXCERPTS_CLIENT_SECRET \
   -e KEYCLOAK_ADMIN_CLIENT_SECRET \
-  -e KEYCLOAK_RECONCILE_REQUIRE_CLIENT_SECRETS=true \
+  -e KEYCLOAK_RECONCILE_REQUIRE_CLIENT_SECRETS=false \
   python:3.12-slim python3 infrastructure/keycloak/render-config.py \
   infrastructure/keycloak "$config_dir"
 
