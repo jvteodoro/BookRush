@@ -194,14 +194,19 @@ UPDATE analytics.analysis_job_item i
               .collect(
                   java.util.stream.Collectors.toMap(
                       ExcerptCandidateGenerator.ChapterBoundary::chapterId, chapter -> chapter));
+      int pilotLimit =
+          Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_MAX_EXCERPTS_PER_ITEM", "500"));
+      var generatedCandidates =
+          ExcerptCandidateGenerator.generateV2(text, chapters, generatorConfig);
+      if (pilotLimit > 0 && generatedCandidates.size() > pilotLimit * 3) {
+        generatedCandidates = generatedCandidates.subList(0, pilotLimit * 3);
+      }
       var candidates =
           CandidatePruner.pruneV2(
-                  ExcerptCandidateGenerator.generateV2(text, chapters, generatorConfig),
+                  generatedCandidates,
                   new CandidatePruner.Config(
                       generatorConfig.minWords(), generatorConfig.maxWords(), "cheap-v2"))
               .accepted();
-      int pilotLimit =
-          Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_MAX_EXCERPTS_PER_ITEM", "500"));
       if (pilotLimit > 0 && candidates.size() > pilotLimit) {
         candidates = candidates.subList(0, pilotLimit);
       }

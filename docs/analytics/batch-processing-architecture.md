@@ -168,7 +168,7 @@ separada das correções já entregues.
 | `ANALYTICS_WORKER_MAX_ATTEMPTS` | `3` | Máximo de claims por item antes de `FAILED`. |
 | `ANALYTICS_WORKER_RETRY_DELAY_SECONDS` | `30` | Backoff base entre retries transitórios. |
 | `ANALYTICS_RUNTIME_TIMEOUT_SECONDS` | `10` no app / `60` no Compose | Timeout de chamadas ao runtime. |
-| `ANALYTICS_MAX_EXCERPTS_PER_ITEM` | `500` | Limite por item no piloto; mantém obras longas de monopolizar a fila. Aumentar somente após o gate de capacidade. |
+| `ANALYTICS_MAX_EXCERPTS_PER_ITEM` | `500` | Limite por item no piloto; a geração/poda também recebe no máximo 3× esse limite para impedir custo quadrático em obras longas. Aumentar somente após o gate de capacidade. |
 | `ANALYTICS_SCOPE_EMBEDDINGS_ENABLED` | conforme ambiente | Habilita embeddings somente quando o artefato está preparado. |
 | `ANALYTICS_NLI_ENABLED` | `false` | Mantém NLI desligado por padrão. |
 
