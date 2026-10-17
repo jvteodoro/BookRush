@@ -270,7 +270,12 @@ public class AnalyticsController {
             jobId));
   }
 
-  @GetMapping({"/internal/v1/analytics/runs", "/internal/v1/content-analytics/runs"})
+  @GetMapping({
+    "/admin/v1/analytics/runs",
+    "/admin/v1/content-analytics/runs",
+    "/internal/v1/analytics/runs",
+    "/internal/v1/content-analytics/runs"
+  })
   @Operation(
       summary = "Listar execuções e métricas",
       description = "Retorna as execuções persistidas, associadas à obra e à versão textual exata.")
@@ -355,6 +360,8 @@ SELECT fd.code, fd.name, fd.unit, avg(ef.numeric_value) AS numeric_value
   }
 
   @GetMapping({
+    "/admin/v1/analytics/books/{bookId}/input",
+    "/admin/v1/content-analytics/books/{bookId}/input",
     "/internal/v1/analytics/books/{bookId}/input",
     "/internal/v1/content-analytics/books/{bookId}/input"
   })

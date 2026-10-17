@@ -462,7 +462,7 @@ export const services = {
     }
     try {
       const { data } = await analyticsHttp.get(
-        "/api/internal/v1/content-analytics/runs",
+        "/api/admin/v1/content-analytics/runs",
         { params: { limit: 100 } },
       );
       return (data.items ?? []).map(
@@ -560,7 +560,7 @@ export const services = {
     try {
       const resolvedBookId = canonicalBookId ?? bookId;
       const { data: input } = await analyticsHttp.get(
-        `/api/internal/v1/content-analytics/books/${resolvedBookId}/input`,
+        `/api/admin/v1/content-analytics/books/${resolvedBookId}/input`,
       );
       const version = (input.items ?? [])[0];
       if (!version?.version_id)
