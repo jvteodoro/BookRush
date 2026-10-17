@@ -29,6 +29,14 @@ pipeline {
           sh 'git check-ref-format --branch "$SELECTED_BRANCH"'
           def remote = [url: 'https://github.com/jvteodoro/BookRush.git']
           if (params.GIT_CREDENTIAL_ID?.trim()) { remote.credentialsId = params.GIT_CREDENTIAL_ID.trim() }
+          sh '''
+            set -euo pipefail
+            uid="$(id -u)"
+            gid="$(id -g)"
+            docker run --rm --volumes-from "$HOSTNAME" -w "$PWD" \
+              -e HOST_UID="$uid" -e HOST_GID="$gid" node:20-bookworm \
+              bash -lc 'for path in mobile/node_modules mobile/dist; do if [ -e "$path" ]; then chown -R "$HOST_UID:$HOST_GID" "$path"; fi; done'
+          '''
           deleteDir()
           def revision = checkout([$class: 'GitSCM',
             branches: [[name: "refs/remotes/origin/${env.SELECTED_BRANCH}"]],
@@ -53,7 +61,7 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          docker run --rm --volumes-from "$HOSTNAME" -w "$PWD/mobile" node:20-bookworm bash -lc '
+          docker run --rm --user "$(id -u):$(id -g)" --volumes-from "$HOSTNAME" -w "$PWD/mobile" node:20-bookworm bash -lc '
             npm ci --no-audit --no-fund
             EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run typecheck
             EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export
