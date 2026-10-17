@@ -118,7 +118,13 @@ pipeline {
     stage('Reconciliar Keycloak Compose') {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
       steps {
-        sh 'bash infrastructure/keycloak/reconcile.sh --env-file /run/bookrush.env'
+        sh '''
+          set -euo pipefail
+          set -a
+          . /run/bookrush.env
+          set +a
+          bash scripts/reconcile-keycloak-agent.sh
+        '''
       }
     }
 
