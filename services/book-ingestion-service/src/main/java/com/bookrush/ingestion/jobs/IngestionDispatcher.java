@@ -165,6 +165,7 @@ public class IngestionDispatcher {
       } finally {
         heartbeat.cancel(false);
       }
+    }
     jdbc.update(
         "UPDATE catalog.ingestion_job SET status=CASE WHEN EXISTS (SELECT 1 FROM"
             + " catalog.ingestion_task WHERE ingestion_job_id=? AND status='RETRY_WAIT') THEN"
