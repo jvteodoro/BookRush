@@ -300,3 +300,10 @@ O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
 Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh
 .env`; o script mantém a URL e um token aleatório no `.env` protegido e nunca
 imprime o token.
+
+O deploy Compose preserva um Keycloak já ativo quando o container persistente
+foi criado por uma instalação anterior e não possui os labels atuais do
+Compose. Isso evita o conflito de nome `bookrush-keycloak-1` durante a
+reconciliação ou rollback; o container continua na rede `bookrush_bookrush` e
+os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
+estiver parado, o deploy volta a incluí-lo na operação.
