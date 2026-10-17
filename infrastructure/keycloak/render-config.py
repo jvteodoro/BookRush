@@ -41,10 +41,7 @@ def main() -> int:
                 raise SystemExit(f"{env_name} ausente para {client['clientId']}")
         target = output / source_file.name
         target.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-        # keycloak-config-cli runs as an unprivileged user in the helper
-        # container. The output directory is ephemeral and removed by the
-        # caller after reconcile, so the files must be readable there.
-        target.chmod(0o644)
+        target.chmod(0o600)
     return 0
 
 

@@ -14,10 +14,7 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 config_dir="$(mktemp -d "$repo_dir/.keycloak-config.XXXXXX")"
 cleanup() { rm -rf -- "$config_dir"; }
 trap cleanup EXIT
-# keycloak-config-cli runs as an unprivileged user in the helper container;
-# the directory contains rendered JSON with secrets injected at runtime and
-# is removed by the trap after the reconcile.
-chmod 755 "$config_dir"
+chmod 700 "$config_dir"
 
 # Keep secrets already provisioned in the persistent realm. The agent owns
 # the ingestion credential, but must not require or replace the existing
@@ -35,7 +32,10 @@ docker run --rm --volumes-from "$HOSTNAME" -w "$repo_dir" \
   python:3.12-slim python3 infrastructure/keycloak/render-config.py \
   infrastructure/keycloak "$config_dir"
 
-docker run --rm --volumes-from "$HOSTNAME" --network "$BOOKRUSH_NETWORK_NAME" \
+# The rendered files remain 0600 in the private workspace. The config-cli
+# container is ephemeral and runs as root only to read those files from the
+# shared volume; it never writes to the persistent Keycloak data volume.
+docker run --rm --user 0:0 --volumes-from "$HOSTNAME" --network "$BOOKRUSH_NETWORK_NAME" \
   -e KEYCLOAK_URL=http://keycloak:8080 \
   -e KEYCLOAK_USER="${KEYCLOAK_CONFIG_CLI_ADMIN_USER:-admin}" \
   -e KEYCLOAK_PASSWORD="$KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" \

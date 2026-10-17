@@ -34,11 +34,11 @@ O bootstrap `--import-realm` do container Keycloak é reservado para volumes
 vazios. Atualizações de uma instalação existente devem usar o reconciliador.
 
 O reconciliador usado pelo agente Jenkins compartilha o volume do workspace
-com um container `keycloak-config-cli` não-root. Por isso, os JSONs renderizados
-ficam legíveis somente dentro desse diretório efêmero compartilhado durante a
-execução e são removidos pelo `trap` ao terminar; nunca são gravados no Git,
-no volume persistente do Keycloak ou no log. A imagem fixada do reconciliador é
-`adorsys/keycloak-config-cli:6.3.0-18.0.2`.
+com um container efêmero `keycloak-config-cli`, executado como root apenas
+para ler o diretório privado de configuração. O diretório permanece `0700` e
+os JSONs `0600`; eles são removidos pelo `trap` ao terminar e nunca são
+gravados no Git, no volume persistente do Keycloak ou no log. A imagem fixada
+do reconciliador é `adorsys/keycloak-config-cli:6.3.0-18.0.2`.
 
 Para validar a configuração sem tocar no ambiente persistente, execute:
 
