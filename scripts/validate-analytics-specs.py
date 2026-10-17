@@ -65,4 +65,14 @@ if prototype_v2.get('version') != 'semantic-prototype-set-v2.0.0' or prototype_v
     raise SystemExit('invalid V2 semantic prototype contract')
 if set(prototype_v2.get('concepts', {})) != {'action', 'dialogue', 'description', 'reflection', 'conflict', 'mystery'}:
     raise SystemExit('V2 semantic prototype concepts are incomplete')
+narrative = data['narrative-hypotheses-v1.yaml']
+required_narrative = {'conflict', 'suspense', 'introspection', 'self_containment',
+                      'curiosity_gap', 'cliffhanger', 'revelation', 'resolution', 'quotability'}
+if narrative.get('model') != 'mdeberta-nli-v1' or set(narrative.get('narrative', {})) != required_narrative:
+    raise SystemExit('narrative hypothesis contract is incomplete')
+if set(narrative.get('emotions', {})) != {'joy', 'sadness', 'fear', 'anger', 'surprise', 'disgust', 'affection'}:
+    raise SystemExit('emotion hypothesis contract is incomplete')
+validation = narrative.get('validation', {})
+if validation.get('sample_en') != 50 or validation.get('sample_pt') != 50:
+    raise SystemExit('NLI validation sample must be 50 per language')
 print(f'validated {len(features)} V1 feature contracts, {len(v2_features)} V2 feature contracts and {len(models)} locked model contracts')
