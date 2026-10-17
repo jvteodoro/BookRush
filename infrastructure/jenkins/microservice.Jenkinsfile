@@ -14,6 +14,9 @@ pipeline {
     string(name: 'E2E_CREDENTIAL_ID', defaultValue: 'bookrush-product-e2e', description: 'Credential Jenkins username/password do usuário de teste no realm bookrush.')
     string(name: 'E2E_BASE_URL', defaultValue: 'https://bookrush.jteodoro.tec.br', description: 'Gateway público usado pelo smoke autenticado.')
     string(name: 'E2E_BOOK_ID', defaultValue: '', description: 'UUID de livro com publication.json aprovado para validar o content-service.')
+    booleanParam(name: 'RUN_INGESTION_S2S_E2E', defaultValue: false, description: 'Validar client_credentials e dry-run da ingestão pelo gateway público; somente para book-ingestion-service.')
+    string(name: 'INGESTION_S2S_CREDENTIAL_ID', defaultValue: 'bookrush-ingestion-token', description: 'Credential Jenkins Secret text do client bookrush-ingestion-admin.')
+    string(name: 'INGESTION_S2S_BASE_URL', defaultValue: 'https://bookrush.jteodoro.tec.br/ingestion', description: 'Gateway público do book-ingestion-service.')
     string(name: 'KUBECONFIG_CREDENTIAL_ID', defaultValue: 'bookrush-kubeconfig', description: 'Credential Jenkins do tipo Secret file para Kubernetes.')
   }
 
@@ -42,6 +45,8 @@ pipeline {
           if (params.RUN_PUBLIC_E2E && env.SELECTED_SERVICE != 'reader-bff-service') { error('RUN_PUBLIC_E2E só é válido para reader-bff-service.') }
           if (params.RUN_PUBLIC_E2E && !params.DEPLOY) { error('RUN_PUBLIC_E2E exige DEPLOY=true para testar a revisão implantada.') }
           if (params.RUN_PUBLIC_E2E && !params.E2E_BOOK_ID?.trim()) { error('RUN_PUBLIC_E2E exige E2E_BOOK_ID.') }
+          if (params.RUN_INGESTION_S2S_E2E && env.SELECTED_SERVICE != 'book-ingestion-service') { error('RUN_INGESTION_S2S_E2E só é válido para book-ingestion-service.') }
+          if (params.RUN_INGESTION_S2S_E2E && !params.DEPLOY) { error('RUN_INGESTION_S2S_E2E exige DEPLOY=true para testar a revisão implantada.') }
         }
       }
     }
@@ -89,6 +94,19 @@ pipeline {
             E2E_BASE_URL="$E2E_BASE_URL" E2E_BOOK_ID="$E2E_BOOK_ID" \
               E2E_OIDC_USERNAME="$E2E_OIDC_USERNAME" E2E_OIDC_PASSWORD="$E2E_OIDC_PASSWORD" \
               bash scripts/test-reader-bff-e2e.sh
+          '''
+        }
+      }
+    }
+    stage('Smoke S2S da ingestão') {
+      when { expression { return params.RUN_INGESTION_S2S_E2E && params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
+      steps {
+        withCredentials([string(credentialsId: params.INGESTION_S2S_CREDENTIAL_ID, variable: 'INGESTION_CLIENT_SECRET')]) {
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
+            INGESTION_BASE_URL="$INGESTION_S2S_BASE_URL" \
+              INGESTION_CLIENT_SECRET="$INGESTION_CLIENT_SECRET" \
+              bash scripts/test-ingestion-s2s-gateway.sh
           '''
         }
       }

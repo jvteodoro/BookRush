@@ -15,6 +15,7 @@ pipeline {
     string(name: 'GUTENBERG_EXTERNAL_IDS', defaultValue: '1342', description: 'IDs Gutenberg separados por vírgula; somente números.')
     string(name: 'INGESTION_BASE_URL', defaultValue: 'https://bookrush.jteodoro.tec.br/ingestion', description: 'Base externa do gateway para o ingestion-service.')
     string(name: 'INGESTION_CREDENTIAL_ID', defaultValue: 'bookrush-ingestion-token', description: 'Credential Jenkins Secret text com token OIDC do operador.')
+    booleanParam(name: 'RUN_INGESTION_S2S_E2E', defaultValue: false, description: 'Validar client_credentials e dry-run da ingestão pelo gateway após o deploy.')
     choice(name: 'GUTENBERG_TIMEOUT_MINUTES', choices: ['5', '15', '30'], description: 'Tempo máximo de polling do job Gutenberg.')
   }
 
@@ -72,6 +73,7 @@ pipeline {
           bash scripts/test-keycloak-realms.sh
           bash scripts/test-keycloak-reconcile.sh
           bash scripts/test-keycloak-access-lifecycle.sh
+          bash scripts/test-keycloak-jwks-rotation.sh
         '''
       }
     }
@@ -186,6 +188,20 @@ pipeline {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
       steps {
         sh 'bash infrastructure/jenkins/deploy-compose.sh'
+      }
+    }
+
+    stage('Smoke S2S da ingestão') {
+      when { expression { return params.RUN_INGESTION_S2S_E2E && params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
+      steps {
+        withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_CLIENT_SECRET')]) {
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
+            INGESTION_BASE_URL="$INGESTION_BASE_URL" \
+              INGESTION_CLIENT_SECRET="$INGESTION_CLIENT_SECRET" \
+              bash scripts/test-ingestion-s2s-gateway.sh
+          '''
+        }
       }
     }
 

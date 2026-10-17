@@ -135,6 +135,23 @@ um evento autenticado no behavior-service e logout OIDC usando o
 `id_token_hint` apenas em memória. O `E2E_BOOK_ID` deve existir no catálogo;
 os registros criados são marcados como teste de integração.
 
+Para validar integrações técnicas da ingestão, o job `bookrush-deploy` aceita
+`RUN_INGESTION_S2S_E2E=true` junto com `DEPLOY=true` e
+`DEPLOY_TARGET=compose`. O estágio usa a credential Secret text
+`bookrush-ingestion-token` como segredo do client `bookrush-ingestion-admin`,
+confere `aud=bookrush-ingestion` sem registrar o token e chama somente
+`POST /api/admin/v1/ingestion/run` com `dryRun=true`, `processAssets=false` e
+uma chave de idempotência nova. O resultado esperado é HTTP 202 (ou 200 em
+replay); nenhum livro, asset ou fonte externa é importado. O job individual de
+`book-ingestion-service` oferece o mesmo teste com os parâmetros
+`RUN_INGESTION_S2S_E2E`, `INGESTION_S2S_CREDENTIAL_ID` e
+`INGESTION_S2S_BASE_URL`.
+
+O estágio de contratos também executa `scripts/test-keycloak-jwks-rotation.sh`
+em um Keycloak descartável. Ele cria um provider `rsa-generated` de prioridade
+maior pelo Admin API, confirma a troca do `kid` e verifica que o JWKS continua
+publicado. O teste não usa o volume `keycloak_data` persistente.
+
 O usuário de teste precisa estar no realm `bookrush`, ter o cliente
 `bookrush-web` e o scope `bookrush.catalog.read`; o usuário administrativo do
 Jenkins no realm `bookrush-platform` não substitui essa credencial. O parâmetro
