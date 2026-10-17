@@ -40,6 +40,8 @@ analytics:
     enabled: ${ANALYTICS_WORKER_ENABLED:false}
     poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}
     stale-after-seconds: ${ANALYTICS_WORKER_STALE_AFTER_SECONDS:900}
+    max-attempts: ${ANALYTICS_WORKER_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${ANALYTICS_WORKER_RETRY_DELAY_SECONDS:30}
     v2:
       version: ${ANALYTICS_V2_GENERATOR_VERSION:sentence-window-v2}
       min-words: ${ANALYTICS_V2_MIN_WORDS:60}

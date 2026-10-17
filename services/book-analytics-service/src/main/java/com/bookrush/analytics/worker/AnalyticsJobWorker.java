@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -40,6 +41,8 @@ public final class AnalyticsJobWorker {
   private final AnalyticsV2GeneratorProperties generatorProperties;
   private final LinguisticRuntimeClient linguisticRuntime;
   private final int staleAfterSeconds;
+  private final int maxAttempts;
+  private final int retryDelaySeconds;
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
@@ -47,13 +50,17 @@ public final class AnalyticsJobWorker {
       AnalyticsMetrics metrics,
       AnalyticsV2GeneratorProperties generatorProperties,
       com.bookrush.analytics.config.AnalyticsRuntimeProperties runtimeProperties,
-      @Value("${analytics.worker.stale-after-seconds:900}") int staleAfterSeconds) {
+      @Value("${analytics.worker.stale-after-seconds:900}") int staleAfterSeconds,
+      @Value("${analytics.worker.max-attempts:3}") int maxAttempts,
+      @Value("${analytics.worker.retry-delay-seconds:30}") int retryDelaySeconds) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
     this.generatorProperties = generatorProperties;
     this.linguisticRuntime = new LinguisticRuntimeClient(runtimeProperties);
     this.staleAfterSeconds = normalizeStaleAfterSeconds(staleAfterSeconds);
+    this.maxAttempts = Math.max(1, maxAttempts);
+    this.retryDelaySeconds = Math.max(1, retryDelaySeconds);
   }
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
@@ -64,7 +71,7 @@ public final class AnalyticsJobWorker {
       process(item);
       complete(item);
     } catch (Exception e) {
-      fail(item, errorCode(e), e.getMessage());
+      fail(item, errorCode(e), e.getMessage(), e);
     }
   }
 
@@ -75,7 +82,10 @@ public final class AnalyticsJobWorker {
 WITH next_item AS (
   SELECT i.id FROM analytics.analysis_job_item i
   JOIN analytics.analysis_job j ON j.id=i.job_id
-  WHERE i.status='PENDING' AND j.cancel_requested=false AND j.status IN ('PENDING','RUNNING')
+  WHERE i.status='PENDING' AND i.attempt_count < ?
+    AND (i.finished_at IS NULL OR i.finished_at <= clock_timestamp() -
+      (? * GREATEST(i.attempt_count, 1) * INTERVAL '1 second'))
+    AND j.cancel_requested=false AND j.status IN ('PENDING','RUNNING')
   ORDER BY i.created_at, i.id FOR UPDATE SKIP LOCKED LIMIT 1
 )
 UPDATE analytics.analysis_job_item i
@@ -89,7 +99,9 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
                     rs.getObject("id", UUID.class),
                     rs.getObject("job_id", UUID.class),
                     rs.getObject("input_asset_version_id", UUID.class))
-                : null);
+                : null,
+        maxAttempts,
+        retryDelaySeconds);
   }
 
   /**
@@ -934,12 +946,26 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         item.jobId());
   }
 
-  private void fail(Item item, String code, String message) {
+  private void fail(Item item, String code, String message, Exception exception) {
+    String safeMessage = message == null ? code : message.substring(0, Math.min(1000, message.length()));
+    if (isRetryable(code, exception)) {
+      jdbc.update(
+          "UPDATE analytics.analysis_job_item SET status='PENDING', finished_at=clock_timestamp(),"
+              + " error_code=?, error_message=? WHERE id=?",
+          code,
+          safeMessage,
+          item.id());
+      jdbc.update(
+          "UPDATE analytics.analysis_job SET status='RUNNING', finished_at=NULL WHERE id=?"
+              + " AND status IN ('PENDING','RUNNING')",
+          item.jobId());
+      return;
+    }
     jdbc.update(
         "UPDATE analytics.analysis_job_item SET status='FAILED', finished_at=clock_timestamp(),"
             + " error_code=?, error_message=? WHERE id=?",
         code,
-        message == null ? code : message.substring(0, Math.min(1000, message.length())),
+        safeMessage,
         item.id());
     jdbc.update(
         "UPDATE analytics.analysis_job SET processed_items=(SELECT count(*) FROM"
@@ -951,6 +977,19 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         item.jobId(),
         item.jobId());
     metrics.jobItemFailed(code);
+  }
+
+  static boolean isRetryable(String code, Exception exception) {
+    if (code == null || code.equals("ASSET_VERSION_UNAVAILABLE")
+        || exception instanceof TextAssetReader.IntegrityException
+        || exception instanceof IllegalArgumentException) return false;
+    return exception instanceof IOException
+        || exception instanceof DataAccessException
+        || code.contains("Timeout")
+        || code.contains("Connect")
+        || code.contains("Unavailable")
+        || code.contains("S3Exception")
+        || code.contains("ResourceAccess");
   }
 
   private static String configurationJson(ExcerptCandidateGenerator.V2Config config) {

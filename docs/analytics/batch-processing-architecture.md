@@ -87,6 +87,13 @@ Essa estratégia é uma lease lógica, não um heartbeat. Ela é adequada porque
 processamento de um item é limitado por timeout de storage/runtime e porque o
 estado persistente permite retomar o lote sem intervenção manual no banco.
 
+Falhas transitórias durante o processamento seguem o mesmo princípio: o item
+volta a `PENDING`, preserva `attempt_count` e aguarda um backoff progressivo.
+São permitidas três tentativas por padrão. Falhas determinísticas, como hash
+ou tamanho incompatível e versão de asset indisponível, permanecem terminais.
+Assim, a retomada automática consegue terminar um lote interrompido sem
+transformar um erro permanente em loop infinito.
+
 ## 4. Persistência em lote e durabilidade
 
 `persistExcerpt` continua inserindo ou reutilizando o excerpt de forma
@@ -158,6 +165,8 @@ separada das correções já entregues.
 | `ANALYTICS_WORKER_ENABLED` | `false` no app / habilitado no Compose | Liga o consumidor persistente. |
 | `ANALYTICS_WORKER_POLL_DELAY_MS` | `1000` | Intervalo entre ciclos sem trabalho. |
 | `ANALYTICS_WORKER_STALE_AFTER_SECONDS` | `900` | Limite para recuperar uma lease órfã. |
+| `ANALYTICS_WORKER_MAX_ATTEMPTS` | `3` | Máximo de claims por item antes de `FAILED`. |
+| `ANALYTICS_WORKER_RETRY_DELAY_SECONDS` | `30` | Backoff base entre retries transitórios. |
 | `ANALYTICS_RUNTIME_TIMEOUT_SECONDS` | `10` no app / `60` no Compose | Timeout de chamadas ao runtime. |
 | `ANALYTICS_MAX_EXCERPTS_PER_ITEM` | `0` | Limite opcional por item; `0` não limita. |
 | `ANALYTICS_SCOPE_EMBEDDINGS_ENABLED` | conforme ambiente | Habilita embeddings somente quando o artefato está preparado. |

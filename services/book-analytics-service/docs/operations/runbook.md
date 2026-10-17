@@ -54,6 +54,14 @@ execuções ou objetos do storage. Depois de um restart, acompanhe o endpoint de
 itens do job e confirme que os itens recuperados voltaram a `COMPLETED` ou
 `FAILED` com uma nova tentativa.
 
+Falhas transitórias também retornam automaticamente a `PENDING`: o worker usa
+até `ANALYTICS_WORKER_MAX_ATTEMPTS` (3 por padrão) e backoff progressivo baseado
+em `ANALYTICS_WORKER_RETRY_DELAY_SECONDS` (30 segundos por padrão). Erros de
+integridade, asset inexistente e argumentos inválidos continuam terminais e
+viram `FAILED`; não são repetidos indefinidamente. O `attempt_count` persistido
+impede que um item seja processado além do limite, enquanto o job continua
+`RUNNING` quando ainda existem itens pendentes.
+
 A persistência de features de cada excerpt usa `JdbcTemplate.batchUpdate`,
 mantendo a unidade idempotente mas evitando um commit síncrono por feature.
 Isso reduz a pressão sobre `WALSync`; `WALSync` prolongado deve ser investigado
