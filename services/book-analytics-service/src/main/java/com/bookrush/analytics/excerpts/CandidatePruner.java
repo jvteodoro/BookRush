@@ -15,7 +15,10 @@ public final class CandidatePruner {
       if (c.wordCount() < config.minWords()) reason = "TOO_SHORT";
       else if (c.wordCount() > config.maxWords()) reason = "TOO_LONG";
       else if (c.text().isBlank()) reason = "EMPTY";
-      else if (!seen.add(normalize(c.text()))) reason = "DUPLICATE";
+      else if (isBoilerplate(c.text())) reason = "BOILERPLATE";
+      else if (seen.contains(normalize(c.text()))) reason = "DUPLICATE";
+      else if (nearDuplicate(c.text(), seen)) reason = "NEAR_DUPLICATE";
+      else seen.add(normalize(c.text()));
       if (reason == null) accepted.add(c);
       else rejected.add(new Rejected(c, reason));
     }
@@ -32,7 +35,10 @@ public final class CandidatePruner {
       if (c.wordCount() < config.minWords()) reason = "TOO_SHORT";
       else if (c.wordCount() > config.maxWords()) reason = "TOO_LONG";
       else if (c.text().isBlank()) reason = "EMPTY";
-      else if (!seen.add(normalize(c.text()))) reason = "DUPLICATE";
+      else if (isBoilerplate(c.text())) reason = "BOILERPLATE";
+      else if (seen.contains(normalize(c.text()))) reason = "DUPLICATE";
+      else if (nearDuplicate(c.text(), seen)) reason = "NEAR_DUPLICATE";
+      else seen.add(normalize(c.text()));
       if (reason == null) accepted.add(c);
       else rejected.add(new V2Rejected(c, reason));
     }
@@ -41,6 +47,22 @@ public final class CandidatePruner {
 
   private static String normalize(String v) {
     return v.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+  }
+
+  private static boolean isBoilerplate(String value) {
+    var normalized = normalize(value);
+    return normalized.matches("(?:table of contents|contents|index|document|sumário|indice)");
+  }
+
+  private static boolean nearDuplicate(String value, Set<String> seen) {
+    var candidate = new HashSet<>(Arrays.asList(normalize(value).split(" ")));
+    if (candidate.size() < 4) return false;
+    return seen.stream().anyMatch(previous -> {
+      var words = new HashSet<>(Arrays.asList(previous.split(" ")));
+      var intersection = candidate.stream().filter(words::contains).count();
+      var union = candidate.size() + words.size() - intersection;
+      return union > 0 && ((double) intersection / union) >= 0.85d;
+    });
   }
 
   public record Config(int minWords, int maxWords, String version) {
