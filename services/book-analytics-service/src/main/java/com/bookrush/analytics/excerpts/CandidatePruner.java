@@ -68,7 +68,8 @@ public final class CandidatePruner {
       String normalized, Map<String, List<Set<String>>> wordIndex) {
     var candidate = new HashSet<>(Arrays.asList(normalized.split(" ")));
     if (candidate.size() < 4) return false;
-    var previousCandidates = new HashSet<Set<String>>();
+    var previousCandidates =
+        Collections.newSetFromMap(new IdentityHashMap<Set<String>, Boolean>());
     for (var word : candidate) previousCandidates.addAll(wordIndex.getOrDefault(word, List.of()));
     return previousCandidates.stream().anyMatch(words -> {
       double sizeRatio = (double) Math.min(candidate.size(), words.size()) / Math.max(candidate.size(), words.size());
