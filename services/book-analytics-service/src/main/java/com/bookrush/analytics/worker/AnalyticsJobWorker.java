@@ -138,7 +138,7 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
           configuration,
           configurationHash,
           "2");
-      var chapters = chapters(item.inputVersion());
+      var chapters = chapters(item.inputVersion(), TextAssetReader.codePointLength(text));
       String language = languageFor(item.inputVersion());
       var detected = linguisticRuntime.language(text);
       if ("VALID".equals(detected.status())
@@ -458,7 +458,7 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
     return values;
   }
 
-  private List<ExcerptCandidateGenerator.ChapterBoundary> chapters(UUID inputVersion) {
+  private List<ExcerptCandidateGenerator.ChapterBoundary> chapters(UUID inputVersion, int textLength) {
     return jdbc.query(
         """
         SELECT id, start_offset, end_offset
@@ -468,8 +468,13 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
         """,
         (rs, row) ->
             new ExcerptCandidateGenerator.ChapterBoundary(
-                rs.getObject("id", UUID.class), rs.getInt("start_offset"), rs.getInt("end_offset")),
-        inputVersion);
+                rs.getObject("id", UUID.class),
+                Math.max(0, rs.getInt("start_offset")),
+                Math.min(textLength, rs.getInt("end_offset"))),
+        inputVersion).stream()
+        .filter(chapter -> chapter.startCodepoint() < textLength)
+        .filter(chapter -> chapter.endCodepoint() > chapter.startCodepoint())
+        .toList();
   }
 
   private UUID persistExcerpt(
