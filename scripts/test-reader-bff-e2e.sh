@@ -158,6 +158,7 @@ token=$(curl -fsS -X POST "$authority/protocol/openid-connect/token" \
   --data-urlencode "code_verifier=$verifier")
 access_token=$(jq -er '.access_token' <<<"$token")
 id_token=$(jq -er '.id_token' <<<"$token")
+refresh_token=$(jq -er '.refresh_token' <<<"$token")
 
 python3 - "$access_token" "$authority" <<'PY'
 import base64, json, sys, time
@@ -178,6 +179,25 @@ if 'bookrush.catalog.read' not in claims.get('scope', '').split():
     raise SystemExit('reader-bff-e2e: scope bookrush.catalog.read ausente')
 print('oidc_claims=valid')
 PY
+
+refreshed_token=$(curl -fsS -X POST "$authority/protocol/openid-connect/token" \
+  --data-urlencode grant_type=refresh_token \
+  --data-urlencode "client_id=$client_id" \
+  --data-urlencode "refresh_token=$refresh_token")
+refreshed_access_token=$(jq -er '.access_token' <<<"$refreshed_token")
+python3 - "$refreshed_access_token" "$authority" <<'PY'
+import base64, json, sys, time
+token, expected_issuer = sys.argv[1:]
+payload = token.split('.')[1]
+payload += '=' * (-len(payload) % 4)
+claims = json.loads(base64.urlsafe_b64decode(payload))
+if claims.get('iss') != expected_issuer:
+    raise SystemExit('reader-bff-e2e: issuer inesperado após refresh')
+if int(claims.get('exp', 0)) <= int(time.time()):
+    raise SystemExit('reader-bff-e2e: token renovado expirado')
+print('oidc_refresh=valid')
+PY
+access_token="$refreshed_access_token"
 
 echo '[3/5] composição autenticada do reader BFF'
 auth_header="Authorization: Bearer $access_token"
@@ -238,7 +258,15 @@ assert_status behavior_event 202 "$status"
 status=$(status_without_body "$tmp_dir/unlike" -X DELETE "$base_url/api/v1/social/books/$E2E_BOOK_ID/like" -H "$auth_header")
 assert_status social_unlike 200 "$status"
 
-echo '[6/7] publicação EPUB encaminhada ao content-service'
+echo '[6/8] autorização cross-realm e papel insuficiente'
+status=$(status_without_body "$tmp_dir/moderation-denied" \
+  "$base_url/api/v1/social/moderation/reports" -H "$auth_header")
+assert_status insufficient_operator_role 403 "$status"
+status=$(status_without_body "$tmp_dir/admin-wrong-realm" \
+  "$base_url/api/v1/admin/kpis" -H "$auth_header")
+assert_status wrong_realm_admin 401 "$status"
+
+echo '[7/8] publicação EPUB encaminhada ao content-service'
 status=$(status_without_body "$tmp_dir/publication" "$base_url/api/v1/reader/books/$E2E_BOOK_ID/publication.json" -H "$auth_header")
 if [[ "$status" == 200 ]]; then
   printf 'authenticated_publication=%s\n' "$status"
@@ -249,7 +277,7 @@ else
   exit 1
 fi
 
-echo '[7/7] logout OIDC e preflight CORS da origem do cliente'
+echo '[8/8] logout OIDC e preflight CORS da origem do cliente'
 logout_endpoint=$(curl -fsS "$authority/.well-known/openid-configuration" | jq -er '.end_session_endpoint')
 status=$(status_without_body "$tmp_dir/logout" -G "$logout_endpoint" \
   --data-urlencode "id_token_hint=$id_token" \

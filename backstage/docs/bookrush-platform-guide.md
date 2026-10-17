@@ -235,8 +235,9 @@ O nível da evidência deve acompanhar o risco da mudança:
    banco vazio, upgrade e mapeamento JPA/JDBC. Funções em índice de expressão
    precisam ser `IMMUTABLE`.
 3. **Identidade:** issuer, JWKS, audience, scope, roles, cliente e claims;
-   testar sem token (`401`), token sem permissão (`403`) e token correto com o
-   status de negócio esperado.
+   testar sem token (`401`), token do realm/audience errado (`401`), token sem
+   permissão (`403`), refresh/logout e token correto com o status de negócio
+   esperado.
 4. **Frontend:** build, estado de loading/401/403/404, cliente autenticado e
    preflight. Assets protegidos devem ser carregados como blob autenticado.
 5. **Container:** imagem nova, Compose válido, rede, volumes, dependências e

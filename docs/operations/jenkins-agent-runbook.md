@@ -124,7 +124,9 @@ credential Jenkins `E2E_CREDENTIAL_ID` do tipo username/password para um
 usuário de teste do realm de produto `bookrush`. O estágio executa
 `scripts/test-reader-bff-e2e.sh`, que faz Authorization Code + PKCE sem
 interação manual, valida claims não sensíveis (`iss`, `aud`, `scope`, `exp`),
-exercita respostas 401/200, o manifesto EPUB e o preflight CORS. Senhas,
+renova o access token com refresh token, exercita respostas 401/403/200,
+verifica que um token do realm de produto não entra na administração do realm
+de plataforma, o manifesto EPUB e o preflight CORS. Senhas,
 tokens, cookies e corpos de resposta nunca são impressos.
 
 O mesmo smoke percorre a estrutura do livro (`book`/`chapters`), operações
