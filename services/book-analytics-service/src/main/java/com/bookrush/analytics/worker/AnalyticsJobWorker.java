@@ -567,19 +567,21 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
             .values());
     var linguistic = linguisticRuntime.analyze(language, candidate.text());
     values.putAll(linguistic.values());
+    var featureRows = new java.util.ArrayList<Object[]>();
     for (var definition : definitions) {
       var value = values.get(definition.getValue());
       if (value == null && !definition.getValue().equals("unique_lemma_ratio")) continue;
-      jdbc.update(
+      featureRows.add(
+          new Object[] {
+            run, definition.getKey(), actual, value, value == null ? linguistic.status() : "VALID"
+          });
+    }
+    if (!featureRows.isEmpty())
+      jdbc.batchUpdate(
           "INSERT INTO"
               + " analytics.excerpt_feature(analysis_run_id,feature_definition_id,excerpt_id,numeric_value,value_status,computed_at)"
               + " VALUES (?,?,?,?, ?, clock_timestamp()) ON CONFLICT DO NOTHING",
-          run,
-          definition.getKey(),
-          actual,
-          value,
-          value == null ? linguistic.status() : "VALID");
-    }
+          featureRows);
     return actual;
   }
 

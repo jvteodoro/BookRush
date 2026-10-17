@@ -51,6 +51,12 @@ execuções ou objetos do storage. Depois de um restart, acompanhe o endpoint de
 itens do job e confirme que os itens recuperados voltaram a `COMPLETED` ou
 `FAILED` com uma nova tentativa.
 
+A persistência de features de cada excerpt usa `JdbcTemplate.batchUpdate`,
+mantendo a unidade idempotente mas evitando um commit síncrono por feature.
+Isso reduz a pressão sobre `WALSync`; `WALSync` prolongado deve ser investigado
+com `pg_stat_activity`, `pg_stat_wal` e saúde do volume, não resolvido
+desativando `fsync` ou `synchronous_commit` globalmente.
+
 IDs de livro, hashes, operation keys e texto nunca são tags. Para investigar um
 job, consulte primeiro `GET /api/admin/v1/analytics/jobs/{id}` e depois
 `/items`; use `resume` somente após corrigir o erro persistido. O cache/provider
