@@ -48,7 +48,7 @@ docker run --rm --user 0:0 -v "$config_volume:/config:ro" --network "$BOOKRUSH_N
 # keycloak-config-cli does not reliably update role mappings for an existing
 # service-account user. Reapply only the ingestion operator role idempotently;
 # no client secret is read or rotated by this step.
-docker run --rm --network "$BOOKRUSH_NETWORK_NAME" \
+docker run --rm -i --network "$BOOKRUSH_NETWORK_NAME" \
   -e KEYCLOAK_URL=http://keycloak:8080 \
   -e KEYCLOAK_USER="${KEYCLOAK_CONFIG_CLI_ADMIN_USER:-admin}" \
   -e KEYCLOAK_PASSWORD="$KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" \
