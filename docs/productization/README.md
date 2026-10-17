@@ -9,10 +9,12 @@ A plataforma foi organizada em bounded contexts independentes. O catálogo conti
 | book-content-service | metadata/content reader boundary | `book_content` |
 | reader-state-service | library, progress, bookmarks | `reader_state` |
 
-As rotas de estado do leitor são protegidas pelo realm de produto (`bookrush`)
-com audience `account`. O gateway envia somente `/api/v1/reader/feed` para o
-`reader-bff-service`; biblioteca, progresso e bookmarks seguem diretamente para
-o `reader-state-service`.
+As rotas do leitor são protegidas pelo realm de produto (`bookrush`) com
+audience `account`. O gateway envia as operações de leitura e composição,
+incluindo `/api/v1/reader/books/*` (publication, capítulos, conteúdo e
+recursos), para o `reader-bff-service`. O `reader-state-service` permanece
+responsável pelas rotas legadas de biblioteca e pela planta; assim, uma
+requisição de capítulos não cai silenciosamente no serviço de estado.
 | reader-profile-service | profile/privacy | `reader_profile` |
 | social-service | likes, comments, follows/report extension | `social` |
 | behavior-service | append-only client/server events | `behavior` |
