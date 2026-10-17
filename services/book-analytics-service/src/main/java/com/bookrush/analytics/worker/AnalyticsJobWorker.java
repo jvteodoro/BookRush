@@ -207,27 +207,36 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
       var values =
           jdbc.query(
               """
-              SELECT fd.code, ef.numeric_value FROM analytics.excerpt_feature ef
+              SELECT fd.code, ef.numeric_value, ef.value_status FROM analytics.excerpt_feature ef
               JOIN analytics.feature_definition fd ON fd.id=ef.feature_definition_id
               WHERE ef.analysis_run_id=? AND ef.excerpt_id=? AND ef.value_status='VALID'
               """,
               rs -> {
                 var m = new java.util.LinkedHashMap<String, Double>();
-                while (rs.next()) m.put(rs.getString(1), rs.getObject(2, Double.class));
-                return m;
+                var statuses = new java.util.LinkedHashMap<String, String>();
+                while (rs.next()) {
+                  m.put(rs.getString(1), rs.getObject(2, Double.class));
+                  statuses.put(rs.getString(1), rs.getString(3));
+                }
+                return new FeatureSnapshot(m, statuses);
               },
               run,
               excerptId);
       var ranked =
           com.bookrush.analytics.excerpts.ExcerptRanker.rank(
-              values,
+              values.features(),
               new com.bookrush.analytics.excerpts.ExcerptRanker.Weights(
                   "EXCERPT_HEURISTIC_RANKER_V1", weights));
+      var dimensions =
+          com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.from(
+              values.features(), values.statuses());
       String components =
           "{"
               + ranked.contributions().entrySet().stream()
                   .map(e -> "\"" + e.getKey() + "\":" + e.getValue())
                   .collect(java.util.stream.Collectors.joining(","))
+              + ",\"dimensions\":"
+              + dimensionsJson(dimensions)
               + "}";
       jdbc.update(
           """
@@ -244,6 +253,30 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
           ranked.score());
     }
   }
+
+  private static String dimensionsJson(
+      Map<String, com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.Dimension> dimensions) {
+    return dimensions.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .map(
+            e -> {
+              var d = e.getValue();
+              String value = d.value() == null ? "null" : Double.toString(d.value());
+              return "\""
+                  + e.getKey()
+                  + "\":{\"value\":"
+                  + value
+                  + ",\"status\":\""
+                  + d.status()
+                  + "\",\"source_feature\":\""
+                  + d.sourceFeature()
+                  + "\"}";
+            })
+        .collect(java.util.stream.Collectors.joining(",", "{", "}"));
+  }
+
+  private record FeatureSnapshot(
+      Map<String, Double> features, Map<String, String> statuses) {}
 
   private void persistNli(UUID run, List<UUID> excerptIds, String language) {
     if (!Boolean.parseBoolean(System.getenv().getOrDefault("ANALYTICS_NLI_ENABLED", "false"))

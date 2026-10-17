@@ -33,6 +33,12 @@ produz um artefato versionado `EXCERPT_SUPERVISED_SCORER_V1` e calcula RMSE do
 baseline e do conjunto de stumps em holdout. A importância é a frequência de
 splits; a promoção continua condicionada à revisão humana e à avaliação do
 dataset.
+
+O endpoint de excerpts retorna também `rank_configuration_hash`, `rank_components`
+e `rank_weights`. Quando dimensões H/C/A/I/Q estiverem disponíveis, elas ficam
+dentro de `rank_components.dimensions`, cada uma com `value`, `status` e
+`source_feature`. Ausência ou indisponibilidade é preservada como `null`/status
+explícito; o worker não converte feature estrutural em rótulo narrativo.
 ## Validação real no ambiente de produção
 
 Em 2026-09-30 foi executada uma prova controlada com duas versões textuais

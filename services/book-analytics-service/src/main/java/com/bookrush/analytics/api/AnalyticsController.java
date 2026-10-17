@@ -395,6 +395,8 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
        e.end_codepoint, e.text, e.text_sha256, e.generation_method,
        e.generator_version, e.created_at, e.body_eligible, e.exclusion_reason,
        er.final_score AS candidate_score, er.ranker_code, er.ranker_version,
+       er.configuration_hash AS rank_configuration_hash,
+       er.components AS rank_components, er.weights AS rank_weights,
        em.code AS embedding_model, em.model_version AS embedding_model_version
   FROM analytics.excerpt e
   JOIN catalog.book_asset_version v ON v.id = e.source_asset_version_id
@@ -402,7 +404,8 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
   LEFT JOIN LATERAL (SELECT ee.embedding_model_id FROM analytics.excerpt_embedding ee
                       WHERE ee.excerpt_id = e.id ORDER BY ee.created_at DESC LIMIT 1) ee ON TRUE
  LEFT JOIN analytics.embedding_model em ON em.id = ee.embedding_model_id
- LEFT JOIN LATERAL (SELECT final_score, ranker_code, ranker_version FROM analytics.excerpt_rank er
+ LEFT JOIN LATERAL (SELECT final_score, ranker_code, ranker_version, configuration_hash,
+                           components, weights FROM analytics.excerpt_rank er
                     WHERE er.excerpt_id=e.id ORDER BY er.created_at DESC LIMIT 1) er ON TRUE
  WHERE a.book_id = ?
    AND e.body_eligible = TRUE
