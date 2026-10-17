@@ -143,6 +143,10 @@ construída sem alterar o `.env` protegido. O valor padrão continua sendo
 `bookrush/seaweedfs:4.46`. O procedimento, parâmetros e limites estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+Se o container existente estiver parado (`exited`), a pipeline dedicada pode
+recuperá-lo preservando o volume persistente; essa exceção é limitada ao job
+`bookrush-seaweedfs` e não permite substituir um container `unhealthy`.
+
 ### Importação Gutenberg (opt-in)
 
 O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para
