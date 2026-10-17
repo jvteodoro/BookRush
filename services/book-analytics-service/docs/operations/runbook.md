@@ -128,3 +128,25 @@ ANALYTICS_MODEL_VOLUME=bookrush_analytics_models bash scripts/test-analytics-mod
 Falha nessa validação é NO-GO para os gates do V1. `MODEL_UNAVAILABLE` não pode
 ser convertido em valores zero nem usado como evidência para fechar os beads de
 bulk-readiness.
+
+## Piloto isolado de capacidade
+
+Para medir o caminho de runtime sem tocar no catálogo, execute:
+
+```bash
+ANALYTICS_MODEL_VOLUME=bookrush_analytics_models \
+ANALYTICS_PILOT_OUTPUT=/tmp/bookrush-analytics-pilot.json \
+bash scripts/run-analytics-pilot.sh
+```
+
+O piloto gera pelo menos 500 fixtures determinísticas (seed `1337`), divide-as
+igualmente entre EN/PT, executa embeddings em lotes de 32 e verifica amostras
+de idioma, spaCy e NLI. O container monta o cache em somente leitura e o
+relatório declara explicitamente `writes_to_production=false` e
+`quality_gate=NOT_ASSESSED`.
+
+Execução de 2026-10-17: `GO_RUNTIME_CAPACITY`, 500/500 embeddings válidos,
+40/40 amostras válidas em fastText, spaCy e NLI, 6.000 candidatos estruturais,
+334,358 s e 1,495 livros/s. Esse resultado prova capacidade e integridade dos
+adaptadores, mas não é GO de qualidade editorial: ainda são necessários corpus
+real, revisão humana, comparação PT/EN e calibração do ranker/classificador.
