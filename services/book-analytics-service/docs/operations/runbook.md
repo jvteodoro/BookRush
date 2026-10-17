@@ -1,5 +1,8 @@
 # Runbook
 
+O desenho e as decisões de capacidade do job estão consolidados em
+[Arquitetura de processamento em lote](../../../../docs/analytics/batch-processing-architecture.md).
+
 Health: `/actuator/health`. OpenAPI: `/v3/api-docs` e `/swagger-ui/index.html`.
 Falhas de migration devem ser tratadas no banco do serviço; não use
 `ddl-auto=update` nem edite migrations aplicadas. Uma análise falha sem apagar

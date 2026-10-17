@@ -5,6 +5,10 @@
 **Escopo:** estado implementado e dados persistidos; este documento não declara
 prontidão para processamento em massa ou validação científica de modelos.
 
+As decisões de arquitetura para processamento de lotes pesados, recuperação de
+leases, persistência em lote e poda de candidatos estão em
+[Arquitetura de processamento em lote](batch-processing-architecture.md).
+
 ## Situação atual
 
 A pipeline barata está operacional no ambiente atual. O serviço Spring Boot é o
