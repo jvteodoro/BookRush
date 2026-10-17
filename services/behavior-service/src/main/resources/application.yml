@@ -20,6 +20,8 @@ management:
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
+  cors:
+    allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
   behavior:
     maintenance-enabled: ${BEHAVIOR_MAINTENANCE_ENABLED:true}
     retention-days: ${BEHAVIOR_RETENTION_DAYS:365}
