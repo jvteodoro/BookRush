@@ -22,6 +22,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -35,6 +37,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 @Component
 @ConditionalOnProperty(name = "analytics.worker.enabled", havingValue = "true")
 public final class AnalyticsJobWorker {
+  private static final Logger log = LoggerFactory.getLogger(AnalyticsJobWorker.class);
   private final JdbcTemplate jdbc;
   private final S3Client s3;
   private final AnalyticsMetrics metrics;
@@ -89,7 +92,9 @@ WITH next_item AS (
   ORDER BY i.created_at, i.id FOR UPDATE SKIP LOCKED LIMIT 1
 )
 UPDATE analytics.analysis_job_item i
-   SET status='RUNNING', attempt_count=i.attempt_count+1, started_at=clock_timestamp(), finished_at=NULL
+   SET status='RUNNING', attempt_count=i.attempt_count+1, started_at=clock_timestamp(), finished_at=NULL,
+       progress_stage='CLAIMED', progress_completed=0, progress_total=0,
+       progress_message='Item atribuído ao worker', progress_updated_at=clock_timestamp()
   FROM next_item n WHERE i.id=n.id
 RETURNING i.id, i.job_id, i.input_asset_version_id
 """,
@@ -107,8 +112,7 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
   /**
    * Returns items abandoned by a worker/container restart to the durable queue.
    *
-   * <p>The worker has no heartbeat because processing is bounded by the runtime timeout. A
-   * conservative lease prevents a crashed worker from permanently blocking a job while leaving
+   * <p>The progress heartbeat prevents a crashed worker from permanently blocking a job while leaving
    * genuinely active work enough time to finish. Only active, non-cancelled jobs are recovered.
    */
   int recoverStaleItems() {
@@ -122,17 +126,20 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
   static String staleLeaseRecoverySql() {
     return """
 UPDATE analytics.analysis_job_item i
-   SET status='PENDING', started_at=NULL, finished_at=NULL, analysis_run_id=NULL
+   SET status='PENDING', started_at=NULL, finished_at=NULL, analysis_run_id=NULL,
+       progress_stage='RECOVERED', progress_message='Lease expirado; item recolocado na fila',
+       progress_updated_at=clock_timestamp()
   FROM analytics.analysis_job j
  WHERE i.job_id=j.id
    AND i.status='RUNNING'
    AND j.cancel_requested=false
    AND j.status IN ('PENDING','RUNNING')
-   AND i.started_at < clock_timestamp() - (? * INTERVAL '1 second')
+   AND COALESCE(i.progress_updated_at, i.started_at) < clock_timestamp() - (? * INTERVAL '1 second')
 """;
   }
 
   private void process(Item item) throws IOException {
+    updateProgress(item, "LOADING_TEXT", 0, 1, "Carregando texto normalizado");
     var physical =
         jdbc.query(
             """
@@ -210,6 +217,8 @@ UPDATE analytics.analysis_job_item i
       if (pilotLimit > 0 && candidates.size() > pilotLimit) {
         candidates = candidates.subList(0, pilotLimit);
       }
+      updateProgress(item, "EXCERPTS", candidates.size(), candidates.size(),
+          "Excerpts candidatos persistidos");
       var excerptIds = new java.util.ArrayList<UUID>();
       for (var candidate : candidates) {
         var id =
@@ -222,7 +231,8 @@ UPDATE analytics.analysis_job_item i
                 language);
         if (id != null) excerptIds.add(id);
       }
-      var excerptVectors = persistEmbeddings(item.inputVersion(), excerptIds, candidates);
+      var excerptVectors = persistEmbeddings(item, excerptIds, candidates);
+      updateProgress(item, "SCOPE_EMBEDDINGS", 0, 1, "Calculando embeddings de capítulo/documento");
       var scopeEmbeddings = persistChapterAndDocumentEmbeddings(
           item.inputVersion(), text, chapters, generatorConfig.version());
       persistPrototypeScores(run, excerptIds, candidates, excerptVectors, scopeEmbeddings, language);
@@ -603,7 +613,8 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
   }
 
   private Map<UUID, List<Double>> persistEmbeddings(
-      UUID version, List<UUID> excerptIds, List<ExcerptCandidateGenerator.V2Candidate> candidates) {
+      Item item, List<UUID> excerptIds, List<ExcerptCandidateGenerator.V2Candidate> candidates) {
+    UUID version = item.inputVersion();
     var vectorsByExcerpt = new java.util.LinkedHashMap<UUID, List<Double>>();
     if (excerptIds.isEmpty() || excerptIds.size() != candidates.size()) return vectorsByExcerpt;
     // The runtime deliberately bounds requests to 32 texts. Chunking here also
@@ -613,16 +624,27 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
     // exceed the runtime read timeout even though the request is valid.
     final int batchSize = 4;
     String bucket = System.getenv().getOrDefault("STORAGE_BUCKET_ML", "books-ml");
+    int total = candidates.size();
     for (int offset = 0; offset < candidates.size(); offset += batchSize) {
       int end = Math.min(offset + batchSize, candidates.size());
       var texts =
           candidates.subList(offset, end).stream()
               .map(ExcerptCandidateGenerator.V2Candidate::text)
               .toList();
+      updateProgress(item, "EMBEDDINGS", offset, total,
+          "Solicitando lote " + (offset + 1) + "-" + end + " de " + total);
+      long startedNanos = System.nanoTime();
       var result = linguisticRuntime.embeddings(texts, 8192);
+      long durationMs = (System.nanoTime() - startedNanos) / 1_000_000;
+      log.info("analytics embeddings progress itemId={} version={} batch={}-{} total={} durationMs={} status={} vectors={}",
+          item.id(), version, offset + 1, end, total, durationMs, result.status(), result.vectors().size());
       if (!"VALID".equals(result.status())
           || result.vectors().size() != texts.size()
-          || result.inputHashes().size() != texts.size()) continue;
+          || result.inputHashes().size() != texts.size()) {
+        updateProgress(item, "EMBEDDINGS", offset, total,
+            "Runtime não retornou um lote válido: " + result.status());
+        continue;
+      }
       var modelId =
           jdbc.query(
               "SELECT id FROM analytics.embedding_model WHERE code=?",
@@ -662,8 +684,17 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
             key);
         vectorsByExcerpt.put(excerptIds.get(offset + i), result.vectors().get(i));
       }
+      updateProgress(item, "EMBEDDINGS", end, total,
+          "Lote persistido " + end + "/" + total + " (" + durationMs + " ms)");
     }
     return vectorsByExcerpt;
+  }
+
+  private void updateProgress(Item item, String stage, int completed, int total, String message) {
+    jdbc.update(
+        "UPDATE analytics.analysis_job_item SET progress_stage=?, progress_completed=?, progress_total=?,"
+            + " progress_message=?, progress_updated_at=clock_timestamp() WHERE id=?",
+        stage, Math.max(0, completed), Math.max(0, total), message, item.id());
   }
 
   private void persistPrototypeScores(
@@ -936,6 +967,8 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
   private void complete(Item item) {
     jdbc.update(
         "UPDATE analytics.analysis_job_item SET status='COMPLETED', finished_at=clock_timestamp(),"
+            + " progress_stage='COMPLETED', progress_completed=1, progress_total=1,"
+            + " progress_message='Item concluído', progress_updated_at=clock_timestamp(),"
             + " error_code=NULL, error_message=NULL WHERE id=?",
         item.id());
     jdbc.update(
@@ -956,7 +989,9 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
     if (isRetryable(code, exception)) {
       jdbc.update(
           "UPDATE analytics.analysis_job_item SET status='PENDING', finished_at=clock_timestamp(),"
+              + " progress_stage='RETRYING', progress_message=?, progress_updated_at=clock_timestamp(),"
               + " error_code=?, error_message=? WHERE id=?",
+          safeMessage,
           code,
           safeMessage,
           item.id());
@@ -968,7 +1003,9 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
     }
     jdbc.update(
         "UPDATE analytics.analysis_job_item SET status='FAILED', finished_at=clock_timestamp(),"
+            + " progress_stage='FAILED', progress_message=?, progress_updated_at=clock_timestamp(),"
             + " error_code=?, error_message=? WHERE id=?",
+        safeMessage,
         code,
         safeMessage,
         item.id());

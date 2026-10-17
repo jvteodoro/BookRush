@@ -359,6 +359,14 @@ function JobQueue({
                 {job.failedItems} falhas
               </span>
             </div>
+            {(job.progressStage || job.lastProgressAt) && (
+              <small>
+                Etapa: {job.progressStage ?? "não informada"}
+                {job.lastProgressAt
+                  ? ` · último avanço: ${new Date(job.lastProgressAt).toLocaleString()}`
+                  : ""}
+              </small>
+            )}
           </div>
         );
       })}

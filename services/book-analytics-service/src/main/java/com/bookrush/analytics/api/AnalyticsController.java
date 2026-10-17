@@ -167,7 +167,8 @@ public class AnalyticsController {
     var rows =
         jdbc.queryForList(
             "SELECT id, operation_key, status, total_items, processed_items, succeeded_items,"
-                + " failed_items, cancel_requested, created_at, started_at, finished_at FROM"
+                + " failed_items, cancel_requested, created_at, started_at, finished_at,"
+                + " (SELECT max(progress_updated_at) FROM analytics.analysis_job_item WHERE job_id=analysis_job.id) AS last_progress_at FROM"
                 + " analytics.analysis_job WHERE id=?",
             jobId);
     return rows.isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(rows.getFirst());
@@ -198,7 +199,9 @@ public class AnalyticsController {
                count(i.id) FILTER (WHERE i.status='PENDING') AS pending_items,
                count(i.id) FILTER (WHERE i.status='RUNNING') AS running_items,
                count(i.id) FILTER (WHERE i.status='COMPLETED') AS completed_items,
-               count(i.id) FILTER (WHERE i.status='FAILED') AS failed_items
+               count(i.id) FILTER (WHERE i.status='FAILED') AS failed_items,
+               max(i.progress_updated_at) AS last_progress_at,
+               max(i.progress_stage) FILTER (WHERE i.status='RUNNING') AS progress_stage
           FROM analytics.analysis_job j
           LEFT JOIN analytics.analysis_job_item i ON i.job_id=j.id
          WHERE (CAST(? AS text) IS NULL OR CAST(? AS text) = '' OR j.status = CAST(? AS text))
@@ -265,7 +268,8 @@ public class AnalyticsController {
     return ResponseEntity.ok(
         jdbc.queryForList(
             "SELECT id, input_asset_version_id, status, attempt_count, analysis_run_id, error_code,"
-                + " error_message, started_at, finished_at FROM analytics.analysis_job_item WHERE"
+                + " error_message, started_at, finished_at, progress_stage, progress_completed,"
+                + " progress_total, progress_message, progress_updated_at FROM analytics.analysis_job_item WHERE"
                 + " job_id=? ORDER BY created_at, id",
             jobId));
   }

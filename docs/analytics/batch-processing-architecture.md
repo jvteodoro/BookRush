@@ -87,6 +87,27 @@ Essa estratégia é uma lease lógica, não um heartbeat. Ela é adequada porque
 processamento de um item é limitado por timeout de storage/runtime e porque o
 estado persistente permite retomar o lote sem intervenção manual no banco.
 
+## Progresso e detecção de travamento
+
+Desde a migration `V21__analytics_item_progress.sql`, cada
+`analysis_job_item` mantém `progress_stage`, `progress_completed`,
+`progress_total`, `progress_message` e `progress_updated_at`. O worker atualiza
+esses campos antes e depois de cada lote de embeddings (lotes de quatro), além
+de registrar no log o item, intervalo do lote, status do runtime e duração.
+
+Isso separa três situações que antes apareciam apenas como `RUNNING`:
+
+- `progress_updated_at` recente e chamadas `200` do runtime: processamento lento,
+  mas ativo;
+- etapa `EMBEDDINGS` sem atualização além do lease: item potencialmente travado,
+  recuperável pelo mecanismo de lease;
+- `FAILED`/`RETRYING`: erro explícito com código e mensagem persistidos.
+
+As APIs administrativas de job e item devolvem os campos de progresso. O
+admin-web exibe a etapa e o horário do último avanço, permitindo correlacionar
+o estado persistido com os logs do `book-analytics-runtime` sem interpretar
+um contador global estagnado como prova suficiente de travamento.
+
 Falhas transitórias durante o processamento seguem o mesmo princípio: o item
 volta a `PENDING`, preserva `attempt_count` e aguarda um backoff progressivo.
 São permitidas três tentativas por padrão. Falhas determinísticas, como hash

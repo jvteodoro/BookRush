@@ -525,6 +525,16 @@ export const services = {
         runningItems: Number(raw.running_items ?? raw.runningItems ?? 0),
         completedItems: Number(raw.completed_items ?? raw.completedItems ?? 0),
         cancelRequested: Boolean(raw.cancel_requested ?? raw.cancelRequested),
+        lastProgressAt: raw.last_progress_at
+          ? String(raw.last_progress_at)
+          : raw.lastProgressAt
+            ? String(raw.lastProgressAt)
+            : undefined,
+        progressStage: raw.progress_stage
+          ? String(raw.progress_stage)
+          : raw.progressStage
+            ? String(raw.progressStage)
+            : undefined,
         createdAt: raw.created_at ? String(raw.created_at) : undefined,
         startedAt: raw.started_at ? String(raw.started_at) : undefined,
         finishedAt: raw.finished_at ? String(raw.finished_at) : undefined,

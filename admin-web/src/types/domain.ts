@@ -50,6 +50,8 @@ export interface AnalyticsJob {
   runningItems: number;
   completedItems: number;
   cancelRequested: boolean;
+  lastProgressAt?: string;
+  progressStage?: string;
   createdAt?: string;
   startedAt?: string;
   finishedAt?: string;
