@@ -15,6 +15,8 @@ O serviço continua sendo o único dono do schema `analytics`. O worker Java coo
   `author_id::work_id`, seed, baseline por dimensão, GBDT determinístico de
   stumps residuais, métricas holdout, importância explicável e hash;
 - observabilidade de baixa cardinalidade, sem IDs de livros em labels.
+- contrato operacional documentado para gates de elegibilidade, provenance do
+  ranker e seleção MMR em `docs/analytics-v2-selection.md`.
 
 ## Preparação de modelos
 

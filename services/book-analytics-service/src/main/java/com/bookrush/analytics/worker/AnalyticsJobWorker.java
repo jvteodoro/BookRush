@@ -9,6 +9,7 @@ import com.bookrush.analytics.excerpts.HeuristicRankerConfig;
 import com.bookrush.analytics.features.EmbeddingMath;
 import com.bookrush.analytics.features.LinguisticRuntimeClient;
 import com.bookrush.analytics.features.LanguageEvidence;
+import com.bookrush.analytics.features.LanguageValidation;
 import com.bookrush.analytics.features.TextFeatureCalculator;
 import com.bookrush.analytics.llm.TopNliCandidateSelector;
 import com.bookrush.analytics.llm.NliHypothesisCatalog;
@@ -372,7 +373,14 @@ UPDATE analytics.analysis_job_item i
           () -> chapters(item.inputVersion(), TextAssetReader.codePointLength(text)));
       String catalogLanguage = languageFor(item.inputVersion());
       String language = catalogLanguage;
-      var detected = timed(item, "LANGUAGE_VALIDATION", () -> linguisticRuntime.language(text));
+      var detected = timed(item, "LANGUAGE_VALIDATION", () -> {
+        var invalidInput = LanguageValidation.validateInputText(text);
+        if (invalidInput != null) {
+          return new LinguisticRuntimeClient.LanguageResult(
+              invalidInput.status().name(), null, invalidInput.confidence(), invalidInput.warning());
+        }
+        return linguisticRuntime.language(text);
+      });
       if ("VALID".equals(detected.status())
           && ("en".equals(detected.language()) || "pt".equals(detected.language()))
           && detected.confidence() >= 0.60d) language = detected.language();
