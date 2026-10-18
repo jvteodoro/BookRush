@@ -10,7 +10,8 @@ materializados.
 O estágio de validação do `bookrush-deploy` executa
 `scripts/validate-change.sh --ci` dentro da imagem `python:3.12-slim`,
 instalando o `git`, `PyYAML` e `jsonschema` no container efêmero antes do gate.
-As pipelines isoladas usam o mesmo container para o gate do analytics. Assim, o agente Jenkins
+As pipelines isoladas usam o mesmo container e também instalam o Git antes do
+gate do analytics. Assim, o agente Jenkins
 precisa apenas do Docker CLI/daemon acessível; ele não precisa ter `python3` ou
 `git` instalados diretamente no container do agente. O gate também registra
 `/repo` como `safe.directory`, pois o workspace montado pode pertencer ao
