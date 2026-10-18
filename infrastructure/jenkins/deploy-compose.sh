@@ -10,6 +10,8 @@ fi
 : "${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}"
 : "${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}"
 : "${SOCIAL_IMAGE:?Imagem social ausente}"
+: "${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}"
+: "${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --profile auth)
 storage_public_endpoint="$(awk -F= '$1 == "STORAGE_PUBLIC_ENDPOINT" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
@@ -29,15 +31,17 @@ old_analytics="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analy
 old_analytics_runtime="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analytics-runtime-1 2>/dev/null || true)"
 old_reader_profile="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-profile-service-1 2>/dev/null || true)"
 old_social="$(docker inspect --format '{{.Config.Image}}' bookrush-social-service-1 2>/dev/null || true)"
+old_admin_service="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-service-1 2>/dev/null || true)"
+old_admin_web="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-web-1 2>/dev/null || true)"
 keycloak_state="$(docker inspect --format '{{.State.Status}}' bookrush-keycloak-1 2>/dev/null || true)"
 diagnose() {
-  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-frontend-1; do
+  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-frontend-1; do
     echo "--- diagnóstico $service ---" >&2
     docker inspect --format 'state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} image={{.Config.Image}}' "$service" >&2 || true
     docker logs --tail=120 --timestamps "$service" >&2 || true
   done
 }
-compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service reader-profile-service social-service frontend)
+compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service reader-profile-service social-service admin-service admin-web frontend)
 if [[ -n "$keycloak_state" ]]; then
   if [[ "$keycloak_state" != running ]]; then
     docker start bookrush-keycloak-1 >/dev/null
@@ -56,8 +60,8 @@ fi
 
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
-  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_reader_profile" && -n "$old_social" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
+  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
   else
@@ -67,7 +71,7 @@ rollback() {
 }
 
 echo "Iniciando deploy das imagens:" >&2
-printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${FRONTEND_IMAGE}" >&2
+printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${ADMIN_SERVICE_IMAGE}" "${ADMIN_WEB_IMAGE}" "${FRONTEND_IMAGE}" >&2
 
 # Não usar somente trap ERR: docker compose pode falhar durante --wait e o
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.

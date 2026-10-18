@@ -14,7 +14,7 @@ test -f infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertica
 test -f infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline do SeaweedFS ausente'
 test -f infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline do admin-web ausente'
 
-for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-keycloak-access-lifecycle.sh scripts/test-microservice.sh scripts/test-reader-bff-e2e.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
+for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-keycloak-access-lifecycle.sh scripts/test-keycloak-user-management.sh scripts/test-microservice.sh scripts/test-reader-bff-e2e.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
   test -f "$file" || fail "script referenciado não existe: $file"
   bash -n "$file" || fail "sintaxe inválida: $file"
 done
@@ -25,6 +25,7 @@ grep -Fq 'bash scripts/test-portal.sh' infrastructure/jenkins/backstage.Jenkinsf
 grep -Fq 'scripts/test-storage.sh' Jenkinsfile || fail 'pipeline principal sem validação de storage'
 grep -Fq 'bash scripts/test-keycloak-reconcile.sh' Jenkinsfile || fail 'pipeline principal sem validação de reconcile Keycloak'
 grep -Fq 'bash scripts/test-keycloak-access-lifecycle.sh' Jenkinsfile || fail 'pipeline principal sem validação de ciclo de acesso Keycloak'
+grep -Fq 'bash scripts/test-keycloak-user-management.sh' Jenkinsfile || fail 'pipeline principal sem validação de gerenciamento de usuários Keycloak'
 grep -Fq 'scripts/test-microservice.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem executor'
 grep -Fq 'scripts/test-vertical.sh' infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical sem executor'
 grep -Fq 'scripts/deploy-compose-service.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem deploy Compose'

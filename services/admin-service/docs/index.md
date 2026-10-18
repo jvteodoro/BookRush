@@ -25,9 +25,17 @@ exigem token do realm `bookrush-platform` com grupo `operators` ou
 `realm-management`; o segredo é fornecido somente por
 `KEYCLOAK_ADMIN_CLIENT_SECRET`.
 
-O endpoint `/users/{subjectKey}/disable|enable` grava auditoria e uma linha de
-restrição após a confirmação do Keycloak. Sem a configuração do cliente, a API
+`GET /users` consulta diretamente o realm de produto `bookrush`, incluindo
+contas que ainda não criaram perfil, e aceita `search`, `page` e `size`. Os
+endpoints `/users/{subjectKey}/disable|enable` exigem motivo, gravam auditoria e
+uma linha de restrição somente após a confirmação do Keycloak. Desabilitar uma
+conta também encerra suas sessões ativas. Sem a configuração do cliente, a API
 responde `503` em vez de fingir que a alteração foi aplicada.
+
+A conta humana administrativa continua autenticada no realm
+`bookrush-platform`. A conta de serviço é separada, existe no realm `bookrush`
+e recebe somente `query-users`, `view-users` e `manage-users`; assim o token técnico gerencia
+leitores sem ampliar as permissões do login humano.
 The service validates the `bookrush-platform` issuer/JWK set and requires the
 `bookrush-ingestion` audience. It maps both OAuth scopes and the Keycloak
 `groups` claim to `SCOPE_*`/`ROLE_*` authorities before enforcing operator

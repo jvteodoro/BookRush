@@ -270,7 +270,9 @@ construir as imagens correspondentes depois de uma alteração. O admin-web usa
 `VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for
 ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
 quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
-cliente possui `query-users`/`manage-users` no realm-management.
+cliente possui `query-users`/`view-users`/`manage-users` no `realm-management` do realm de
+produto `bookrush`. A autenticação humana do painel continua no realm separado
+`bookrush-platform`.
 
 Na primeira ativação do `admin-service`, provisionar e validar o cliente sem
 exibir ou versionar o segredo:

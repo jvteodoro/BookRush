@@ -97,11 +97,19 @@ export type ApprovalHistoryPage = {
 };
 export type AdminUser = {
   subjectKey: string;
-  displayName?: string;
-  bio?: string;
-  isPublic?: boolean;
-  enabled?: boolean;
-  updatedAt?: string;
+  username: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  enabled: boolean;
+  createdTimestamp?: number;
+};
+export type AdminUserPage = {
+  items: AdminUser[];
+  page: number;
+  size: number;
+  totalItems: number;
+  last: boolean;
 };
 export type AdminReport = {
   id: string;
@@ -172,20 +180,34 @@ function mapBook(raw: Record<string, unknown>): BookCandidate {
 }
 
 export const services = {
-  async listAdminUsers(): Promise<AdminUser[]> {
-    const { data } = await adminHttp.get("/api/v1/admin/users");
-    return (data.items ?? data).map((item: Record<string, unknown>) => ({
-      subjectKey: String(item.subjectKey ?? item.subject_key),
-      displayName: item.displayName ?? item.display_name,
-      bio: item.bio,
-      isPublic: item.isPublic ?? item.is_public,
-      enabled: item.enabled !== false,
-      updatedAt: item.updatedAt ?? item.updated_at,
-    }));
+  async listAdminUsers(
+    search = "",
+    page = 0,
+    size = 25,
+  ): Promise<AdminUserPage> {
+    const { data } = await adminHttp.get("/api/v1/admin/users", {
+      params: { search: search.trim(), page, size },
+    });
+    return {
+      items: data.items.map((item: Record<string, unknown>) => ({
+        subjectKey: String(item.subjectKey),
+        username: String(item.username),
+        email: item.email ? String(item.email) : undefined,
+        firstName: item.firstName ? String(item.firstName) : undefined,
+        lastName: item.lastName ? String(item.lastName) : undefined,
+        enabled: item.enabled !== false,
+        createdTimestamp: Number(item.createdTimestamp ?? 0),
+      })),
+      page: Number(data.page),
+      size: Number(data.size),
+      totalItems: Number(data.totalItems),
+      last: Boolean(data.last),
+    };
   },
-  async setUserEnabled(subjectKey: string, enabled: boolean) {
+  async setUserEnabled(subjectKey: string, enabled: boolean, reason: string) {
     const { data } = await adminHttp.post(
       `/api/v1/admin/users/${encodeURIComponent(subjectKey)}/${enabled ? "enable" : "disable"}`,
+      { reason },
     );
     return data;
   },

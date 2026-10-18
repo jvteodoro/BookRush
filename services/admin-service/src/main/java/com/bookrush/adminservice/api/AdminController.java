@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -110,35 +111,66 @@ public class AdminController {
   }
 
   @GetMapping("/users")
-  public Object users(Principal principal, Authentication authentication) {
+  public Object users(@RequestParam(defaultValue = "") String search,
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "25") int size,
+      Principal principal, Authentication authentication) {
     requireOperator(authentication);
     actor(principal);
-    var users = jdbc.queryForList("SELECT subject_key, display_name, bio, is_public, updated_at "
-        + "FROM reader_profile.profile ORDER BY updated_at DESC LIMIT 100");
-    users.forEach(user -> user.put("enabled", keycloak.isEnabled(String.valueOf(user.get("subject_key")))));
-    return users;
+    if (page < 0 || size < 1 || size > 100) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page or size is outside the allowed range");
+    }
+    var users = keycloak.users(search, page, size).stream().map(user -> Map.of(
+        "subjectKey", String.valueOf(user.get("id")),
+        "username", String.valueOf(user.getOrDefault("username", "")),
+        "email", String.valueOf(user.getOrDefault("email", "")),
+        "firstName", String.valueOf(user.getOrDefault("firstName", "")),
+        "lastName", String.valueOf(user.getOrDefault("lastName", "")),
+        "enabled", !Boolean.FALSE.equals(user.get("enabled")),
+        "createdTimestamp", user.getOrDefault("createdTimestamp", 0))).toList();
+    long total = keycloak.count(search);
+    return Map.of("items", users, "page", page, "size", size,
+        "totalItems", total, "last", (long) (page + 1) * size >= total);
   }
 
   @PostMapping("/users/{subjectKey}/disable")
-  public Object disable(@PathVariable String subjectKey, Principal principal, Authentication authentication) {
-    return setEnabled(subjectKey, false, principal, authentication);
+  public Object disable(@PathVariable String subjectKey, @RequestBody UserStatusChange change,
+      Principal principal, Authentication authentication) {
+    return setEnabled(subjectKey, false, change, principal, authentication);
   }
 
   @PostMapping("/users/{subjectKey}/enable")
-  public Object enable(@PathVariable String subjectKey, Principal principal, Authentication authentication) {
-    return setEnabled(subjectKey, true, principal, authentication);
+  public Object enable(@PathVariable String subjectKey, @RequestBody UserStatusChange change,
+      Principal principal, Authentication authentication) {
+    return setEnabled(subjectKey, true, change, principal, authentication);
   }
 
-  private Object setEnabled(String subjectKey, boolean enabled, Principal principal, Authentication authentication) {
+  public record UserStatusChange(String reason) {}
+
+  private Object setEnabled(String subjectKey, boolean enabled, UserStatusChange change,
+      Principal principal, Authentication authentication) {
     requireOperator(authentication);
     String actor = actor(principal);
+    if (subjectKey == null || subjectKey.isBlank()) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "subjectKey is required");
+    }
+    String reason = change == null || change.reason() == null ? "" : change.reason().trim();
+    if (reason.length() < 3 || reason.length() > 200) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reason must contain 3 to 200 characters");
+    }
+    if (subjectKey.equals(actor)) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "operators cannot change their own account status");
+    }
     keycloak.setEnabled(subjectKey, enabled);
-    jdbc.update("INSERT INTO admin.audit_log(id, actor_subject, action, target, details) VALUES (?, ?, ?, ?, ?::jsonb)",
+    jdbc.update("INSERT INTO admin.audit_log(id, actor_subject, action, target, details) "
+            + "VALUES (?, ?, ?, ?, jsonb_build_object('source', 'keycloak-admin-api', 'enabled', ?, 'reason', ?))",
         UUID.randomUUID(), actor, enabled ? "USER_ENABLED" : "USER_DISABLED", subjectKey,
-        "{\"source\":\"keycloak-admin-api\"}");
-    jdbc.update("INSERT INTO admin.user_restriction(id, target_subject_key, status, reason_code, actor_subject, keycloak_command_key, confirmed_at, details) VALUES (?, ?, ?, ?, ?, ?, now(), ?::jsonb)",
+        enabled, reason);
+    jdbc.update("INSERT INTO admin.user_restriction(id, target_subject_key, status, reason_code, actor_subject, "
+            + "keycloak_command_key, confirmed_at, details) VALUES (?, ?, ?, ?, ?, ?, now(), "
+            + "jsonb_build_object('source', 'keycloak-admin-api', 'enabled', ?, 'reason', ?))",
         UUID.randomUUID(), subjectKey, enabled ? "REVOKED" : "ACTIVE", enabled ? "ADMIN_RESTORE" : "ADMIN_DISABLE",
-        actor, "admin-" + UUID.randomUUID(), "{\"enabled\":" + enabled + "}");
+        actor, "admin-" + UUID.randomUUID(), enabled, reason);
     return Map.of("subjectKey", subjectKey, "enabled", enabled, "updated", true);
   }
 

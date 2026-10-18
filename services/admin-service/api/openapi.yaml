@@ -1,5 +1,93 @@
 openapi: 3.0.3
 info:
-  title: admin-service
-  version: 0.1.0
-paths: {}
+  title: BookRush Admin API
+  version: 0.2.0
+  description: Administrative user lifecycle and audit operations.
+paths:
+  /api/v1/admin/users:
+    get:
+      summary: Search product-realm users
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses:
+        '200':
+          description: Paginated users from the product Keycloak realm
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPage' }
+        '400': { description: Invalid pagination }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+        '503': { description: Product-realm management client is not configured }
+  /api/v1/admin/users/{subjectKey}/disable:
+    post:
+      summary: Disable a product user and revoke active sessions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: subjectKey, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserStatusChange' }
+      responses:
+        '200': { description: User disabled and action audited }
+        '400': { description: Invalid reason }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+        '404': { description: Product user not found }
+        '409': { description: Operator cannot modify their own account }
+        '502': { description: Keycloak rejected the operation }
+        '503': { description: Product-realm management client is not configured }
+  /api/v1/admin/users/{subjectKey}/enable:
+    post:
+      summary: Re-enable a product user
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: subjectKey, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserStatusChange' }
+      responses:
+        '200': { description: User enabled and action audited }
+        '400': { description: Invalid reason }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+        '404': { description: Product user not found }
+        '409': { description: Operator cannot modify their own account }
+        '502': { description: Keycloak rejected the operation }
+        '503': { description: Product-realm management client is not configured }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    UserStatusChange:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 200 }
+    AdminUser:
+      type: object
+      required: [subjectKey, username, enabled]
+      properties:
+        subjectKey: { type: string }
+        username: { type: string }
+        email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
+        enabled: { type: boolean }
+        createdTimestamp: { type: integer, format: int64 }
+    UserPage:
+      type: object
+      required: [items, page, size, totalItems, last]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/AdminUser' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalItems: { type: integer, format: int64 }
+        last: { type: boolean }
