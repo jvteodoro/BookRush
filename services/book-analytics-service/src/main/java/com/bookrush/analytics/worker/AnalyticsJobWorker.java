@@ -72,8 +72,9 @@ UPDATE analytics.analysis_job_item
        error_code=NULL, error_message=NULL, progress_stage='PENDING',
        progress_completed=0, progress_total=0, progress_message=NULL,
        progress_updated_at=clock_timestamp()
- WHERE status='RUNNING' AND error_code IS NOT NULL
-   AND progress_updated_at < clock_timestamp() - INTERVAL '60 seconds'
+ WHERE status='RUNNING'
+   AND ((error_code IS NOT NULL AND progress_updated_at < clock_timestamp() - INTERVAL '60 seconds')
+        OR (error_code IS NULL AND progress_updated_at < clock_timestamp() - INTERVAL '10 minutes'))
    AND job_id IN (SELECT id FROM analytics.analysis_job WHERE status IN ('PENDING','RUNNING'))
 """);
   }

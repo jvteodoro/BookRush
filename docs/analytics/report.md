@@ -239,6 +239,10 @@ janela de segurança, itens `RUNNING` com erro deixados por uma recriação do
 container; isso evita que uma execução interrompida bloqueie o lote. Não conclua que o job terminou apenas
 porque um container está saudável.
 
+Itens `RUNNING` sem erro também são recuperados quando o timestamp de progresso
+fica inalterado por dez minutos, evitando que uma queda abrupta do processo
+deixe o job permanentemente ocupado.
+
 O gerador de excerpts também descarta sentenças compostas apenas por
 separadores/whitespace. Esses intervalos não têm conteúdo e, se fossem
 persistidos, poderiam inverter os offsets Unicode (`start > end`) e interromper
