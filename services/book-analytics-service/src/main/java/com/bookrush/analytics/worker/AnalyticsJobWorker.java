@@ -9,6 +9,8 @@ import com.bookrush.analytics.features.LinguisticRuntimeClient;
 import com.bookrush.analytics.features.LanguageEvidence;
 import com.bookrush.analytics.features.TextFeatureCalculator;
 import com.bookrush.analytics.llm.TopNliCandidateSelector;
+import com.bookrush.analytics.llm.NliHypothesisCatalog;
+import com.bookrush.analytics.llm.NliInferenceAdapter;
 import com.bookrush.analytics.observability.AnalyticsMetrics;
 import com.bookrush.analytics.storage.TextAssetReader;
 import java.io.IOException;
@@ -58,6 +60,7 @@ public final class AnalyticsJobWorker {
   private final Semaphore processingSlots;
   private final com.bookrush.analytics.excerpts.SupervisedCandidateScorer supervisedScorer;
   private final HeuristicRankerConfig heuristicRankerConfig;
+  private final NliInferenceAdapter nliInference;
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
@@ -72,7 +75,8 @@ public final class AnalyticsJobWorker {
       @Value("${analytics.scorer.enabled:false}") boolean scorerEnabled,
       @Value("${analytics.scorer.artifact:${analytics.models.cache-dir}/candidate-scorer.json}") String scorerArtifact,
       @Value("${analytics.scorer.allow-experimental:false}") boolean allowExperimentalScorer,
-      @Value("${analytics.ranker.config:classpath:analytics-ranker-v1.json}") Resource rankerConfigResource) {
+      @Value("${analytics.ranker.config:classpath:analytics-ranker-v1.json}") Resource rankerConfigResource,
+      @Value("${analytics.nli.hypotheses:classpath:nli-hypotheses-v1.json}") Resource nliHypothesisResource) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
@@ -90,6 +94,18 @@ public final class AnalyticsJobWorker {
     });
     this.heuristicRankerConfig = loadHeuristicRankerConfig(rankerConfigResource);
     this.supervisedScorer = loadSupervisedScorer(scorerEnabled, scorerArtifact, allowExperimentalScorer);
+    this.nliInference = new NliInferenceAdapter(this.linguisticRuntime, loadNliHypotheses(nliHypothesisResource));
+  }
+
+  private NliHypothesisCatalog loadNliHypotheses(Resource resource) {
+    try {
+      var catalog = NliHypothesisCatalog.load(resource.getInputStream());
+      log.info("analytics NLI hypotheses configured code={} version={} languages={}",
+          catalog.code(), catalog.version(), catalog.sets().keySet());
+      return catalog;
+    } catch (IOException e) {
+      throw new IllegalStateException("unable to load NLI hypothesis catalog", e);
+    }
   }
 
   private HeuristicRankerConfig loadHeuristicRankerConfig(Resource resource) {
@@ -323,7 +339,7 @@ UPDATE analytics.analysis_job_item i
       }
     });
     var generatorConfig = generatorProperties.candidateConfig();
-    var configuration = configurationJson(generatorConfig);
+    var configuration = configurationJson(generatorConfig, nliInference);
     var configurationHash = sha256(configuration);
     var analyzer =
         jdbc.queryForObject(
@@ -585,37 +601,21 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
         TopNliCandidateSelector.select(candidates, excerptIds, embeddings, limit).stream()
             .map(TopNliCandidateSelector.Selection::excerptId)
             .toList();
-    var hypotheses = nliHypotheses(language);
-    for (UUID excerptId : selected) {
+      for (UUID excerptId : selected) {
       String text =
           jdbc.query(
               "SELECT text FROM analytics.excerpt WHERE id=?",
               rs -> rs.next() ? rs.getString(1) : null,
               excerptId);
       if (text == null) continue;
-      for (var entry : hypotheses.entrySet()) {
-        var result = linguisticRuntime.nli(text, entry.getValue());
-        if (!"VALID".equals(result.status())) continue;
-        var score = result.score();
-        persistNliValue(
-            run, excerptId, "narrative." + entry.getKey(), "entailment", score.entailment());
-        persistNliValue(run, excerptId, "narrative." + entry.getKey(), "neutral", score.neutral());
-        persistNliValue(
-            run, excerptId, "narrative." + entry.getKey(), "contradiction", score.contradiction());
-        persistNliValue(run, excerptId, "narrative." + entry.getKey(), "support", score.support());
-        persistNliValue(
-            run, excerptId, "narrative." + entry.getKey(), "confidence", score.confidence());
-      }
-      for (var entry : emotionHypotheses(language).entrySet()) {
-        var result = linguisticRuntime.nli(text, entry.getValue());
-        if (!"VALID".equals(result.status())) continue;
-        var score = result.score();
-        String prefix = "emotion." + entry.getKey();
-        persistNliValue(run, excerptId, prefix, "entailment", score.entailment());
-        persistNliValue(run, excerptId, prefix, "neutral", score.neutral());
-        persistNliValue(run, excerptId, prefix, "contradiction", score.contradiction());
-        persistNliValue(run, excerptId, prefix, "support", score.support());
-        persistNliValue(run, excerptId, prefix, "confidence", score.confidence());
+      for (var observation : nliInference.infer(text, language)) {
+        if (!"VALID".equals(observation.status())) continue;
+        String prefix = observation.kind() + "." + observation.key();
+        persistNliValue(run, excerptId, prefix, "entailment", observation.entailment());
+        persistNliValue(run, excerptId, prefix, "neutral", observation.neutral());
+        persistNliValue(run, excerptId, prefix, "contradiction", observation.contradiction());
+        persistNliValue(run, excerptId, prefix, "support", observation.support());
+        persistNliValue(run, excerptId, prefix, "confidence", observation.confidence());
       }
     }
   }
@@ -1322,7 +1322,8 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         || code.contains("ResourceAccess");
   }
 
-  private static String configurationJson(ExcerptCandidateGenerator.V2Config config) {
+  private static String configurationJson(
+      ExcerptCandidateGenerator.V2Config config, NliInferenceAdapter nliInference) {
     String profiles =
         config.windowProfiles().stream()
             .map(profile -> "[" + profile.targetWords() + "," + profile.sentenceStride() + "]")
@@ -1337,7 +1338,11 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         + config.maxWords()
         + ",\"crossChapter\":"
         + config.crossChapter()
-        + "}";
+        + ",\"nliHypothesisSet\":{\"code\":\""
+        + nliInference.hypothesisSetCode()
+        + "\",\"version\":\""
+        + nliInference.hypothesisSetVersion()
+        + "\"}}";
   }
 
   private static String sha256(String value) {

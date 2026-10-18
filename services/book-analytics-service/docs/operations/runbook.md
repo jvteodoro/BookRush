@@ -278,3 +278,10 @@ O gateway público estava em HTTP 502 e o SeaweedFS local parado, portanto a
 fonte textual foi Gutenberg público a partir da proveniência do snapshot; o
 resultado não é um gate de produção nem cobre qualidade humana, PT ou escrita
 de analytics.
+
+O NLI usa o artefato versionado `ANALYTICS_NLI_HYPOTHESES` (por padrão,
+`classpath:nli-hypotheses-v1.json`). O `NliInferenceAdapter` envia cada
+hipótese no idioma detectado ao runtime local e só persiste observações com
+status `VALID`; falhas do runtime não são convertidas em zero. Para trocar o
+conjunto, publique um novo artefato e altere a variável no ambiente do serviço,
+sem editar o arquivo histórico nem misturar hipóteses de idiomas.
