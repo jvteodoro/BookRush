@@ -1,6 +1,7 @@
 import { HttpFetcher, Manifest, Publication } from "@readium/shared";
 import { WebPubNavigator, WebPubPreferences } from "@readium/navigator";
 import { authClient } from "../auth";
+import { apiRoutes, readerApiPath } from "../app/apiRoutes";
 import type {
   ReadiumBridge,
   ReaderChapter,
@@ -80,7 +81,7 @@ export const readiumBridge: ReadiumBridge = {
     await this.unmount();
     container = nextContainer;
     const response = await authClient.fetch(
-      `/api/v1/content/books/${encodeURIComponent(bookId)}/publication.json`,
+      apiRoutes.reader.publication(bookId),
     );
     if (!response.ok) {
       throw new Error(`Publicação indisponível (HTTP ${response.status}).`);
@@ -93,7 +94,10 @@ export const readiumBridge: ReadiumBridge = {
     }
     const fetcher = new HttpFetcher(
       (input, init) =>
-        authClient.fetch(String(input), { ...init, cache: "no-store" }),
+        authClient.fetch(readerApiPath(String(input)), {
+          ...init,
+          cache: "no-store",
+        }),
       window.location.origin,
     );
     publication = new Publication({ manifest: parsedManifest, fetcher });

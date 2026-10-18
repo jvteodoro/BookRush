@@ -4,6 +4,7 @@ import java.security.Principal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,26 +32,33 @@ public class BookReviewController {
   @GetMapping("/review")
   public ReviewPage review(
       @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "25") int size) {
+      @RequestParam(defaultValue = "25") int size,
+      @RequestParam(defaultValue = "") String q,
+      @RequestParam(defaultValue = "updatedAt") String sort,
+      @RequestParam(defaultValue = "desc") String direction) {
     if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "page must be >= 0 and size must be between 1 and 100");
     }
+    String search = q == null ? "" : q.trim().toLowerCase(Locale.ROOT);
+    String pattern = "%" + search + "%";
+    String predicate = "status='REVIEW_REQUIRED' AND (?='' OR lower(coalesce(canonical_title,'') || ' ' || coalesce(original_title,'') || ' ' || coalesce(description,'')) LIKE ?)";
     Long totalResult =
         jdbc.queryForObject(
-            "SELECT count(*) FROM catalog.book WHERE status='REVIEW_REQUIRED'", Long.class);
+            "SELECT count(*) FROM catalog.book WHERE " + predicate,
+            Long.class,
+            search,
+            pattern);
     long total = totalResult == null ? 0L : totalResult;
     int offset = Math.multiplyExact(page, size);
+    String listSql = String.format(
+        "SELECT id, canonical_title, original_title, original_language, "
+            + "first_publication_year, description, status, updated_at "
+            + "FROM catalog.book WHERE %s ORDER BY %s %s, id LIMIT ? OFFSET ?",
+        predicate, orderColumn(sort), orderDirection(direction));
     List<BookReview> items =
         jdbc.query(
-            """
-            SELECT id, canonical_title, original_title, original_language,
-                   first_publication_year, description, status, updated_at
-            FROM catalog.book
-            WHERE status='REVIEW_REQUIRED'
-            ORDER BY updated_at DESC, id
-            LIMIT ? OFFSET ?
-            """,
+            listSql,
             (rs, row) ->
                 new BookReview(
                     rs.getObject("id", UUID.class),
@@ -62,9 +70,24 @@ public class BookReviewController {
                     rs.getString("status"),
                     toInstant(rs.getObject("updated_at", OffsetDateTime.class)),
                     assets(rs.getObject("id", UUID.class))),
+            search,
+            pattern,
             size,
             offset);
     return new ReviewPage(items, page, size, total, offset + items.size() >= total);
+  }
+
+  private static String orderColumn(String sort) {
+    return switch (sort == null ? "" : sort) {
+      case "title" -> "canonical_title";
+      case "language" -> "original_language";
+      case "year" -> "first_publication_year";
+      default -> "updated_at";
+    };
+  }
+
+  private static String orderDirection(String direction) {
+    return "asc".equalsIgnoreCase(direction) ? "ASC" : "DESC";
   }
 
   @GetMapping("/approval-history")
@@ -163,7 +186,8 @@ public class BookReviewController {
 
   private void audit(
       UUID bookId, String action, String previousStatus, String newStatus, Principal principal) {
-    String actor = principal == null ? "unknown" : principal.getName();
+    String actor = principal == null ? null : principal.getName();
+    if (actor == null || actor.isBlank()) actor = "unknown";
     jdbc.update(
         """
         INSERT INTO catalog.book_review_audit

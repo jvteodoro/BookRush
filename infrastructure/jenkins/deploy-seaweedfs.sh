@@ -10,9 +10,13 @@ compose=(docker compose --project-name bookrush -f "$repo_root/compose.yaml" --e
 [[ -f "$env_file" ]] || { echo "Arquivo de ambiente ausente: $env_file" >&2; exit 1; }
 
 storage_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' bookrush-seaweedfs-1 2>/dev/null || true)"
-if [[ "$storage_health" != healthy ]]; then
+storage_state="$(docker inspect --format '{{.State.Status}}' bookrush-seaweedfs-1 2>/dev/null || true)"
+if [[ "$storage_health" != healthy && "$storage_state" != exited ]]; then
   echo 'SeaweedFS atual não está saudável; deploy interrompido para evitar substituir uma instância indisponível.' >&2
   exit 1
+fi
+if [[ "$storage_health" != healthy ]]; then
+  echo "SeaweedFS está parado (estado=$storage_state); recuperação autorizada pela pipeline dedicada." >&2
 fi
 
 old_image="$(docker inspect --format '{{.Config.Image}}' bookrush-seaweedfs-1 2>/dev/null || true)"

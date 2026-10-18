@@ -38,6 +38,76 @@ export interface AnalyticsRun {
   processedItems?: number;
 }
 
+export interface AnalyticsJob {
+  id: string;
+  operationKey: string;
+  status: string;
+  totalItems: number;
+  processedItems: number;
+  succeededItems: number;
+  failedItems: number;
+  pendingItems: number;
+  runningItems: number;
+  completedItems: number;
+  cancelRequested: boolean;
+  lastProgressAt?: string;
+  progressStage?: string;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+export interface AnalyticsJobItem {
+  id: string;
+  job_id?: string;
+  input_asset_version_id: string;
+  book_id?: string;
+  book_title?: string;
+  status: string;
+  attempt_count: number;
+  analysis_run_id?: string;
+  error_code?: string;
+  error_message?: string;
+  started_at?: string;
+  finished_at?: string;
+  progress_stage?: string;
+  progress_completed?: number;
+  progress_total?: number;
+  progress_message?: string;
+  progress_updated_at?: string;
+}
+
+export interface AnalyticsPhase {
+  id: string;
+  attempt_count: number;
+  phase: string;
+  status: string;
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number | null;
+  error_code?: string;
+  metadata?: Record<string, unknown>;
+  logs?: AnalyticsPhaseLog[];
+}
+
+export interface AnalyticsPhaseLog {
+  id: string;
+  phase_timing_id?: string;
+  occurred_at: string;
+  level: "INFO" | "WARN" | "ERROR" | string;
+  message: string;
+  progress_completed?: number | null;
+  progress_total?: number | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AnalyticsItemDetail {
+  item: AnalyticsJobItem;
+  phases: AnalyticsPhase[];
+  statistics: Record<string, number>;
+  remainingPhases: string[];
+}
+
 export interface FeedWeights {
   hook: number;
   novelty: number;

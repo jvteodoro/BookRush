@@ -33,6 +33,25 @@ default. O procedimento de recuperação é:
 4. rotacionar a credencial e revisar sessões imediatamente após o uso;
 5. reconciliar a configuração declarativa sem apagar usuários ou clients.
 
+O ciclo operacional está em `infrastructure/keycloak/break-glass.sh`. Ele
+exige um `.env` protegido e `BREAK_GLASS_CONFIRM=I_UNDERSTAND` explícito:
+
+```bash
+BREAK_GLASS_CONFIRM=I_UNDERSTAND infrastructure/keycloak/break-glass.sh \
+  --env-file /run/bookrush.env prepare
+BREAK_GLASS_CONFIRM=I_UNDERSTAND infrastructure/keycloak/break-glass.sh \
+  --env-file /run/bookrush.env arm
+BREAK_GLASS_CONFIRM=I_UNDERSTAND infrastructure/keycloak/break-glass.sh \
+  --env-file /run/bookrush.env revoke
+```
+
+`prepare` cria ou atualiza a conta desabilitada, associa `platform-admins` e
+exige `CONFIGURE_TOTP`; `arm` habilita uma conta previamente preparada; e
+`revoke` desabilita a conta e encerra as sessões. `BREAK_GLASS_PASSWORD` só é
+exigida em `prepare`, deve ser diferente da senha administrativa e vem do
+cofre. O seed OTP é cadastrado por procedimento independente. O script não é
+executado pela pipeline Jenkins para evitar habilitação acidental.
+
 Desabilitar uma conta impede novos tokens, mas não revoga instantaneamente um
 JWT já emitido. O prazo efetivo é limitado pelo TTL/access token e pela sessão
 local de cada aplicação; o ensaio deve medir esse prazo antes de anunciar um
@@ -46,3 +65,20 @@ membership de usuários. A autenticação real, teste de fator ausente, retirada
 de grant e recuperação break-glass precisam ser executados com Keycloak
 descartável e segredo fornecido em runtime. Não foram executados nesta sessão
 porque o daemon Docker não está acessível; não há credencial real versionada.
+
+## Ensaio automatizado
+
+O fluxo descartável de MFA, grupo privilegiado e revogação é executado por:
+
+```bash
+bash scripts/test-keycloak-access-lifecycle.sh
+```
+
+O script importa somente `bookrush-platform` em um Keycloak temporário, cria
+usuários e cliente sintéticos, confirma que `CONFIGURE_TOTP` impede a emissão
+de token antes do fator, verifica a emissão para um usuário sem ações pendentes
+e desabilita esse usuário para confirmar a rejeição de novos tokens. Todos os
+usuários, cliente, containers e volumes são removidos no `EXIT`. A pipeline
+principal executa o mesmo ensaio junto às validações declarativas dos realms.
+Esse teste não simula nem altera a conta break-glass operacional, que deve
+continuar fora do Git e ser ensaiada sob procedimento controlado.

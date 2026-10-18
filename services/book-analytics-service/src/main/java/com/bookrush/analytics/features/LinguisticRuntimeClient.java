@@ -14,8 +14,10 @@ public final class LinguisticRuntimeClient {
   public record LanguageResult(String status, String language, double confidence, String warning) {}
 
   private final RestClient client;
+  private final int languageSampleChars;
 
   public LinguisticRuntimeClient(AnalyticsRuntimeProperties p) {
+    languageSampleChars = p.languageSampleChars();
     var factory = new SimpleClientHttpRequestFactory();
     int timeout = Math.max(1, p.timeoutSeconds()) * 1000;
     factory.setConnectTimeout(timeout);
@@ -31,7 +33,7 @@ public final class LinguisticRuntimeClient {
               .post()
               .uri("/v1/language")
               .contentType(MediaType.APPLICATION_JSON)
-              .body(Map.of("text", text))
+              .body(Map.of("text", languageSample(text)))
               .retrieve()
               .body(Map.class);
       return new LanguageResult(
@@ -42,6 +44,14 @@ public final class LinguisticRuntimeClient {
     } catch (Exception e) {
       return new LanguageResult("MODEL_UNAVAILABLE", "und", 0d, "runtime unavailable");
     }
+  }
+
+  /** Language identification needs a representative sample, not the whole book. */
+  private String languageSample(String text) {
+    if (text == null || text.length() <= languageSampleChars) return text;
+    int tailLength = languageSampleChars / 5;
+    int headLength = languageSampleChars - tailLength;
+    return text.substring(0, headLength) + "\n" + text.substring(text.length() - tailLength);
   }
 
   @SuppressWarnings("unchecked")

@@ -17,12 +17,13 @@ spring:
     baseline-on-migrate: false
     clean-disabled: true
 management:
-  endpoints.web.exposure.include: health,info,metrics
+  endpoints.web.exposure.include: health,info,metrics,prometheus
   endpoint.health.probes.enabled: true
 springdoc:
   swagger-ui.disable-swagger-default-url: true
   swagger-ui.path: /swagger-ui.html
 bookrush:
+  behavior-outbox-token: ${BEHAVIOR_OUTBOX_SINK_TOKEN:}
   openapi.server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}/analytics
   security.enabled: ${ANALYTICS_SECURITY_ENABLED:false}
   security.issuer: ${ANALYTICS_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
@@ -35,9 +36,14 @@ analytics:
   runtime:
     url: ${ANALYTICS_RUNTIME_URL:http://book-analytics-runtime:8092}
     timeout-seconds: ${ANALYTICS_RUNTIME_TIMEOUT_SECONDS:10}
+    language-sample-chars: ${ANALYTICS_RUNTIME_LANGUAGE_SAMPLE_CHARS:90000}
   worker:
     enabled: ${ANALYTICS_WORKER_ENABLED:false}
     poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}
+    concurrency: ${ANALYTICS_WORKER_CONCURRENCY:1}
+    stale-after-seconds: ${ANALYTICS_WORKER_STALE_AFTER_SECONDS:900}
+    max-attempts: ${ANALYTICS_WORKER_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${ANALYTICS_WORKER_RETRY_DELAY_SECONDS:30}
     v2:
       version: ${ANALYTICS_V2_GENERATOR_VERSION:sentence-window-v2}
       min-words: ${ANALYTICS_V2_MIN_WORDS:60}

@@ -2,11 +2,14 @@ package com.bookrush.readerstateservice.api;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.servlet.http.HttpServletRequest;
+import com.bookrush.readerstateservice.BehaviorEventPublisher;
 import java.security.Principal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,15 +25,25 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1/reader")
 public class ReaderStateController {
+  private static final String PLANT_FORMULA_VERSION = "reading-minutes-v1";
+  private static final int MAX_PLANT_STAGE = 5;
   private final JdbcTemplate jdbc;
+  private final BehaviorEventPublisher behavior;
 
-  public ReaderStateController(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+  public ReaderStateController(JdbcTemplate jdbc, BehaviorEventPublisher behavior) {
+    this.jdbc = jdbc;
+    this.behavior = behavior;
+  }
 
   private String subject(Principal principal) {
     if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
     }
     return principal.getName();
+  }
+
+  private String authorization(HttpServletRequest request) {
+    return request == null ? null : request.getHeader("Authorization");
   }
 
   private int integerValue(Map<String, Object> body, String key) {
@@ -41,10 +54,12 @@ public class ReaderStateController {
   public record Progress(@NotNull Long positionCodepoint, @NotNull Double percent) {}
 
   @PostMapping("/books/{bookId}/opened")
-  public Map<String, Object> opened(@PathVariable UUID bookId, Principal principal) {
+  public Map<String, Object> opened(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
+    String subject = subject(principal);
     jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?) "
         + "on conflict(subject_key,book_id) do update set last_opened_at=now()",
-        subject(principal), bookId);
+        subject, bookId);
+    behavior.publish("BOOK_OPEN", bookId, Map.of(), authorization(request));
     return Map.of("bookId", bookId, "recorded", true);
   }
 
@@ -62,9 +77,10 @@ public class ReaderStateController {
     return Map.of("id", id, "startedAt", Instant.now());
   }
 
+  @Transactional
   @PostMapping("/sessions/{id}/end")
   public Object endSession(@PathVariable UUID id, @RequestBody Map<String, Object> body,
-      Principal principal) {
+      Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
     int seconds = integerValue(body, "activeSeconds");
     int updated = jdbc.update("UPDATE reader_state.session SET ended_at = now(), active_seconds = ? "
@@ -74,22 +90,54 @@ public class ReaderStateController {
     jdbc.update("INSERT INTO reader_state.reading_day(subject_key, day, minutes) VALUES (?, CURRENT_DATE, ?) "
         + "ON CONFLICT (subject_key, day) DO UPDATE SET minutes = "
         + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, seconds / 60);
-    return Map.of("id", id, "activeSeconds", seconds);
+    behavior.publish("READ_SESSION", null, Map.of("activeSeconds", seconds), authorization(request));
+    return Map.of("id", id, "activeSeconds", seconds, "plant", refreshPlant(subject));
   }
 
   @GetMapping("/streak")
   public Map<String, Object> streak(Principal principal) {
     String subject = subject(principal);
+    return Map.of("currentDays", currentStreak(subject), "measuredUntil", LocalDate.now());
+  }
+
+  @GetMapping("/plant")
+  public Map<String, Object> plant(Principal principal) {
+    return refreshPlant(subject(principal));
+  }
+
+  private Map<String, Object> refreshPlant(String subject) {
+    Number totalMinutesValue = jdbc.queryForObject(
+        "SELECT COALESCE(SUM(minutes), 0) FROM reader_state.reading_day WHERE subject_key = ?",
+        Number.class, subject);
+    long totalMinutes = totalMinutesValue == null ? 0 : Math.max(0, totalMinutesValue.longValue());
+    int streakDays = currentStreak(subject);
+    int stage = (int) Math.min(MAX_PLANT_STAGE, totalMinutes / 60);
+    LocalDate measuredUntil = LocalDate.now();
+    jdbc.update("INSERT INTO reader_state.plant_state(subject_key, formula_version, stage, streak_days, "
+            + "total_reading_minutes, measured_until) VALUES (?, ?, ?, ?, ?, ?) "
+            + "ON CONFLICT (subject_key) DO UPDATE SET formula_version = EXCLUDED.formula_version, "
+            + "stage = EXCLUDED.stage, streak_days = EXCLUDED.streak_days, "
+            + "total_reading_minutes = EXCLUDED.total_reading_minutes, "
+            + "measured_until = EXCLUDED.measured_until, updated_at = now()",
+        subject, PLANT_FORMULA_VERSION, stage, streakDays, totalMinutes, measuredUntil);
+    return Map.of("formulaVersion", PLANT_FORMULA_VERSION, "stage", stage,
+        "streakDays", streakDays, "totalReadingMinutes", totalMinutes,
+        "measuredUntil", measuredUntil);
+  }
+
+  private int currentStreak(String subject) {
     var days = jdbc.queryForList("SELECT day FROM reader_state.reading_day WHERE subject_key = ? "
         + "AND minutes > 0 ORDER BY day DESC LIMIT 366", subject);
     int current = 0;
     LocalDate expected = LocalDate.now();
     for (var row : days) {
-      LocalDate day = ((java.sql.Date) row.get("day")).toLocalDate();
+      Object rawDay = row.get("day");
+      LocalDate day = rawDay instanceof java.sql.Date sqlDate
+          ? sqlDate.toLocalDate() : LocalDate.parse(String.valueOf(rawDay));
       if (day.equals(expected)) { current++; expected = expected.minusDays(1); }
       else if (day.isBefore(expected)) break;
     }
-    return Map.of("currentDays", current, "measuredUntil", LocalDate.now());
+    return current;
   }
 
   @GetMapping("/library")
@@ -113,11 +161,12 @@ public class ReaderStateController {
 
   @PutMapping("/books/{bookId}/progress")
   public Map<String, Object> progress(@PathVariable UUID bookId, @Valid @RequestBody Progress value,
-      Principal principal) {
+      Principal principal, HttpServletRequest request) {
     jdbc.update("INSERT INTO reader_state.progress(subject_key, book_id, position_codepoint, percent) "
         + "VALUES (?, ?, ?, ?) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
         + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, updated_at = now()",
         subject(principal), bookId, value.positionCodepoint(), value.percent());
+    behavior.publish("READ_PROGRESS", bookId, Map.of("percent", value.percent()), authorization(request));
     return Map.of("bookId", bookId, "percent", value.percent());
   }
 

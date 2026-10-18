@@ -1,4 +1,6 @@
 services:
+  book-analytics-runtime:
+    image: ${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}
   reader-profile-service:
     image: ${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}
   social-service:

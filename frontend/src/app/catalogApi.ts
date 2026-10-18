@@ -1,8 +1,9 @@
 import { authClient } from "../auth";
 import type { CatalogBook, RecommendationItem } from "./types";
+import { apiRoutes } from "./apiRoutes";
 
 export async function loadCatalog(): Promise<CatalogBook[]> {
-  const response = await fetch("/api/v1/books?page=0&size=50", {
+  const response = await fetch(apiRoutes.catalog.list(), {
     credentials: "same-origin",
   });
   if (!response.ok) {
@@ -17,7 +18,7 @@ export async function loadCatalog(): Promise<CatalogBook[]> {
 }
 
 export async function loadLibrary(): Promise<string[]> {
-  const response = await authClient.fetch("/api/v1/reader/library");
+  const response = await authClient.fetch(apiRoutes.reader.library());
   if (!response.ok) return [];
   const rows = (await response.json()) as Array<{
     book_id?: string;
@@ -29,7 +30,7 @@ export async function loadLibrary(): Promise<string[]> {
 }
 
 export async function loadRecent(): Promise<string[]> {
-  const response = await authClient.fetch("/api/v1/reader/recent");
+  const response = await authClient.fetch(apiRoutes.reader.recent());
   if (!response.ok) return [];
   const rows = (await response.json()) as Array<{
     book_id?: string;
@@ -41,7 +42,7 @@ export async function loadRecent(): Promise<string[]> {
 }
 
 export async function loadRecommendationFeed(): Promise<RecommendationItem[]> {
-  const response = await authClient.fetch("/api/v1/reader/feed?size=50");
+  const response = await authClient.fetch(apiRoutes.reader.feed());
   if (!response.ok) return [];
   const payload = (await response.json()) as { items?: RecommendationItem[] };
   return payload.items ?? [];
@@ -51,12 +52,8 @@ export async function loadSocialCounts(
   bookId: string,
 ): Promise<{ likes: number; comments: number; liked: boolean }> {
   const [likesResponse, commentsResponse] = await Promise.all([
-    authClient.fetch(
-      `/api/v1/social/books/${encodeURIComponent(bookId)}/likes`,
-    ),
-    authClient.fetch(
-      `/api/v1/social/books/${encodeURIComponent(bookId)}/comments`,
-    ),
+    authClient.fetch(apiRoutes.social.likes(bookId)),
+    authClient.fetch(apiRoutes.social.comments(bookId)),
   ]);
   let likes = 0;
   let liked = false;

@@ -12,6 +12,24 @@ components:
 servers:
   - url: https://bookrush.jteodoro.tec.br/analytics
 paths:
+  /api/admin/v1/content-analytics/phase-timings:
+    get:
+      summary: Distribution of persisted analytics phase durations
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: query
+          name: jobId
+          required: false
+          schema: {type: string, format: uuid}
+        - in: query
+          name: limit
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 200}
+      responses:
+        '200':
+          description: Aggregated phase timing distributions
+        '400':
+          description: Invalid limit
   /api/internal/v1/analytics/books/{bookId}/summary:
     get:
       summary: Resumo de analytics
@@ -39,6 +57,30 @@ paths:
       responses:
         '200': { description: Excerpts paginados ligados à versão exata }
   /api/admin/v1/analytics/jobs:
+    get:
+      summary: Listar jobs de analytics
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: Jobs recentes com progresso persistido
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { type: object }
     post:
       summary: Criar job idempotente
       requestBody:
@@ -64,9 +106,30 @@ paths:
       summary: Listar itens e falhas do job
       parameters:
         - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: status, in: query, schema: {type: string}}
       responses:
-        '200': {description: Itens persistidos do job}
+        '200': {description: Itens persistidos do job com paginação; cada item inclui book_id, book_title e input_asset_version_id}
         '404': {description: Job inexistente}
+  /api/admin/v1/analytics/jobs/{jobId}/items/{itemId}:
+    get:
+      summary: Detalhar item e fases do job
+      parameters:
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: "Item, título do livro, identificadores (job/item/asset), fases expansíveis com eventos persistidos, tentativas monotônicas e recuperação de fases órfãs, progresso por lote, estatísticas derivadas das features do analysis_run_id e fases pendentes"}
+        '404': {description: Item inexistente}
+  /api/admin/v1/content-analytics/jobs/{jobId}/items/{itemId}:
+    get:
+      summary: Detalhar item e fases do content analytics
+      parameters:
+        - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: "Item, título do livro, identificadores (job/item/asset), fases expansíveis com eventos persistidos, tentativas monotônicas e recuperação de fases órfãs, progresso por lote, estatísticas derivadas das features do analysis_run_id e fases pendentes"}
+        '404': {description: Item inexistente}
   /api/admin/v1/analytics/jobs/{jobId}/cancel:
     post:
       summary: Solicitar cancelamento cooperativo
@@ -83,6 +146,27 @@ paths:
         '202': {description: Job recolocado na fila}
         '404': {description: Job inexistente ou não retomável}
   /api/admin/v1/content-analytics/jobs:
+    get:
+      summary: Listar jobs de content analytics
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200':
+          description: Jobs recentes com progresso persistido
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { type: object }
     post:
       summary: Criar job de Content Analytics V1
       security: [{bearerAuth: []}]

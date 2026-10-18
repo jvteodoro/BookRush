@@ -154,7 +154,11 @@ public final class ExcerptCandidateGenerator {
       String raw = matcher.group();
       int leadingUtf16 = leadingUtf16(raw);
       int trailingUtf16 = trailingUtf16(raw);
-      if (leadingUtf16 == trailingUtf16) continue;
+      // A regex match may consist only of whitespace. In that case the first
+      // non-whitespace position is after the last non-whitespace position;
+      // emitting it would create an inverted code-point interval and make the
+      // downstream slice throw StringIndexOutOfBoundsException.
+      if (leadingUtf16 >= trailingUtf16) continue;
       int sentenceStart =
           startCodepoint + section.codePointCount(0, matcher.start() + leadingUtf16);
       int sentenceEnd = startCodepoint + section.codePointCount(0, matcher.start() + trailingUtf16);
@@ -206,7 +210,11 @@ public final class ExcerptCandidateGenerator {
   }
 
   private static String slice(String text, int startCodepoint, int endCodepoint) {
-    return text.substring(toUtf16(text, startCodepoint), toUtf16(text, endCodepoint));
+    int length = codePointLength(text);
+    int start = Math.max(0, Math.min(startCodepoint, length));
+    int end = Math.max(start, Math.min(endCodepoint, length));
+    if (start == end) return "";
+    return text.substring(toUtf16(text, start), toUtf16(text, end));
   }
 
   private static int toUtf16(String text, int codepoint) {

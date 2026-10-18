@@ -3,6 +3,7 @@ import { AppShell, type ReaderTab } from "../components/layout/AppShell";
 import { ExcerptFeed } from "../components/book/ExcerptFeed";
 import { Card } from "../components/ui/Card";
 import { authClient } from "../auth";
+import { apiRoutes } from "../app/apiRoutes";
 import { LibraryPage } from "./LibraryPage";
 import type { LibraryBook } from "./library";
 import { SearchPage } from "./SearchPage";
@@ -29,6 +30,13 @@ type Runtime = {
   __BOOKRUSH_BOOKS__: SourceBook[];
   __BOOKRUSH_LIKES__: Record<string, boolean>;
   __BOOKRUSH_STREAK__?: { currentDays?: number };
+  __BOOKRUSH_PLANT__?: {
+    formulaVersion?: string;
+    stage?: number;
+    streakDays?: number;
+    totalReadingMinutes?: number;
+    measuredUntil?: string;
+  } | null;
   __BOOKRUSH_API__: {
     saved: Set<string>;
     save: (id: string, enabled: boolean) => Promise<void>;
@@ -163,7 +171,7 @@ export function LiveReader({
     let active = true;
     const revision = saveRevision.current;
     void authClient
-      .fetch("/api/v1/reader/library")
+      .fetch(apiRoutes.reader.library())
       .then(async (response) => {
         if (!response.ok)
           throw new Error("Não foi possível atualizar sua biblioteca.");
@@ -263,6 +271,7 @@ export function LiveReader({
     setTab(nextTab);
   };
   const streak = runtime().__BOOKRUSH_STREAK__?.currentDays;
+  const plant = runtime().__BOOKRUSH_PLANT__;
   const openCatalogBook = (book: LibraryBook) =>
     void action(book.id, async () => {
       // The existing reader resolves IDs from its catalog array. Register books
@@ -351,6 +360,7 @@ export function LiveReader({
           userName={userName}
           savedCount={saved.length}
           streak={streak}
+          plant={plant}
           onNavigate={navigate}
         />
       ) : (

@@ -9,8 +9,8 @@
     "lint": "eslint .",
     "test": "node --test tests/*.test.mjs",
     "test:coverage": "node --test --experimental-test-coverage tests/*.test.mjs",
-    "format": "prettier --write src/main.tsx src/app/*.ts src/reader/readiumBridge.ts public/pageloop.js public/pageloop.css",
-    "format:check": "prettier --check src/main.tsx src/app/*.ts src/reader/readiumBridge.ts public/pageloop.js public/pageloop.css",
+    "format": "prettier --write src/main.tsx src/app/*.ts src/reader/AccountPages.tsx src/reader/comments.ts src/reader/library.ts src/reader/readiumBridge.ts src/reader/search.ts src/reader/LiveReader.tsx public/pageloop.js public/pageloop.css",
+    "format:check": "prettier --check src/main.tsx src/app/*.ts src/reader/AccountPages.tsx src/reader/comments.ts src/reader/library.ts src/reader/readiumBridge.ts src/reader/search.ts src/reader/LiveReader.tsx public/pageloop.js public/pageloop.css",
     "preview": "vite preview"
   },
   "dependencies": {

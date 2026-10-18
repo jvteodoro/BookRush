@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
@@ -19,6 +20,7 @@ const icons = {
   "/analytics": BarChart3,
   "/feed-lab": FlaskConical,
   "/training": GraduationCap,
+  "/operations": Users,
 } as const;
 
 export function Sidebar() {

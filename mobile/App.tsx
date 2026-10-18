@@ -1,34 +1,443 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import { StatusBar } from 'expo-status-bar';
-import { Book, listBooks, listLibrary, trackEvent, updateLibrary } from './src/api';
+import { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Linking,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import * as AuthSession from "expo-auth-session";
+import * as WebBrowser from "expo-web-browser";
+import { StatusBar } from "expo-status-bar";
+import {
+  Book,
+  listBooks,
+  listLibrary,
+  sendBehaviorEvents,
+  updateLibrary,
+} from "./src/api";
+import { createTelemetry } from "./src/telemetry";
 
 WebBrowser.maybeCompleteAuthSession();
-const authority = process.env.EXPO_PUBLIC_OIDC_AUTHORITY ?? 'https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush';
-const clientId = process.env.EXPO_PUBLIC_OIDC_CLIENT_ID ?? 'bookrush-mobile';
-const redirectUri = AuthSession.makeRedirectUri({ scheme: 'bookrush', path: 'callback' });
-const registrationUri = `${authority}/protocol/openid-connect/registrations?client_id=${encodeURIComponent(clientId)}&response_type=code&scope=openid&redirect_uri=${encodeURIComponent('bookrush://registered')}`;
-const discovery: AuthSession.DiscoveryDocument = { authorizationEndpoint: `${authority}/protocol/openid-connect/auth`, tokenEndpoint: `${authority}/protocol/openid-connect/token`, revocationEndpoint: `${authority}/protocol/openid-connect/revoke`, endSessionEndpoint: `${authority}/protocol/openid-connect/logout` };
+const authority =
+  process.env.EXPO_PUBLIC_OIDC_AUTHORITY ??
+  "https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush";
+const clientId = process.env.EXPO_PUBLIC_OIDC_CLIENT_ID ?? "bookrush-mobile";
+const redirectUri = AuthSession.makeRedirectUri({
+  scheme: "bookrush",
+  path: "callback",
+});
+const registrationUri = `${authority}/protocol/openid-connect/registrations?client_id=${encodeURIComponent(clientId)}&response_type=code&scope=openid&redirect_uri=${encodeURIComponent("bookrush://registered")}`;
+const discovery: AuthSession.DiscoveryDocument = {
+  authorizationEndpoint: `${authority}/protocol/openid-connect/auth`,
+  tokenEndpoint: `${authority}/protocol/openid-connect/token`,
+  revocationEndpoint: `${authority}/protocol/openid-connect/revoke`,
+  endSessionEndpoint: `${authority}/protocol/openid-connect/logout`,
+};
 
 export default function App() {
-  const [request, response, promptAsync] = AuthSession.useAuthRequest({ clientId, redirectUri, responseType: AuthSession.ResponseType.Code, scopes: ['openid', 'profile', 'email'], usePKCE: true }, discovery);
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId,
+      redirectUri,
+      responseType: AuthSession.ResponseType.Code,
+      scopes: ["openid", "profile", "email"],
+      usePKCE: true,
+    },
+    discovery,
+  );
   const [token, setToken] = useState<string>();
   const [books, setBooks] = useState<Book[]>([]);
   const [saved, setSaved] = useState<string[]>([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [selected, setSelected] = useState<Book>();
+  const telemetry = useMemo(
+    () =>
+      token
+        ? createTelemetry((events) => sendBehaviorEvents(token, events))
+        : undefined,
+    [token],
+  );
 
-  useEffect(() => { if (response?.type === 'success' && response.params.code) void exchangeCode(response.params.code); }, [response]);
-  useEffect(() => { if (token) void listLibrary(token).then(setSaved).catch(cause => setError(cause instanceof Error ? cause.message : 'Falha ao carregar biblioteca')); }, [token]);
-  async function exchangeCode(code: string) { setBusy(true); setError(''); try { const result = await AuthSession.exchangeCodeAsync({ clientId, code, redirectUri, extraParams: { code_verifier: request?.codeVerifier ?? '' } }, discovery); setToken(result.accessToken); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível concluir o login.'); } finally { setBusy(false); } }
-  async function loadBooks() { if (!token) return; setBusy(true); setError(''); try { setBooks((await listBooks(token, query)).items); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível carregar o catálogo.'); } finally { setBusy(false); } }
+  useEffect(() => {
+    if (response?.type === "success" && response.params.code)
+      void exchangeCode(response.params.code);
+  }, [response]);
+  useEffect(() => {
+    if (token)
+      void listLibrary(token)
+        .then(setSaved)
+        .catch((cause) =>
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Falha ao carregar biblioteca",
+          ),
+        );
+  }, [token]);
+  async function exchangeCode(code: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await AuthSession.exchangeCodeAsync(
+        {
+          clientId,
+          code,
+          redirectUri,
+          extraParams: { code_verifier: request?.codeVerifier ?? "" },
+        },
+        discovery,
+      );
+      setToken(result.accessToken);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível concluir o login.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function loadBooks() {
+    if (!token) return;
+    setBusy(true);
+    setError("");
+    try {
+      setBooks((await listBooks(token, query)).items);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Não foi possível carregar o catálogo.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   const shown = useMemo(() => books, [books]);
-  if (!token) return <SafeAreaView style={styles.center}><StatusBar style="light" /><Text style={styles.logo}>B</Text><Text style={styles.kicker}>UM UNIVERSO DE HISTÓRIAS</Text><Text style={styles.title}>Seu próximo{`\n`}capítulo começa aqui.</Text><Text style={styles.subtitle}>Descubra livros que combinam com você.</Text>{error ? <Text style={styles.error}>{error}</Text> : null}<Pressable disabled={!request || busy} style={styles.primary} onPress={() => void promptAsync()}><Text style={styles.primaryText}>{busy ? 'Conectando…' : 'Entrar com Keycloak  →'}</Text></Pressable><Pressable onPress={() => void Linking.openURL(registrationUri)}><Text style={styles.register}>Ainda não tem conta? <Text style={styles.registerStrong}>Cadastre-se</Text></Text></Pressable><Text style={styles.hint}>Login seguro · Tokens ficam apenas na memória</Text></SafeAreaView>;
-  return <SafeAreaView style={styles.root}><StatusBar style="light" /><View style={styles.header}><Text style={styles.brand}>BookRush</Text><Pressable onPress={() => setToken(undefined)}><Text style={styles.logout}>Sair</Text></Pressable></View><View style={styles.hero}><Text style={styles.kicker}>DESCUBRA SUA PRÓXIMA LEITURA</Text><Text style={styles.heading}>Histórias que <Text style={styles.italic}>ficam</Text>.</Text></View><View style={styles.search}><TextInput value={query} onChangeText={setQuery} placeholder="Buscar por título…" placeholderTextColor="#89978e" style={styles.input} onSubmitEditing={() => void loadBooks()} /><Pressable onPress={() => void loadBooks()}><Text style={styles.searchAction}>Buscar</Text></Pressable></View>{error ? <Text style={styles.error}>{error}</Text> : null}{busy ? <ActivityIndicator color="#d76c51" style={styles.loader} /> : null}<FlatList data={shown} keyExtractor={item => item.id} contentContainerStyle={styles.list} renderItem={({ item, index }) => <BookCard book={item} index={index} saved={saved.includes(item.id)} onSave={() => { const next = !saved.includes(item.id); setSaved(current => next ? [...current, item.id] : current.filter(id => id !== item.id)); void updateLibrary(token, item.id, next).catch(cause => setError(cause instanceof Error ? cause.message : 'Falha ao salvar')); }} onOpen={() => { setSelected(item); void trackEvent(token, 'BOOK_OPEN', item.id); }} />} ListEmptyComponent={!busy ? <Text style={styles.empty}>Pesquise ou atualize para carregar o catálogo.</Text> : null} />{selected ? <View style={styles.modal}><Pressable style={styles.close} onPress={() => setSelected(undefined)}><Text style={styles.closeText}>×</Text></Pressable><Text style={styles.modalTitle}>{selected.canonicalTitle}</Text><Text style={styles.meta}>{selected.firstPublicationYear ?? 'Ano não informado'} · {selected.originalLanguage ?? 'Idioma não informado'}</Text><Text style={styles.modalBody}>{selected.description ?? 'Detalhes e trechos deste livro estarão disponíveis em breve.'}</Text><Pressable style={styles.primary} onPress={() => setSelected(undefined)}><Text style={styles.primaryText}>Continuar explorando</Text></Pressable></View> : null}</SafeAreaView>;
+  if (!token)
+    return (
+      <SafeAreaView style={styles.center}>
+        <StatusBar style="light" />
+        <Text style={styles.logo}>B</Text>
+        <Text style={styles.kicker}>UM UNIVERSO DE HISTÓRIAS</Text>
+        <Text style={styles.title}>Seu próximo{`\n`}capítulo começa aqui.</Text>
+        <Text style={styles.subtitle}>
+          Descubra livros que combinam com você.
+        </Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Pressable
+          disabled={!request || busy}
+          style={styles.primary}
+          onPress={() => void promptAsync()}
+        >
+          <Text style={styles.primaryText}>
+            {busy ? "Conectando…" : "Entrar com Keycloak  →"}
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => void Linking.openURL(registrationUri)}>
+          <Text style={styles.register}>
+            Ainda não tem conta?{" "}
+            <Text style={styles.registerStrong}>Cadastre-se</Text>
+          </Text>
+        </Pressable>
+        <Text style={styles.hint}>
+          Login seguro · Tokens ficam apenas na memória
+        </Text>
+      </SafeAreaView>
+    );
+  return (
+    <SafeAreaView style={styles.root}>
+      <StatusBar style="light" />
+      <View style={styles.header}>
+        <Text style={styles.brand}>BookRush</Text>
+        <Pressable onPress={() => setToken(undefined)}>
+          <Text style={styles.logout}>Sair</Text>
+        </Pressable>
+      </View>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>DESCUBRA SUA PRÓXIMA LEITURA</Text>
+        <Text style={styles.heading}>
+          Histórias que <Text style={styles.italic}>ficam</Text>.
+        </Text>
+      </View>
+      <View style={styles.search}>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Buscar por título…"
+          placeholderTextColor="#89978e"
+          style={styles.input}
+          onSubmitEditing={() => void loadBooks()}
+        />
+        <Pressable onPress={() => void loadBooks()}>
+          <Text style={styles.searchAction}>Buscar</Text>
+        </Pressable>
+      </View>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {busy ? (
+        <ActivityIndicator color="#d76c51" style={styles.loader} />
+      ) : null}
+      <FlatList
+        data={shown}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.list}
+        renderItem={({ item, index }) => (
+          <BookCard
+            book={item}
+            index={index}
+            saved={saved.includes(item.id)}
+            onSave={() => {
+              const next = !saved.includes(item.id);
+              setSaved((current) =>
+                next
+                  ? [...current, item.id]
+                  : current.filter((id) => id !== item.id),
+              );
+              telemetry?.track(next ? "BOOK_SAVED" : "BOOK_UNSAVED", item.id);
+              void updateLibrary(token, item.id, next).catch((cause) =>
+                setError(
+                  cause instanceof Error ? cause.message : "Falha ao salvar",
+                ),
+              );
+            }}
+            onOpen={() => {
+              setSelected(item);
+              telemetry?.track("BOOK_OPEN", item.id);
+            }}
+          />
+        )}
+        ListEmptyComponent={
+          !busy ? (
+            <Text style={styles.empty}>
+              Pesquise ou atualize para carregar o catálogo.
+            </Text>
+          ) : null
+        }
+      />
+      {selected ? (
+        <View style={styles.modal}>
+          <Pressable
+            style={styles.close}
+            onPress={() => setSelected(undefined)}
+          >
+            <Text style={styles.closeText}>×</Text>
+          </Pressable>
+          <Text style={styles.modalTitle}>{selected.canonicalTitle}</Text>
+          <Text style={styles.meta}>
+            {selected.firstPublicationYear ?? "Ano não informado"} ·{" "}
+            {selected.originalLanguage ?? "Idioma não informado"}
+          </Text>
+          <Text style={styles.modalBody}>
+            {selected.description ??
+              "Detalhes e trechos deste livro estarão disponíveis em breve."}
+          </Text>
+          <Pressable
+            style={styles.primary}
+            onPress={() => setSelected(undefined)}
+          >
+            <Text style={styles.primaryText}>Continuar explorando</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </SafeAreaView>
+  );
 }
-function BookCard({ book, index, saved, onSave, onOpen }: { book: Book; index: number; saved: boolean; onSave: () => void; onOpen: () => void }) { const colors = ['#233d35', '#202b52', '#5a2337', '#26311f']; return <View style={[styles.card, { backgroundColor: colors[index % colors.length] }]}><Pressable onPress={onOpen} style={styles.feedPress}><Text style={styles.coverLanguage}>{book.originalLanguage?.toUpperCase() ?? 'BOOKRUSH'} · TRECHO</Text><Text style={styles.feedQuote}>“{book.description || `Descubra ${book.canonicalTitle}.`}</Text><Text style={styles.cardTitle}>{book.canonicalTitle}</Text></Pressable><View style={styles.cardFooter}><Pressable onPress={onSave}><Text style={styles.star}>{saved ? '★' : '☆'}</Text><Text style={styles.actionLabel}>{saved ? 'Salvo' : 'Salvar'}</Text></Pressable><Pressable onPress={onOpen}><Text style={styles.star}>↗</Text><Text style={styles.actionLabel}>Abrir</Text></Pressable></View></View>; }
-const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#0a0a0d' }, center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, backgroundColor: '#0a0a0d' }, logo: { backgroundColor: '#25e0d4', color: '#0a0a0d', borderRadius: 18, paddingHorizontal: 21, paddingVertical: 10, fontSize: 42, fontWeight: '700', marginBottom: 24 }, kicker: { color: '#9ba1ae', fontSize: 11, letterSpacing: 1.5, fontWeight: '600' }, title: { color: '#f3f4f5', fontSize: 38, lineHeight: 42, fontWeight: '700', textAlign: 'center', marginVertical: 14 }, subtitle: { color: '#9ba1ae', fontSize: 16, textAlign: 'center', marginBottom: 24 }, primary: { backgroundColor: '#153d35', borderRadius: 28, paddingHorizontal: 20, paddingVertical: 14, alignItems: 'center' }, primaryText: { color: '#fff', fontWeight: '700' }, register: { color: '#356157', marginTop: 16 }, registerStrong: { color: '#d76c51', fontWeight: '700' }, hint: { color: '#94a098', fontSize: 11, marginTop: 14 }, error: { color: '#913f31', backgroundColor: '#fae8e2', padding: 10, borderRadius: 8, marginVertical: 10, textAlign: 'center' }, header: { height: 64, borderBottomWidth: 1, borderBottomColor: '#272b33', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18 }, brand: { color: '#f3f4f5', fontSize: 24, fontWeight: '700' }, logout: { color: '#356157' }, hero: { padding: 25 }, heading: { color: '#f3f4f5', fontSize: 34, fontWeight: '700', marginTop: 10 }, italic: { color: '#d76c51', fontStyle: 'italic' }, search: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#15171d', marginHorizontal: 18, borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: '#2b2f38' }, input: { flex: 1, height: 46, color: '#f3f4f5' }, searchAction: { color: '#244e42', fontWeight: '600' }, loader: { margin: 18 }, list: { padding: 14, paddingBottom: 30 }, columns: { gap: 14 }, card: { minHeight: 500, borderRadius: 20, marginBottom: 14, padding: 22, justifyContent: 'space-between' }, feedPress: { flex: 1 }, feedQuote: { color: '#f7f7f5', fontSize: 27, lineHeight: 34, fontWeight: '700', marginTop: 24 }, actionLabel: { color: '#b4bac6', fontSize: 10, textAlign: 'center' }, cover: { aspectRatio: .72, borderRadius: 7, padding: 13, justifyContent: 'space-between' }, symbol: { alignSelf: 'flex-end', color: '#fff', fontSize: 30 }, coverTitle: { color: '#fff', fontSize: 18, fontWeight: '700' }, coverLanguage: { color: '#fff', fontSize: 10, letterSpacing: 1 }, cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 8 }, cardTitle: { flex: 1, color: '#fff', fontWeight: '800', fontSize: 15, marginTop: 28 }, star: { color: '#d76c51', fontSize: 25 }, empty: { color: '#9ba1ae', textAlign: 'center', marginTop: 60 }, modal: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#fbfbf7', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 26, shadowColor: '#17352e', shadowOpacity: .2, shadowRadius: 20 }, close: { position: 'absolute', right: 18, top: 10 }, closeText: { fontSize: 30, color: '#718078' }, modalTitle: { fontSize: 28, fontWeight: '700', color: '#263a32', marginTop: 18 }, meta: { color: '#7d8c83', marginVertical: 8 }, modalBody: { color: '#9ba1ae', lineHeight: 23, marginBottom: 18 } });
+function BookCard({
+  book,
+  index,
+  saved,
+  onSave,
+  onOpen,
+}: {
+  book: Book;
+  index: number;
+  saved: boolean;
+  onSave: () => void;
+  onOpen: () => void;
+}) {
+  const colors = ["#233d35", "#202b52", "#5a2337", "#26311f"];
+  return (
+    <View
+      style={[styles.card, { backgroundColor: colors[index % colors.length] }]}
+    >
+      <Pressable onPress={onOpen} style={styles.feedPress}>
+        <Text style={styles.coverLanguage}>
+          {book.originalLanguage?.toUpperCase() ?? "BOOKRUSH"} · TRECHO
+        </Text>
+        <Text style={styles.feedQuote}>
+          “{book.description || `Descubra ${book.canonicalTitle}.`}
+        </Text>
+        <Text style={styles.cardTitle}>{book.canonicalTitle}</Text>
+      </Pressable>
+      <View style={styles.cardFooter}>
+        <Pressable onPress={onSave}>
+          <Text style={styles.star}>{saved ? "★" : "☆"}</Text>
+          <Text style={styles.actionLabel}>{saved ? "Salvo" : "Salvar"}</Text>
+        </Pressable>
+        <Pressable onPress={onOpen}>
+          <Text style={styles.star}>↗</Text>
+          <Text style={styles.actionLabel}>Abrir</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#0a0a0d" },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 28,
+    backgroundColor: "#0a0a0d",
+  },
+  logo: {
+    backgroundColor: "#25e0d4",
+    color: "#0a0a0d",
+    borderRadius: 18,
+    paddingHorizontal: 21,
+    paddingVertical: 10,
+    fontSize: 42,
+    fontWeight: "700",
+    marginBottom: 24,
+  },
+  kicker: {
+    color: "#9ba1ae",
+    fontSize: 11,
+    letterSpacing: 1.5,
+    fontWeight: "600",
+  },
+  title: {
+    color: "#f3f4f5",
+    fontSize: 38,
+    lineHeight: 42,
+    fontWeight: "700",
+    textAlign: "center",
+    marginVertical: 14,
+  },
+  subtitle: {
+    color: "#9ba1ae",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  primary: {
+    backgroundColor: "#153d35",
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  primaryText: { color: "#fff", fontWeight: "700" },
+  register: { color: "#356157", marginTop: 16 },
+  registerStrong: { color: "#d76c51", fontWeight: "700" },
+  hint: { color: "#94a098", fontSize: 11, marginTop: 14 },
+  error: {
+    color: "#913f31",
+    backgroundColor: "#fae8e2",
+    padding: 10,
+    borderRadius: 8,
+    marginVertical: 10,
+    textAlign: "center",
+  },
+  header: {
+    height: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: "#272b33",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+  },
+  brand: { color: "#f3f4f5", fontSize: 24, fontWeight: "700" },
+  logout: { color: "#356157" },
+  hero: { padding: 25 },
+  heading: { color: "#f3f4f5", fontSize: 34, fontWeight: "700", marginTop: 10 },
+  italic: { color: "#d76c51", fontStyle: "italic" },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#15171d",
+    marginHorizontal: 18,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#2b2f38",
+  },
+  input: { flex: 1, height: 46, color: "#f3f4f5" },
+  searchAction: { color: "#244e42", fontWeight: "600" },
+  loader: { margin: 18 },
+  list: { padding: 14, paddingBottom: 30 },
+  columns: { gap: 14 },
+  card: {
+    minHeight: 500,
+    borderRadius: 20,
+    marginBottom: 14,
+    padding: 22,
+    justifyContent: "space-between",
+  },
+  feedPress: { flex: 1 },
+  feedQuote: {
+    color: "#f7f7f5",
+    fontSize: 27,
+    lineHeight: 34,
+    fontWeight: "700",
+    marginTop: 24,
+  },
+  actionLabel: { color: "#b4bac6", fontSize: 10, textAlign: "center" },
+  cover: {
+    aspectRatio: 0.72,
+    borderRadius: 7,
+    padding: 13,
+    justifyContent: "space-between",
+  },
+  symbol: { alignSelf: "flex-end", color: "#fff", fontSize: 30 },
+  coverTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  coverLanguage: { color: "#fff", fontSize: 10, letterSpacing: 1 },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginTop: 8,
+  },
+  cardTitle: {
+    flex: 1,
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 15,
+    marginTop: 28,
+  },
+  star: { color: "#d76c51", fontSize: 25 },
+  empty: { color: "#9ba1ae", textAlign: "center", marginTop: 60 },
+  modal: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#fbfbf7",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 26,
+    shadowColor: "#17352e",
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+  },
+  close: { position: "absolute", right: 18, top: 10 },
+  closeText: { fontSize: 30, color: "#718078" },
+  modalTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#263a32",
+    marginTop: 18,
+  },
+  meta: { color: "#7d8c83", marginVertical: 8 },
+  modalBody: { color: "#9ba1ae", lineHeight: 23, marginBottom: 18 },
+});
