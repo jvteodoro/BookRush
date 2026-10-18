@@ -30,4 +30,13 @@ class AnalyticsRolePolicyTest {
         AnalyticsRolePolicy.rolesFor(List.of("readers", "developers")));
     assertTrue(AnalyticsRolePolicy.rolesFor(List.of("readers")).isEmpty());
   }
+
+  @Test
+  void itemListQueryQualifiesJoinedColumns() {
+    var sql = AnalyticsController.itemListSql(true);
+
+    assertTrue(sql.contains("WHERE i.job_id=? AND i.status=?"));
+    assertTrue(sql.contains("ORDER BY i.created_at, i.id"));
+    assertTrue(sql.contains("i.error_message"));
+  }
 }

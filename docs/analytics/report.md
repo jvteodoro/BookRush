@@ -44,6 +44,11 @@ alguns lotes, sem invalidar os embeddings já persistidos. O teste unitário
 verifica agora que a query possui exatamente quatro placeholders correspondentes
 aos argumentos fornecidos.
 
+Também foi corrigida a consulta paginada de itens do Admin Web: como ela faz
+joins com catálogo, `job_id`, `status`, `created_at` e `id` precisam ser
+qualificados com o alias de `analysis_job_item`. Sem isso, PostgreSQL retornava
+`column reference "created_at" is ambiguous` e a tela recebia HTTP 500.
+
 Os endpoints administrativos usados nessa navegação são:
 
 - `GET /api/admin/v1/content-analytics/jobs?limit=200&offset=0`
