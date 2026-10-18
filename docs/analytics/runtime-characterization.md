@@ -8,8 +8,8 @@ somente a chamada HTTP ao modelo, com o modelo aquecido; ela não representa o
 tempo total de um item da pipeline, que inclui leitura do EPUB, seleção,
 persistência, armazenamento, retries e coordenação do worker.
 
-O teste é reproduzível com
-[`benchmark-analytics-runtime-characterization.py`](../../scripts/benchmark-analytics-runtime-characterization.py).
+O teste é reproduzível com o script
+`scripts/benchmark-analytics-runtime-characterization.py`.
 O script recebe JSONL com `id` e `text`, evitando acoplamento a credenciais ou
 ao banco de produção.
 
