@@ -135,6 +135,14 @@ override `infrastructure/compose.analytics-gpu.yaml` e manter
 reativar um lote. O modelo de tópicos permanece experimental e não deve ser
 promovido automaticamente.
 
+O ranking analítico do feed é ativado explicitamente pela variável
+`FEED_ANALYTICS_RANKING_ENABLED=true` no `recommendation-service`. A pipeline
+vertical `bookrush-vertical-analytics` deve publicar/deployar
+`book-analytics-service` e `recommendation-service` juntos. A validação pós-
+deploy deve chamar o feed autenticado e confirmar `rankingVersion`/
+`modelVersion=analytics-aware-v1` quando houver scores elegíveis; em caso de
+indisponibilidade do analytics, o fallback esperado é `heuristic-v1`.
+
 ### Pipeline dedicada do SeaweedFS
 
 O bootstrap cria o job `bookrush-seaweedfs` a partir de

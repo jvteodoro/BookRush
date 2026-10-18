@@ -76,8 +76,12 @@ public final class AnalyticsScoreClient {
           } catch (IllegalArgumentException ignored) { }
         }
       }
-      for (UUID id : missing) cache.putIfAbsent(id,
-          new CacheEntry(result.get(id), now.plus(properties.cacheTtl())));
+      for (UUID id : missing) {
+        BookScore score = result.get(id);
+        if (score != null) {
+          cache.putIfAbsent(id, new CacheEntry(score, now.plus(properties.cacheTtl())));
+        }
+      }
       metrics.counter("bookrush.feed.ranking", "result", "analytics").increment();
       return result;
     } catch (RestClientException | IllegalStateException ex) {

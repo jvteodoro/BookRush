@@ -51,9 +51,9 @@ analítico antes do desempate heurístico e da diversidade de idioma. Se o
 analytics, o token S2S ou o timeout falhar, o resultado volta integralmente ao
 `heuristic-v1`; nenhum score ausente é convertido em zero.
 
-A ativação pode ser controlada explicitamente; quando a flag não é fornecida,
-ela acompanha `FEED_EXCERPTS_ENABLED`, reutilizando a mesma credencial S2S já
-configurada:
+A ativação é controlada explicitamente por `FEED_ANALYTICS_RANKING_ENABLED`.
+O Compose mantém o ranking habilitado por padrão, reutilizando a mesma
+credencial S2S já configurada:
 
 ```text
 FEED_ANALYTICS_RANKING_ENABLED=true
@@ -111,5 +111,6 @@ Também é necessário um teste de integração com dois livros: um com excerpts
 - Features semânticas, NLI e ranking podem estar ausentes no modo offline; o feed não deve inventar score ou transformar ausência em zero.
 - O score atual é técnico, derivado do ranker de excerpts, e não foi validado
   como métrica de qualidade editorial ou comportamento de leitores.
-- O ranking analítico permanece desligado por padrão; a flag de excerpts não o
-  ativa implicitamente.
+- O ranking analítico pode ser desligado com `FEED_ANALYTICS_RANKING_ENABLED=false`
+  para rollback controlado; a flag de excerpts não é mais usada como ativação
+  implícita.

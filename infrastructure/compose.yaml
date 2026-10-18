@@ -562,6 +562,7 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      FEED_ANALYTICS_RANKING_ENABLED: ${FEED_ANALYTICS_RANKING_ENABLED:-true}
       FEED_ANALYTICS_RANKING_MODEL_VERSION: ${FEED_ANALYTICS_RANKING_MODEL_VERSION:-analytics-aware-v1}
       FEED_ANALYTICS_RANKING_URL: ${FEED_ANALYTICS_RANKING_URL:-http://book-analytics-service:8091}
       FEED_ANALYTICS_RANKING_TOKEN_URI: ${FEED_ANALYTICS_RANKING_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}

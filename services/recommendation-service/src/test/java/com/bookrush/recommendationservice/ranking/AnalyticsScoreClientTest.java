@@ -44,4 +44,27 @@ class AnalyticsScoreClientTest {
     assertEquals(first, second);
     server.verify();
   }
+
+  @Test
+  void acceptsPartialScoreResponsesWithoutPoisoningTheCache() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    UUID scored = UUID.randomUUID();
+    UUID unscored = UUID.randomUUID();
+    server.expect(requestTo("http://keycloak/token"))
+        .andRespond(withSuccess("{\"access_token\":\"technical\",\"expires_in\":300}", MediaType.APPLICATION_JSON));
+    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/book-scores"))
+        .andRespond(withSuccess("{\"items\":[{\"bookId\":\"" + scored
+            + "\",\"score\":0.87}]}", MediaType.APPLICATION_JSON));
+    var properties = new AnalyticsRankingProperties(true, "analytics-aware-v1", "http://analytics",
+        "http://keycloak/token", "client", "secret", "aud", "scope", Duration.ofMinutes(1),
+        Duration.ofSeconds(1), Duration.ofSeconds(1), 100);
+    var client = new AnalyticsScoreClient(builder, properties, new SimpleMeterRegistry(), false);
+
+    var result = client.find(List.of(scored, unscored));
+
+    assertEquals(0.87, result.get(scored).score());
+    assertEquals(1, result.size());
+    server.verify();
+  }
 }
