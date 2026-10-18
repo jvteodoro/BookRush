@@ -4,7 +4,8 @@ Migration `V26__language_validation_features.sql` adds the document-scoped
 features `language.detected`, `language.confidence` and `language.agreement`.
 
 The analytics worker writes the prediction and confidence returned by the
-local fastText runtime together with `value_status` and `warning`. When the
+local fastText runtime through the immutable `LanguageEvidence` value object,
+together with `value_status` and `warning`. When the
 prediction is valid, `language.agreement` records whether it matches the
 catalog language. This is evidence only: the worker never changes catalog
 metadata automatically. Missing model artifacts remain explicit

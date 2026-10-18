@@ -6,6 +6,7 @@ import com.bookrush.analytics.excerpts.ExcerptCandidateGenerator;
 import com.bookrush.analytics.excerpts.HeuristicRankerConfig;
 import com.bookrush.analytics.features.EmbeddingMath;
 import com.bookrush.analytics.features.LinguisticRuntimeClient;
+import com.bookrush.analytics.features.LanguageEvidence;
 import com.bookrush.analytics.features.TextFeatureCalculator;
 import com.bookrush.analytics.llm.TopNliCandidateSelector;
 import com.bookrush.analytics.observability.AnalyticsMetrics;
@@ -356,7 +357,7 @@ UPDATE analytics.analysis_job_item i
       if ("VALID".equals(detected.status())
           && ("en".equals(detected.language()) || "pt".equals(detected.language()))
           && detected.confidence() >= 0.60d) language = detected.language();
-      persistLanguageValidation(run, item.inputVersion(), catalogLanguage, detected);
+      persistLanguageValidation(run, item.inputVersion(), LanguageEvidence.from(catalogLanguage, detected));
       var chapterById =
           chapters.stream()
               .collect(
@@ -636,12 +637,8 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
   private void persistLanguageValidation(
       UUID run,
       UUID inputVersion,
-      String catalogLanguage,
-      LinguisticRuntimeClient.LanguageResult detected) {
-    String status = switch (detected.status()) {
-      case "VALID", "MODEL_UNAVAILABLE", "INVALID_INPUT", "INSUFFICIENT_SAMPLE", "ERROR" -> detected.status();
-      default -> "UNSUPPORTED";
-    };
+      LanguageEvidence evidence) {
+    String status = evidence.status();
     jdbc.update(
         """
 INSERT INTO analytics.document_feature
@@ -654,8 +651,8 @@ DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
   confidence=EXCLUDED.confidence,sample_size=EXCLUDED.sample_size,
   warning=EXCLUDED.warning,computed_at=EXCLUDED.computed_at
 """,
-        run, inputVersion, detected.language(), status,
-        "VALID".equals(status) ? detected.confidence() : null, detected.warning());
+        run, inputVersion, evidence.detectedLanguage(), status,
+        "VALID".equals(status) ? evidence.confidence() : null, evidence.warning());
     jdbc.update(
         """
 INSERT INTO analytics.document_feature
@@ -668,9 +665,9 @@ DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
   confidence=EXCLUDED.confidence,sample_size=EXCLUDED.sample_size,
   warning=EXCLUDED.warning,computed_at=EXCLUDED.computed_at
 """,
-        run, inputVersion, detected.confidence(), status,
-        "VALID".equals(status) ? detected.confidence() : null, detected.warning());
-    if ("VALID".equals(status) && catalogLanguage != null && detected.language() != null) {
+        run, inputVersion, evidence.confidence(), status,
+        "VALID".equals(status) ? evidence.confidence() : null, evidence.warning());
+    if (evidence.agreement() != null) {
       jdbc.update(
           """
 INSERT INTO analytics.document_feature
@@ -682,7 +679,7 @@ DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
   numeric_value=EXCLUDED.numeric_value,value_status=EXCLUDED.value_status,
   confidence=EXCLUDED.confidence,computed_at=EXCLUDED.computed_at
 """,
-          run, inputVersion, catalogLanguage.equalsIgnoreCase(detected.language()) ? 1d : 0d);
+          run, inputVersion, evidence.agreement());
     }
   }
 

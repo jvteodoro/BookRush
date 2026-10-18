@@ -55,3 +55,8 @@ dimensões H/C/A/I/Q e sua proveniência em `analytics.excerpt_rank`.
 O ranker heurístico também usa configuração versionada no classpath; a
 variável `ANALYTICS_RANKER_CONFIG` só deve apontar para artefatos com estado
 `UNVALIDATED` até existir um processo formal de promoção.
+
+A validação fastText é normalizada em `LanguageEvidence` antes da persistência:
+predição, confiança, idioma declarado, concordância e warning permanecem
+separados. `MODEL_UNAVAILABLE` e outros estados não são convertidos em valores
+válidos ou em concordância artificial.
