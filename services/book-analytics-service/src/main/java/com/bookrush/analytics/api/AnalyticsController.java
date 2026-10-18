@@ -637,11 +637,15 @@ WITH latest_asset AS (
 SELECT book_id, MAX(final_score) AS score,
        (ARRAY_AGG(ranker_version ORDER BY final_score DESC, created_at DESC))[1] AS ranker_version
   FROM ranked
- GROUP BY book_id
+    GROUP BY book_id
 """.formatted(placeholders);
     var rows = jdbc.queryForList(sql, bookIds.toArray());
     metrics.bookScoresBatch();
-    return ResponseEntity.ok(Map.of("items", rows, "requested", bookIds.size(), "returned", rows.size()));
+    var items = rows.stream().map(row -> Map.of(
+        "bookId", row.get("book_id"),
+        "score", row.get("score"),
+        "rankerVersion", row.get("ranker_version"))).toList();
+    return ResponseEntity.ok(Map.of("items", items, "requested", bookIds.size(), "returned", items.size()));
   }
 
   @GetMapping("/internal/v1/content-analytics/asset-versions/{assetVersionId}")

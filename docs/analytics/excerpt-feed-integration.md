@@ -52,6 +52,10 @@ analítico antes do desempate heurístico e da diversidade de idioma. Se o
 analytics, o token S2S ou o timeout falhar, o resultado volta integralmente ao
 `heuristic-v1`; nenhum score ausente é convertido em zero.
 
+O controller normaliza os nomes das colunas PostgreSQL (`book_id` e
+`ranker_version`) para o contrato JSON (`bookId` e `rankerVersion`) antes de
+responder ao cliente S2S.
+
 A ativação é controlada explicitamente por `FEED_ANALYTICS_RANKING_ENABLED`.
 O Compose mantém o ranking habilitado por padrão, reutilizando a mesma
 credencial S2S já configurada:
