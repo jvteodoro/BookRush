@@ -3,10 +3,8 @@ package com.bookrush.analytics.worker;
 import com.bookrush.analytics.config.AnalyticsV2GeneratorProperties;
 import com.bookrush.analytics.excerpts.CandidatePruner;
 import com.bookrush.analytics.excerpts.ExcerptCandidateGenerator;
-import com.bookrush.analytics.features.EmbeddingMath;
 import com.bookrush.analytics.features.LinguisticRuntimeClient;
 import com.bookrush.analytics.features.TextFeatureCalculator;
-import com.bookrush.analytics.llm.TopNliCandidateSelector;
 import com.bookrush.analytics.observability.AnalyticsMetrics;
 import com.bookrush.analytics.storage.TextAssetReader;
 import java.io.IOException;
@@ -17,13 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -37,33 +31,23 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 @Component
 @ConditionalOnProperty(name = "analytics.worker.enabled", havingValue = "true")
 public final class AnalyticsJobWorker {
-  private static final Logger log = LoggerFactory.getLogger(AnalyticsJobWorker.class);
   private final JdbcTemplate jdbc;
   private final S3Client s3;
   private final AnalyticsMetrics metrics;
   private final AnalyticsV2GeneratorProperties generatorProperties;
   private final LinguisticRuntimeClient linguisticRuntime;
-  private final int staleAfterSeconds;
-  private final int maxAttempts;
-  private final int retryDelaySeconds;
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
       S3Client s3,
       AnalyticsMetrics metrics,
       AnalyticsV2GeneratorProperties generatorProperties,
-      com.bookrush.analytics.config.AnalyticsRuntimeProperties runtimeProperties,
-      @Value("${analytics.worker.stale-after-seconds:900}") int staleAfterSeconds,
-      @Value("${analytics.worker.max-attempts:3}") int maxAttempts,
-      @Value("${analytics.worker.retry-delay-seconds:30}") int retryDelaySeconds) {
+      com.bookrush.analytics.config.AnalyticsRuntimeProperties runtimeProperties) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
     this.generatorProperties = generatorProperties;
     this.linguisticRuntime = new LinguisticRuntimeClient(runtimeProperties);
-    this.staleAfterSeconds = normalizeStaleAfterSeconds(staleAfterSeconds);
-    this.maxAttempts = Math.max(1, maxAttempts);
-    this.retryDelaySeconds = Math.max(1, retryDelaySeconds);
   }
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
@@ -74,74 +58,44 @@ public final class AnalyticsJobWorker {
       process(item);
       complete(item);
     } catch (Exception e) {
-      fail(item, errorCode(e), e.getMessage(), e);
+      fail(item, errorCode(e), e.getMessage());
     }
   }
 
   private Item claimOne() {
-    recoverStaleItems();
     return jdbc.query(
         """
 WITH next_item AS (
   SELECT i.id FROM analytics.analysis_job_item i
   JOIN analytics.analysis_job j ON j.id=i.job_id
-  WHERE i.status='PENDING' AND i.attempt_count < ?
-    AND (i.finished_at IS NULL OR i.finished_at <= clock_timestamp() -
-      (? * GREATEST(i.attempt_count, 1) * INTERVAL '1 second'))
-    AND j.cancel_requested=false AND j.status IN ('PENDING','RUNNING')
+  WHERE i.status='PENDING' AND j.cancel_requested=false AND j.status IN ('PENDING','RUNNING')
   ORDER BY i.created_at, i.id FOR UPDATE SKIP LOCKED LIMIT 1
 )
 UPDATE analytics.analysis_job_item i
-   SET status='RUNNING', attempt_count=i.attempt_count+1, started_at=clock_timestamp(), finished_at=NULL,
-       progress_stage='CLAIMED', progress_completed=0, progress_total=0,
-       progress_message='Item atribuído ao worker', progress_updated_at=clock_timestamp()
+   SET status='RUNNING', attempt_count=i.attempt_count+1, started_at=clock_timestamp(), finished_at=NULL
   FROM next_item n WHERE i.id=n.id
-RETURNING i.id, i.job_id, i.input_asset_version_id
+RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
 """,
         rs ->
-            rs.next()
+          rs.next()
                 ? new Item(
                     rs.getObject("id", UUID.class),
                     rs.getObject("job_id", UUID.class),
-                    rs.getObject("input_asset_version_id", UUID.class))
-                : null,
-        maxAttempts,
-        retryDelaySeconds);
+                    rs.getObject("input_asset_version_id", UUID.class),
+                    rs.getInt("attempt_count"))
+                : null);
   }
 
-  /**
-   * Returns items abandoned by a worker/container restart to the durable queue.
-   *
-   * <p>The progress heartbeat prevents a crashed worker from permanently blocking a job while leaving
-   * genuinely active work enough time to finish. Only active, non-cancelled jobs are recovered.
-   */
-  int recoverStaleItems() {
-    return jdbc.update(staleLeaseRecoverySql(), staleAfterSeconds);
+  private void process(Item item) throws Exception {
+    timed(item, "ITEM_TOTAL", () -> {
+      processPhases(item);
+      return null;
+    });
   }
 
-  static int normalizeStaleAfterSeconds(int seconds) {
-    return Math.max(1, seconds);
-  }
-
-  static String staleLeaseRecoverySql() {
-    return """
-UPDATE analytics.analysis_job_item i
-   SET status='PENDING', started_at=NULL, finished_at=NULL, analysis_run_id=NULL,
-       progress_stage='RECOVERED', progress_message='Lease expirado; item recolocado na fila',
-       progress_updated_at=clock_timestamp()
-  FROM analytics.analysis_job j
- WHERE i.job_id=j.id
-   AND i.status='RUNNING'
-   AND j.cancel_requested=false
-   AND j.status IN ('PENDING','RUNNING')
-   AND COALESCE(i.progress_updated_at, i.started_at) < clock_timestamp() - (? * INTERVAL '1 second')
-""";
-  }
-
-  private void process(Item item) throws IOException {
-    updateProgress(item, "LOADING_TEXT", 0, 1, "Carregando texto normalizado");
+  private void processPhases(Item item) throws Exception {
     var physical =
-        jdbc.query(
+        timed(item, "LOAD_METADATA", () -> jdbc.query(
             """
             SELECT v.bucket, v.object_key, v.size_bytes, v.sha256
               FROM catalog.book_asset_version v
@@ -155,14 +109,16 @@ UPDATE analytics.analysis_job_item i
                         rs.getLong("size_bytes"),
                         rs.getString("sha256"))
                     : null,
-            item.inputVersion());
+            item.inputVersion()));
     if (physical == null) throw new IllegalStateException("ASSET_VERSION_UNAVAILABLE");
     String text;
-    try (var stream =
-        s3.getObject(
-            GetObjectRequest.builder().bucket(physical.bucket()).key(physical.key()).build())) {
-      text = TextAssetReader.readNormalized(stream, physical.size(), physical.sha256());
-    }
+    text = timed(item, "READ_ASSET", () -> {
+      try (var stream =
+          s3.getObject(
+              GetObjectRequest.builder().bucket(physical.bucket()).key(physical.key()).build())) {
+        return TextAssetReader.readNormalized(stream, physical.size(), physical.sha256());
+      }
+    });
     var generatorConfig = generatorProperties.candidateConfig();
     var configuration = configurationJson(generatorConfig);
     var configurationHash = sha256(configuration);
@@ -190,9 +146,9 @@ UPDATE analytics.analysis_job_item i
           configuration,
           configurationHash,
           "2");
-      var chapters = chapters(item.inputVersion(), TextAssetReader.codePointLength(text));
+      var chapters = timed(item, "CHAPTER_DISCOVERY", () -> chapters(item.inputVersion()));
       String language = languageFor(item.inputVersion());
-      var detected = linguisticRuntime.language(text);
+      var detected = timed(item, "LANGUAGE_VALIDATION", () -> linguisticRuntime.language(text));
       if ("VALID".equals(detected.status())
           && ("en".equals(detected.language()) || "pt".equals(detected.language()))
           && detected.confidence() >= 0.60d) language = detected.language();
@@ -201,43 +157,49 @@ UPDATE analytics.analysis_job_item i
               .collect(
                   java.util.stream.Collectors.toMap(
                       ExcerptCandidateGenerator.ChapterBoundary::chapterId, chapter -> chapter));
-      int pilotLimit =
-          Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_MAX_EXCERPTS_PER_ITEM", "500"));
-      var generatedCandidates =
-          ExcerptCandidateGenerator.generateV2(text, chapters, generatorConfig);
-      if (pilotLimit > 0 && generatedCandidates.size() > pilotLimit * 3) {
-        generatedCandidates = generatedCandidates.subList(0, pilotLimit * 3);
-      }
-      var candidates =
+      var candidates = timed(item, "EXCERPT_SELECTION", () ->
           CandidatePruner.pruneV2(
-                  generatedCandidates,
+                  ExcerptCandidateGenerator.generateV2(text, chapters, generatorConfig),
                   new CandidatePruner.Config(
                       generatorConfig.minWords(), generatorConfig.maxWords(), "cheap-v2"))
-              .accepted();
+              .accepted());
+      int pilotLimit =
+          Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_MAX_EXCERPTS_PER_ITEM", "0"));
       if (pilotLimit > 0 && candidates.size() > pilotLimit) {
         candidates = candidates.subList(0, pilotLimit);
       }
-      updateProgress(item, "EXCERPTS", candidates.size(), candidates.size(),
-          "Excerpts candidatos persistidos");
-      var excerptIds = new java.util.ArrayList<UUID>();
-      for (var candidate : candidates) {
-        var id =
-            persistExcerpt(
-                run,
-                item.inputVersion(),
-                candidate,
-                chapterById,
-                TextAssetReader.codePointLength(text),
-                language);
-        if (id != null) excerptIds.add(id);
-      }
-      var excerptVectors = persistEmbeddings(item, excerptIds, candidates);
-      updateProgress(item, "SCOPE_EMBEDDINGS", 0, 1, "Calculando embeddings de capítulo/documento");
-      var scopeEmbeddings = persistChapterAndDocumentEmbeddings(
-          item.inputVersion(), text, chapters, generatorConfig.version());
-      persistPrototypeScores(run, excerptIds, candidates, excerptVectors, scopeEmbeddings, language);
-      persistRanks(run, excerptIds);
-      persistNli(run, excerptIds, candidates, excerptVectors, language);
+      final var persistedRun = run;
+      final var selectedCandidates = candidates;
+      final var selectedLanguage = language;
+      var excerptIds = timed(item, "EXCERPT_PERSISTENCE", () -> {
+        var ids = new java.util.ArrayList<UUID>();
+        for (var candidate : selectedCandidates) {
+          var id =
+              persistExcerpt(
+                  persistedRun,
+                  item.inputVersion(),
+                  candidate,
+                  chapterById,
+                  TextAssetReader.codePointLength(text),
+                  selectedLanguage);
+          if (id != null) ids.add(id);
+        }
+        return ids;
+      });
+      final var persistedExcerptIds = java.util.List.copyOf(excerptIds);
+      var excerptVectors = timed(item, "EXCERPT_EMBEDDINGS", () ->
+          persistEmbeddings(item.inputVersion(), persistedExcerptIds, selectedCandidates));
+      timed(item, "FEATURES", () -> {
+        persistPrototypeScores(persistedRun, persistedExcerptIds, selectedCandidates, excerptVectors, selectedLanguage);
+        persistRanks(persistedRun, persistedExcerptIds);
+        persistNli(persistedRun, persistedExcerptIds, selectedLanguage);
+        return null;
+      });
+      timed(item, "SCOPE_EMBEDDINGS", () -> {
+        persistChapterAndDocumentEmbeddings(
+            item.inputVersion(), text, chapters, generatorConfig.version());
+        return null;
+      });
       jdbc.update(
           "UPDATE analytics.analysis_run SET status='COMPLETED', finished_at=clock_timestamp()"
               + " WHERE id=?",
@@ -245,7 +207,61 @@ UPDATE analytics.analysis_job_item i
       metrics.excerptsGenerated(candidates.size());
     }
     jdbc.update(
+        "UPDATE analytics.analysis_phase_timing SET analysis_run_id=?"
+            + " WHERE job_item_id=? AND attempt_count=? AND analysis_run_id IS NULL",
+        run,
+        item.id(),
+        item.attemptCount());
+    jdbc.update(
         "UPDATE analytics.analysis_job_item SET analysis_run_id=? WHERE id=?", run, item.id());
+  }
+
+  private <T> T timed(Item item, String phase, PhaseOperation<T> operation) throws Exception {
+    var timing = startPhase(item, phase);
+    try {
+      return metrics.timePhaseChecked(phase, operation::run);
+    } catch (Exception exception) {
+      timing.failed = true;
+      throw exception;
+    } finally {
+      timing.close();
+    }
+  }
+
+  private PhaseTiming startPhase(Item item, String phase) {
+    var id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO analytics.analysis_phase_timing"
+            + "(id,job_id,job_item_id,attempt_count,phase,status) VALUES (?,?,?,?,?,'RUNNING')",
+        id, item.jobId(), item.id(), item.attemptCount(), phase);
+    return new PhaseTiming(id, phase);
+  }
+
+  @FunctionalInterface
+  private interface PhaseOperation<T> {
+    T run() throws Exception;
+  }
+
+  private final class PhaseTiming implements AutoCloseable {
+    private final UUID id;
+    private final String phase;
+    private final long startedNanos = System.nanoTime();
+    private boolean failed;
+
+    private PhaseTiming(UUID id, String phase) {
+      this.id = id;
+      this.phase = phase;
+    }
+
+    @Override
+    public void close() {
+      var durationMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
+      jdbc.update(
+          "UPDATE analytics.analysis_phase_timing SET status=?, finished_at=clock_timestamp(),"
+              + " duration_ms=?, error_code=? WHERE id=?",
+          failed ? "FAILED" : "COMPLETED", durationMs, failed ? "PHASE_FAILED" : null, id);
+      if (failed) metrics.phaseFailed(phase); else metrics.phaseCompleted(phase);
+    }
   }
 
   private void persistRanks(UUID run, List<UUID> excerptIds) {
@@ -269,36 +285,27 @@ UPDATE analytics.analysis_job_item i
       var values =
           jdbc.query(
               """
-              SELECT fd.code, ef.numeric_value, ef.value_status FROM analytics.excerpt_feature ef
+              SELECT fd.code, ef.numeric_value FROM analytics.excerpt_feature ef
               JOIN analytics.feature_definition fd ON fd.id=ef.feature_definition_id
               WHERE ef.analysis_run_id=? AND ef.excerpt_id=? AND ef.value_status='VALID'
               """,
               rs -> {
                 var m = new java.util.LinkedHashMap<String, Double>();
-                var statuses = new java.util.LinkedHashMap<String, String>();
-                while (rs.next()) {
-                  m.put(rs.getString(1), rs.getObject(2, Double.class));
-                  statuses.put(rs.getString(1), rs.getString(3));
-                }
-                return new FeatureSnapshot(m, statuses);
+                while (rs.next()) m.put(rs.getString(1), rs.getObject(2, Double.class));
+                return m;
               },
               run,
               excerptId);
       var ranked =
           com.bookrush.analytics.excerpts.ExcerptRanker.rank(
-              values.features(),
+              values,
               new com.bookrush.analytics.excerpts.ExcerptRanker.Weights(
                   "EXCERPT_HEURISTIC_RANKER_V1", weights));
-      var dimensions =
-          com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.from(
-              values.features(), values.statuses());
       String components =
           "{"
               + ranked.contributions().entrySet().stream()
                   .map(e -> "\"" + e.getKey() + "\":" + e.getValue())
                   .collect(java.util.stream.Collectors.joining(","))
-              + ",\"dimensions\":"
-              + dimensionsJson(dimensions)
               + "}";
       jdbc.update(
           """
@@ -316,45 +323,13 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
     }
   }
 
-  private static String dimensionsJson(
-      Map<String, com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.Dimension> dimensions) {
-    return dimensions.entrySet().stream()
-        .sorted(Map.Entry.comparingByKey())
-        .map(
-            e -> {
-              var d = e.getValue();
-              String value = d.value() == null ? "null" : Double.toString(d.value());
-              return "\""
-                  + e.getKey()
-                  + "\":{\"value\":"
-                  + value
-                  + ",\"status\":\""
-                  + d.status()
-                  + "\",\"source_feature\":\""
-                  + d.sourceFeature()
-                  + "\"}";
-            })
-        .collect(java.util.stream.Collectors.joining(",", "{", "}"));
-  }
-
-  private record FeatureSnapshot(
-      Map<String, Double> features, Map<String, String> statuses) {}
-
-  private void persistNli(
-      UUID run,
-      List<UUID> excerptIds,
-      List<ExcerptCandidateGenerator.V2Candidate> candidates,
-      Map<UUID, List<Double>> embeddings,
-      String language) {
+  private void persistNli(UUID run, List<UUID> excerptIds, String language) {
     if (!Boolean.parseBoolean(System.getenv().getOrDefault("ANALYTICS_NLI_ENABLED", "false"))
         || excerptIds.isEmpty()) return;
     int limit =
         Math.max(
             1, Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_NLI_MAX_EXCERPTS", "50")));
-    var selected =
-        TopNliCandidateSelector.select(candidates, excerptIds, embeddings, limit).stream()
-            .map(TopNliCandidateSelector.Selection::excerptId)
-            .toList();
+    var selected = excerptIds.size() <= limit ? excerptIds : excerptIds.subList(0, limit);
     var hypotheses = nliHypotheses(language);
     for (UUID excerptId : selected) {
       String text =
@@ -518,7 +493,7 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
     return values;
   }
 
-  private List<ExcerptCandidateGenerator.ChapterBoundary> chapters(UUID inputVersion, int textLength) {
+  private List<ExcerptCandidateGenerator.ChapterBoundary> chapters(UUID inputVersion) {
     return jdbc.query(
         """
         SELECT id, start_offset, end_offset
@@ -528,13 +503,8 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
         """,
         (rs, row) ->
             new ExcerptCandidateGenerator.ChapterBoundary(
-                rs.getObject("id", UUID.class),
-                Math.max(0, rs.getInt("start_offset")),
-                Math.min(textLength, rs.getInt("end_offset"))),
-        inputVersion).stream()
-        .filter(chapter -> chapter.startCodepoint() < textLength)
-        .filter(chapter -> chapter.endCodepoint() > chapter.startCodepoint())
-        .toList();
+                rs.getObject("id", UUID.class), rs.getInt("start_offset"), rs.getInt("end_offset")),
+        inputVersion);
   }
 
   private UUID persistExcerpt(
@@ -594,27 +564,24 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
             .values());
     var linguistic = linguisticRuntime.analyze(language, candidate.text());
     values.putAll(linguistic.values());
-    var featureRows = new java.util.ArrayList<Object[]>();
     for (var definition : definitions) {
       var value = values.get(definition.getValue());
       if (value == null && !definition.getValue().equals("unique_lemma_ratio")) continue;
-      featureRows.add(
-          new Object[] {
-            run, definition.getKey(), actual, value, value == null ? linguistic.status() : "VALID"
-          });
-    }
-    if (!featureRows.isEmpty())
-      jdbc.batchUpdate(
+      jdbc.update(
           "INSERT INTO"
               + " analytics.excerpt_feature(analysis_run_id,feature_definition_id,excerpt_id,numeric_value,value_status,computed_at)"
               + " VALUES (?,?,?,?, ?, clock_timestamp()) ON CONFLICT DO NOTHING",
-          featureRows);
+          run,
+          definition.getKey(),
+          actual,
+          value,
+          value == null ? linguistic.status() : "VALID");
+    }
     return actual;
   }
 
   private Map<UUID, List<Double>> persistEmbeddings(
-      Item item, List<UUID> excerptIds, List<ExcerptCandidateGenerator.V2Candidate> candidates) {
-    UUID version = item.inputVersion();
+      UUID version, List<UUID> excerptIds, List<ExcerptCandidateGenerator.V2Candidate> candidates) {
     var vectorsByExcerpt = new java.util.LinkedHashMap<UUID, List<Double>>();
     if (excerptIds.isEmpty() || excerptIds.size() != candidates.size()) return vectorsByExcerpt;
     // The runtime deliberately bounds requests to 32 texts. Chunking here also
@@ -624,27 +591,16 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
     // exceed the runtime read timeout even though the request is valid.
     final int batchSize = 4;
     String bucket = System.getenv().getOrDefault("STORAGE_BUCKET_ML", "books-ml");
-    int total = candidates.size();
     for (int offset = 0; offset < candidates.size(); offset += batchSize) {
       int end = Math.min(offset + batchSize, candidates.size());
       var texts =
           candidates.subList(offset, end).stream()
               .map(ExcerptCandidateGenerator.V2Candidate::text)
               .toList();
-      updateProgress(item, "EMBEDDINGS", offset, total,
-          "Solicitando lote " + (offset + 1) + "-" + end + " de " + total);
-      long startedNanos = System.nanoTime();
       var result = linguisticRuntime.embeddings(texts, 8192);
-      long durationMs = (System.nanoTime() - startedNanos) / 1_000_000;
-      log.info("analytics embeddings progress itemId={} version={} batch={}-{} total={} durationMs={} status={} vectors={}",
-          item.id(), version, offset + 1, end, total, durationMs, result.status(), result.vectors().size());
       if (!"VALID".equals(result.status())
           || result.vectors().size() != texts.size()
-          || result.inputHashes().size() != texts.size()) {
-        updateProgress(item, "EMBEDDINGS", offset, total,
-            "Runtime não retornou um lote válido: " + result.status());
-        continue;
-      }
+          || result.inputHashes().size() != texts.size()) continue;
       var modelId =
           jdbc.query(
               "SELECT id FROM analytics.embedding_model WHERE code=?",
@@ -684,17 +640,8 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
             key);
         vectorsByExcerpt.put(excerptIds.get(offset + i), result.vectors().get(i));
       }
-      updateProgress(item, "EMBEDDINGS", end, total,
-          "Lote persistido " + end + "/" + total + " (" + durationMs + " ms)");
     }
     return vectorsByExcerpt;
-  }
-
-  private void updateProgress(Item item, String stage, int completed, int total, String message) {
-    jdbc.update(
-        "UPDATE analytics.analysis_job_item SET progress_stage=?, progress_completed=?, progress_total=?,"
-            + " progress_message=?, progress_updated_at=clock_timestamp() WHERE id=?",
-        stage, Math.max(0, completed), Math.max(0, total), message, item.id());
   }
 
   private void persistPrototypeScores(
@@ -702,11 +649,8 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
       List<UUID> excerptIds,
       List<ExcerptCandidateGenerator.V2Candidate> candidates,
       Map<UUID, List<Double>> vectors,
-      ScopeEmbeddings scopeEmbeddings,
       String language) {
-    if (vectors.isEmpty()
-        && scopeEmbeddings.chapterVectors().isEmpty()
-        && scopeEmbeddings.documentVector() == null) return;
+    if (vectors.isEmpty()) return;
     var examples = new java.util.LinkedHashMap<String, String>();
     boolean pt = "pt".equalsIgnoreCase(language);
     if (pt) {
@@ -750,48 +694,13 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
             "semantic.prototype." + examples.keySet().toArray()[i] + ".raw_cosine");
       }
     }
-    for (var entry : scopeEmbeddings.chapterVectors().entrySet()) {
-      persistScopePrototypeScores(run, "chapter", entry.getKey(), entry.getValue(), result.vectors(), examples.keySet());
-    }
-    if (scopeEmbeddings.documentVector() != null) {
-      persistScopePrototypeScores(run, "document", null, scopeEmbeddings.documentVector(), result.vectors(), examples.keySet());
-    }
-  }
-
-  private void persistScopePrototypeScores(
-      UUID run,
-      String scope,
-      UUID scopeId,
-      List<Double> vector,
-      List<List<Double>> prototypes,
-      java.util.Set<String> concepts) {
-    int index = 0;
-    for (String concept : concepts) {
-      double score = cosine(vector, prototypes.get(index++));
-      String code = "semantic.prototype." + concept + ".raw_cosine." + scope;
-      if ("chapter".equals(scope)) {
-        jdbc.update(
-            """
-INSERT INTO analytics.chapter_feature(analysis_run_id,feature_definition_id,chapter_id,numeric_value,value_status,computed_at)
-SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition fd
- WHERE fd.code=? ON CONFLICT DO NOTHING
-""",
-            run, scopeId, score, code);
-      } else {
-        jdbc.update(
-            """
-INSERT INTO analytics.document_feature(analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,computed_at)
-SELECT ?,fd.id,ar.input_asset_version_id,?,?, 'VALID',clock_timestamp()
- FROM analytics.feature_definition fd JOIN analytics.analysis_run ar ON ar.id=?
- WHERE fd.code=? ON CONFLICT DO NOTHING
-""",
-            run, score, run, code);
-      }
-    }
   }
 
   private static double cosine(List<Double> left, List<Double> right) {
-    return EmbeddingMath.cosine(left, right);
+    if (left.size() != right.size() || left.isEmpty()) return 0d;
+    double value = 0;
+    for (int i = 0; i < left.size(); i++) value += left.get(i) * right.get(i);
+    return value;
   }
 
   /**
@@ -799,22 +708,20 @@ SELECT ?,fd.id,ar.input_asset_version_id,?,?, 'VALID',clock_timestamp()
    * code-point chunks and aggregated with a weighted mean, so a whole book is never silently
    * truncated to a model context.
    */
-  private ScopeEmbeddings persistChapterAndDocumentEmbeddings(
+  private void persistChapterAndDocumentEmbeddings(
       UUID version,
       String text,
       List<ExcerptCandidateGenerator.ChapterBoundary> chapters,
       String generatorVersion) {
     if (!Boolean.parseBoolean(
-        System.getenv().getOrDefault("ANALYTICS_SCOPE_EMBEDDINGS_ENABLED", "true")))
-      return ScopeEmbeddings.empty();
+        System.getenv().getOrDefault("ANALYTICS_SCOPE_EMBEDDINGS_ENABLED", "true"))) return;
     String bucket = System.getenv().getOrDefault("STORAGE_BUCKET_ML", "books-ml");
     UUID modelId =
         jdbc.query(
             "SELECT id FROM analytics.embedding_model WHERE code='bge-m3-dense-v1'",
             rs -> rs.next() ? rs.getObject(1, UUID.class) : null);
-    if (modelId == null) return ScopeEmbeddings.empty();
+    if (modelId == null) return;
     var chapterVectors = new java.util.ArrayList<WeightedVector>();
-    var chapterEmbeddings = new java.util.LinkedHashMap<UUID, List<Double>>();
     for (var chapter : chapters) {
       if (chapter.endCodepoint() <= chapter.startCodepoint()) continue;
       String chapterText = codePointSlice(text, chapter.startCodepoint(), chapter.endCodepoint());
@@ -837,7 +744,6 @@ VALUES (?,?,?,?,?,'weighted-codepoint-chunks','S3',?,?) ON CONFLICT DO NOTHING
           key);
       chapterVectors.add(
           new WeightedVector(embedded.vector(), Math.max(1, codePointLength(chapterText))));
-      chapterEmbeddings.put(chapter.chapterId(), embedded.vector());
     }
     List<Double> document;
     if (chapterVectors.isEmpty()) {
@@ -845,7 +751,7 @@ VALUES (?,?,?,?,?,'weighted-codepoint-chunks','S3',?,?) ON CONFLICT DO NOTHING
       // document still requires a complete embedding, so aggregate chunks of
       // the whole normalized text instead of silently omitting it.
       var embedded = embedWholeText(text);
-      if (embedded == null) return new ScopeEmbeddings(chapterEmbeddings, null);
+      if (embedded == null) return;
       document = embedded.vector();
     } else {
       document = weightedMean(chapterVectors);
@@ -865,14 +771,6 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
         document.size(),
         bucket,
         key);
-    return new ScopeEmbeddings(chapterEmbeddings, document);
-  }
-
-  private record ScopeEmbeddings(
-      Map<UUID, List<Double>> chapterVectors, List<Double> documentVector) {
-    private static ScopeEmbeddings empty() {
-      return new ScopeEmbeddings(Map.of(), null);
-    }
   }
 
   private EmbeddedVector embedWholeText(String value) {
@@ -932,11 +830,8 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
   }
 
   private static String codePointSlice(String value, int start, int end) {
-    int length = codePointLength(value);
-    int safeStart = Math.max(0, Math.min(start, length));
-    int safeEnd = Math.max(safeStart, Math.min(end, length));
-    int begin = value.offsetByCodePoints(0, safeStart);
-    int finish = value.offsetByCodePoints(begin, safeEnd - safeStart);
+    int begin = value.offsetByCodePoints(0, start);
+    int finish = value.offsetByCodePoints(begin, end - start);
     return value.substring(begin, finish);
   }
 
@@ -967,8 +862,6 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
   private void complete(Item item) {
     jdbc.update(
         "UPDATE analytics.analysis_job_item SET status='COMPLETED', finished_at=clock_timestamp(),"
-            + " progress_stage='COMPLETED', progress_completed=1, progress_total=1,"
-            + " progress_message='Item concluído', progress_updated_at=clock_timestamp(),"
             + " error_code=NULL, error_message=NULL WHERE id=?",
         item.id());
     reconcileJob(item.jobId());
@@ -988,49 +881,18 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         jobId);
   }
 
-  private void fail(Item item, String code, String message, Exception exception) {
-    String safeMessage = message == null ? code : message.substring(0, Math.min(1000, message.length()));
-    if (isRetryable(code, exception)) {
-      jdbc.update(
-          "UPDATE analytics.analysis_job_item SET status='PENDING', finished_at=clock_timestamp(),"
-              + " progress_stage='RETRYING', progress_message=?, progress_updated_at=clock_timestamp(),"
-              + " error_code=?, error_message=? WHERE id=?",
-          safeMessage,
-          code,
-          safeMessage,
-          item.id());
-      jdbc.update(
-          "UPDATE analytics.analysis_job SET status='RUNNING', finished_at=NULL WHERE id=?"
-              + " AND status IN ('PENDING','RUNNING')",
-          item.jobId());
-      return;
-    }
+  private void fail(Item item, String code, String message) {
     jdbc.update(
         "UPDATE analytics.analysis_job_item SET status='FAILED', finished_at=clock_timestamp(),"
-            + " progress_stage='FAILED', progress_message=?, progress_updated_at=clock_timestamp(),"
             + " error_code=?, error_message=? WHERE id=?",
-        safeMessage,
         code,
-        safeMessage,
+        message == null ? code : message.substring(0, Math.min(1000, message.length())),
         item.id());
     // A failed item is terminal only for that item. The batch must remain
     // RUNNING while other items are pending or being processed, so a restart
     // or one bad book cannot strand the rest of the queue.
     reconcileJob(item.jobId());
     metrics.jobItemFailed(code);
-  }
-
-  static boolean isRetryable(String code, Exception exception) {
-    if (code == null || code.equals("ASSET_VERSION_UNAVAILABLE")
-        || exception instanceof TextAssetReader.IntegrityException
-        || exception instanceof IllegalArgumentException) return false;
-    return exception instanceof IOException
-        || exception instanceof DataAccessException
-        || code.contains("Timeout")
-        || code.contains("Connect")
-        || code.contains("Unavailable")
-        || code.contains("S3Exception")
-        || code.contains("ResourceAccess");
   }
 
   private static String configurationJson(ExcerptCandidateGenerator.V2Config config) {
@@ -1067,7 +929,7 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         : e.getClass().getSimpleName();
   }
 
-  private record Item(UUID id, UUID jobId, UUID inputVersion) {}
+  private record Item(UUID id, UUID jobId, UUID inputVersion, int attemptCount) {}
 
   private record Physical(String bucket, String key, long size, String sha256) {}
 }

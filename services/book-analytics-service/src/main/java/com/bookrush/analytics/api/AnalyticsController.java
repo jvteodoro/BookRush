@@ -167,54 +167,10 @@ public class AnalyticsController {
     var rows =
         jdbc.queryForList(
             "SELECT id, operation_key, status, total_items, processed_items, succeeded_items,"
-                + " failed_items, cancel_requested, created_at, started_at, finished_at,"
-                + " (SELECT max(progress_updated_at) FROM analytics.analysis_job_item WHERE job_id=analysis_job.id) AS last_progress_at FROM"
+                + " failed_items, cancel_requested, created_at, started_at, finished_at FROM"
                 + " analytics.analysis_job WHERE id=?",
             jobId);
     return rows.isEmpty() ? ResponseEntity.notFound().build() : ResponseEntity.ok(rows.getFirst());
-  }
-
-  @GetMapping({"/admin/v1/analytics/jobs", "/admin/v1/content-analytics/jobs"})
-  @Operation(
-      summary = "Listar jobs de analytics",
-      description = "Lista jobs persistidos para acompanhamento operacional, inclusive jobs criados por outro cliente.")
-  public ResponseEntity<Map<String, Object>> jobs(
-      @RequestParam(defaultValue = "50") int limit,
-      @RequestParam(defaultValue = "0") int offset,
-      @RequestParam(required = false) String status) {
-    if (limit < 1 || limit > 200 || offset < 0) {
-      return ResponseEntity.badRequest()
-          .body(Map.of("code", "INVALID_PAGE", "message", "limit must be 1..200 and offset must be non-negative"));
-    }
-    var allowedStatuses = java.util.Set.of("PENDING", "RUNNING", "COMPLETED", "COMPLETED_WITH_ERRORS", "FAILED", "CANCELLED");
-    if (status != null && !status.isBlank() && !allowedStatuses.contains(status)) {
-      return ResponseEntity.badRequest()
-          .body(Map.of("code", "INVALID_STATUS", "message", "unsupported job status"));
-    }
-    var rows = jdbc.queryForList(
-        """
-        SELECT j.id, j.operation_key, j.status, j.total_items, j.processed_items,
-               j.succeeded_items, j.failed_items, j.cancel_requested, j.created_at,
-               j.started_at, j.finished_at,
-               count(i.id) FILTER (WHERE i.status='PENDING') AS pending_items,
-               count(i.id) FILTER (WHERE i.status='RUNNING') AS running_items,
-               count(i.id) FILTER (WHERE i.status='COMPLETED') AS completed_items,
-               count(i.id) FILTER (WHERE i.status='FAILED') AS failed_items,
-               max(i.progress_updated_at) AS last_progress_at,
-               max(i.progress_stage) FILTER (WHERE i.status='RUNNING') AS progress_stage
-          FROM analytics.analysis_job j
-          LEFT JOIN analytics.analysis_job_item i ON i.job_id=j.id
-         WHERE (CAST(? AS text) IS NULL OR CAST(? AS text) = '' OR j.status = CAST(? AS text))
-         GROUP BY j.id
-         ORDER BY j.created_at DESC, j.id DESC
-         LIMIT ? OFFSET ?
-        """,
-        status,
-        status,
-        status,
-        limit,
-        offset);
-    return ResponseEntity.ok(Map.of("items", rows, "limit", limit, "offset", offset));
   }
 
   @PostMapping({
@@ -268,18 +224,51 @@ public class AnalyticsController {
     return ResponseEntity.ok(
         jdbc.queryForList(
             "SELECT id, input_asset_version_id, status, attempt_count, analysis_run_id, error_code,"
-                + " error_message, started_at, finished_at, progress_stage, progress_completed,"
-                + " progress_total, progress_message, progress_updated_at FROM analytics.analysis_job_item WHERE"
+                + " error_message, started_at, finished_at FROM analytics.analysis_job_item WHERE"
                 + " job_id=? ORDER BY created_at, id",
             jobId));
   }
 
   @GetMapping({
-    "/admin/v1/analytics/runs",
-    "/admin/v1/content-analytics/runs",
-    "/internal/v1/analytics/runs",
-    "/internal/v1/content-analytics/runs"
+    "/admin/v1/analytics/phase-timings",
+    "/admin/v1/content-analytics/phase-timings"
   })
+  @Operation(
+      summary = "Distribuição de duração por fase",
+      description =
+          "Retorna contagem, média, mínimo, máximo e percentis das fases persistidas para dashboards.")
+  public ResponseEntity<Map<String, Object>> phaseTimings(
+      @RequestParam(required = false) UUID jobId,
+      @RequestParam(defaultValue = "200") int limit) {
+    if (limit < 1 || limit > 1000)
+      return ResponseEntity.badRequest()
+          .body(Map.of("code", "INVALID_LIMIT", "message", "limit must be between 1 and 1000"));
+    var rows =
+        jdbc.queryForList(
+            """
+SELECT phase, status,
+       count(*) AS samples,
+       round(avg(duration_ms)::numeric, 2) AS mean_ms,
+       min(duration_ms) AS min_ms,
+       percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms,
+       percentile_cont(0.90) WITHIN GROUP (ORDER BY duration_ms) AS p90_ms,
+       percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,
+       percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms,
+       max(duration_ms) AS max_ms
+  FROM analytics.analysis_phase_timing
+ WHERE duration_ms IS NOT NULL
+   AND (? IS NULL OR job_id=?)
+ GROUP BY phase, status
+ ORDER BY phase, status
+ LIMIT ?
+""",
+            jobId,
+            jobId,
+            limit);
+    return ResponseEntity.ok(Map.of("items", rows, "total", rows.size()));
+  }
+
+  @GetMapping({"/internal/v1/analytics/runs", "/internal/v1/content-analytics/runs"})
   @Operation(
       summary = "Listar execuções e métricas",
       description = "Retorna as execuções persistidas, associadas à obra e à versão textual exata.")
@@ -364,8 +353,6 @@ SELECT fd.code, fd.name, fd.unit, avg(ef.numeric_value) AS numeric_value
   }
 
   @GetMapping({
-    "/admin/v1/analytics/books/{bookId}/input",
-    "/admin/v1/content-analytics/books/{bookId}/input",
     "/internal/v1/analytics/books/{bookId}/input",
     "/internal/v1/content-analytics/books/{bookId}/input"
   })
@@ -447,8 +434,6 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
        e.end_codepoint, e.text, e.text_sha256, e.generation_method,
        e.generator_version, e.created_at, e.body_eligible, e.exclusion_reason,
        er.final_score AS candidate_score, er.ranker_code, er.ranker_version,
-       er.configuration_hash AS rank_configuration_hash,
-       er.components AS rank_components, er.weights AS rank_weights,
        em.code AS embedding_model, em.model_version AS embedding_model_version
   FROM analytics.excerpt e
   JOIN catalog.book_asset_version v ON v.id = e.source_asset_version_id
@@ -456,8 +441,7 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
   LEFT JOIN LATERAL (SELECT ee.embedding_model_id FROM analytics.excerpt_embedding ee
                       WHERE ee.excerpt_id = e.id ORDER BY ee.created_at DESC LIMIT 1) ee ON TRUE
  LEFT JOIN analytics.embedding_model em ON em.id = ee.embedding_model_id
- LEFT JOIN LATERAL (SELECT final_score, ranker_code, ranker_version, configuration_hash,
-                           components, weights FROM analytics.excerpt_rank er
+ LEFT JOIN LATERAL (SELECT final_score, ranker_code, ranker_version FROM analytics.excerpt_rank er
                     WHERE er.excerpt_id=e.id ORDER BY er.created_at DESC LIMIT 1) er ON TRUE
  WHERE a.book_id = ?
    AND e.body_eligible = TRUE
