@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { services } from "../../lib/services";
+import type { AnalyticsItemDetail, AnalyticsPhase } from "../../types/domain";
 
 const formatDate = (value?: string) =>
   value ? new Date(value).toLocaleString() : "—";
@@ -45,6 +46,7 @@ const formatDuration = (duration?: number | null) => {
 export function AnalyticsItemPage() {
   const { jobId = "", itemId = "" } = useParams();
   const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
+  const [expandedPhase, setExpandedPhase] = useState<string | null>(null);
   const detail = useQuery({
     queryKey: ["analytics-item", jobId, itemId],
     queryFn: () => services.getAnalyticsItemDetail(jobId, itemId),
@@ -153,17 +155,17 @@ export function AnalyticsItemPage() {
           </div>
           <div className="phase-list" role="tabpanel">
             {selectedPhases.map((phase) => (
-              <div className="phase-row" key={phase.id}>
-                <PhaseIcon status={phase.status} />
-                <div>
-                  <strong>{phaseLabel(phase.phase)}</strong>
-                  <small>
-                    {phase.status} · início {formatDate(phase.started_at)} · fim{" "}
-                    {formatDate(phase.finished_at)}
-                  </small>
-                </div>
-                <b>{formatDuration(phase.duration_ms)}</b>
-              </div>
+              <PhaseEntry
+                key={phase.id}
+                phase={phase}
+                item={item}
+                expanded={expandedPhase === phase.id}
+                onToggle={() =>
+                  setExpandedPhase((current) =>
+                    current === phase.id ? null : phase.id,
+                  )
+                }
+              />
             ))}
             {phases.length === 0 && (
               <p className="muted">Nenhuma fase registrada.</p>
@@ -192,6 +194,106 @@ export function AnalyticsItemPage() {
         </div>
       </div>
     </section>
+  );
+}
+
+function PhaseEntry({
+  phase,
+  item,
+  expanded,
+  onToggle,
+}: {
+  phase: AnalyticsPhase;
+  item: AnalyticsItemDetail["item"];
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const logs = phase.logs ?? [];
+  const lastLog = logs.length > 0 ? logs[logs.length - 1] : undefined;
+  const isCurrent = phase.status === "RUNNING";
+  const progress = lastLog?.progress_total
+    ? {
+        completed: lastLog.progress_completed ?? 0,
+        total: lastLog.progress_total,
+      }
+    : isCurrent && item.progress_total
+      ? {
+          completed: item.progress_completed ?? 0,
+          total: item.progress_total,
+        }
+      : null;
+  const percentage = progress
+    ? Math.min(100, Math.round((progress.completed / progress.total) * 100))
+    : null;
+
+  return (
+    <div className={`phase-entry ${expanded ? "expanded" : ""}`}>
+      <button
+        className="phase-row"
+        onClick={onToggle}
+        type="button"
+        aria-expanded={expanded}
+      >
+        <PhaseIcon status={phase.status} />
+        <div>
+          <strong>{phaseLabel(phase.phase)}</strong>
+          <small>
+            {phase.status} · início {formatDate(phase.started_at)} · fim{" "}
+            {formatDate(phase.finished_at)}
+          </small>
+        </div>
+        <b>{formatDuration(phase.duration_ms)}</b>
+        <span className="phase-expand">{expanded ? "−" : "+"}</span>
+      </button>
+      {expanded && (
+        <div className="phase-details">
+          {progress && (
+            <div className="phase-progress">
+              <div className="phase-progress-label">
+                <span>
+                  {lastLog?.message ?? item.progress_message ?? "Progresso"}
+                </span>
+                <b>
+                  {progress.completed}/{progress.total} · {percentage}%
+                </b>
+              </div>
+              <div
+                className="phase-progress-track"
+                role="progressbar"
+                aria-valuenow={progress.completed}
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+              >
+                <span style={{ width: `${percentage}%` }} />
+              </div>
+            </div>
+          )}
+          <div className="phase-log-list">
+            {logs.length === 0 ? (
+              <span className="muted">
+                Nenhum evento detalhado persistido para esta fase.
+              </span>
+            ) : (
+              logs.map((log) => (
+                <div
+                  className={`phase-log phase-log-${log.level.toLowerCase()}`}
+                  key={log.id}
+                >
+                  <time>{formatDate(log.occurred_at)}</time>
+                  <span>{log.message}</span>
+                  {log.progress_total ? (
+                    <b>
+                      {log.progress_completed ?? 0}/{log.progress_total}
+                    </b>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+          {phase.error_code && <p className="error-text">{phase.error_code}</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

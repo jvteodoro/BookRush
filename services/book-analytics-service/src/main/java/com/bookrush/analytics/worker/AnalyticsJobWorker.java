@@ -377,7 +377,8 @@ UPDATE analytics.analysis_job_item i
     jdbc.update("INSERT INTO analytics.analysis_phase_timing"
         + "(id,job_id,job_item_id,attempt_count,phase,status) VALUES (?,?,?,?,?,'RUNNING')",
         id, item.jobId(), item.id(), item.attemptCount(), phase);
-    return new PhaseTiming(id, phase);
+    writePhaseLog(id, item, "INFO", "Fase iniciada", null, null);
+    return new PhaseTiming(id, phase, item);
   }
 
   @FunctionalInterface
@@ -386,19 +387,42 @@ UPDATE analytics.analysis_job_item i
   private final class PhaseTiming implements AutoCloseable {
     private final UUID id;
     private final String phase;
+    private final Item item;
     private final long startedNanos = System.nanoTime();
     private boolean failed;
 
-    private PhaseTiming(UUID id, String phase) { this.id = id; this.phase = phase; }
+    private PhaseTiming(UUID id, String phase, Item item) {
+      this.id = id;
+      this.phase = phase;
+      this.item = item;
+    }
 
     @Override
     public void close() {
       var durationMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
+      var status = failed ? "FAILED" : "COMPLETED";
       jdbc.update("UPDATE analytics.analysis_phase_timing SET status=?, finished_at=clock_timestamp(),"
           + " duration_ms=?, error_code=? WHERE id=?",
-          failed ? "FAILED" : "COMPLETED", durationMs, failed ? "PHASE_FAILED" : null, id);
+          status, durationMs, failed ? "PHASE_FAILED" : null, id);
+      writePhaseLog(id, item, failed ? "ERROR" : "INFO",
+          failed ? "Fase encerrada com falha" : "Fase concluída", null, null);
       if (failed) metrics.phaseFailed(phase); else metrics.phaseCompleted(phase);
     }
+  }
+
+  private void writePhaseLog(
+      UUID phaseTimingId,
+      Item item,
+      String level,
+      String message,
+      Integer completed,
+      Integer total) {
+    jdbc.update(
+        "INSERT INTO analytics.analysis_phase_log"
+            + "(id,phase_timing_id,job_id,job_item_id,attempt_count,level,message,progress_completed,progress_total)"
+            + " VALUES (?,?,?,?,?,?,?,?,?)",
+        UUID.randomUUID(), phaseTimingId, item.jobId(), item.id(), item.attemptCount(), level,
+        message, completed, total);
   }
 
   private void persistRanks(UUID run, List<UUID> excerptIds) {
@@ -848,6 +872,14 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
         "UPDATE analytics.analysis_job_item SET progress_stage=?, progress_completed=?, progress_total=?,"
             + " progress_message=?, progress_updated_at=clock_timestamp() WHERE id=?",
         stage, Math.max(0, completed), Math.max(0, total), message, item.id());
+    jdbc.update(
+        "INSERT INTO analytics.analysis_phase_log"
+            + "(id,phase_timing_id,job_id,job_item_id,attempt_count,level,message,progress_completed,progress_total)"
+            + " SELECT ?,p.id,p.job_id,p.job_item_id,p.attempt_count,'INFO',?,?,?"
+            + " FROM analytics.analysis_phase_timing p"
+            + " WHERE p.job_item_id=? AND p.attempt_count=? AND p.status='RUNNING'"
+            + " ORDER BY p.started_at DESC, p.id DESC LIMIT 1",
+        UUID.randomUUID(), message, Math.max(0, completed), Math.max(0, total), item.id(), item.attemptCount());
   }
 
   private void persistPrototypeScores(

@@ -345,6 +345,15 @@ public class AnalyticsController {
         "SELECT id, attempt_count, phase, status, started_at, finished_at, duration_ms, error_code, metadata"
             + " FROM analytics.analysis_phase_timing WHERE job_id=? AND job_item_id=? ORDER BY started_at, id",
         jobId, itemId);
+    var phaseLogs = jdbc.queryForList(
+        "SELECT phase_timing_id, id, occurred_at, level, message, progress_completed, progress_total, metadata"
+            + " FROM analytics.analysis_phase_log WHERE job_id=? AND job_item_id=?"
+            + " ORDER BY occurred_at, id",
+        jobId, itemId);
+    var logsByPhase = phaseLogs.stream().collect(
+        java.util.stream.Collectors.groupingBy(row -> row.get("phase_timing_id")));
+    phases.forEach(phase -> phase.put(
+        "logs", logsByPhase.getOrDefault(phase.get("id"), java.util.List.of())));
     var item = itemRows.getFirst();
     var runId = item.get("analysis_run_id");
     var statistics = new LinkedHashMap<String, Object>();

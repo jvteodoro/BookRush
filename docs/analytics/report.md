@@ -49,6 +49,17 @@ joins com catálogo, `job_id`, `status`, `created_at` e `id` precisam ser
 qualificados com o alias de `analysis_job_item`. Sem isso, PostgreSQL retornava
 `column reference "created_at" is ambiguous` e a tela recebia HTTP 500.
 
+### Detalhe operacional por fase
+
+O detalhe do item retorna `logs` dentro de cada fase. Cada evento possui
+timestamp, nível, mensagem e, quando aplicável, `progress_completed` e
+`progress_total`. O worker grava eventos de início/fim e atualizações de lote;
+em embeddings, por exemplo, a tela pode mostrar `365/500` e o último lote
+persistido. O Admin Web apresenta cada fase como uma seção expansível com barra
+de progresso e histórico de eventos. Fases antigas sem eventos continuam
+visíveis com sua duração persistida, mas não podem ser retroativamente
+detalhadas.
+
 Os endpoints administrativos usados nessa navegação são:
 
 - `GET /api/admin/v1/content-analytics/jobs?limit=200&offset=0`

@@ -943,12 +943,20 @@ input {
 }
 .phase-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto 18px;
   align-items: center;
   gap: 8px;
   padding: 9px 0;
   border-bottom: 1px solid #182238;
   font-size: 12px;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .phase-row:last-child {
   border-bottom: 0;
@@ -964,6 +972,77 @@ input {
 .phase-row b {
   color: #b7c2d3;
   font-size: 11px;
+}
+.phase-expand {
+  color: #78e9c7;
+  font-size: 17px;
+  text-align: center;
+}
+.phase-details {
+  margin: 0 0 5px 28px;
+  padding: 10px 12px;
+  border-left: 1px solid #283550;
+  background: #0d1627;
+}
+.phase-progress {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.phase-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #aab7ca;
+  font-size: 11px;
+}
+.phase-progress-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.phase-progress-label b {
+  color: #78e9c7;
+  white-space: nowrap;
+}
+.phase-progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #202c42;
+}
+.phase-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #78e9c7;
+  transition: width 300ms ease;
+}
+.phase-log-list {
+  display: grid;
+  gap: 5px;
+}
+.phase-log {
+  display: grid;
+  grid-template-columns: 145px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  color: #aab7ca;
+  font-size: 11px;
+}
+.phase-log time {
+  color: #66758e;
+  font-variant-numeric: tabular-nums;
+}
+.phase-log b {
+  color: #78e9c7;
+  font-size: 10px;
+}
+.phase-log-error span {
+  color: #ff9da9;
+}
+.phase-log-warn span {
+  color: #f1c66d;
 }
 .phase-complete {
   color: #78e9c7;

@@ -87,6 +87,18 @@ export interface AnalyticsPhase {
   duration_ms?: number | null;
   error_code?: string;
   metadata?: Record<string, unknown>;
+  logs?: AnalyticsPhaseLog[];
+}
+
+export interface AnalyticsPhaseLog {
+  id: string;
+  phase_timing_id?: string;
+  occurred_at: string;
+  level: "INFO" | "WARN" | "ERROR" | string;
+  message: string;
+  progress_completed?: number | null;
+  progress_total?: number | null;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AnalyticsItemDetail {
