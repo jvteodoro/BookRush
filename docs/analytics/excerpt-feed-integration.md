@@ -65,6 +65,11 @@ FEED_ANALYTICS_RANKING_ENABLED=true
 FEED_ANALYTICS_RANKING_MODEL_VERSION=analytics-aware-v1
 ```
 
+O segredo deve ser injetado explicitamente em
+`FEED_ANALYTICS_RANKING_CLIENT_SECRET`; no Compose de produção ele é ligado à
+mesma Secret Text já usada por `FEED_EXCERPTS_CLIENT_SECRET`. Isso evita
+depender de placeholders aninhados do Spring durante a inicialização.
+
 O ledger passa a registrar `modelVersion=analytics-aware-v1` e o motivo
 `analytics-score` somente quando pelo menos um candidato recebeu score. A
 ausência de scores mantém `modelVersion=heuristic-v1`, permitindo identificar
