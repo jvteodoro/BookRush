@@ -8,6 +8,9 @@ import {
 } from "../mocks/data";
 import {
   AnalyticsRun,
+  AnalyticsItemDetail,
+  AnalyticsJob,
+  AnalyticsJobItem,
   BookCandidate,
   FeedEvent,
   FeedWeights,
@@ -460,11 +463,15 @@ export const services = {
       return structuredClone(mutableRuns);
     }
     try {
-      const { data } = await analyticsHttp.get(
-        "/api/internal/v1/content-analytics/runs",
-        { params: { limit: 100 } },
-      );
-      return (data.items ?? []).map(
+      const [{ data }, { data: jobs }] = await Promise.all([
+        analyticsHttp.get("/api/internal/v1/content-analytics/runs", {
+          params: { limit: 100 },
+        }),
+        analyticsHttp.get("/api/admin/v1/content-analytics/jobs", {
+          params: { limit: 100 },
+        }),
+      ]);
+      const persistedRuns = (data.items ?? []).map(
         (raw: Record<string, unknown>): AnalyticsRun => ({
           id: String(raw.id),
           bookId: String(raw.book_id ?? raw.bookId),
@@ -496,6 +503,36 @@ export const services = {
             : [],
         }),
       );
+      const jobRuns = (jobs.items ?? []).map(
+        (raw: Record<string, unknown>): AnalyticsRun => ({
+          id: String(raw.id),
+          bookId: String(raw.book_id ?? raw.bookId ?? ""),
+          status: (String(raw.status ?? "PENDING") === "COMPLETED"
+            ? "SUCCEEDED"
+            : ["FAILED", "COMPLETED_WITH_ERRORS", "CANCELLED"].includes(
+                  String(raw.status),
+                )
+              ? "FAILED"
+              : String(raw.status ?? "PENDING")) as AnalyticsRun["status"],
+          modelVersion: `analytics-job · ${String(raw.current_stage ?? "queued")}`,
+          startedAt: String(
+            raw.started_at ??
+              raw.startedAt ??
+              raw.created_at ??
+              new Date().toISOString(),
+          ),
+          finishedAt: raw.finished_at ? String(raw.finished_at) : undefined,
+          metrics: [],
+          operationKey: raw.operation_key
+            ? String(raw.operation_key)
+            : undefined,
+          totalItems: Number(raw.total_items ?? raw.totalItems ?? 0),
+          processedItems: Number(
+            raw.processed_items ?? raw.processedItems ?? 0,
+          ),
+        }),
+      );
+      return [...jobRuns, ...persistedRuns];
     } catch (error) {
       throw problem(
         error,
@@ -577,6 +614,54 @@ export const services = {
     } catch (error) {
       throw problem(error, "Não foi possível consultar o job de analytics.");
     }
+  },
+  async listAnalyticsJobs(): Promise<AnalyticsJob[]> {
+    if (config.useMocks) return [];
+    try {
+      const { data } = await analyticsHttp.get(
+        "/api/admin/v1/content-analytics/jobs",
+        { params: { limit: 200 } },
+      );
+      return (data.items ?? []) as AnalyticsJob[];
+    } catch (error) {
+      throw problem(error, "Não foi possível consultar os jobs de analytics.");
+    }
+  },
+  async getAnalyticsJobItems(
+    jobId: string,
+    params: { offset?: number; limit?: number; status?: string } = {},
+  ): Promise<{ items: AnalyticsJobItem[]; hasMore: boolean }> {
+    if (config.useMocks) return { items: [], hasMore: false };
+    const { data } = await analyticsHttp.get(
+      `/api/admin/v1/content-analytics/jobs/${jobId}/items`,
+      { params },
+    );
+    return {
+      items: (data.items ?? data) as AnalyticsJobItem[],
+      hasMore: Boolean(data.hasMore),
+    };
+  },
+  async getAnalyticsItemDetail(
+    jobId: string,
+    itemId: string,
+  ): Promise<AnalyticsItemDetail> {
+    if (config.useMocks)
+      return {
+        item: {
+          id: itemId,
+          job_id: jobId,
+          input_asset_version_id: "mock",
+          status: "COMPLETED",
+          attempt_count: 1,
+        },
+        phases: [],
+        statistics: {},
+        remainingPhases: [],
+      };
+    const { data } = await analyticsHttp.get(
+      `/api/admin/v1/content-analytics/jobs/${jobId}/items/${itemId}`,
+    );
+    return data as AnalyticsItemDetail;
   },
   async createSession(
     userId: string,

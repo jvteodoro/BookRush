@@ -8,7 +8,20 @@ public record StageIdentity(
     String textSha256,
     String analyzerVersion,
     String modelRevision,
-    String configurationHash) {
+    String configurationHash,
+    String hypothesisVersion,
+    String prototypeSetVersion,
+    String corpusModelVersion) {
+  public StageIdentity(
+      UUID assetVersionId,
+      String textSha256,
+      String analyzerVersion,
+      String modelRevision,
+      String configurationHash) {
+    this(assetVersionId, textSha256, analyzerVersion, modelRevision, configurationHash,
+        null, null, null);
+  }
+
   public StageIdentity {
     Objects.requireNonNull(assetVersionId);
     Objects.requireNonNull(textSha256);
@@ -22,6 +35,9 @@ public record StageIdentity(
             && textSha256.equals(requested.textSha256)
             && analyzerVersion.equals(requested.analyzerVersion)
             && Objects.equals(modelRevision, requested.modelRevision)
-            && configurationHash.equals(requested.configurationHash));
+            && configurationHash.equals(requested.configurationHash)
+            && Objects.equals(hypothesisVersion, requested.hypothesisVersion)
+            && Objects.equals(prototypeSetVersion, requested.prototypeSetVersion)
+            && Objects.equals(corpusModelVersion, requested.corpusModelVersion));
   }
 }

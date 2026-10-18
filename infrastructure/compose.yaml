@@ -152,10 +152,10 @@ services:
       KC_HTTP_ENABLED: "true"
     volumes:
       - keycloak_data:/opt/keycloak/data
-      # This path is resolved by the Docker daemon, not by the Jenkins
-      # container that invokes Compose through the Docker socket.
-      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
-      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-platform-realm.json:/opt/keycloak/data/import/bookrush-platform-realm.json:ro
+      # Realm JSON is applied by the idempotent keycloak-config-cli reconcile
+      # step. Do not bind-mount files from the Jenkins workspace here: Compose
+      # may be invoked inside a Jenkins container through the host Docker
+      # socket, in which case the daemon cannot see that workspace path.
     ports:
       - "127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}:8080"
     healthcheck:
@@ -516,6 +516,7 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
       BEHAVIOR_OUTBOX_SINK_URL: ${BEHAVIOR_OUTBOX_SINK_URL:-}
       BEHAVIOR_OUTBOX_SINK_TOKEN: ${BEHAVIOR_OUTBOX_SINK_TOKEN:-}
       BEHAVIOR_OUTBOX_DELAY_MS: ${BEHAVIOR_OUTBOX_DELAY_MS:-5000}

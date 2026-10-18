@@ -161,12 +161,59 @@ public class AnalyticsController {
 
   private record ExistingJob(UUID id, String status, int totalItems, String requestHash) {}
 
+  @GetMapping({"/admin/v1/analytics/jobs", "/admin/v1/content-analytics/jobs"})
+  @Operation(
+      summary = "Listar jobs de analytics",
+      description = "Retorna jobs recentes com contadores e estágio atual para acompanhamento operacional.")
+  public ResponseEntity<Map<String, Object>> jobs(
+      @RequestParam(defaultValue = "100") int limit,
+      @RequestParam(defaultValue = "0") int offset,
+      @RequestParam(required = false) String status) {
+    if (limit < 1 || limit > 200 || offset < 0)
+      return ResponseEntity.badRequest()
+          .body(Map.of("code", "INVALID_PAGE", "message", "limit must be between 1 and 200 and offset must be non-negative"));
+    var normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
+    var rows = normalizedStatus == null
+        ? jdbc.queryForList(
+            """
+            SELECT j.id, j.operation_key, j.status, j.current_stage, j.total_items,
+                   j.processed_items, j.succeeded_items, j.failed_items, j.cancel_requested,
+                   j.created_at, j.started_at, j.finished_at,
+                   (array_agg(a.book_id ORDER BY a.book_id))[1] AS book_id
+              FROM analytics.analysis_job j
+              LEFT JOIN analytics.analysis_job_item i ON i.job_id=j.id
+              LEFT JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id
+              LEFT JOIN catalog.book_asset a ON a.id=v.book_asset_id
+             GROUP BY j.id
+             ORDER BY j.created_at DESC, j.id DESC
+             LIMIT ? OFFSET ?
+            """, limit + 1, offset)
+        : jdbc.queryForList(
+            """
+            SELECT j.id, j.operation_key, j.status, j.current_stage, j.total_items,
+                   j.processed_items, j.succeeded_items, j.failed_items, j.cancel_requested,
+                   j.created_at, j.started_at, j.finished_at,
+                   (array_agg(a.book_id ORDER BY a.book_id))[1] AS book_id
+              FROM analytics.analysis_job j
+              LEFT JOIN analytics.analysis_job_item i ON i.job_id=j.id
+              LEFT JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id
+              LEFT JOIN catalog.book_asset a ON a.id=v.book_asset_id
+             WHERE j.status=?
+             GROUP BY j.id
+             ORDER BY j.created_at DESC, j.id DESC
+             LIMIT ? OFFSET ?
+            """, normalizedStatus, limit + 1, offset);
+    var hasMore = rows.size() > limit;
+    if (hasMore) rows = rows.subList(0, limit);
+    return ResponseEntity.ok(Map.of("items", rows, "limit", limit, "offset", offset, "hasMore", hasMore));
+  }
+
   @GetMapping({"/admin/v1/analytics/jobs/{jobId}", "/admin/v1/content-analytics/jobs/{jobId}"})
   @Operation(summary = "Consultar job", description = "Consulta estado e contadores persistidos.")
   public ResponseEntity<Map<String, Object>> job(@PathVariable UUID jobId) {
     var rows =
         jdbc.queryForList(
-            "SELECT id, operation_key, status, total_items, processed_items, succeeded_items,"
+            "SELECT id, operation_key, status, current_stage, total_items, processed_items, succeeded_items,"
                 + " failed_items, cancel_requested, created_at, started_at, finished_at FROM"
                 + " analytics.analysis_job WHERE id=?",
             jobId);
@@ -216,17 +263,126 @@ public class AnalyticsController {
   @Operation(
       summary = "Listar itens do job",
       description = "Consulta itens, tentativas e erros sem perder histórico do job.")
-  public ResponseEntity<Object> items(@PathVariable UUID jobId) {
+  public ResponseEntity<Object> items(
+      @PathVariable UUID jobId,
+      @RequestParam(defaultValue = "100") int limit,
+      @RequestParam(defaultValue = "0") int offset,
+      @RequestParam(required = false) String status) {
+    if (limit < 1 || limit > 500 || offset < 0)
+      return ResponseEntity.badRequest().body(Map.of("code", "INVALID_PAGE", "message", "limit must be between 1 and 500 and offset must be non-negative"));
     var exists =
         jdbc.queryForObject(
             "SELECT count(*) FROM analytics.analysis_job WHERE id=?", Integer.class, jobId);
     if (exists == null || exists == 0) return ResponseEntity.notFound().build();
-    return ResponseEntity.ok(
+    var normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
+    var rows = normalizedStatus == null ? jdbc.queryForList(
+            """
+            SELECT i.id, i.input_asset_version_id, i.status, i.attempt_count, i.analysis_run_id,
+                   i.error_code, i.error_message, i.started_at, i.finished_at,
+                   i.progress_stage, i.progress_completed, i.progress_total,
+                   i.progress_message, i.progress_updated_at, a.book_id
+              FROM analytics.analysis_job_item i
+              LEFT JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id
+              LEFT JOIN catalog.book_asset a ON a.id=v.book_asset_id
+             WHERE i.job_id=? ORDER BY i.created_at, i.id LIMIT ? OFFSET ?
+            """,
+            jobId, limit + 1, offset) : jdbc.queryForList(
+            """
+            SELECT i.id, i.input_asset_version_id, i.status, i.attempt_count, i.analysis_run_id,
+                   i.error_code, i.error_message, i.started_at, i.finished_at,
+                   i.progress_stage, i.progress_completed, i.progress_total,
+                   i.progress_message, i.progress_updated_at, a.book_id
+              FROM analytics.analysis_job_item i
+              LEFT JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id
+              LEFT JOIN catalog.book_asset a ON a.id=v.book_asset_id
+             WHERE i.job_id=? AND i.status=? ORDER BY i.created_at, i.id LIMIT ? OFFSET ?
+            """, jobId, normalizedStatus, limit + 1, offset);
+    var hasMore = rows.size() > limit;
+    if (hasMore) rows = rows.subList(0, limit);
+    return ResponseEntity.ok(Map.of("items", rows, "limit", limit, "offset", offset, "hasMore", hasMore));
+  }
+
+  @GetMapping({
+    "/admin/v1/analytics/jobs/{jobId}/items/{itemId}",
+    "/admin/v1/content-analytics/jobs/{jobId}/items/{itemId}"
+  })
+  @Operation(
+      summary = "Detalhar item do job",
+      description = "Retorna progresso, fases, estatísticas e fases ainda não executadas.")
+  public ResponseEntity<Object> itemDetail(
+      @PathVariable UUID jobId, @PathVariable UUID itemId) {
+    var itemRows =
         jdbc.queryForList(
-            "SELECT id, input_asset_version_id, status, attempt_count, analysis_run_id, error_code,"
-                + " error_message, started_at, finished_at FROM analytics.analysis_job_item WHERE"
-                + " job_id=? ORDER BY created_at, id",
-            jobId));
+            """
+            SELECT i.id, i.job_id, i.input_asset_version_id, i.status, i.attempt_count,
+                   i.analysis_run_id, i.error_code, i.error_message, i.started_at, i.finished_at,
+                   i.progress_stage, i.progress_completed, i.progress_total,
+                   i.progress_message, i.progress_updated_at, a.book_id
+              FROM analytics.analysis_job_item i
+              LEFT JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id
+              LEFT JOIN catalog.book_asset a ON a.id=v.book_asset_id
+             WHERE i.job_id=? AND i.id=?
+            """,
+            jobId,
+            itemId);
+    if (itemRows.isEmpty()) return ResponseEntity.notFound().build();
+    var phases =
+        jdbc.queryForList(
+            """
+            SELECT id, attempt_count, phase, status, started_at, finished_at, duration_ms,
+                   error_code, metadata
+              FROM analytics.analysis_phase_timing
+             WHERE job_id=? AND job_item_id=?
+             ORDER BY started_at, id
+            """,
+            jobId,
+            itemId);
+    var item = itemRows.getFirst();
+    var runId = item.get("analysis_run_id");
+    var statistics = new LinkedHashMap<String, Object>();
+    statistics.put("excerpts", 0);
+    statistics.put("features", 0);
+    statistics.put("embeddings", 0);
+    if (runId != null) {
+      var stats =
+          jdbc.queryForMap(
+              """
+              SELECT
+                (SELECT count(*) FROM analytics.excerpt WHERE analysis_run_id=?) AS excerpts,
+                (SELECT count(*) FROM analytics.excerpt_feature WHERE analysis_run_id=?) AS features,
+                (SELECT count(*) FROM analytics.excerpt_embedding ee
+                   JOIN analytics.excerpt e ON e.id=ee.excerpt_id
+                  WHERE e.analysis_run_id=?) AS embeddings
+              """,
+              runId,
+              runId,
+              runId);
+      statistics.putAll(stats);
+    }
+    var completedPhases =
+        phases.stream()
+            .filter(row -> "COMPLETED".equals(row.get("status")))
+            .map(row -> String.valueOf(row.get("phase")))
+            .collect(java.util.stream.Collectors.toSet());
+    var expectedPhases =
+        java.util.List.of(
+            "LOAD_METADATA",
+            "READ_ASSET",
+            "CHAPTER_DISCOVERY",
+            "LANGUAGE_VALIDATION",
+            "EXCERPT_SELECTION",
+            "EXCERPT_PERSISTENCE",
+            "EXCERPT_EMBEDDINGS",
+            "FEATURES",
+            "SCOPE_EMBEDDINGS");
+    var body = new LinkedHashMap<String, Object>();
+    body.put("item", item);
+    body.put("phases", phases);
+    body.put("statistics", statistics);
+    body.put(
+        "remainingPhases",
+        expectedPhases.stream().filter(phase -> !completedPhases.contains(phase)).toList());
+    return ResponseEntity.ok(body);
   }
 
   @GetMapping({

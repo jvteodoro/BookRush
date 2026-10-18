@@ -7,6 +7,32 @@ prontidão para processamento em massa ou validação científica de modelos.
 
 ## Situação atual
 
+## Operação pelo Admin Web
+
+O painel administrativo de analytics foi organizado para operar com milhares de
+livros sem carregar a biblioteca inteira na tela. A entrada é a tabela compacta
+de **jobs**, que permite filtrar por ID/status e ordenar por data, status ou
+progresso. A lista usa paginação (`limit`/`offset`) e atualização automática.
+
+Ao abrir um job, a tela mostra apenas os itens daquele job, com filtro por
+`PENDING`, `RUNNING`, `COMPLETED` ou `FAILED`, busca por item/asset/livro,
+ordenação por início, tentativas ou status e paginação de 100 itens. Cada item
+abre seu rastreamento individual, que apresenta a fase atual, tentativa,
+horários, duração e status de cada fase persistida, contagens de excerpts,
+features e embeddings e as fases ainda pendentes.
+
+Os endpoints administrativos usados nessa navegação são:
+
+- `GET /api/admin/v1/content-analytics/jobs?limit=200&offset=0`
+- `GET /api/admin/v1/content-analytics/jobs/{jobId}`
+- `GET /api/admin/v1/content-analytics/jobs/{jobId}/items?limit=100&offset=0&status=...`
+- `GET /api/admin/v1/content-analytics/jobs/{jobId}/items/{itemId}`
+
+Eles continuam protegidos pelo escopo `bookrush.analytics`; a paginação não
+remove autorização nem expõe dados fora do job solicitado. O detalhe do item é
+observacional: ele lê as fases e métricas persistidas pelo worker e não dispara
+uma nova execução.
+
 A pipeline barata está operacional no ambiente atual. O serviço Spring Boot é o
 único writer do schema `analytics`, o worker persistente está habilitado e o
 modo offline está ativo. A execução não baixa modelos no startup.
@@ -186,6 +212,7 @@ criam e controlam jobs; as internas leem dados ligados ao catálogo.
 | Método | Rota | Finalidade |
 | --- | --- | --- |
 | POST | `/api/admin/v1/content-analytics/jobs` | Cria ou recupera job idempotente. |
+| GET | `/api/admin/v1/content-analytics/jobs?limit=100&status=RUNNING` | Lista jobs recentes com estágio e contadores para a operação. |
 | GET | `/api/admin/v1/content-analytics/jobs/{jobId}` | Estado e contadores persistidos. |
 | POST | `/api/admin/v1/content-analytics/jobs/{jobId}/cancel` | Solicita cancelamento cooperativo. |
 | GET | `/api/admin/v1/content-analytics/jobs/{jobId}/items` | Itens, tentativas e erros sanitizados. |
@@ -245,6 +272,25 @@ Antes de um lote maior, é necessário:
 5. executar os gates 1–8 de `VALIDATION_PLAN_V1.md` e registrar decisão GO;
 6. medir throughput, storage e memória no piloto antes de iniciar qualquer
    corpus completo.
+
+### Reinício limpo do piloto
+
+Quando um job acumular falhas de uma versão antiga do worker, não se deve
+apagar suas linhas nem reutilizar sua `operation_key`. O procedimento é:
+
+1. preservar o job antigo como evidência e marcá-lo como cancelado/reiniciado;
+2. criar uma nova `operation_key` e copiar somente os
+   `input_asset_version_id` para itens `PENDING`;
+3. acompanhar a nova execução pela listagem administrativa, que consulta
+   `analysis_job` (não apenas `analysis_run`);
+4. comparar falhas e tempos com o job antigo somente depois de o lote novo
+   avançar.
+
+Em 18/10/2026 o lote sujo de 498 itens foi preservado e substituído por uma
+execução limpa. O admin passou a atualizar a lista de jobs a cada três
+segundos, exibindo status, estágio e contadores persistidos. A consulta exige o
+mesmo bearer administrativo e audience/scope `bookrush.analytics` das demais
+rotas de analytics.
 
 O princípio permanece: medições, scores de modelo e scores de produto têm
 semânticas diferentes. Analytics V1 produz observações rastreáveis; não afirma

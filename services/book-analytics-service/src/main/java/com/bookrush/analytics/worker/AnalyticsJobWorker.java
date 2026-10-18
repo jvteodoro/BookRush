@@ -14,6 +14,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,6 +49,37 @@ public final class AnalyticsJobWorker {
     this.metrics = metrics;
     this.generatorProperties = generatorProperties;
     this.linguisticRuntime = new LinguisticRuntimeClient(runtimeProperties);
+  }
+
+  /**
+   * A container replacement can leave rows claimed by the previous JVM in RUNNING. Those rows
+   * are not active anymore and must be returned to the durable queue before polling starts.
+   * Phase rows are retained as failed recovery evidence rather than being deleted.
+   */
+  @PostConstruct
+  void recoverOrphanedItems() {
+    jdbc.update(
+        """
+        UPDATE analytics.analysis_phase_timing t
+           SET status='FAILED', finished_at=clock_timestamp(),
+               duration_ms=GREATEST(0, extract(epoch FROM (clock_timestamp()-started_at))*1000)::bigint,
+               error_code='WORKER_RESTART_RECOVERY'
+         WHERE t.status='RUNNING'
+           AND EXISTS (
+                 SELECT 1 FROM analytics.analysis_job_item i
+                  JOIN analytics.analysis_job j ON j.id=i.job_id
+                 WHERE i.id=t.job_item_id AND i.status='RUNNING'
+                   AND j.status IN ('PENDING','RUNNING') AND j.cancel_requested=false)
+        """);
+    jdbc.update(
+        """
+        UPDATE analytics.analysis_job_item i
+           SET status='PENDING', started_at=NULL, finished_at=NULL,
+               error_code=NULL, error_message=NULL
+          FROM analytics.analysis_job j
+         WHERE i.job_id=j.id AND i.status='RUNNING'
+           AND j.status IN ('PENDING','RUNNING') AND j.cancel_requested=false
+        """);
   }
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
@@ -148,7 +180,11 @@ RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
           "2");
       var chapters = timed(item, "CHAPTER_DISCOVERY", () -> chapters(item.inputVersion()));
       String language = languageFor(item.inputVersion());
-      var detected = timed(item, "LANGUAGE_VALIDATION", () -> linguisticRuntime.language(text));
+      var detected =
+          timed(
+              item,
+              "LANGUAGE_VALIDATION",
+              () -> linguisticRuntime.language(languageSample(text)));
       if ("VALID".equals(detected.status())
           && ("en".equals(detected.language()) || "pt".equals(detected.language()))
           && detected.confidence() >= 0.60d) language = detected.language();
@@ -564,18 +600,21 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
             .values());
     var linguistic = linguisticRuntime.analyze(language, candidate.text());
     values.putAll(linguistic.values());
+    var featureRows = new java.util.ArrayList<Object[]>();
     for (var definition : definitions) {
       var value = values.get(definition.getValue());
       if (value == null && !definition.getValue().equals("unique_lemma_ratio")) continue;
-      jdbc.update(
+      featureRows.add(
+          new Object[] {
+            run, definition.getKey(), actual, value, value == null ? linguistic.status() : "VALID"
+          });
+    }
+    if (!featureRows.isEmpty()) {
+      jdbc.batchUpdate(
           "INSERT INTO"
               + " analytics.excerpt_feature(analysis_run_id,feature_definition_id,excerpt_id,numeric_value,value_status,computed_at)"
               + " VALUES (?,?,?,?, ?, clock_timestamp()) ON CONFLICT DO NOTHING",
-          run,
-          definition.getKey(),
-          actual,
-          value,
-          value == null ? linguistic.status() : "VALID");
+          featureRows);
     }
     return actual;
   }
@@ -830,9 +869,21 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
   }
 
   private static String codePointSlice(String value, int start, int end) {
-    int begin = value.offsetByCodePoints(0, start);
-    int finish = value.offsetByCodePoints(begin, end - start);
+    int length = value.codePointCount(0, value.length());
+    int boundedStart = Math.max(0, Math.min(start, length));
+    int boundedEnd = Math.max(boundedStart, Math.min(end, length));
+    int begin = value.offsetByCodePoints(0, boundedStart);
+    int finish = value.offsetByCodePoints(begin, boundedEnd - boundedStart);
     return value.substring(begin, finish);
+  }
+
+  private static String languageSample(String value) {
+    int maxCodepoints =
+        Math.max(
+            256,
+            Integer.parseInt(
+                System.getenv().getOrDefault("ANALYTICS_LANGUAGE_MAX_CODEPOINTS", "12000")));
+    return codePointSlice(value, 0, Math.min(maxCodepoints, codePointLength(value)));
   }
 
   private static int codePointLength(String value) {

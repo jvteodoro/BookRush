@@ -38,6 +38,68 @@ export interface AnalyticsRun {
   processedItems?: number;
 }
 
+export type AnalyticsJobStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "COMPLETED"
+  | "COMPLETED_WITH_ERRORS"
+  | "FAILED"
+  | "CANCELLED";
+
+export interface AnalyticsJob {
+  id: string;
+  operation_key?: string;
+  status: AnalyticsJobStatus;
+  current_stage?: string;
+  total_items: number;
+  processed_items: number;
+  succeeded_items: number;
+  failed_items: number;
+  cancel_requested?: boolean;
+  book_id?: string;
+  created_at?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
+export interface AnalyticsJobItem {
+  id: string;
+  job_id?: string;
+  input_asset_version_id: string;
+  book_id?: string;
+  status: string;
+  attempt_count: number;
+  analysis_run_id?: string;
+  error_code?: string;
+  error_message?: string;
+  started_at?: string;
+  finished_at?: string;
+  progress_stage?: string;
+  progress_completed?: number;
+  progress_total?: number;
+  progress_message?: string;
+  progress_updated_at?: string;
+}
+
+export interface AnalyticsPhase {
+  id: string;
+  attempt_count: number;
+  phase: string;
+  status: string;
+  started_at: string;
+  finished_at?: string;
+  duration_ms?: number;
+  error_code?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AnalyticsItemDetail {
+  item: AnalyticsJobItem;
+  phases: AnalyticsPhase[];
+  statistics: Record<string, number>;
+  remainingPhases: string[];
+}
+
 export interface FeedWeights {
   hook: number;
   novelty: number;
