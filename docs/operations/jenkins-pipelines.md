@@ -85,6 +85,11 @@ deploy individual preserva rollback somente no Compose; no Kubernetes o
 rollout falho deixa o Deployment disponível para diagnóstico e o Jenkins
 marca a execução como falha.
 
+Os estágios de publicação e deploy da pipeline vertical usam apenas construções
+compatíveis com `/bin/sh`, que é o shell padrão do passo `sh` no Jenkins. A
+lista de serviços é materializada antes do `while`, evitando process
+substitution (`< <(...)`) e o erro `redirection unexpected` durante o deploy.
+
 ## Arquivos e operação
 
 - `infrastructure/jenkins/microservice.Jenkinsfile`: pipeline reutilizável por serviço.
