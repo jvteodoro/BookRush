@@ -72,7 +72,21 @@ class LanguageResponse(BaseModel):
 MODELS={'en':'spacy-en-core-web-sm-v1/en_core_web_sm-3.8.0-py3-none-any.whl','pt':'spacy-pt-core-news-sm-v1/pt_core_news_sm-3.8.0-py3-none-any.whl'}
 def unavailable(language, reason): return AnalyzeResponse(status='MODEL_UNAVAILABLE',language=language,warning=reason)
 @app.get('/health')
-def health(): return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true'}
+def health():
+ try:
+  import torch
+  cuda = bool(torch.cuda.is_available())
+  device = str(_torch_device(torch))
+  details = {'cuda': cuda, 'device': device}
+  if cuda:
+   details['device_name'] = torch.cuda.get_device_name(0)
+   details['memory_allocated_bytes'] = int(torch.cuda.memory_allocated(0))
+   details['memory_reserved_bytes'] = int(torch.cuda.memory_reserved(0))
+   details['memory_total_bytes'] = int(torch.cuda.get_device_properties(0).total_memory)
+  return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true', **details}
+ except Exception as exc:
+  return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true',
+          'cuda': False, 'device': 'cpu', 'warning': type(exc).__name__}
 
 def _load_embedding_model():
  global _embedding_model, _embedding_tokenizer
@@ -104,6 +118,10 @@ def embeddings(request: EmbeddingRequest):
   vectors=normalized.cpu().tolist()
   return EmbeddingResponse(status='VALID',model='bge-m3-dense-v1',dimension=len(vectors[0]),vectors=vectors,input_hashes=[hashlib.sha256(t.encode('utf-8')).hexdigest() for t in request.texts])
  except Exception as exc:
+  try:
+   import torch
+   if torch.cuda.is_available(): torch.cuda.empty_cache()
+  except Exception: pass
   return EmbeddingResponse(status='ERROR',model='bge-m3-dense-v1',warning=type(exc).__name__)
 
 def _load_nli():
@@ -188,6 +206,10 @@ def nli_batch(request: NliBatchRequest):
                    'neutral': neutral, 'contradiction': contradiction})
   return NliBatchResponse(status='VALID', results=results)
  except Exception as exc:
+  try:
+   import torch
+   if torch.cuda.is_available(): torch.cuda.empty_cache()
+  except Exception: pass
   warning=f'{type(exc).__name__}: {str(exc)[:180]}'
   return NliBatchResponse(status='ERROR', results=[
    {'id': item.id, **_nli_error('ERROR', warning)} for item in request.items], warning=warning)

@@ -922,11 +922,11 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
       int end = Math.min(offset + batchSize, candidates.size());
       var pendingIndexes = new java.util.ArrayList<Integer>();
       var texts = new java.util.ArrayList<String>();
-      for (int index = offset; index < end; index++) {
-        if (!vectorsByExcerpt.containsKey(excerptIds.get(index))) {
-          pendingIndexes.add(index);
-          texts.add(candidates.get(index).text());
-        }
+      for (var index : EmbeddingResumePlanner.pendingIndexes(
+          excerptIds.subList(offset, end), vectorsByExcerpt)) {
+        int candidateIndex = offset + index;
+        pendingIndexes.add(candidateIndex);
+        texts.add(candidates.get(candidateIndex).text());
       }
       if (texts.isEmpty()) continue;
       int completedBefore = vectorsByExcerpt.size();
@@ -1020,15 +1020,6 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
       }
     }
     return result;
-  }
-
-  private static String sha256(String text) {
-    try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-          .digest(text.getBytes(StandardCharsets.UTF_8)));
-    } catch (java.security.NoSuchAlgorithmException exception) {
-      throw new IllegalStateException("SHA-256 unavailable", exception);
-    }
   }
 
   private record PersistedEmbedding(UUID excerptId, String inputSha256, String bucket, String objectKey) {}

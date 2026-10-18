@@ -66,3 +66,19 @@ Só depois desses dados o batch padrão deve ser aumentado no serviço de
 produção. A GPU testada é uma GTX 1050 Ti com 4 GiB, portanto o limite seguro
 deve ser definido pelo p95 de tamanho dos textos e pela VRAM disponível, não
 apenas pelo número de itens.
+
+## Sweep GPU adicional
+
+Em 2026-10-18, o runtime CUDA foi medido novamente com os mesmos 8 excertos e
+batch 1, 4 e 8. O healthcheck confirmou `cuda=true`, GTX 1050 Ti e 4.225.630.208
+bytes de VRAM total. Batch 4 manteve todas as respostas `VALID`, NLI com
+equivalência absoluta máxima `0.0` e embeddings com diferença máxima `6e-8`
+contra o batch 1. Batch 8 de NLI falhou com `CUDA out of memory` (a GPU ficou
+com aproximadamente 71 MiB livres); por isso o default de NLI permanece 4/8
+conforme o serviço, e batch 8 não é considerado seguro nesta GPU.
+
+O planner Java de retomada possui teste unitário que verifica que uma tentativa
+subsequente solicita somente índices sem vetor persistido, mantendo a ordem
+original. A prova de reinício do worker real ainda deve ocorrer no próximo
+deploy controlado; o job produtivo não foi interrompido para produzir essa
+evidência.
