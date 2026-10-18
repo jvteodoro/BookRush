@@ -664,10 +664,68 @@
   border-bottom: 1px solid var(--br-outline-soft);
 }
 
+.br-privacy-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+
+.br-privacy-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.35fr);
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--br-outline-soft);
+  border-radius: var(--br-radius-md);
+  background: var(--br-surface-2);
+}
+
+.br-privacy-field strong,
+.br-privacy-field small {
+  display: block;
+}
+
+.br-privacy-field small {
+  margin-top: 0.35rem;
+  color: var(--br-content-dim);
+  line-height: 1.45;
+}
+
+.br-privacy-field select {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--br-outline);
+  border-radius: var(--br-radius-sm);
+  background: var(--br-surface-1);
+  color: var(--br-content);
+  font: inherit;
+}
+
+.br-privacy-field select:focus-visible {
+  outline: 2px solid var(--br-red);
+  outline-offset: 2px;
+}
+
+.br-privacy-field select:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.br-account-status {
+  margin: 1rem 0;
+  color: var(--br-content-dim);
+}
+
+.br-account-status--error {
+  color: var(--br-red);
+}
+
 @media (max-width: 640px) {
   .br-plant-card,
   .br-profile-hero,
-  .br-account-grid {
+  .br-account-grid,
+  .br-privacy-field {
     grid-template-columns: 1fr;
   }
 

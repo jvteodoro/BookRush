@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Switch } from "../components/ui/Switch";
 import type { ReaderTab } from "../components/layout/AppShell";
+import { PrivacyPage } from "./PrivacyPage";
 
 type AccountRuntime = {
   __BOOKRUSH_PROFILE__?: {
@@ -140,47 +140,7 @@ export function AccountPage({
   }
 
   if (tab === "privacy") {
-    return (
-      <section className="br-account-page">
-        <PageHeading
-          eyebrow="CONTROLE DE VISIBILIDADE"
-          title="Privacidade"
-          description="Você escolhe o que compartilhar com outros leitores."
-        />
-        <Card className="br-account-panel">
-          <h2>Visibilidade do perfil</h2>
-          <p className="br-muted">
-            Estas preferências controlam a exposição das suas atividades no
-            produto.
-          </p>
-          <Switch
-            className="br-privacy-option"
-            label="Perfil público"
-            defaultChecked={profile?.isPublic ?? true}
-          />
-          <Switch
-            className="br-privacy-option"
-            label="Atividade de leitura"
-            defaultChecked
-          />
-          <Switch
-            className="br-privacy-option"
-            label="Biblioteca"
-            defaultChecked
-          />
-          <Switch
-            className="br-privacy-option"
-            label="Sequência de leitura"
-            defaultChecked
-          />
-          <ActionRow>
-            <Button onClick={() => onNavigate("profile")}>
-              Voltar ao perfil
-            </Button>
-          </ActionRow>
-        </Card>
-      </section>
-    );
+    return <PrivacyPage onBack={() => onNavigate("profile")} />;
   }
 
   if (tab === "admin") {
