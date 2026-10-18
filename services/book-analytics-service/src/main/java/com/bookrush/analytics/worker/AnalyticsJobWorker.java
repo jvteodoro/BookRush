@@ -786,6 +786,11 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
         "UPDATE analytics.analysis_job_item SET status='COMPLETED', finished_at=clock_timestamp(),"
             + " error_code=NULL, error_message=NULL WHERE id=?",
         item.id());
+    reconcileJob(item.jobId());
+  }
+
+  /** Recomputes the aggregate from items instead of making one item decide the job outcome. */
+  private void reconcileJob(UUID jobId) {
     jdbc.update(
         """
 UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analytics.analysis_job_item i WHERE i.job_id=j.id AND i.status IN ('COMPLETED','FAILED','CANCELLED')),
@@ -796,7 +801,7 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
     started_at=COALESCE(started_at,clock_timestamp()), finished_at=CASE WHEN NOT EXISTS(SELECT 1 FROM analytics.analysis_job_item i WHERE i.job_id=j.id AND i.status IN ('PENDING','RUNNING')) THEN clock_timestamp() ELSE NULL END
  WHERE j.id=?
 """,
-        item.jobId());
+        jobId);
   }
 
   private void fail(Item item, String code, String message) {
@@ -806,15 +811,9 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         code,
         message == null ? code : message.substring(0, Math.min(1000, message.length())),
         item.id());
-    jdbc.update(
-        "UPDATE analytics.analysis_job SET processed_items=(SELECT count(*) FROM"
-            + " analytics.analysis_job_item WHERE job_id=? AND status IN"
-            + " ('COMPLETED','FAILED','CANCELLED')), failed_items=(SELECT count(*) FROM"
-            + " analytics.analysis_job_item WHERE job_id=? AND status='FAILED'),"
-            + " status='COMPLETED_WITH_ERRORS', finished_at=clock_timestamp() WHERE id=?",
-        item.jobId(),
-        item.jobId(),
-        item.jobId());
+    // A failed item must not terminate a batch while other items are still pending or running.
+    // The aggregate query also leaves the job RUNNING so the scheduler can continue claiming work.
+    reconcileJob(item.jobId());
     metrics.jobItemFailed(code);
   }
 

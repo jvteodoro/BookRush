@@ -218,6 +218,24 @@ fonte de detalhes de payload, autenticação e respostas.
 O serviço expõe health, info e métricas Spring Boot. Métricas operacionais
 incluem criação/replay/conflito de jobs, itens processados, excerpts listados e
 etapas de execução. Logs podem usar ID de job, versão de asset, analyzer e
+
+### Recuperação de lotes e itens travados
+
+O worker deve recalcular o estado agregado de `analysis_job` após cada item,
+considerando simultaneamente itens `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`
+e `CANCELLED`. Uma falha isolada não pode marcar o lote como terminado enquanto
+ainda houver itens pendentes ou em execução. Itens que já atingiram o limite de
+tentativas devem ser inspecionados pela API de itens; após a correção da causa,
+o endpoint de retomada pode recolocá-los na fila sem apagar o histórico de
+tentativas.
+
+Durante um lote grande, acompanhe conjuntamente os contadores do job, a
+distribuição de status dos itens, `progress_stage`, `progress_completed`,
+`progress_total` e `progress_updated_at`. Um item em `EMBEDDINGS` pode levar
+minutos em CPU, especialmente em livros longos; ausência de alteração de
+`progress_updated_at` por vários ciclos de polling, ou logs sem novas etapas,
+é o sinal operacional de travamento. Não conclua que o job terminou apenas
+porque um container está saudável.
 estágio, mas não devem registrar tokens, segredos, URLs assinadas ou o texto
 integral do livro.
 
