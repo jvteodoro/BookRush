@@ -649,6 +649,7 @@ services:
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      RECOMMENDATION_URL: http://recommendation-service:8098
       READER_STATE_URL: http://reader-state-service:8094
       CATALOG_URL: http://catalog-service:8080
       BOOK_CONTENT_URL: http://book-content-service:8093
