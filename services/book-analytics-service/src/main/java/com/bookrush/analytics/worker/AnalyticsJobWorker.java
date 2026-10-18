@@ -52,6 +52,7 @@ public final class AnalyticsJobWorker {
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
   public void poll() {
+    recoverInterruptedItem();
     var item = claimOne();
     if (item == null) return;
     try {
@@ -60,6 +61,21 @@ public final class AnalyticsJobWorker {
     } catch (Exception e) {
       fail(item, errorCode(e), e.getMessage());
     }
+  }
+
+  /** Requeues an item left RUNNING by a container restart after a failed attempt. */
+  private void recoverInterruptedItem() {
+    jdbc.update(
+        """
+UPDATE analytics.analysis_job_item
+   SET status='PENDING', started_at=NULL, finished_at=NULL,
+       error_code=NULL, error_message=NULL, progress_stage='PENDING',
+       progress_completed=0, progress_total=0, progress_message=NULL,
+       progress_updated_at=clock_timestamp()
+ WHERE status='RUNNING' AND error_code IS NOT NULL
+   AND progress_updated_at < clock_timestamp() - INTERVAL '60 seconds'
+   AND job_id IN (SELECT id FROM analytics.analysis_job WHERE status IN ('PENDING','RUNNING'))
+""");
   }
 
   private Item claimOne() {
@@ -752,6 +768,10 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
   }
 
   private static String codePointSlice(String value, int start, int end) {
+    int length = codePointLength(value);
+    start = Math.max(0, Math.min(start, length));
+    end = Math.max(start, Math.min(end, length));
+    if (end <= start) return "";
     int begin = value.offsetByCodePoints(0, start);
     int finish = value.offsetByCodePoints(begin, end - start);
     return value.substring(begin, finish);

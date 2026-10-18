@@ -234,7 +234,9 @@ distribuição de status dos itens, `progress_stage`, `progress_completed`,
 `progress_total` e `progress_updated_at`. Um item em `EMBEDDINGS` pode levar
 minutos em CPU, especialmente em livros longos; ausência de alteração de
 `progress_updated_at` por vários ciclos de polling, ou logs sem novas etapas,
-é o sinal operacional de travamento. Não conclua que o job terminou apenas
+é o sinal operacional de travamento. O worker também reencaminha, após uma
+janela de segurança, itens `RUNNING` com erro deixados por uma recriação do
+container; isso evita que uma execução interrompida bloqueie o lote. Não conclua que o job terminou apenas
 porque um container está saudável.
 estágio, mas não devem registrar tokens, segredos, URLs assinadas ou o texto
 integral do livro.
