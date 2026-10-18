@@ -74,20 +74,28 @@ WITH next_item AS (
 UPDATE analytics.analysis_job_item i
    SET status='RUNNING', attempt_count=i.attempt_count+1, started_at=clock_timestamp(), finished_at=NULL
   FROM next_item n WHERE i.id=n.id
-RETURNING i.id, i.job_id, i.input_asset_version_id
+RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
 """,
         rs ->
-            rs.next()
+          rs.next()
                 ? new Item(
                     rs.getObject("id", UUID.class),
                     rs.getObject("job_id", UUID.class),
-                    rs.getObject("input_asset_version_id", UUID.class))
+                    rs.getObject("input_asset_version_id", UUID.class),
+                    rs.getInt("attempt_count"))
                 : null);
   }
 
-  private void process(Item item) throws IOException {
+  private void process(Item item) throws Exception {
+    timed(item, "ITEM_TOTAL", () -> {
+      processPhases(item);
+      return null;
+    });
+  }
+
+  private void processPhases(Item item) throws Exception {
     var physical =
-        jdbc.query(
+        timed(item, "LOAD_METADATA", () -> jdbc.query(
             """
             SELECT v.bucket, v.object_key, v.size_bytes, v.sha256
               FROM catalog.book_asset_version v
@@ -101,14 +109,16 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
                         rs.getLong("size_bytes"),
                         rs.getString("sha256"))
                     : null,
-            item.inputVersion());
+            item.inputVersion()));
     if (physical == null) throw new IllegalStateException("ASSET_VERSION_UNAVAILABLE");
     String text;
-    try (var stream =
-        s3.getObject(
-            GetObjectRequest.builder().bucket(physical.bucket()).key(physical.key()).build())) {
-      text = TextAssetReader.readNormalized(stream, physical.size(), physical.sha256());
-    }
+    text = timed(item, "READ_ASSET", () -> {
+      try (var stream =
+          s3.getObject(
+              GetObjectRequest.builder().bucket(physical.bucket()).key(physical.key()).build())) {
+        return TextAssetReader.readNormalized(stream, physical.size(), physical.sha256());
+      }
+    });
     var generatorConfig = generatorProperties.candidateConfig();
     var configuration = configurationJson(generatorConfig);
     var configurationHash = sha256(configuration);
@@ -136,9 +146,9 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
           configuration,
           configurationHash,
           "2");
-      var chapters = chapters(item.inputVersion());
+      var chapters = timed(item, "CHAPTER_DISCOVERY", () -> chapters(item.inputVersion()));
       String language = languageFor(item.inputVersion());
-      var detected = linguisticRuntime.language(text);
+      var detected = timed(item, "LANGUAGE_VALIDATION", () -> linguisticRuntime.language(text));
       if ("VALID".equals(detected.status())
           && ("en".equals(detected.language()) || "pt".equals(detected.language()))
           && detected.confidence() >= 0.60d) language = detected.language();
@@ -147,35 +157,49 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
               .collect(
                   java.util.stream.Collectors.toMap(
                       ExcerptCandidateGenerator.ChapterBoundary::chapterId, chapter -> chapter));
-      var candidates =
+      var candidates = timed(item, "EXCERPT_SELECTION", () ->
           CandidatePruner.pruneV2(
                   ExcerptCandidateGenerator.generateV2(text, chapters, generatorConfig),
                   new CandidatePruner.Config(
                       generatorConfig.minWords(), generatorConfig.maxWords(), "cheap-v2"))
-              .accepted();
+              .accepted());
       int pilotLimit =
           Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_MAX_EXCERPTS_PER_ITEM", "0"));
       if (pilotLimit > 0 && candidates.size() > pilotLimit) {
         candidates = candidates.subList(0, pilotLimit);
       }
-      var excerptIds = new java.util.ArrayList<UUID>();
-      for (var candidate : candidates) {
-        var id =
-            persistExcerpt(
-                run,
-                item.inputVersion(),
-                candidate,
-                chapterById,
-                TextAssetReader.codePointLength(text),
-                language);
-        if (id != null) excerptIds.add(id);
-      }
-      var excerptVectors = persistEmbeddings(item.inputVersion(), excerptIds, candidates);
-      persistPrototypeScores(run, excerptIds, candidates, excerptVectors, language);
-      persistChapterAndDocumentEmbeddings(
-          item.inputVersion(), text, chapters, generatorConfig.version());
-      persistRanks(run, excerptIds);
-      persistNli(run, excerptIds, language);
+      final var persistedRun = run;
+      final var selectedCandidates = candidates;
+      final var selectedLanguage = language;
+      var excerptIds = timed(item, "EXCERPT_PERSISTENCE", () -> {
+        var ids = new java.util.ArrayList<UUID>();
+        for (var candidate : selectedCandidates) {
+          var id =
+              persistExcerpt(
+                  persistedRun,
+                  item.inputVersion(),
+                  candidate,
+                  chapterById,
+                  TextAssetReader.codePointLength(text),
+                  selectedLanguage);
+          if (id != null) ids.add(id);
+        }
+        return ids;
+      });
+      final var persistedExcerptIds = java.util.List.copyOf(excerptIds);
+      var excerptVectors = timed(item, "EXCERPT_EMBEDDINGS", () ->
+          persistEmbeddings(item.inputVersion(), persistedExcerptIds, selectedCandidates));
+      timed(item, "FEATURES", () -> {
+        persistPrototypeScores(persistedRun, persistedExcerptIds, selectedCandidates, excerptVectors, selectedLanguage);
+        persistRanks(persistedRun, persistedExcerptIds);
+        persistNli(persistedRun, persistedExcerptIds, selectedLanguage);
+        return null;
+      });
+      timed(item, "SCOPE_EMBEDDINGS", () -> {
+        persistChapterAndDocumentEmbeddings(
+            item.inputVersion(), text, chapters, generatorConfig.version());
+        return null;
+      });
       jdbc.update(
           "UPDATE analytics.analysis_run SET status='COMPLETED', finished_at=clock_timestamp()"
               + " WHERE id=?",
@@ -183,7 +207,61 @@ RETURNING i.id, i.job_id, i.input_asset_version_id
       metrics.excerptsGenerated(candidates.size());
     }
     jdbc.update(
+        "UPDATE analytics.analysis_phase_timing SET analysis_run_id=?"
+            + " WHERE job_item_id=? AND attempt_count=? AND analysis_run_id IS NULL",
+        run,
+        item.id(),
+        item.attemptCount());
+    jdbc.update(
         "UPDATE analytics.analysis_job_item SET analysis_run_id=? WHERE id=?", run, item.id());
+  }
+
+  private <T> T timed(Item item, String phase, PhaseOperation<T> operation) throws Exception {
+    var timing = startPhase(item, phase);
+    try {
+      return metrics.timePhaseChecked(phase, operation::run);
+    } catch (Exception exception) {
+      timing.failed = true;
+      throw exception;
+    } finally {
+      timing.close();
+    }
+  }
+
+  private PhaseTiming startPhase(Item item, String phase) {
+    var id = UUID.randomUUID();
+    jdbc.update(
+        "INSERT INTO analytics.analysis_phase_timing"
+            + "(id,job_id,job_item_id,attempt_count,phase,status) VALUES (?,?,?,?,?,'RUNNING')",
+        id, item.jobId(), item.id(), item.attemptCount(), phase);
+    return new PhaseTiming(id, phase);
+  }
+
+  @FunctionalInterface
+  private interface PhaseOperation<T> {
+    T run() throws Exception;
+  }
+
+  private final class PhaseTiming implements AutoCloseable {
+    private final UUID id;
+    private final String phase;
+    private final long startedNanos = System.nanoTime();
+    private boolean failed;
+
+    private PhaseTiming(UUID id, String phase) {
+      this.id = id;
+      this.phase = phase;
+    }
+
+    @Override
+    public void close() {
+      var durationMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
+      jdbc.update(
+          "UPDATE analytics.analysis_phase_timing SET status=?, finished_at=clock_timestamp(),"
+              + " duration_ms=?, error_code=? WHERE id=?",
+          failed ? "FAILED" : "COMPLETED", durationMs, failed ? "PHASE_FAILED" : null, id);
+      if (failed) metrics.phaseFailed(phase); else metrics.phaseCompleted(phase);
+    }
   }
 
   private void persistRanks(UUID run, List<UUID> excerptIds) {
@@ -851,7 +929,7 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         : e.getClass().getSimpleName();
   }
 
-  private record Item(UUID id, UUID jobId, UUID inputVersion) {}
+  private record Item(UUID id, UUID jobId, UUID inputVersion, int attemptCount) {}
 
   private record Physical(String bucket, String key, long size, String sha256) {}
 }

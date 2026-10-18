@@ -229,6 +229,45 @@ public class AnalyticsController {
             jobId));
   }
 
+  @GetMapping({
+    "/admin/v1/analytics/phase-timings",
+    "/admin/v1/content-analytics/phase-timings"
+  })
+  @Operation(
+      summary = "Distribuição de duração por fase",
+      description =
+          "Retorna contagem, média, mínimo, máximo e percentis das fases persistidas para dashboards.")
+  public ResponseEntity<Map<String, Object>> phaseTimings(
+      @RequestParam(required = false) UUID jobId,
+      @RequestParam(defaultValue = "200") int limit) {
+    if (limit < 1 || limit > 1000)
+      return ResponseEntity.badRequest()
+          .body(Map.of("code", "INVALID_LIMIT", "message", "limit must be between 1 and 1000"));
+    var rows =
+        jdbc.queryForList(
+            """
+SELECT phase, status,
+       count(*) AS samples,
+       round(avg(duration_ms)::numeric, 2) AS mean_ms,
+       min(duration_ms) AS min_ms,
+       percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms,
+       percentile_cont(0.90) WITHIN GROUP (ORDER BY duration_ms) AS p90_ms,
+       percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,
+       percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms,
+       max(duration_ms) AS max_ms
+  FROM analytics.analysis_phase_timing
+ WHERE duration_ms IS NOT NULL
+   AND (? IS NULL OR job_id=?)
+ GROUP BY phase, status
+ ORDER BY phase, status
+ LIMIT ?
+""",
+            jobId,
+            jobId,
+            limit);
+    return ResponseEntity.ok(Map.of("items", rows, "total", rows.size()));
+  }
+
   @GetMapping({"/internal/v1/analytics/runs", "/internal/v1/content-analytics/runs"})
   @Operation(
       summary = "Listar execuções e métricas",

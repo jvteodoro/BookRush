@@ -42,6 +42,32 @@ Ele requer `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY` e `STORAGE_SECRET_KEY`, alé
 de bucket/key/hash/size registrados no catálogo. Para uma execução local sem
 object storage, mantenha a variável em `false`; jobs permanecerão `PENDING`.
 
+## Telemetria de duração e dashboards
+
+O endpoint `/actuator/prometheus` exporta contadores e histogramas para
+Prometheus. As séries `bookrush_analytics_phase_duration_seconds` e
+`bookrush_analytics_phase_completions_total` usam somente a dimensão de baixa
+cardinalidade `phase`; não incluem livro, hash, texto ou token. As fases
+persistidas são `ITEM_TOTAL`, `LOAD_METADATA`, `READ_ASSET`,
+`CHAPTER_DISCOVERY`, `LANGUAGE_VALIDATION`, `EXCERPT_SELECTION`,
+`EXCERPT_PERSISTENCE`, `EXCERPT_EMBEDDINGS`, `FEATURES` e
+`SCOPE_EMBEDDINGS`.
+
+Cada execução grava a tabela `analytics.analysis_phase_timing`, permitindo
+reconstruir distribuições mesmo após reinício. O endpoint administrativo
+`GET /api/admin/v1/content-analytics/phase-timings?jobId=<uuid>` retorna
+amostras, média, mínimo, P50, P90, P95, P99 e máximo em milissegundos. Use
+Prometheus para séries temporais e alertas; use esse endpoint/SQL para análise
+histórica por lote, tentativa e fase.
+
+Sugestões de painéis Grafana:
+
+- P50/P95/P99 por `phase` usando o histograma Prometheus;
+- taxa de falha por fase e código do job;
+- throughput de itens concluídos por minuto;
+- idade do item `RUNNING` comparada ao último `progress_updated_at`;
+- duração total do job versus quantidade de itens, excerpts e embeddings.
+
 IDs de livro, hashes, operation keys e texto nunca são tags. Para investigar um
 job, consulte primeiro `GET /api/admin/v1/analytics/jobs/{id}` e depois
 `/items`; use `resume` somente após corrigir o erro persistido. O cache/provider
