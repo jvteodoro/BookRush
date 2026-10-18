@@ -28,6 +28,8 @@ grep -Fq 'bash scripts/test-keycloak-access-lifecycle.sh' Jenkinsfile || fail 'p
 grep -Fq 'bash scripts/test-keycloak-user-management.sh' Jenkinsfile || fail 'pipeline principal sem validação de gerenciamento de usuários Keycloak'
 grep -Fq 'ADMIN_SERVICE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/admin-service}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-service'
 grep -Fq 'ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-web}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-web'
+test -f infrastructure/keycloak/read-client-secret.py || fail 'resolvedor seguro do segredo admin-service ausente'
+grep -Fq 'KEYCLOAK_ADMIN_CLIENT_SECRET="$(docker run' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose não injeta o segredo reconciliado do admin-service'
 grep -Fq 'scripts/test-microservice.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem executor'
 grep -Fq 'scripts/test-vertical.sh' infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical sem executor'
 grep -Fq 'scripts/deploy-compose-service.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem deploy Compose'

@@ -291,8 +291,14 @@ bash scripts/test-keycloak-admin-service-client.sh .env
 ```
 
 O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
-e concede apenas `query-users` e `manage-users` à conta de serviço. O teste
+e concede apenas `query-users`, `view-users` e `manage-users` à conta de serviço. O teste
 valida token, roles e acesso à API de usuários sem imprimir credenciais.
+Quando uma instalação anterior ainda não possui
+`KEYCLOAK_ADMIN_CLIENT_SECRET` no arquivo protegido, a reconciliação cria o
+cliente e o deploy consulta seu segredo pela API administrativa do Keycloak.
+O valor é capturado com `xtrace` desativado, permanece apenas no processo de
+deploy e é injetado no container do `admin-service`; ele não é gravado no
+workspace nem exibido no log do Jenkins.
 
 O usuário permanente `codex-jenkins-agent` também permanece nos grupos
 `operators` e `platform-operators`; a associação é reconciliada no realm e é

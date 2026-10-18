@@ -93,3 +93,5 @@ The `/admin/operations` screen calls the authenticated `/api/v1/admin/*`
 facade. The browser sends the platform-realm bearer and `X-Admin-Client`.
 User lifecycle actions return `503` when the Keycloak service account is not
 configured; the UI must surface that error and must not assume success.
+The user list preserves the API problem detail in its error state and provides
+an explicit retry action instead of rendering a generic empty state.

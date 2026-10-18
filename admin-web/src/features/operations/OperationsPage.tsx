@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldAlert, UserCheck, UserX } from "lucide-react";
+import { Search, ShieldAlert, UserCheck, UserX } from "lucide-react";
 import { services } from "../../lib/services";
 
 export function OperationsPage() {
@@ -68,21 +68,24 @@ export function OperationsPage() {
       <div className="panel">
         <h2>Usuários</h2>
         <form
-          className="toolbar"
+          className="user-search"
           onSubmit={(event) => {
             event.preventDefault();
             setPage(0);
             setSearch(searchInput);
           }}
         >
-          <label>
-            Buscar por usuário, nome ou email
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Digite para buscar"
-              maxLength={200}
-            />
+          <label className="user-search-label">
+            <span>Buscar por usuário, nome ou e-mail</span>
+            <span className="user-search-field">
+              <Search size={18} aria-hidden="true" />
+              <input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Nome, usuário ou e-mail"
+                maxLength={200}
+              />
+            </span>
           </label>
           <button type="submit" className="primary-action">
             Buscar
@@ -91,7 +94,23 @@ export function OperationsPage() {
         {users.isLoading ? (
           <p>Carregando…</p>
         ) : users.isError ? (
-          <p role="alert">Não foi possível carregar os usuários.</p>
+          <div className="user-load-error" role="alert">
+            <div>
+              <strong>Não foi possível carregar os usuários.</strong>
+              <span>
+                {users.error instanceof Error
+                  ? users.error.message
+                  : "Verifique a integração com o Keycloak e tente novamente."}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={() => void users.refetch()}
+            >
+              Tentar novamente
+            </button>
+          </div>
         ) : users.data?.items.length === 0 ? (
           <p>Nenhum usuário encontrado.</p>
         ) : (

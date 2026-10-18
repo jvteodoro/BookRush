@@ -55,6 +55,16 @@ admin create users -r bookrush -s username="$target_username" -s enabled=true -s
 target_id="$(admin get users -r bookrush -q username="$target_username" --fields id --format csv --noquotes)"
 test -n "$service_user" && test -n "$realm_management" && test -n "$target_id"
 
+resolved_secret="$(docker run --rm -i --network "container:$name" \
+  -e KEYCLOAK_URL=http://127.0.0.1:8080 \
+  -e KEYCLOAK_REALM=bookrush \
+  -e KEYCLOAK_CLIENT_ID=bookrush-admin-service \
+  -e KEYCLOAK_USER=admin \
+  -e KEYCLOAK_PASSWORD="$admin_password" \
+  python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py")"
+test "$resolved_secret" = "$client_secret"
+echo 'Keycloak user management: protected client secret resolution OK'
+
 token="$(docker exec "$probe" curl -fsS -X POST http://127.0.0.1:8080/realms/bookrush/protocol/openid-connect/token \
   -d grant_type=client_credentials -d client_id=bookrush-admin-service \
   --data-urlencode "client_secret=$client_secret" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"

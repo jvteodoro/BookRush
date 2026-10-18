@@ -185,24 +185,28 @@ export const services = {
     page = 0,
     size = 25,
   ): Promise<AdminUserPage> {
-    const { data } = await adminHttp.get("/api/v1/admin/users", {
-      params: { search: search.trim(), page, size },
-    });
-    return {
-      items: data.items.map((item: Record<string, unknown>) => ({
-        subjectKey: String(item.subjectKey),
-        username: String(item.username),
-        email: item.email ? String(item.email) : undefined,
-        firstName: item.firstName ? String(item.firstName) : undefined,
-        lastName: item.lastName ? String(item.lastName) : undefined,
-        enabled: item.enabled !== false,
-        createdTimestamp: Number(item.createdTimestamp ?? 0),
-      })),
-      page: Number(data.page),
-      size: Number(data.size),
-      totalItems: Number(data.totalItems),
-      last: Boolean(data.last),
-    };
+    try {
+      const { data } = await adminHttp.get("/api/v1/admin/users", {
+        params: { search: search.trim(), page, size },
+      });
+      return {
+        items: data.items.map((item: Record<string, unknown>) => ({
+          subjectKey: String(item.subjectKey),
+          username: String(item.username),
+          email: item.email ? String(item.email) : undefined,
+          firstName: item.firstName ? String(item.firstName) : undefined,
+          lastName: item.lastName ? String(item.lastName) : undefined,
+          enabled: item.enabled !== false,
+          createdTimestamp: Number(item.createdTimestamp ?? 0),
+        })),
+        page: Number(data.page),
+        size: Number(data.size),
+        totalItems: Number(data.totalItems),
+        last: Boolean(data.last),
+      };
+    } catch (error) {
+      throw problem(error, "A integração de usuários com o Keycloak falhou.");
+    }
   },
   async setUserEnabled(subjectKey: string, enabled: boolean, reason: string) {
     const { data } = await adminHttp.post(
