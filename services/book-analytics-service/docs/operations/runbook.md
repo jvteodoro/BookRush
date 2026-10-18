@@ -73,6 +73,14 @@ job, consulte primeiro `GET /api/admin/v1/analytics/jobs/{id}` e depois
 `/items`; use `resume` somente após corrigir o erro persistido. O cache/provider
 LLM desabilitado não gera chamadas externas.
 
+Uma falha de item não encerra o lote enquanto existirem itens `PENDING` ou
+`RUNNING`: o worker reconcilia os contadores e mantém o job `RUNNING`, mesmo
+após reinício do container. O lote só termina como `COMPLETED` ou
+`COMPLETED_WITH_ERRORS` quando não restam itens transitórios. Se um job terminal
+ainda tiver itens pendentes, trate-o como estado legado e use `resume` após
+verificar os erros dos itens; não crie um segundo job para a mesma
+`operationKey`.
+
 ## Benchmark offline
 
 Execute `scripts/benchmark-analytics.sh [books]` from the repository. O harness

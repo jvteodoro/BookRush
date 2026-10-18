@@ -971,6 +971,10 @@ VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING
             + " progress_message='Item concluído', progress_updated_at=clock_timestamp(),"
             + " error_code=NULL, error_message=NULL WHERE id=?",
         item.id());
+    reconcileJob(item.jobId());
+  }
+
+  private void reconcileJob(UUID jobId) {
     jdbc.update(
         """
 UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analytics.analysis_job_item i WHERE i.job_id=j.id AND i.status IN ('COMPLETED','FAILED','CANCELLED')),
@@ -981,7 +985,7 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
     started_at=COALESCE(started_at,clock_timestamp()), finished_at=CASE WHEN NOT EXISTS(SELECT 1 FROM analytics.analysis_job_item i WHERE i.job_id=j.id AND i.status IN ('PENDING','RUNNING')) THEN clock_timestamp() ELSE NULL END
  WHERE j.id=?
 """,
-        item.jobId());
+        jobId);
   }
 
   private void fail(Item item, String code, String message, Exception exception) {
@@ -1009,15 +1013,10 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         code,
         safeMessage,
         item.id());
-    jdbc.update(
-        "UPDATE analytics.analysis_job SET processed_items=(SELECT count(*) FROM"
-            + " analytics.analysis_job_item WHERE job_id=? AND status IN"
-            + " ('COMPLETED','FAILED','CANCELLED')), failed_items=(SELECT count(*) FROM"
-            + " analytics.analysis_job_item WHERE job_id=? AND status='FAILED'),"
-            + " status='COMPLETED_WITH_ERRORS', finished_at=clock_timestamp() WHERE id=?",
-        item.jobId(),
-        item.jobId(),
-        item.jobId());
+    // A failed item is terminal only for that item. The batch must remain
+    // RUNNING while other items are pending or being processed, so a restart
+    // or one bad book cannot strand the rest of the queue.
+    reconcileJob(item.jobId());
     metrics.jobItemFailed(code);
   }
 
