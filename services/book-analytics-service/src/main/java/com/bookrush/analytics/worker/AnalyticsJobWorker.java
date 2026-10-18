@@ -163,14 +163,15 @@ RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
    * genuinely active work enough time to finish. Only active, non-cancelled jobs are recovered.
    */
   int recoverStaleItems() {
+    int orphanedPhases = jdbc.update(orphanedPhaseRecoverySql());
     int recoveredPhases = jdbc.update(stalePhaseRecoverySql(), staleAfterSeconds);
     int recoveredItems = jdbc.update(
         staleLeaseRecoverySql(), maxAttempts, maxAttempts, maxAttempts, maxAttempts,
         maxAttempts, maxAttempts, staleAfterSeconds);
     int exhaustedItems = jdbc.update(exhaustedPendingRecoverySql(), maxAttempts);
-    if (recoveredPhases > 0 || recoveredItems > 0 || exhaustedItems > 0) {
-      log.warn("analytics stale recovery phases={} items={} exhaustedPending={}",
-          recoveredPhases, recoveredItems, exhaustedItems);
+    if (orphanedPhases > 0 || recoveredPhases > 0 || recoveredItems > 0 || exhaustedItems > 0) {
+      log.warn("analytics stale recovery orphanedPhases={} phases={} items={} exhaustedPending={}",
+          orphanedPhases, recoveredPhases, recoveredItems, exhaustedItems);
     }
     return recoveredItems + exhaustedItems;
   }
@@ -220,6 +221,20 @@ UPDATE analytics.analysis_phase_timing p
    AND j.cancel_requested=false
    AND j.status IN ('PENDING','RUNNING')
    AND COALESCE(i.progress_updated_at, i.started_at) < clock_timestamp() - (? * INTERVAL '1 second')
+""";
+  }
+
+  static String orphanedPhaseRecoverySql() {
+    return """
+UPDATE analytics.analysis_phase_timing p
+   SET status='FAILED', finished_at=COALESCE(p.finished_at, clock_timestamp()),
+       duration_ms=GREATEST(0, (EXTRACT(EPOCH FROM (COALESCE(p.finished_at, clock_timestamp()) - p.started_at)) * 1000)::bigint),
+       error_code='WORKER_RESTART_RECOVERY'
+  FROM analytics.analysis_job_item i
+ WHERE p.job_item_id=i.id
+   AND p.job_id=i.job_id
+   AND p.status='RUNNING'
+   AND p.attempt_count < i.attempt_count
 """;
   }
 

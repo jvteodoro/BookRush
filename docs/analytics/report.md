@@ -65,6 +65,9 @@ maior `attempt_count` já persistido nas fases, e não apenas o contador atual d
 item. A migration V24 também renumera execuções históricas quando um requeue
 manual antigo reutilizou números; isso impede que duas execuções sejam
 agrupadas na mesma aba do admin e evita burlar `max-attempts`.
+Fases `RUNNING` de uma tentativa menor que a atual são fechadas como
+`WORKER_RESTART_RECOVERY`, evitando que uma execução antiga continue aparecendo
+como ativa depois que o item avançou.
 
 As estatísticas `excerpts`, `features` e `embeddings` são calculadas pelo
 `analysis_run_id` através das tabelas de features do run. Excerpts são

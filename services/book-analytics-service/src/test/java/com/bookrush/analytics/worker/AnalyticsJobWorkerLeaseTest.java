@@ -46,6 +46,15 @@ class AnalyticsJobWorkerLeaseTest {
   }
 
   @Test
+  void orphanedPhaseRecoveryClosesRunningPhasesFromOlderAttempts() {
+    var sql = AnalyticsJobWorker.orphanedPhaseRecoverySql();
+
+    assertTrue(sql.contains("p.status='RUNNING'"));
+    assertTrue(sql.contains("p.attempt_count < i.attempt_count"));
+    assertTrue(sql.contains("WORKER_RESTART_RECOVERY"));
+  }
+
+  @Test
   void exhaustedPendingRecoveryCannotLeaveAnUnclaimableItemInQueue() {
     var sql = AnalyticsJobWorker.exhaustedPendingRecoverySql();
 
