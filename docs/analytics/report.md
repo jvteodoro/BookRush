@@ -25,6 +25,25 @@ abre seu rastreamento individual, que apresenta a fase atual, tentativa,
 horários, duração e status de cada fase persistida, contagens de excerpts,
 features e embeddings e as fases ainda pendentes.
 
+### Retomada segura durante atualização
+
+O worker executa cada item em uma tarefa independente e grava o progresso por
+lote. A persistência de features de documento usa quatro parâmetros e
+`ON CONFLICT DO NOTHING`, portanto uma reinicialização pode repetir o lote sem
+duplicar observações já gravadas. Ao reivindicar uma nova tentativa, o worker
+limpa o erro da tentativa anterior para que a interface não exiba uma exceção
+antiga como se fosse o erro da execução atual. O stale recovery marca fases
+abandonadas e reencaminha itens dentro do limite de tentativas; itens que
+atingiram o limite ficam explicitamente `FAILED`, em vez de permanecerem
+presos como `PENDING`.
+
+Em 18/10/2026 foi corrigido um placeholder extra na inserção de
+`analytics.document_feature`. Esse erro lançava
+`DataIntegrityViolationException` durante `EXCERPT_EMBEDDINGS` depois de
+alguns lotes, sem invalidar os embeddings já persistidos. O teste unitário
+verifica agora que a query possui exatamente quatro placeholders correspondentes
+aos argumentos fornecidos.
+
 Os endpoints administrativos usados nessa navegação são:
 
 - `GET /api/admin/v1/content-analytics/jobs?limit=200&offset=0`

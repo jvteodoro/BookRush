@@ -127,6 +127,7 @@ WITH next_item AS (
 )
 UPDATE analytics.analysis_job_item i
    SET status='RUNNING', attempt_count=i.attempt_count+1, started_at=clock_timestamp(), finished_at=NULL,
+       error_code=NULL, error_message=NULL,
        progress_stage='CLAIMED', progress_completed=0, progress_total=0,
        progress_message='Item atribuído ao worker', progress_updated_at=clock_timestamp()
   FROM next_item n WHERE i.id=n.id
@@ -930,16 +931,18 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
 """,
             run, scopeId, score, code);
       } else {
-        jdbc.update(
-            """
-INSERT INTO analytics.document_feature(analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,computed_at)
-SELECT ?,fd.id,ar.input_asset_version_id,?,?, 'VALID',clock_timestamp()
- FROM analytics.feature_definition fd JOIN analytics.analysis_run ar ON ar.id=?
- WHERE fd.code=? ON CONFLICT DO NOTHING
-""",
-            run, score, run, code);
+        jdbc.update(documentFeatureInsertSql(), run, score, run, code);
       }
     }
+  }
+
+  static String documentFeatureInsertSql() {
+    return """
+INSERT INTO analytics.document_feature(analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,computed_at)
+SELECT ?,fd.id,ar.input_asset_version_id,?, 'VALID',clock_timestamp()
+ FROM analytics.feature_definition fd JOIN analytics.analysis_run ar ON ar.id=?
+ WHERE fd.code=? ON CONFLICT DO NOTHING
+""";
   }
 
   private static double cosine(List<Double> left, List<Double> right) {

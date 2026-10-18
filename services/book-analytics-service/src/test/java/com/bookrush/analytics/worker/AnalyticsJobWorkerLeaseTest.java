@@ -44,4 +44,13 @@ class AnalyticsJobWorkerLeaseTest {
     assertTrue(sql.contains("status='FAILED'"));
     assertTrue(sql.contains("WORKER_RESTART_RECOVERY"));
   }
+
+  @Test
+  void documentFeatureInsertBindsEveryPlaceholder() {
+    var sql = AnalyticsJobWorker.documentFeatureInsertSql();
+
+    assertEquals(4, sql.chars().filter(character -> character == '?').count());
+    assertTrue(sql.contains("numeric_value,value_status,computed_at"));
+    assertTrue(sql.contains("SELECT ?,fd.id,ar.input_asset_version_id,?, 'VALID'"));
+  }
 }
