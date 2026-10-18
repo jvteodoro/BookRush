@@ -39,6 +39,18 @@ Prometheus quando habilitado. Os nomes principais são:
 - `bookrush.analytics.excerpts{operation=generated}`;
 - `bookrush.analytics.failures{stage=analysis}`;
 - `bookrush.analytics.analyzer.duration`.
+- `bookrush.analytics.phase.duration{phase=...}` com percentis P50/P90/P95/P99;
+- `bookrush.analytics.phase.completions{phase=...}` e
+  `bookrush.analytics.phase.failures{phase=...}`.
+
+As durações históricas também são persistidas em
+`analytics.analysis_phase_timing`, nas fases `ITEM_TOTAL`, `LOAD_METADATA`,
+`READ_ASSET`, `CHAPTER_DISCOVERY`, `LANGUAGE_VALIDATION`,
+`EXCERPT_SELECTION`, `EXCERPT_PERSISTENCE`, `EXCERPT_EMBEDDINGS`, `FEATURES`
+e `SCOPE_EMBEDDINGS`. O endpoint administrativo
+`GET /api/admin/v1/content-analytics/phase-timings?jobId=<uuid>` retorna média,
+mínimo, P50, P90, P95, P99 e máximo por fase/estado. Use Prometheus para
+alertas e séries temporais; use o endpoint para comparar batches históricos.
 
 O worker determinístico é ativado no Compose por `ANALYTICS_WORKER_ENABLED=true`.
 Ele requer `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY` e `STORAGE_SECRET_KEY`, além

@@ -254,6 +254,31 @@ public class AnalyticsController {
   }
 
   @GetMapping({
+    "/admin/v1/analytics/phase-timings",
+    "/admin/v1/content-analytics/phase-timings"
+  })
+  @Operation(summary = "Distribuição de duração por fase", description = "Retorna estatísticas históricas das fases do worker para dashboards e investigação de latência.")
+  public ResponseEntity<Map<String, Object>> phaseTimings(
+      @RequestParam(required = false) UUID jobId,
+      @RequestParam(defaultValue = "200") int limit) {
+    if (limit < 1 || limit > 1000) {
+      return ResponseEntity.badRequest().body(Map.of("code", "INVALID_LIMIT"));
+    }
+    var rows = jdbc.queryForList(
+        "SELECT phase, status, count(*) AS samples, avg(duration_ms) AS mean_ms,"
+            + " min(duration_ms) AS min_ms, max(duration_ms) AS max_ms,"
+            + " percentile_cont(0.50) WITHIN GROUP (ORDER BY duration_ms) AS p50_ms,"
+            + " percentile_cont(0.90) WITHIN GROUP (ORDER BY duration_ms) AS p90_ms,"
+            + " percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,"
+            + " percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms"
+            + " FROM analytics.analysis_phase_timing"
+            + " WHERE duration_ms IS NOT NULL AND (? IS NULL OR job_id=?)"
+            + " GROUP BY phase, status ORDER BY phase, status LIMIT ?",
+        jobId, jobId, limit);
+    return ResponseEntity.ok(Map.of("items", rows, "total", rows.size()));
+  }
+
+  @GetMapping({
     "/admin/v1/analytics/jobs/{jobId}/items",
     "/admin/v1/content-analytics/jobs/{jobId}/items"
   })
