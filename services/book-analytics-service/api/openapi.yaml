@@ -110,7 +110,7 @@ paths:
         - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
         - {name: status, in: query, schema: {type: string}}
       responses:
-        '200': {description: Itens persistidos do job com paginação}
+        '200': {description: Itens persistidos do job com paginação; cada item inclui book_id, book_title e input_asset_version_id}
         '404': {description: Job inexistente}
   /api/admin/v1/analytics/jobs/{jobId}/items/{itemId}:
     get:
@@ -119,7 +119,7 @@ paths:
         - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
-        '200': {description: "Item, fases, estatísticas e fases pendentes"}
+        '200': {description: "Item, título do livro, identificadores (job/item/asset), fases, estatísticas e fases pendentes"}
         '404': {description: Item inexistente}
   /api/admin/v1/content-analytics/jobs/{jobId}/items/{itemId}:
     get:
@@ -128,7 +128,7 @@ paths:
         - {name: jobId, in: path, required: true, schema: {type: string, format: uuid}}
         - {name: itemId, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
-        '200': {description: "Item, fases, estatísticas e fases pendentes"}
+        '200': {description: "Item, título do livro, identificadores (job/item/asset), fases, estatísticas e fases pendentes"}
         '404': {description: Item inexistente}
   /api/admin/v1/analytics/jobs/{jobId}/cancel:
     post:

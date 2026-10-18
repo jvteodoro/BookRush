@@ -57,14 +57,23 @@ Ele requer `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY` e `STORAGE_SECRET_KEY`, alé
 de bucket/key/hash/size registrados no catálogo. Para uma execução local sem
 object storage, mantenha a variável em `false`; jobs permanecerão `PENDING`.
 
+O polling e a recuperação de leases executam na thread de agendamento, separada
+do executor que processa os itens. `ANALYTICS_WORKER_CONCURRENCY` controla o
+número de itens processados simultaneamente e vale `1` por padrão; mesmo com
+um único item ativo, análises longas não bloqueiam heartbeat, recuperação de
+órfãos ou consultas administrativas.
+
 O worker usa uma lease lógica para evitar que uma interrupção deixe itens
 permanentemente em `RUNNING`. Itens de jobs ativos, não cancelados, sem
 atualização por `ANALYTICS_WORKER_STALE_AFTER_SECONDS` (900 segundos por
-padrão) são devolvidos a `PENDING` antes do próximo claim. O limite deve ser
-maior que o pior tempo esperado de uma análise; ele não remove itens, jobs,
-execuções ou objetos do storage. Depois de um restart, acompanhe o endpoint de
-itens do job e confirme que os itens recuperados voltaram a `COMPLETED` ou
-`FAILED` com uma nova tentativa.
+padrão) são recuperados antes do próximo claim. Se ainda houver tentativas
+disponíveis, voltam a `PENDING`; se o item já atingiu
+`ANALYTICS_WORKER_MAX_ATTEMPTS`, ele fica `FAILED` com
+`WORKER_RESTART_RECOVERY`, em vez de entrar numa fila que não poderia mais ser
+reclamada. O limite deve ser maior que o pior tempo esperado de uma análise;
+a recuperação não remove itens, jobs, execuções ou objetos do storage. Depois
+de um restart, acompanhe o endpoint de itens do job e confirme que os itens
+recuperados voltaram a `COMPLETED` ou `FAILED` de forma explícita.
 
 Falhas transitórias também retornam automaticamente a `PENDING`: o worker usa
 até `ANALYTICS_WORKER_MAX_ATTEMPTS` (3 por padrão) e backoff progressivo baseado
@@ -74,9 +83,11 @@ viram `FAILED`; não são repetidos indefinidamente. O `attempt_count` persistid
 impede que um item seja processado além do limite, enquanto o job continua
 `RUNNING` quando ainda existem itens pendentes.
 
-A persistência de features de cada excerpt usa `JdbcTemplate.batchUpdate`,
-mantendo a unidade idempotente mas evitando um commit síncrono por feature.
-Isso reduz a pressão sobre `WALSync`; `WALSync` prolongado deve ser investigado
+A persistência de features e embeddings é idempotente por conflito/chave de
+entrada; os lotes de embeddings são confirmados progressivamente no storage e
+no banco. Uma interrupção pode repetir o lote em andamento, mas não perde os
+lotes anteriores nem exige recomeçar o job inteiro. Isso reduz a pressão sobre
+`WALSync`; `WALSync` prolongado deve ser investigado
 com `pg_stat_activity`, `pg_stat_wal` e saúde do volume, não resolvido
 desativando `fsync` ou `synchronous_commit` globalmente.
 

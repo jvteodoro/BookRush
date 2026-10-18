@@ -299,15 +299,23 @@ public class AnalyticsController {
     var normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
     var rows = normalizedStatus == null
         ? jdbc.queryForList(
-            "SELECT id, input_asset_version_id, status, attempt_count, analysis_run_id, error_code,"
+            "SELECT i.id, i.job_id, i.input_asset_version_id, b.id AS book_id,"
+                + " COALESCE(NULLIF(b.canonical_title,''), b.original_title) AS book_title,"
+                + " i.status, i.attempt_count, i.analysis_run_id, i.error_code,"
                 + " error_message, started_at, finished_at, progress_stage, progress_completed,"
-                + " progress_total, progress_message, progress_updated_at FROM analytics.analysis_job_item WHERE"
+                + " progress_total, progress_message, progress_updated_at FROM analytics.analysis_job_item i"
+                + " JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id"
+                + " JOIN catalog.book_asset a ON a.id=v.book_asset_id JOIN catalog.book b ON b.id=a.book_id WHERE"
                 + " job_id=? ORDER BY created_at, id LIMIT ? OFFSET ?",
             jobId, limit + 1, offset)
         : jdbc.queryForList(
-            "SELECT id, input_asset_version_id, status, attempt_count, analysis_run_id, error_code,"
+            "SELECT i.id, i.job_id, i.input_asset_version_id, b.id AS book_id,"
+                + " COALESCE(NULLIF(b.canonical_title,''), b.original_title) AS book_title,"
+                + " i.status, i.attempt_count, i.analysis_run_id, i.error_code,"
                 + " error_message, started_at, finished_at, progress_stage, progress_completed,"
-                + " progress_total, progress_message, progress_updated_at FROM analytics.analysis_job_item WHERE"
+                + " progress_total, progress_message, progress_updated_at FROM analytics.analysis_job_item i"
+                + " JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id"
+                + " JOIN catalog.book_asset a ON a.id=v.book_asset_id JOIN catalog.book b ON b.id=a.book_id WHERE"
                 + " job_id=? AND status=? ORDER BY created_at, id LIMIT ? OFFSET ?",
             jobId, normalizedStatus, limit + 1, offset);
     var hasMore = rows.size() > limit;
@@ -322,10 +330,15 @@ public class AnalyticsController {
   @Operation(summary = "Detalhar item e fases do job", description = "Retorna progresso, fases, estatísticas e fases ainda não executadas.")
   public ResponseEntity<Object> itemDetail(@PathVariable UUID jobId, @PathVariable UUID itemId) {
     var itemRows = jdbc.queryForList(
-        "SELECT i.id, i.job_id, i.input_asset_version_id, i.status, i.attempt_count,"
+        "SELECT i.id, i.job_id, i.input_asset_version_id, b.id AS book_id,"
+            + " COALESCE(NULLIF(b.canonical_title,''), b.original_title) AS book_title,"
+            + " i.status, i.attempt_count,"
             + " i.analysis_run_id, i.error_code, i.error_message, i.started_at, i.finished_at,"
             + " i.progress_stage, i.progress_completed, i.progress_total, i.progress_message,"
-            + " i.progress_updated_at FROM analytics.analysis_job_item i WHERE i.job_id=? AND i.id=?",
+            + " i.progress_updated_at FROM analytics.analysis_job_item i"
+            + " JOIN catalog.book_asset_version v ON v.id=i.input_asset_version_id"
+            + " JOIN catalog.book_asset a ON a.id=v.book_asset_id JOIN catalog.book b ON b.id=a.book_id"
+            + " WHERE i.job_id=? AND i.id=?",
         jobId, itemId);
     if (itemRows.isEmpty()) return ResponseEntity.notFound().build();
     var phases = jdbc.queryForList(

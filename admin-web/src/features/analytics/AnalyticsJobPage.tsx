@@ -134,8 +134,10 @@ export function AnalyticsJobPage() {
                     className="table-link"
                     to={`/analytics/jobs/${jobId}/items/${item.id}`}
                   >
-                    <strong>{item.id.slice(0, 8)}</strong>
-                    <small>{item.book_id ?? item.input_asset_version_id}</small>
+                    <strong>{item.book_title ?? "Livro sem título"}</strong>
+                    <small>
+                      asset {item.input_asset_version_id} · job {jobId}
+                    </small>
                   </Link>
                 </td>
                 <td>

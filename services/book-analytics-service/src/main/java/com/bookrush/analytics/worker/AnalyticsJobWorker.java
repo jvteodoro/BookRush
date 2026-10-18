@@ -16,6 +16,10 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import jakarta.annotation.PreDestroy;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
@@ -46,6 +50,8 @@ public final class AnalyticsJobWorker {
   private final int staleAfterSeconds;
   private final int maxAttempts;
   private final int retryDelaySeconds;
+  private final ExecutorService processingExecutor;
+  private final Semaphore processingSlots;
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
@@ -55,7 +61,8 @@ public final class AnalyticsJobWorker {
       com.bookrush.analytics.config.AnalyticsRuntimeProperties runtimeProperties,
       @Value("${analytics.worker.stale-after-seconds:900}") int staleAfterSeconds,
       @Value("${analytics.worker.max-attempts:3}") int maxAttempts,
-      @Value("${analytics.worker.retry-delay-seconds:30}") int retryDelaySeconds) {
+      @Value("${analytics.worker.retry-delay-seconds:30}") int retryDelaySeconds,
+      @Value("${analytics.worker.concurrency:1}") int concurrency) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
@@ -64,22 +71,49 @@ public final class AnalyticsJobWorker {
     this.staleAfterSeconds = normalizeStaleAfterSeconds(staleAfterSeconds);
     this.maxAttempts = Math.max(1, maxAttempts);
     this.retryDelaySeconds = Math.max(1, retryDelaySeconds);
+    int workerConcurrency = Math.max(1, concurrency);
+    this.processingSlots = new Semaphore(workerConcurrency);
+    this.processingExecutor = Executors.newFixedThreadPool(workerConcurrency, task -> {
+      var thread = new Thread(task, "analytics-item-worker");
+      thread.setDaemon(true);
+      return thread;
+    });
   }
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
   public void poll() {
+    recoverStaleItems();
+    if (!processingSlots.tryAcquire()) return;
     var item = claimOne();
-    if (item == null) return;
+    if (item == null) {
+      processingSlots.release();
+      return;
+    }
+    try {
+      processingExecutor.execute(() -> processClaimedItem(item));
+    } catch (RuntimeException rejected) {
+      processingSlots.release();
+      throw rejected;
+    }
+  }
+
+  private void processClaimedItem(Item item) {
     try {
       process(item);
       complete(item);
     } catch (Exception e) {
       fail(item, errorCode(e), e.getMessage(), e);
+    } finally {
+      processingSlots.release();
     }
   }
 
+  @PreDestroy
+  void shutdown() {
+    processingExecutor.shutdownNow();
+  }
+
   private Item claimOne() {
-    recoverStaleItems();
     return jdbc.query(
         """
 WITH next_item AS (
@@ -117,7 +151,14 @@ RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
    * genuinely active work enough time to finish. Only active, non-cancelled jobs are recovered.
    */
   int recoverStaleItems() {
-    return jdbc.update(staleLeaseRecoverySql(), staleAfterSeconds);
+    int recoveredPhases = jdbc.update(stalePhaseRecoverySql(), staleAfterSeconds);
+    int recoveredItems = jdbc.update(
+        staleLeaseRecoverySql(), maxAttempts, maxAttempts, maxAttempts, maxAttempts,
+        staleAfterSeconds);
+    if (recoveredPhases > 0) {
+      log.warn("analytics stale recovery phases={} items={}", recoveredPhases, recoveredItems);
+    }
+    return recoveredItems;
   }
 
   static int normalizeStaleAfterSeconds(int seconds) {
@@ -127,11 +168,40 @@ RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
   static String staleLeaseRecoverySql() {
     return """
 UPDATE analytics.analysis_job_item i
-   SET status='PENDING', started_at=NULL, finished_at=NULL, analysis_run_id=NULL,
-       progress_stage='RECOVERED', progress_message='Lease expirado; item recolocado na fila',
+   SET status=CASE WHEN i.attempt_count >= ? THEN 'FAILED' ELSE 'PENDING' END,
+       started_at=NULL,
+       finished_at=CASE WHEN i.attempt_count >= ? THEN clock_timestamp() ELSE NULL END,
+       analysis_run_id=NULL,
+       progress_stage=CASE WHEN i.attempt_count >= ? THEN 'FAILED' ELSE 'RECOVERED' END,
+       progress_message=CASE WHEN i.attempt_count >= ?
+           THEN 'Lease expirado após atingir o limite de tentativas'
+           ELSE 'Lease expirado; item recolocado na fila' END,
+       error_code=CASE WHEN i.attempt_count >= ? THEN 'WORKER_RESTART_RECOVERY' ELSE NULL END,
+       error_message=CASE WHEN i.attempt_count >= ?
+           THEN 'O worker foi interrompido após o limite de tentativas'
+           ELSE NULL END,
        progress_updated_at=clock_timestamp()
   FROM analytics.analysis_job j
  WHERE i.job_id=j.id
+   AND i.status='RUNNING'
+   AND j.cancel_requested=false
+   AND j.status IN ('PENDING','RUNNING')
+   AND COALESCE(i.progress_updated_at, i.started_at) < clock_timestamp() - (? * INTERVAL '1 second')
+""";
+  }
+
+  static String stalePhaseRecoverySql() {
+    return """
+UPDATE analytics.analysis_phase_timing p
+   SET status='FAILED', finished_at=clock_timestamp(),
+       duration_ms=GREATEST(0, (EXTRACT(EPOCH FROM (clock_timestamp() - p.started_at)) * 1000)::bigint),
+       error_code='WORKER_RESTART_RECOVERY'
+  FROM analytics.analysis_job_item i
+  JOIN analytics.analysis_job j ON j.id=i.job_id
+ WHERE p.job_item_id=i.id
+   AND p.job_id=i.job_id
+   AND p.attempt_count=i.attempt_count
+   AND p.status='RUNNING'
    AND i.status='RUNNING'
    AND j.cancel_requested=false
    AND j.status IN ('PENDING','RUNNING')

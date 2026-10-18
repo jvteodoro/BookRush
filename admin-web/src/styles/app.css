@@ -882,6 +882,13 @@ input {
 .analytics-summary-strip span + span {
   margin-left: 10px;
 }
+.analytics-identifiers {
+  display: block;
+  margin-top: 7px;
+  color: #748198;
+  font-size: 10px;
+  word-break: break-all;
+}
 .detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);

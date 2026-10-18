@@ -62,6 +62,7 @@ export interface AnalyticsJobItem {
   job_id?: string;
   input_asset_version_id: string;
   book_id?: string;
+  book_title?: string;
   status: string;
   attempt_count: number;
   analysis_run_id?: string;

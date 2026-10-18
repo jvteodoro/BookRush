@@ -91,11 +91,15 @@ export function AnalyticsItemPage() {
       <header className="pagehead analytics-pagehead">
         <div>
           <span className="eyebrow">ITEM TRACE</span>
-          <h1>{item.book_id ?? item.input_asset_version_id}</h1>
+          <h1>{item.book_title ?? "Livro sem título"}</h1>
           <p>
             {item.status} · tentativa {item.attempt_count} · fase atual:{" "}
             {item.progress_stage ?? "—"}
           </p>
+          <small className="analytics-identifiers">
+            asset version {item.input_asset_version_id} · job{" "}
+            {item.job_id ?? jobId}
+          </small>
         </div>
       </header>
       <div className="analytics-summary-strip">
