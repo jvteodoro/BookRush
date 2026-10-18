@@ -12,6 +12,24 @@ components:
 servers:
   - url: https://bookrush.jteodoro.tec.br/analytics
 paths:
+  /api/admin/v1/content-analytics/phase-timings:
+    get:
+      summary: Distribution of persisted analytics phase durations
+      security: [{bearerAuth: []}]
+      parameters:
+        - in: query
+          name: jobId
+          required: false
+          schema: {type: string, format: uuid}
+        - in: query
+          name: limit
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 200}
+      responses:
+        '200':
+          description: Aggregated phase timing distributions
+        '400':
+          description: Invalid limit
   /api/internal/v1/analytics/books/{bookId}/summary:
     get:
       summary: Resumo de analytics
