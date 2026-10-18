@@ -649,7 +649,9 @@ services:
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      READER_STATE_URL: http://reader-state-service:8094
       CATALOG_URL: http://catalog-service:8080
+      BOOK_CONTENT_URL: http://book-content-service:8093
       BOOKRUSH_SECURITY_ENABLED: ${BOOKRUSH_SECURITY_ENABLED:-true}
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}

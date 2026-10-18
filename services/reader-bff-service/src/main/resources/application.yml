@@ -14,5 +14,5 @@ bookrush:
   cors:
     allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
   recommendation-url: ${RECOMMENDATION_URL:http://recommendation-service:8098}
-  reader-state-url: ${READER_STATE_URL:http://reader-state-service:8096}
-  content-url: ${BOOK_CONTENT_URL:http://book-content-service:8094}
+  reader-state-url: ${READER_STATE_URL:http://reader-state-service:8094}
+  content-url: ${BOOK_CONTENT_URL:http://book-content-service:8093}

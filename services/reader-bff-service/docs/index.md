@@ -19,4 +19,6 @@ recommendation impressions, publication manifests and EPUB resources. It
 forwards the caller's bearer token to the owning service and returns `502` when
 an upstream dependency is unavailable; it never falls back to anonymous or
 mock data. Upstream URLs are configured with `READER_STATE_URL` and
-`BOOK_CONTENT_URL`.
+`BOOK_CONTENT_URL`. In the Compose topology, `book-content-service` listens
+on port `8093`; the BFF default and Compose override must remain aligned with
+that port.

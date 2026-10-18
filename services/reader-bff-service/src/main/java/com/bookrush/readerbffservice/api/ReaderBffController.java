@@ -27,8 +27,8 @@ public class ReaderBffController {
 
   public ReaderBffController(
       @Value("${bookrush.recommendation-url:http://recommendation-service:8098}") String recommendationUrl,
-      @Value("${bookrush.reader-state-url:http://reader-state-service:8096}") String stateUrl,
-      @Value("${bookrush.content-url:http://book-content-service:8094}") String contentUrl) {
+      @Value("${bookrush.reader-state-url:http://reader-state-service:8094}") String stateUrl,
+      @Value("${bookrush.content-url:http://book-content-service:8093}") String contentUrl) {
     recommendations = client(recommendationUrl);
     state = client(stateUrl);
     content = client(contentUrl);
