@@ -72,23 +72,25 @@ function requestError(status: number, action: "carregar" | "salvar"): Error {
 
 export async function loadPrivacy(
   transport: PrivacyTransport,
-): Promise<{ profile: ReaderProfile; preferences: PrivacyPreferences }> {
-  const response = await transport("/api/v1/profile");
+): Promise<{ preferences: PrivacyPreferences }> {
+  const response = await transport("/api/v1/profile/privacy");
   if (!response.ok) throw requestError(response.status, "carregar");
-  const profile = (await response.json()) as ReaderProfile;
-  return { profile, preferences: normalizePrivacy(profile) };
+  const preferences = normalizePrivacy(
+    (await response.json()) as PrivacyPreferences,
+  );
+  return { preferences };
 }
 
 export async function savePrivacy(
   preferences: PrivacyPreferences,
   transport: PrivacyTransport,
-): Promise<{ profile: ReaderProfile; preferences: PrivacyPreferences }> {
-  const response = await transport("/api/v1/profile", {
+): Promise<{ preferences: PrivacyPreferences }> {
+  const response = await transport("/api/v1/profile/privacy", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(preferences),
   });
   if (!response.ok) throw requestError(response.status, "salvar");
-  const profile = (await response.json()) as ReaderProfile;
-  return { profile, preferences: normalizePrivacy(profile) };
+  const saved = normalizePrivacy((await response.json()) as PrivacyPreferences);
+  return { preferences: saved };
 }

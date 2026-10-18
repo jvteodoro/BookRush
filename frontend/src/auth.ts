@@ -1,7 +1,7 @@
 import { User, UserManager, WebStorageStateStore } from 'oidc-client-ts';
 
-const authority = import.meta.env.VITE_OIDC_AUTHORITY?.trim() || 'https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush';
-const clientId = import.meta.env.VITE_OIDC_CLIENT_ID?.trim() || 'bookrush-web';
+const authority = import.meta.env.VITE_OIDC_AUTHORITY ?? 'https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush';
+const clientId = import.meta.env.VITE_OIDC_CLIENT_ID ?? 'bookrush-web';
 const origin = window.location.origin;
 
 class MemoryStorage implements Storage {

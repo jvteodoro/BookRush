@@ -7,6 +7,9 @@ import {
   feedItems,
 } from "../mocks/data";
 import {
+  AnalyticsJob,
+  AnalyticsItemDetail,
+  AnalyticsJobItem,
   AnalyticsRun,
   BookCandidate,
   FeedEvent,
@@ -92,6 +95,32 @@ export type ApprovalHistoryPage = {
   totalItems: number;
   last: boolean;
 };
+export type AdminUser = {
+  subjectKey: string;
+  displayName?: string;
+  bio?: string;
+  isPublic?: boolean;
+  enabled?: boolean;
+  updatedAt?: string;
+};
+export type AdminReport = {
+  id: string;
+  reporter: string;
+  bookId?: string;
+  commentId?: string;
+  reason: string;
+  status: string;
+  createdAt?: string;
+};
+export type AdminComment = {
+  id: string;
+  bookId: string;
+  subjectKey: string;
+  body: string;
+  visibility: string;
+  reasonCode?: string;
+  createdAt?: string;
+};
 
 const sleep = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 let mutableBooks = [...books];
@@ -101,6 +130,7 @@ const catalogHttp = createHttp(config.apis.catalog, () => undefined);
 const ingestionHttp = createHttp(config.apis.ingestion, () => undefined);
 const analyticsHttp = createHttp(config.apis.analytics, () => undefined);
 const feedHttp = createHttp(config.apis.feed, () => undefined);
+const adminHttp = createHttp(config.apis.admin, () => undefined);
 
 function idempotencyKey(prefix: string, id: string) {
   return `${prefix}-${id}-${crypto.randomUUID()}`;
@@ -142,6 +172,59 @@ function mapBook(raw: Record<string, unknown>): BookCandidate {
 }
 
 export const services = {
+  async listAdminUsers(): Promise<AdminUser[]> {
+    const { data } = await adminHttp.get("/api/v1/admin/users");
+    return (data.items ?? data).map((item: Record<string, unknown>) => ({
+      subjectKey: String(item.subjectKey ?? item.subject_key),
+      displayName: item.displayName ?? item.display_name,
+      bio: item.bio,
+      isPublic: item.isPublic ?? item.is_public,
+      enabled: item.enabled !== false,
+      updatedAt: item.updatedAt ?? item.updated_at,
+    }));
+  },
+  async setUserEnabled(subjectKey: string, enabled: boolean) {
+    const { data } = await adminHttp.post(
+      `/api/v1/admin/users/${encodeURIComponent(subjectKey)}/${enabled ? "enable" : "disable"}`,
+    );
+    return data;
+  },
+  async listAdminReports(): Promise<AdminReport[]> {
+    const { data } = await adminHttp.get("/api/v1/admin/reports");
+    return (data.items ?? data).map((item: Record<string, unknown>) => ({
+      id: String(item.id),
+      reporter: String(item.reporter),
+      bookId: item.bookId ?? item.book_id,
+      commentId: item.commentId ?? item.comment_id,
+      reason: String(item.reason),
+      status: String(item.status),
+      createdAt: item.createdAt ?? item.created_at,
+    }));
+  },
+  async listAdminComments(): Promise<AdminComment[]> {
+    const { data } = await adminHttp.get("/api/v1/admin/moderation/comments");
+    return (data.items ?? data).map((item: Record<string, unknown>) => ({
+      id: String(item.id),
+      bookId: String(item.bookId ?? item.book_id),
+      subjectKey: String(item.subjectKey ?? item.subject_key),
+      body: String(item.body),
+      visibility: String(item.visibility ?? "VISIBLE"),
+      reasonCode: item.reasonCode ?? item.reason_code,
+      createdAt: item.createdAt ?? item.created_at,
+    }));
+  },
+  async moderateAdminComment(commentId: string, visibility: string) {
+    const { data } = await adminHttp.post("/api/v1/admin/moderation/comments", {
+      commentId,
+      visibility,
+      reasonCode: "ADMIN_REVIEW",
+    });
+    return data;
+  },
+  async adminKpis() {
+    const { data } = await adminHttp.get("/api/v1/admin/kpis");
+    return data;
+  },
   async listBookPage(
     query = "",
     page = 0,
@@ -224,12 +307,18 @@ export const services = {
   async listBooks(query = "", page = 0, size = 50): Promise<BookCandidate[]> {
     return (await this.listBookPage(query, page, size)).items;
   },
-  async listReviewBooks(page = 0, size = 25): Promise<ReviewBookPage> {
+  async listReviewBooks(
+    page = 0,
+    size = 25,
+    query = "",
+    sort = "updatedAt",
+    direction: "asc" | "desc" = "desc",
+  ): Promise<ReviewBookPage> {
     if (config.useMocks)
       return { items: [], page, size, totalItems: 0, last: true };
     try {
       const { data } = await catalogHttp.get("/admin/books/review", {
-        params: { page, size },
+        params: { page, size, q: query, sort, direction },
       });
       return {
         items: data.items ?? [],
@@ -381,7 +470,7 @@ export const services = {
     }
     try {
       const { data } = await analyticsHttp.get(
-        "/api/internal/v1/content-analytics/runs",
+        "/api/admin/v1/content-analytics/runs",
         { params: { limit: 100 } },
       );
       return (data.items ?? []).map(
@@ -423,6 +512,45 @@ export const services = {
       );
     }
   },
+  async listAnalyticsJobs(): Promise<AnalyticsJob[]> {
+    if (config.useMocks) return [];
+    try {
+      const { data } = await analyticsHttp.get(
+        "/api/admin/v1/content-analytics/jobs",
+        {
+          params: { limit: 100 },
+        },
+      );
+      return (data.items ?? []).map((raw: Record<string, unknown>) => ({
+        id: String(raw.id),
+        operationKey: String(raw.operation_key ?? raw.operationKey ?? ""),
+        status: String(raw.status ?? "UNKNOWN"),
+        totalItems: Number(raw.total_items ?? raw.totalItems ?? 0),
+        processedItems: Number(raw.processed_items ?? raw.processedItems ?? 0),
+        succeededItems: Number(raw.succeeded_items ?? raw.succeededItems ?? 0),
+        failedItems: Number(raw.failed_items ?? raw.failedItems ?? 0),
+        pendingItems: Number(raw.pending_items ?? raw.pendingItems ?? 0),
+        runningItems: Number(raw.running_items ?? raw.runningItems ?? 0),
+        completedItems: Number(raw.completed_items ?? raw.completedItems ?? 0),
+        cancelRequested: Boolean(raw.cancel_requested ?? raw.cancelRequested),
+        lastProgressAt: raw.last_progress_at
+          ? String(raw.last_progress_at)
+          : raw.lastProgressAt
+            ? String(raw.lastProgressAt)
+            : undefined,
+        progressStage: raw.progress_stage
+          ? String(raw.progress_stage)
+          : raw.progressStage
+            ? String(raw.progressStage)
+            : undefined,
+        createdAt: raw.created_at ? String(raw.created_at) : undefined,
+        startedAt: raw.started_at ? String(raw.started_at) : undefined,
+        finishedAt: raw.finished_at ? String(raw.finished_at) : undefined,
+      }));
+    } catch (error) {
+      throw problem(error, "Não foi possível listar os jobs de analytics.");
+    }
+  },
   async runAnalytics(
     bookId: string,
     canonicalBookId?: string,
@@ -450,7 +578,7 @@ export const services = {
     try {
       const resolvedBookId = canonicalBookId ?? bookId;
       const { data: input } = await analyticsHttp.get(
-        `/api/internal/v1/content-analytics/books/${resolvedBookId}/input`,
+        `/api/admin/v1/content-analytics/books/${resolvedBookId}/input`,
       );
       const version = (input.items ?? [])[0];
       if (!version?.version_id)
@@ -496,6 +624,51 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível consultar o job de analytics.");
+    }
+  },
+  async getAnalyticsJobItems(
+    jobId: string,
+    params: { offset?: number; limit?: number; status?: string } = {},
+  ): Promise<{ items: AnalyticsJobItem[]; hasMore: boolean }> {
+    if (config.useMocks) return { items: [], hasMore: false };
+    try {
+      const { data } = await analyticsHttp.get(
+        `/api/admin/v1/content-analytics/jobs/${jobId}/items`,
+        { params },
+      );
+      return {
+        items: (data.items ?? data) as AnalyticsJobItem[],
+        hasMore: Boolean(data.hasMore),
+      };
+    } catch (error) {
+      throw problem(error, "Não foi possível listar os itens do job.");
+    }
+  },
+  async getAnalyticsItemDetail(
+    jobId: string,
+    itemId: string,
+  ): Promise<AnalyticsItemDetail> {
+    if (config.useMocks) {
+      return {
+        item: {
+          id: itemId,
+          job_id: jobId,
+          input_asset_version_id: "mock",
+          status: "COMPLETED",
+          attempt_count: 1,
+        },
+        phases: [],
+        statistics: {},
+        remainingPhases: [],
+      };
+    }
+    try {
+      const { data } = await analyticsHttp.get(
+        `/api/admin/v1/content-analytics/jobs/${jobId}/items/${itemId}`,
+      );
+      return data as AnalyticsItemDetail;
+    } catch (error) {
+      throw problem(error, "Não foi possível consultar o item do job.");
     }
   },
   async createSession(
@@ -686,6 +859,18 @@ export const services = {
     );
     return { ...data, ...item.data };
   },
+  async annotationItem(itemId: string) {
+    const { data } = await analyticsHttp.get(
+      `/api/admin/v1/annotation/items/${itemId}`,
+    );
+    return data;
+  },
+  async annotationProgress(id: string) {
+    const { data } = await analyticsHttp.get(
+      `/api/admin/v1/annotation/campaigns/${id}/progress`,
+    );
+    return data;
+  },
   async rateFirstScreen(itemId: string, hook: number) {
     const { data } = await analyticsHttp.post(
       `/api/admin/v1/annotation/items/${itemId}/first-screen`,
@@ -697,10 +882,11 @@ export const services = {
     itemId: string,
     dimensions: Record<string, number>,
     confidence: number,
+    failureTags: string[] = [],
   ) {
     const { data } = await analyticsHttp.post(
       `/api/admin/v1/annotation/items/${itemId}/lock`,
-      { dimensions, confidence, failureTags: [] },
+      { dimensions, confidence, failureTags },
     );
     return data;
   },

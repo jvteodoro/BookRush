@@ -16,8 +16,10 @@ public final class AnalyticsMetrics {
   private final Counter analysisFailures;
   private final Counter generatedExcerpts;
   private final Timer analyzerDuration;
+  private final MeterRegistry registry;
 
   public AnalyticsMetrics(MeterRegistry registry) {
+    this.registry = registry;
     jobsCreated = registry.counter("bookrush.analytics.jobs", "outcome", "created");
     jobsReplayed = registry.counter("bookrush.analytics.jobs", "outcome", "replayed");
     jobsConflicted = registry.counter("bookrush.analytics.jobs", "outcome", "conflict");
@@ -57,6 +59,33 @@ public final class AnalyticsMetrics {
 
   public <T> T time(java.util.function.Supplier<T> operation) {
     return analyzerDuration.record(operation);
+  }
+
+  public <T> T timePhase(String phase, java.util.function.Supplier<T> operation) {
+    return Timer.builder("bookrush.analytics.phase.duration")
+        .description("Duration of a persisted analytics processing phase")
+        .tag("phase", phase)
+        .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+        .register(registry)
+        .record(operation);
+  }
+
+  public <T> T timePhaseChecked(String phase, java.util.concurrent.Callable<T> operation)
+      throws Exception {
+    return Timer.builder("bookrush.analytics.phase.duration")
+        .description("Duration of a persisted analytics processing phase")
+        .tag("phase", phase)
+        .publishPercentiles(0.5, 0.9, 0.95, 0.99)
+        .register(registry)
+        .recordCallable(operation);
+  }
+
+  public void phaseCompleted(String phase) {
+    registry.counter("bookrush.analytics.phase.completions", "phase", phase).increment();
+  }
+
+  public void phaseFailed(String phase) {
+    registry.counter("bookrush.analytics.phase.failures", "phase", phase).increment();
   }
 
   public Duration durationEstimate() {

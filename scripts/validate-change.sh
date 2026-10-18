@@ -107,7 +107,15 @@ if ((${#errors[@]})); then
   exit 1
 fi
 if has_prefix services/book-analytics-service/config/ || has_prefix services/book-analytics-service/src/ || has_path scripts/validate-analytics-specs.py; then
-  python3 scripts/validate-analytics-specs.py
+  if python3 -c 'import yaml, jsonschema' >/dev/null 2>&1; then
+    python3 scripts/validate-analytics-specs.py
+  elif command -v docker >/dev/null 2>&1 && [[ -n "${HOSTNAME:-}" ]]; then
+    docker run --rm --volumes-from "$HOSTNAME" -w "$PWD" python:3.12-slim bash -lc \
+      'python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema && python3 scripts/validate-analytics-specs.py'
+  else
+    echo 'Change gate: PyYAML/jsonschema ausentes e Docker indisponível para o fallback do validador analytics.' >&2
+    exit 1
+  fi
 fi
 if [[ "$mode" == ci || "$mode" == push ]]; then bash scripts/validate-pipelines.sh; fi
 echo "Change gate: OK (${#changed[@]} arquivos analisados)"

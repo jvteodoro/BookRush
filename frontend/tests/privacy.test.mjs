@@ -52,7 +52,7 @@ test("privacy loads all persisted audiences from the authenticated endpoint", as
     return response(profile);
   });
   assert.deepEqual(loaded.preferences, profile);
-  assert.deepEqual(calls, [["/api/v1/profile", undefined]]);
+  assert.deepEqual(calls, [["/api/v1/profile/privacy", undefined]]);
 });
 
 test("privacy saves only the five granular preferences as JSON", async () => {
@@ -66,7 +66,7 @@ test("privacy saves only the five granular preferences as JSON", async () => {
     return response(preferences);
   });
   const [url, init] = calls[0];
-  assert.equal(url, "/api/v1/profile");
+  assert.equal(url, "/api/v1/profile/privacy");
   assert.equal(init.method, "PUT");
   assert.equal(init.headers["Content-Type"], "application/json");
   assert.deepEqual(JSON.parse(init.body), preferences);

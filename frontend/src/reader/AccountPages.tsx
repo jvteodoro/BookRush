@@ -14,6 +14,13 @@ type AccountRuntime = {
   __BOOKRUSH_ADMIN_REPORTS__?: unknown[];
   __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[];
 };
+type PlantState = {
+  formulaVersion?: string;
+  stage?: number;
+  streakDays?: number;
+  totalReadingMinutes?: number;
+  measuredUntil?: string;
+};
 
 const accountRuntime = () => window as unknown as AccountRuntime;
 
@@ -25,6 +32,7 @@ type Props = {
   userName: string;
   savedCount: number;
   streak?: number;
+  plant?: PlantState | null;
   onNavigate: (tab: ReaderTab) => void;
 };
 
@@ -55,11 +63,11 @@ export function AccountPage({
   userName,
   savedCount,
   streak = 0,
+  plant,
   onNavigate,
 }: Props) {
   const profile = accountRuntime().__BOOKRUSH_PROFILE__;
   const displayName = profile?.displayName?.trim() || userName;
-
   if (tab === "plant") {
     return (
       <section className="br-account-page">
@@ -83,7 +91,10 @@ export function AccountPage({
               <b>{savedCount}</b> livros salvos
             </span>
             <span>
-              <b>4</b> min lidos hoje
+              <b>{plant?.totalReadingMinutes ?? 0}</b> min lidos
+            </span>
+            <span>
+              <b>{plant?.stage ?? 0}</b>/5 estágio da planta
             </span>
           </div>
           <ActionRow>

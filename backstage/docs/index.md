@@ -7,6 +7,7 @@ Markdown, catálogo, OpenAPI, diagramas e ADRs são revisados por pull request.
 Não há editor wiki nem armazenamento de documentação autoral no portal.
 
 - [Arquitetura](architecture.md) e [modelo de entidades](catalog.md)
+- [Guia da plataforma BookRush](bookrush-platform-guide.md): serviços, identidade, Jenkins, validação e incidentes
 - [Desenvolvimento local](local-development.md) e [configuração](configuration.md)
 - [Adicionar serviços](onboarding.md) e [template Java](templates.md)
 - [TechDocs, APIs e diagramas](documentation.md)

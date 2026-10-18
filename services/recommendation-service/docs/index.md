@@ -17,6 +17,10 @@ impression only when the authenticated subject owns the originating request.
 The browser calls this after its viewability threshold, so non-visible feed
 items are not treated as negative outcomes. The endpoint is idempotent.
 
+Requests de feed e impressões viewable emitem eventos server-side ao
+behavior-service com o bearer autenticado e retry limitado. O behavior-service
+é responsável pela persistência idempotente e pelo outbox transacional.
+
 ## Analytics excerpts
 
 The optional `excerpt` field is enriched in this service through a technical

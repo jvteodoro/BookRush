@@ -1,0 +1,39 @@
+openapi: 3.0.3
+info:
+  title: reader-state-service
+  version: 0.1.0
+  description: Estado privado de leitura e projeção versionada da planta.
+servers:
+  - url: https://bookrush.jteodoro.tec.br
+paths:
+  /api/v1/reader/plant:
+    get:
+      operationId: getReaderPlant
+      summary: Obter a projeção de crescimento do leitor
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Projeção persistida e recalculada para o subject autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlantState'
+        '401':
+          description: Token ausente ou inválido.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    PlantState:
+      type: object
+      required: [formulaVersion, stage, streakDays, totalReadingMinutes, measuredUntil]
+      properties:
+        formulaVersion: { type: string, example: reading-minutes-v1 }
+        stage: { type: integer, minimum: 0, maximum: 5 }
+        streakDays: { type: integer, minimum: 0 }
+        totalReadingMinutes: { type: integer, format: int64, minimum: 0 }
+        measuredUntil: { type: string, format: date }

@@ -97,6 +97,10 @@ docker volume create "$data_volume" > /dev/null
 docker run --rm --network none --mount "type=volume,src=$backup_volume,dst=/backup,readonly" --mount "type=volume,src=$data_volume,dst=/data" --entrypoint sh "$test_image" -c 'cp -a /backup/. /data/'
 "${compose[@]}" up -d --no-deps seaweedfs
 wait_for_healthy seaweedfs 180
-docker run --rm --network host -i --entrypoint curl "$test_image" --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1 --config - < "$run_dir/persistence-url" > "$run_dir/probe-after"
+if ! docker run --rm --network host -i --entrypoint curl "$test_image" --fail --silent --show-error --retry 10 --retry-all-errors --retry-delay 1 --config - < "$run_dir/persistence-url" > "$run_dir/probe-after"; then
+  echo "SeaweedFS presigned GET failed after physical restore; container logs:" >&2
+  docker logs --tail=240 "$weed_container" >&2 || true
+  exit 1
+fi
 cmp "$run_dir/probe-before" "$run_dir/probe-after"
 echo "PostgreSQL logical restore and SeaweedFS physical restore: OK"

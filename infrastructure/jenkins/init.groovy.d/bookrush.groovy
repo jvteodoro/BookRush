@@ -94,6 +94,10 @@ def microserviceParameters = [
     new BooleanParameterDefinition('PUBLISH', false, 'Publicar a imagem validada.'),
     new ChoiceParameterDefinition('DEPLOY_TARGET', ['none', 'compose', 'kubernetes'] as String[], 'Destino do deploy; none apenas valida.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Implantar a imagem validada no destino escolhido.'),
+    new BooleanParameterDefinition('RUN_PUBLIC_E2E', false, 'Executar smoke autenticado do reader-bff pelo gateway público.'),
+    new StringParameterDefinition('E2E_CREDENTIAL_ID', 'bookrush-product-e2e', 'Credential username/password do usuário de teste do realm bookrush.'),
+    new StringParameterDefinition('E2E_BASE_URL', 'https://bookrush.jteodoro.tec.br', 'Gateway público usado pelo smoke autenticado.'),
+    new StringParameterDefinition('E2E_BOOK_ID', '', 'UUID de livro com publication.json aprovado.'),
     new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Credential Jenkins do tipo Secret file para Kubernetes.')
 ]
 def verticalParameters = [

@@ -1,34 +1,15 @@
 package com.bookrush.readerprofileservice.api;
 
 import java.security.Principal;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/profile")
 public class ProfileController {
-  private static final String PROFILE_QUERY =
-      """
-      select p.subject_key as "subject", p.display_name as "displayName", p.bio,
-             (coalesce(pp.profile_visibility,
-               case when p.is_public then 'PUBLIC' else 'PRIVATE' end) = 'PUBLIC') as "isPublic",
-             coalesce(pp.profile_visibility,
-               case when p.is_public then 'PUBLIC' else 'PRIVATE' end) as "profileVisibility",
-             coalesce(pp.activity_visibility, 'PUBLIC') as "activityVisibility",
-             coalesce(pp.library_visibility, 'PRIVATE') as "libraryVisibility",
-             coalesce(pp.recent_visibility, 'PRIVATE') as "recentVisibility",
-             coalesce(pp.social_graph_visibility, 'PUBLIC') as "socialGraphVisibility",
-             p.updated_at as "updatedAt"
-        from reader_profile.profile p
-        left join reader_profile.profile_privacy pp on pp.subject_key = p.subject_key
-       where p.subject_key = ?
-      """;
-
   private final JdbcTemplate jdbc;
 
   public ProfileController(JdbcTemplate jdbc) {
@@ -36,125 +17,108 @@ public class ProfileController {
   }
 
   private String subject(Principal principal) {
-    return principal == null ? "anonymous" : principal.getName();
+    if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
+    }
+    return principal.getName();
   }
 
   @GetMapping
   public Object get(Principal principal) {
     String subject = subject(principal);
-    var rows = jdbc.queryForList(PROFILE_QUERY, subject);
-    return rows.isEmpty() ? emptyProfile(subject) : rows.getFirst();
+    var rows = jdbc.queryForList(
+        "select subject_key,display_name,bio,is_public,updated_at from reader_profile.profile where subject_key=?",
+        subject);
+    return rows.isEmpty() ? Map.of("subject", subject, "displayName", "") : rows.getFirst();
   }
 
   @GetMapping("/public")
   public Object publicProfile(@RequestParam String subject) {
-    var rows =
-        jdbc.queryForList(
-            """
-            select p.subject_key as "subject", p.display_name as "displayName", p.bio
-              from reader_profile.profile p
-              left join reader_profile.profile_privacy pp on pp.subject_key = p.subject_key
-             where p.subject_key = ?
-               and coalesce(pp.profile_visibility,
-                 case when p.is_public then 'PUBLIC' else 'PRIVATE' end) = 'PUBLIC'
-            """,
-            subject);
+    var rows = jdbc.queryForList(
+        "select subject_key,display_name as \"displayName\",bio from reader_profile.profile where subject_key=? and is_public=true",
+        subject);
     return rows.isEmpty() ? Map.of("subject", subject, "displayName", "") : rows.getFirst();
   }
 
-  public record Update(
-      String displayName,
-      String bio,
-      Boolean isPublic,
+  public record Update(String displayName, String bio, Boolean isPublic) {}
+
+  @PutMapping
+  public Object update(@RequestBody Update update, Principal principal) {
+    String subject = subject(principal);
+    jdbc.update(
+        "insert into reader_profile.profile(subject_key,display_name,bio,is_public) values(?,?,?,?) on conflict(subject_key) do update set display_name=excluded.display_name,bio=excluded.bio,is_public=excluded.is_public,updated_at=now()",
+        subject,
+        update.displayName(),
+        update.bio(),
+        update.isPublic() == null || update.isPublic());
+    return get(principal);
+  }
+
+  public record Privacy(
       String profileVisibility,
       String activityVisibility,
       String libraryVisibility,
       String recentVisibility,
       String socialGraphVisibility) {}
 
-  @PutMapping
-  @Transactional
-  public Object update(@RequestBody Update update, Principal principal) {
+  @GetMapping("/privacy")
+  public Privacy privacy(Principal principal) {
     String subject = subject(principal);
-    String profileVisibility =
-        visibility(
-            update.profileVisibility(),
-            update.isPublic() == null ? null : (update.isPublic() ? "PUBLIC" : "PRIVATE"));
-    String activityVisibility = visibility(update.activityVisibility(), null);
-    String libraryVisibility = visibility(update.libraryVisibility(), null);
-    String recentVisibility = visibility(update.recentVisibility(), null);
-    String socialGraphVisibility = visibility(update.socialGraphVisibility(), null);
-
-    Boolean publicProfile =
-        profileVisibility == null ? null : profileVisibility.equals("PUBLIC");
-    jdbc.update(
-        """
-        insert into reader_profile.profile(subject_key, display_name, bio, is_public)
-        values (?, ?, ?, coalesce(?::boolean, true))
-        on conflict(subject_key) do update set
-          display_name = coalesce(excluded.display_name, reader_profile.profile.display_name),
-          bio = coalesce(excluded.bio, reader_profile.profile.bio),
-          is_public = coalesce(?::boolean, reader_profile.profile.is_public),
-          updated_at = now()
-        """,
-        subject,
-        update.displayName(),
-        update.bio(),
-        publicProfile,
-        publicProfile);
-
-    jdbc.update(
-        """
-        insert into reader_profile.profile_privacy(
-          subject_key, profile_visibility, activity_visibility, library_visibility,
-          recent_visibility, social_graph_visibility)
-        values (?, coalesce(?, 'PUBLIC'), coalesce(?, 'PUBLIC'), coalesce(?, 'PRIVATE'),
-                coalesce(?, 'PRIVATE'), coalesce(?, 'PUBLIC'))
-        on conflict(subject_key) do update set
-          profile_visibility = coalesce(?, reader_profile.profile_privacy.profile_visibility),
-          activity_visibility = coalesce(?, reader_profile.profile_privacy.activity_visibility),
-          library_visibility = coalesce(?, reader_profile.profile_privacy.library_visibility),
-          recent_visibility = coalesce(?, reader_profile.profile_privacy.recent_visibility),
-          social_graph_visibility = coalesce(?, reader_profile.profile_privacy.social_graph_visibility),
-          updated_at = now()
-        """,
-        subject,
-        profileVisibility,
-        activityVisibility,
-        libraryVisibility,
-        recentVisibility,
-        socialGraphVisibility,
-        profileVisibility,
-        activityVisibility,
-        libraryVisibility,
-        recentVisibility,
-        socialGraphVisibility);
-    return get(principal);
-  }
-
-  private static String visibility(String value, String fallback) {
-    String candidate = value == null ? fallback : value;
-    if (candidate == null) return null;
-    String normalized = candidate.trim().toUpperCase();
-    if (!normalized.equals("PUBLIC")
-        && !normalized.equals("FOLLOWERS")
-        && !normalized.equals("PRIVATE")) {
-      throw new ResponseStatusException(
-          HttpStatus.BAD_REQUEST, "visibility must be PUBLIC, FOLLOWERS or PRIVATE");
+    ensureProfile(subject);
+    var rows = jdbc.queryForList(
+        "select profile_visibility,activity_visibility,library_visibility,recent_visibility,social_graph_visibility from reader_profile.profile_privacy where subject_key=?",
+        subject);
+    if (rows.isEmpty()) {
+      return new Privacy("PUBLIC", "PUBLIC", "PRIVATE", "PRIVATE", "PUBLIC");
     }
-    return normalized;
+    var row = rows.getFirst();
+    return new Privacy(
+        String.valueOf(row.get("profile_visibility")),
+        String.valueOf(row.get("activity_visibility")),
+        String.valueOf(row.get("library_visibility")),
+        String.valueOf(row.get("recent_visibility")),
+        String.valueOf(row.get("social_graph_visibility")));
   }
 
-  private static Map<String, Object> emptyProfile(String subject) {
-    Map<String, Object> profile = new LinkedHashMap<>();
-    profile.put("subject", subject);
-    profile.put("displayName", "");
-    profile.put("isPublic", true);
-    profile.put("profileVisibility", "PUBLIC");
-    profile.put("activityVisibility", "PUBLIC");
-    profile.put("libraryVisibility", "PRIVATE");
-    profile.put("recentVisibility", "PRIVATE");
-    profile.put("socialGraphVisibility", "PUBLIC");
-    return profile;
+  @PutMapping("/privacy")
+  public Privacy updatePrivacy(@RequestBody Privacy privacy, Principal principal) {
+    String subject = subject(principal);
+    validate(privacy);
+    ensureProfile(subject);
+    jdbc.update(
+        "insert into reader_profile.profile_privacy(subject_key,profile_visibility,activity_visibility,library_visibility,recent_visibility,social_graph_visibility) values(?,?,?,?,?,?) on conflict(subject_key) do update set profile_visibility=excluded.profile_visibility,activity_visibility=excluded.activity_visibility,library_visibility=excluded.library_visibility,recent_visibility=excluded.recent_visibility,social_graph_visibility=excluded.social_graph_visibility,updated_at=now()",
+        subject,
+        privacy.profileVisibility(),
+        privacy.activityVisibility(),
+        privacy.libraryVisibility(),
+        privacy.recentVisibility(),
+        privacy.socialGraphVisibility());
+    jdbc.update("update reader_profile.profile set is_public=? where subject_key=?", "PUBLIC".equals(privacy.profileVisibility()), subject);
+    return privacy(subjectPrincipal(subject));
+  }
+
+  private void ensureProfile(String subject) {
+    jdbc.update(
+        "insert into reader_profile.profile(subject_key,is_public) values(?,true) on conflict(subject_key) do nothing",
+        subject);
+  }
+
+  private void validate(Privacy privacy) {
+    if (privacy == null
+        || !visibility(privacy.profileVisibility())
+        || !visibility(privacy.activityVisibility())
+        || !visibility(privacy.libraryVisibility())
+        || !visibility(privacy.recentVisibility())
+        || !visibility(privacy.socialGraphVisibility())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid privacy visibility");
+    }
+  }
+
+  private boolean visibility(String value) {
+    return "PUBLIC".equals(value) || "FOLLOWERS".equals(value) || "PRIVATE".equals(value);
+  }
+
+  private Principal subjectPrincipal(String subject) {
+    return () -> subject;
   }
 }

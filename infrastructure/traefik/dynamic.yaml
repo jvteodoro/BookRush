@@ -70,14 +70,15 @@ http:
       service: analytics
 
     reader-bff:
-      # O BFF expõe somente o feed. As rotas de biblioteca, progresso e
-      # bookmarks pertencem ao reader-state-service.
-      rule: Path(`/api/v1/reader/feed`)
+      # O frontend usa o BFF como fronteira única para leitura, estado e
+      # conteúdo. O reader-state continua atendendo apenas a rota legada de
+      # plant e o prefixo /api/v1/library.
+      rule: Path(`/api/v1/reader/feed`) || Path(`/api/v1/reader/recommendations`) || Path(`/api/v1/reader/library`) || Path(`/api/v1/reader/recent`) || Path(`/api/v1/reader/streak`) || PathPrefix(`/api/v1/reader/books`) || PathPrefix(`/api/v1/reader/recommendations/impressions`)
       entryPoints: [web]
       priority: 140
       service: reader-bff
     reader-state:
-      rule: PathPrefix(`/api/v1/library`) || PathPrefix(`/api/v1/reader`)
+      rule: PathPrefix(`/api/v1/library`) || Path(`/api/v1/reader/plant`)
       entryPoints: [web]
       priority: 125
       service: reader-state

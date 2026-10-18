@@ -1,72 +1,53 @@
 openapi: 3.0.3
 info:
   title: reader-profile-service
-  version: 0.2.0
-  description: Perfis de leitores e preferências granulares de privacidade.
-servers:
-  - url: /
+  version: 0.1.0
 paths:
   /api/v1/profile:
     get:
-      summary: Retorna o perfil autenticado e suas preferências
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
-        "200":
-          description: Perfil e preferências atuais
+        '200': { description: Authenticated profile }
+        '401': { description: Authentication required }
+    put:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Updated authenticated profile }
+        '401': { description: Authentication required }
+  /api/v1/profile/privacy:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Authenticated privacy policy
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Profile"
-        "401":
-          description: Token ausente, inválido ou expirado
-        "403":
-          description: Token sem autorização para o produto
+              schema: { $ref: '#/components/schemas/Privacy' }
+        '401': { description: Authentication required }
     put:
-      summary: Atualiza parcialmente perfil e preferências de privacidade
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/ProfileUpdate"
+            schema: { $ref: '#/components/schemas/Privacy' }
       responses:
-        "200":
-          description: Perfil atualizado
+        '200':
+          description: Updated privacy policy
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/Profile"
-        "400":
-          description: Audiência diferente de PUBLIC, FOLLOWERS ou PRIVATE
-        "401":
-          description: Token ausente, inválido ou expirado
-        "403":
-          description: Token sem autorização para o produto
+              schema: { $ref: '#/components/schemas/Privacy' }
+        '400': { description: Invalid visibility value }
+        '401': { description: Authentication required }
   /api/v1/profile/public:
     get:
-      summary: Retorna os campos públicos de um perfil
-      security:
-        - bearerAuth: []
       parameters:
-        - in: query
-          name: subject
+        - name: subject
+          in: query
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
-        "200":
-          description: Perfil público ou resposta vazia quando não for público
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PublicProfile"
-        "401":
-          description: Token ausente, inválido ou expirado
-        "403":
-          description: Token sem autorização para o produto
+        '200': { description: Public profile or an empty profile response }
 components:
   securitySchemes:
     bearerAuth:
@@ -74,54 +55,12 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    Visibility:
-      type: string
-      enum: [PUBLIC, FOLLOWERS, PRIVATE]
-    ProfileUpdate:
+    Privacy:
       type: object
+      required: [profileVisibility, activityVisibility, libraryVisibility, recentVisibility, socialGraphVisibility]
       properties:
-        displayName:
-          type: string
-        bio:
-          type: string
-        isPublic:
-          type: boolean
-          deprecated: true
-        profileVisibility:
-          $ref: "#/components/schemas/Visibility"
-        activityVisibility:
-          $ref: "#/components/schemas/Visibility"
-        libraryVisibility:
-          $ref: "#/components/schemas/Visibility"
-        recentVisibility:
-          $ref: "#/components/schemas/Visibility"
-        socialGraphVisibility:
-          $ref: "#/components/schemas/Visibility"
-    Profile:
-      allOf:
-        - $ref: "#/components/schemas/ProfileUpdate"
-        - type: object
-          required:
-            - subject
-            - isPublic
-            - profileVisibility
-            - activityVisibility
-            - libraryVisibility
-            - recentVisibility
-            - socialGraphVisibility
-          properties:
-            subject:
-              type: string
-            updatedAt:
-              type: string
-              format: date-time
-    PublicProfile:
-      type: object
-      required: [subject, displayName]
-      properties:
-        subject:
-          type: string
-        displayName:
-          type: string
-        bio:
-          type: string
+        profileVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        activityVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        libraryVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        recentVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }
+        socialGraphVisibility: { type: string, enum: [PUBLIC, FOLLOWERS, PRIVATE] }

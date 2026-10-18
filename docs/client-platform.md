@@ -6,13 +6,6 @@ O cliente web em `frontend/` e o aplicativo React Native em `mobile/` são as in
 
 O Vite gera uma SPA responsiva servida pelo Nginx. O login usa `bookrush-web` no realm `bookrush`, Authorization Code + PKCE e tokens somente em memória. Após autenticar, a aplicação consulta `GET /api/v1/books`, oferece busca, detalhes e uma estante local do dispositivo. O backend continua responsável por autorização e pode retornar 401/403 sem que o cliente tente contornar a política.
 
-O build Docker usa por padrão a autoridade OIDC de produção e aceita a
-sobrescrita `VITE_OIDC_AUTHORITY`. No Compose, ela é derivada de
-`KEYCLOAK_PUBLIC_URL`; o Nginx do frontend encaminha `/api/v1/profile`
-diretamente ao `reader-profile-service`. Isso mantém login e preferências
-funcionais também no endereço local `http://localhost:18080`, sem deixar a
-imagem produzida diretamente pelo Jenkins com uma autoridade OIDC vazia.
-
 Validação local:
 
 ```bash
@@ -49,10 +42,11 @@ O protótipo PageLoop foi usado apenas para hierarquia visual e fluxos de descob
 
 A experiência autenticada usa os mesmos blocos do modelo fornecido: shell, busca, catálogo, biblioteca e leitor. O runtime React consulta o catálogo e o estado do leitor pelas APIs autenticadas; não carrega mais `public/pageloop.js` nem datasets mockados/localStorage como fonte de verdade. O aplicativo mobile mantém o feed vertical escuro e consulta catálogo/biblioteca/eventos por HTTP autenticado.
 
-O SDK `frontend/src/telemetry.ts` mantém uma fila em memória, envia lotes ao
-behavior-service com retry limitado e suporta impressão por
-`IntersectionObserver` e dwell. Payloads são reduzidos por allowlist
-estrutural, sem texto livre, tokens ou identificadores pessoais.
+Os SDKs `frontend/src/telemetry.ts` e `mobile/src/telemetry.ts` mantêm uma fila
+em memória, enviam lotes ao behavior-service com retry limitado e suportam
+impressão por `IntersectionObserver` no web e por chamada explícita no mobile,
+além de dwell. Payloads são reduzidos por allowlist estrutural, sem texto
+livre, tokens ou identificadores pessoais.
 
 O portal PageLoop também consulta o `publisher-service` quando o usuário
 autenticado abre a área de publicador. Rascunhos e submissões são criados e
@@ -113,11 +107,11 @@ projeção textual disponível permanecem indisponíveis até a ingestão conclu
 artifact autorizado.
 
 O perfil autenticado é carregado de `GET /api/v1/profile`; nome e bio deixam de
-depender da lista de usuários do protótipo. A edição e cinco preferências de
-privacidade persistem por `PUT /api/v1/profile`: perfil, atividade, biblioteca,
-leituras recentes e grafo social aceitam `PUBLIC`, `FOLLOWERS` ou `PRIVATE`.
-O campo legado `isPublic` continua compatível e corresponde à visibilidade do
-perfil. A administração exibe somente
+depender da lista de usuários do protótipo. As cinco preferências de privacidade
+são lidas e persistidas em `GET/PUT /api/v1/profile/privacy`: perfil, atividade,
+biblioteca, leituras recentes e grafo social aceitam `PUBLIC`, `FOLLOWERS` ou
+`PRIVATE`. O campo legado `isPublic` continua compatível e corresponde à
+visibilidade do perfil. A administração exibe somente
 usuários e denúncias retornados pela facade, e decisões são registradas por
 `POST /api/v1/admin/moderation`; não há bloqueios ou métricas simuladas no
 cliente.

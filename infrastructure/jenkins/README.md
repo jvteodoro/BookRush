@@ -75,6 +75,12 @@ remota participam do build. Alterações locais deste diretório não são impla
 O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
+O estágio `Validação Mobile` executa `npm ci`, `npm run typecheck` e
+`EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export` em `mobile/` usando
+`node:20-bookworm`. O bundle Android em `mobile/dist/` é arquivado como
+artefato; a dependência `expo-asset` fica fixada no lockfile para o export do
+Expo SDK 52. Isso valida o aplicativo, mas não publica APK nem substitui um
+job de distribuição mobile.
 
 Antes dos builds, as pipelines executam `scripts/validate-change.sh --ci`.
 Esse gate exige documentação ou contrato para mudanças de código, infraestrutura
@@ -136,6 +142,10 @@ O Compose aceita `SEAWEEDFS_IMAGE` para que a pipeline injete a imagem
 construída sem alterar o `.env` protegido. O valor padrão continua sendo
 `bookrush/seaweedfs:4.46`. O procedimento, parâmetros e limites estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
+
+Se o container existente estiver parado (`exited`), a pipeline dedicada pode
+recuperá-lo preservando o volume persistente; essa exceção é limitada ao job
+`bookrush-seaweedfs` e não permite substituir um container `unhealthy`.
 
 ### Importação Gutenberg (opt-in)
 
@@ -254,3 +264,46 @@ O deploy Compose exige as imagens `BACKEND_IMAGE`, `INGESTION_IMAGE`,
 constrói/publica todas elas antes de executar o script de deploy. Essa matriz
 também é refletida em `infrastructure/compose.yaml`, evitando que uma imagem
 obrigatória fique apenas com o fallback `:local`.
+
+Os jobs de social, publisher, behavior e admin devem executar `mvn verify` e
+construir as imagens correspondentes depois de uma alteração. O admin-web usa
+`VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for
+ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
+quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
+cliente possui `query-users`/`manage-users` no realm-management.
+
+Na primeira ativação do `admin-service`, provisionar e validar o cliente sem
+exibir ou versionar o segredo:
+
+```bash
+infrastructure/keycloak/provision-admin-service-client.sh --env-file .env
+infrastructure/keycloak/reconcile.sh --env-file .env
+bash scripts/test-keycloak-admin-service-client.sh .env
+```
+
+O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
+e concede apenas `query-users` e `manage-users` à conta de serviço. O teste
+valida token, roles e acesso à API de usuários sem imprimir credenciais.
+
+O usuário permanente `codex-jenkins-agent` também permanece nos grupos
+`operators` e `platform-operators`; a associação é reconciliada no realm e é
+necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.
+O cliente `bookrush-jenkins` também publica a audience `bookrush-ingestion`,
+mantendo os tokens emitidos para smoke tests compatíveis com os serviços
+de plataforma. O mapper `jenkins-subject` e o client scope `profile` também
+emitem a claim OIDC `sub`, necessária para associar o actor autenticado às
+ações administrativas; após alterar o realm, gere token novo e valide `iss`,
+`aud`, `sub` e `groups` antes do smoke.
+protegidos.
+
+O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
+Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh
+.env`; o script mantém a URL e um token aleatório no `.env` protegido e nunca
+imprime o token.
+
+O deploy Compose preserva um Keycloak já ativo quando o container persistente
+foi criado por uma instalação anterior e não possui os labels atuais do
+Compose. Isso evita o conflito de nome `bookrush-keycloak-1` durante a
+reconciliação ou rollback; o container continua na rede `bookrush_bookrush` e
+os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
+estiver parado, o deploy volta a incluí-lo na operação.

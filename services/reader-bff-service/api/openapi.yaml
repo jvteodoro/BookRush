@@ -2,4 +2,152 @@ openapi: 3.0.3
 info:
   title: reader-bff-service
   version: 0.1.0
-paths: {}
+paths:
+  /api/v1/reader/feed:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200': { description: Composed recommendation feed }
+        '401': { description: Authentication required }
+        '502': { description: Recommendation service unavailable }
+  /api/v1/reader/recommendations:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Recommendation feed }
+        '401': { description: Authentication required }
+        '502': { description: Recommendation service unavailable }
+  /api/v1/reader/library:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Authenticated library }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+  /api/v1/reader/library/{bookId}:
+    put:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Library entry saved }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+    delete:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Library entry removed }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+  /api/v1/reader/recent:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Recent books }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+  /api/v1/reader/streak:
+    get:
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Reading streak }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+  /api/v1/reader/books/{bookId}/progress:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Book progress }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+    put:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Progress updated }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+  /api/v1/reader/books/{bookId}/bookmarks:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Book bookmarks }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+    post:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Bookmark saved }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+  /api/v1/reader/books/{bookId}/opened:
+    post:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Open event recorded }
+        '401': { description: Authentication required }
+        '502': { description: Reader state service unavailable }
+  /api/v1/reader/books/{bookId}:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Reader book content metadata }
+        '401': { description: Authentication required }
+        '502': { description: Book content service unavailable }
+  /api/v1/reader/books/{bookId}/publication.json:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: EPUB publication manifest }
+        '401': { description: Authentication required }
+        '502': { description: Book content service unavailable }
+  /api/v1/reader/books/{bookId}/chapters:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Book chapter structure }
+        '401': { description: Authentication required }
+        '502': { description: Book content service unavailable }
+  /api/v1/reader/books/{bookId}/chapters/{chapterId}/content:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: chapterId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Chapter content }
+        '401': { description: Authentication required }
+        '502': { description: Book content service unavailable }
+  /api/v1/reader/books/{bookId}/resources/{resource}:
+    get:
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: resource, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: EPUB resource }
+        '401': { description: Authentication required }
+        '502': { description: Book content service unavailable }
+  /api/v1/reader/recommendations/impressions/{impressionId}/viewable:
+    post:
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: impressionId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        '200': { description: Impression recorded }
+        '401': { description: Authentication required }
+        '502': { description: Recommendation service unavailable }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

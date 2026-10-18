@@ -42,9 +42,25 @@
       ]
     },
     {
+      "name": "platform-operators",
+      "realmRoles": [
+        "platform-operator"
+      ]
+    },
+    {
       "name": "platform-admins",
       "realmRoles": [
         "platform-admin"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-bookrush-ingestion-admin",
+      "enabled": true,
+      "serviceAccountClientId": "bookrush-ingestion-admin",
+      "realmRoles": [
+        "platform-operator"
       ]
     }
   ],
@@ -64,6 +80,17 @@
       ],
       "protocolMappers": [
         {
+          "name": "jenkins-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "claim.name": "sub",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
           "name": "jenkins-preferred-username",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-property-mapper",
@@ -76,8 +103,8 @@
             "userinfo.token.claim": "true"
           }
         },
-        {
-          "name": "jenkins-groups",
+    {
+      "name": "jenkins-groups",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-group-membership-mapper",
           "config": {
@@ -85,11 +112,24 @@
             "claim.name": "groups",
             "id.token.claim": "true",
             "access.token.claim": "true",
-            "userinfo.token.claim": "true"
-          }
-        }
+        "userinfo.token.claim": "true"
+      }
+    },
+    {
+      "name": "jenkins-audience",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-audience-mapper",
+      "config": {
+        "included.client.audience": "bookrush-ingestion",
+        "access.token.claim": "true",
+        "id.token.claim": "false",
+        "userinfo.token.claim": "false"
+      }
+    }
       ],
-      "defaultClientScopes": [],
+      "defaultClientScopes": [
+        "profile"
+      ],
       "optionalClientScopes": []
     },
     {
@@ -259,6 +299,55 @@
             "included.client.audience": "bookrush-ingestion",
             "access.token.claim": "true",
             "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "ingestion-realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "admin-service-management-roles",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-client-role-mapper",
+      "config": {
+        "usermodel.clientRoleMapping.clientId": "realm-management",
+        "claim.name": "resource_access.realm-management.roles",
+        "jsonType.label": "String",
+        "multivalued": "true",
+        "access.token.claim": "true",
+        "id.token.claim": "false",
+        "userinfo.token.claim": "false"
+      }
+    }
+      ]
+    },
+    {
+      "clientId": "bookrush-admin-service",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "protocolMappers": [
+        {
+          "name": "admin-service-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-ingestion",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
           }
         }
       ]

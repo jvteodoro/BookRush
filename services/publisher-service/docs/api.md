@@ -40,3 +40,25 @@ mesmo vínculo preserva o estado; tentar trocar o livro retorna conflito.
 Uma execução de ingestão pode carregar `publisherSubmissionId` nos parâmetros
 do comando. A submissão passa a `PROCESSING` e as consultas expõem também
 `ingestion_job_id` e `linked_at`.
+
+## Membership e revisão
+
+O primeiro uso de uma submissão cria uma membership `ACTIVE` idempotente para
+o publicador. Memberships `SUSPENDED` e `REVOKED` não podem criar ou alterar
+submissões. `GET /api/v1/publisher/memberships` lista memberships do subject.
+
+`PUT /api/v1/publisher/submissions/{id}/metadata` atualiza metadados do
+rascunho e `POST /api/v1/publisher/submissions/{id}/rights` registra o estado
+de direitos antes do envio. Operadores consultam `GET
+/api/v1/publisher/review` e decidem uma submissão com `POST
+/api/v1/publisher/submissions/{id}/review`, usando `APPROVED`, `REJECTED` ou
+`CHANGES_REQUESTED`. Aprovação cria o registro de `published_work`.
+
+`GET /api/v1/publisher/submissions/{id}/reviews` lista o histórico de decisões
+do próprio publicador. Depois de publicada, `POST
+/api/v1/publisher/submissions/{id}/withdraw` revoga a publicação do mesmo
+subject, marca `published_work` como `WITHDRAWN` e emite um evento de domínio.
+As rotas administrativas de revisão continuam restritas aos grupos de
+operadores e usam CORS explícito.
+Authentication uses the `bookrush-platform` issuer/JWK set; Keycloak groups
+are mapped to `ROLE_*` authorities for operator-only workflow actions.

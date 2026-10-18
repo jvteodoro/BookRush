@@ -71,9 +71,8 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
     setLoading(true);
     setError("");
     void loadPrivacy(authenticatedFetch)
-      .then(({ profile, preferences: loaded }) => {
+      .then(({ preferences: loaded }) => {
         if (!active) return;
-        runtime.__BOOKRUSH_PROFILE__ = profile;
         setPreferences(loaded);
       })
       .catch((cause) => {
@@ -103,7 +102,6 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
     setMessage("");
     try {
       const saved = await savePrivacy(preferences, authenticatedFetch);
-      runtime.__BOOKRUSH_PROFILE__ = saved.profile;
       setPreferences(saved.preferences);
       setMessage("Preferências de privacidade salvas.");
     } catch (cause) {

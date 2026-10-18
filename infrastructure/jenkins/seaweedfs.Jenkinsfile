@@ -54,7 +54,7 @@ pipeline {
     }
     stage('Deploy Compose') {
       when { expression { return params.DEPLOY } }
-      steps { sh 'bash infrastructure/jenkins/deploy-seaweedfs.sh "$SEAWEEDFS_IMAGE"' }
+      steps { sh 'SEAWEEDFS_ALLOW_RECOVERY=true bash infrastructure/jenkins/deploy-seaweedfs.sh "$SEAWEEDFS_IMAGE"' }
     }
   }
 }

@@ -1,31 +1,22 @@
 # reader-profile-service
 
-Reader profile and privacy preferences. Este serviço é um bounded context
-independente; contratos e ownership estão no ADR 0034.
+Reader profile and privacy preferences. Este serviço é um bounded context independente; contratos e ownership estão no ADR 0034.
 
-## API de perfil e privacidade
+## Privacidade
 
-As rotas públicas passam pelo gateway em `/api/v1/profile` e pertencem a este
-serviço. Ambas exigem bearer do realm de produto `bookrush`, com issuer e
-audience configurados pelas propriedades `BOOKRUSH_SECURITY_*`.
+As preferências de visibilidade são persistidas em `reader_profile.profile_privacy`
+e pertencem ao sujeito autenticado. O frontend usa o mesmo bearer token do
+login do produto:
 
-- `GET /api/v1/profile` retorna o perfil autenticado e as cinco audiências;
-- `PUT /api/v1/profile` atualiza parcialmente perfil e preferências;
-- `GET /api/v1/profile/public?subject=...` expõe nome e bio somente quando
-  `profileVisibility=PUBLIC`.
+- `GET /api/v1/profile/privacy` lê a política atual;
+- `PUT /api/v1/profile/privacy` grava os campos `profileVisibility`,
+  `activityVisibility`, `libraryVisibility`, `recentVisibility` e
+  `socialGraphVisibility`.
 
-Cada preferência aceita `PUBLIC`, `FOLLOWERS` ou `PRIVATE`:
+Cada campo aceita `PUBLIC`, `FOLLOWERS` ou `PRIVATE`. A rota não aceita usuário
+anônimo e mantém `profile.is_public` sincronizado com `profileVisibility` para
+preservar compatibilidade com a consulta pública existente.
 
-| Campo | Padrão | Conteúdo protegido |
-| --- | --- | --- |
-| `profileVisibility` | `PUBLIC` | Perfil e biografia |
-| `activityVisibility` | `PUBLIC` | Curtidas, comentários e atividade |
-| `libraryVisibility` | `PRIVATE` | Biblioteca salva |
-| `recentVisibility` | `PRIVATE` | Leituras recentes |
-| `socialGraphVisibility` | `PUBLIC` | Seguidores e seguindo |
-
-O campo legado `isPublic` permanece compatível e altera apenas
-`profileVisibility`. Valores desconhecidos retornam `400`; ausência ou
-invalidade do token retorna `401`, e falta de autorização retorna `403`.
-
-O contrato completo está em [`api/openapi.yaml`](../api/openapi.yaml).
+O contrato está em `api/openapi.yaml`. A origem do browser e as authorities são
+as mesmas do restante do serviço; não há bypass de autenticação nem origem CORS
+curinga.
