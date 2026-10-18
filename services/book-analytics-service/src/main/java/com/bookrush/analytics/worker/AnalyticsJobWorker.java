@@ -3,6 +3,7 @@ package com.bookrush.analytics.worker;
 import com.bookrush.analytics.config.AnalyticsV2GeneratorProperties;
 import com.bookrush.analytics.excerpts.CandidatePruner;
 import com.bookrush.analytics.excerpts.ExcerptCandidateGenerator;
+import com.bookrush.analytics.excerpts.HeuristicRankerConfig;
 import com.bookrush.analytics.features.EmbeddingMath;
 import com.bookrush.analytics.features.LinguisticRuntimeClient;
 import com.bookrush.analytics.features.TextFeatureCalculator;
@@ -25,6 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
@@ -54,6 +56,7 @@ public final class AnalyticsJobWorker {
   private final ExecutorService processingExecutor;
   private final Semaphore processingSlots;
   private final com.bookrush.analytics.excerpts.SupervisedCandidateScorer supervisedScorer;
+  private final HeuristicRankerConfig heuristicRankerConfig;
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
@@ -67,7 +70,8 @@ public final class AnalyticsJobWorker {
       @Value("${analytics.worker.concurrency:1}") int concurrency,
       @Value("${analytics.scorer.enabled:false}") boolean scorerEnabled,
       @Value("${analytics.scorer.artifact:${analytics.models.cache-dir}/candidate-scorer.json}") String scorerArtifact,
-      @Value("${analytics.scorer.allow-experimental:false}") boolean allowExperimentalScorer) {
+      @Value("${analytics.scorer.allow-experimental:false}") boolean allowExperimentalScorer,
+      @Value("${analytics.ranker.config:classpath:analytics-ranker-v1.json}") Resource rankerConfigResource) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
@@ -83,7 +87,19 @@ public final class AnalyticsJobWorker {
       thread.setDaemon(true);
       return thread;
     });
+    this.heuristicRankerConfig = loadHeuristicRankerConfig(rankerConfigResource);
     this.supervisedScorer = loadSupervisedScorer(scorerEnabled, scorerArtifact, allowExperimentalScorer);
+  }
+
+  private HeuristicRankerConfig loadHeuristicRankerConfig(Resource resource) {
+    try {
+      var config = HeuristicRankerConfig.load(resource.getInputStream());
+      log.info("analytics heuristic ranker configured code={} version={} state={}",
+          config.code(), config.version(), config.state());
+      return config;
+    } catch (IOException e) {
+      throw new IllegalStateException("unable to load analytics ranker configuration", e);
+    }
   }
 
   private com.bookrush.analytics.excerpts.SupervisedCandidateScorer loadSupervisedScorer(
@@ -469,22 +485,11 @@ UPDATE analytics.analysis_job_item i
   }
 
   private void persistRanks(UUID run, List<UUID> excerptIds) {
-    var weights =
-        Map.of(
-            "question_ratio",
-            .20d,
-            "dialogue_ratio",
-            .20d,
-            "punctuation_density",
-            .10d,
-            "short_sentence_ratio",
-            .15d,
-            "sentence_length_cv",
-            .15d,
-            "lex.ttr",
-            .20d);
-    String weightJson =
-        "{\"question_ratio\":0.2,\"dialogue_ratio\":0.2,\"punctuation_density\":0.1,\"short_sentence_ratio\":0.15,\"sentence_length_cv\":0.15,\"lex.ttr\":0.2}";
+    var weights = heuristicRankerConfig.weights();
+    String weightJson = weights.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .map(entry -> "\"" + entry.getKey() + "\":" + entry.getValue())
+        .collect(java.util.stream.Collectors.joining(",", "{", "}"));
     for (UUID excerptId : excerptIds) {
       var values =
           jdbc.query(
@@ -507,13 +512,12 @@ UPDATE analytics.analysis_job_item i
       var ranked =
           com.bookrush.analytics.excerpts.ExcerptRanker.rank(
               values.features(),
-              new com.bookrush.analytics.excerpts.ExcerptRanker.Weights(
-                  "EXCERPT_HEURISTIC_RANKER_V1", weights));
+              heuristicRankerConfig.asWeights());
       var supervised = supervisedScorer == null ? null : supervisedScorer.score(values.features());
       var dimensions = supervised == null
           ? com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.from(values.features(), values.statuses())
           : supervised.dimensions();
-      String rankerCode = supervised == null ? "EXCERPT_HEURISTIC_RANKER" : supervised.code();
+      String rankerCode = supervised == null ? heuristicRankerConfig.code() : supervised.code();
       String rankerVersion = supervised == null ? ranked.version() : supervised.version();
       double finalScore = supervised == null ? ranked.score() : supervised.score();
       String components =

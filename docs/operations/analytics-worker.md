@@ -51,3 +51,7 @@ livros, evitando que um smoke test seja confundido com evidência operacional.
 O scorer supervisionado é opt-in e permanece desativado por padrão. Quando
 ativado, o worker valida versão, estado e SHA-256 do artefato antes de gravar
 dimensões H/C/A/I/Q e sua proveniência em `analytics.excerpt_rank`.
+
+O ranker heurístico também usa configuração versionada no classpath; a
+variável `ANALYTICS_RANKER_CONFIG` só deve apontar para artefatos com estado
+`UNVALIDATED` até existir um processo formal de promoção.

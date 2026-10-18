@@ -37,6 +37,8 @@ analytics:
     enabled: ${ANALYTICS_SUPERVISED_SCORER_ENABLED:false}
     artifact: ${ANALYTICS_SUPERVISED_SCORER_ARTIFACT:${ANALYTICS_MODEL_CACHE_DIR:/var/lib/bookrush/models}/candidate-scorer.json}
     allow-experimental: ${ANALYTICS_SUPERVISED_SCORER_ALLOW_EXPERIMENTAL:false}
+  ranker:
+    config: ${ANALYTICS_RANKER_CONFIG:classpath:analytics-ranker-v1.json}
   runtime:
     url: ${ANALYTICS_RUNTIME_URL:http://book-analytics-runtime:8092}
     timeout-seconds: ${ANALYTICS_RUNTIME_TIMEOUT_SECONDS:10}

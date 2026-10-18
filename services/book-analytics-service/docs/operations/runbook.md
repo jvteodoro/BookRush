@@ -169,6 +169,12 @@ Artefatos experimentais só podem ser usados em testes locais controlados com
 checksum verificado e um lote pequeno de aceitação; não depende do piloto de
 500 livros.
 
+O ranker heurístico bootstrap é carregado do artefato versionado
+`analytics-ranker-v1.json`, com estado explícito `UNVALIDATED`. A variável
+`ANALYTICS_RANKER_CONFIG` permite apontar para outro artefato compatível, mas o
+worker rejeita estados diferentes de `UNVALIDATED` para impedir promoção
+silenciosa da configuração experimental.
+
 O runtime também expõe `/v1/language`, usando o artefato fastText `lid.176.bin`
 somente do cache local. O worker aceita o idioma detectado apenas para `en` ou
 `pt` com confiança mínima de 0,60; caso contrário mantém o idioma canônico ou
