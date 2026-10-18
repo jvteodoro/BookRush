@@ -188,9 +188,16 @@ ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
 deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
-frontend, perfis de leitores e social; isso garante que contratos usados pelo
-frontend sejam implantados na mesma revisão. PostgreSQL, Redis, pgAdmin e
-Jenkins são preservados.
+frontend, perfis de leitores, social, `admin-service` e `admin-web`; isso garante
+que contratos usados pelas interfaces sejam implantados na mesma revisão.
+PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
+
+Um job parametrizado pode carregar o Jenkinsfile da `main` antes de fazer o
+checkout de uma feature. Enquanto a `main` ainda não conhecer as imagens
+administrativas, `deploy-compose.sh` deriva suas tags das imagens de catálogo e
+frontend e constrói localmente somente as que estiverem ausentes. Depois que o
+Jenkinsfile novo estiver na `main`, as imagens são normalmente construídas e
+publicadas no estágio **Imagens**, e esse fallback não executa builds adicionais.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
 perfil e social para as imagens criadas pela construção atual.

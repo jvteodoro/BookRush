@@ -10,9 +10,25 @@ fi
 : "${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}"
 : "${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}"
 : "${SOCIAL_IMAGE:?Imagem social ausente}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_dir="$(cd "${script_dir}/../.." && pwd)"
+
+# O job parametrizado pode carregar o Jenkinsfile da main antes de fazer
+# checkout de uma feature. Durante a transição para uma pipeline que publica as
+# imagens administrativas, derive os nomes e construa apenas o que estiver
+# ausente no daemon usado pelo deploy.
+if [[ -z "${ADMIN_SERVICE_IMAGE:-}" ]]; then
+  ADMIN_SERVICE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/admin-service}"
+  [[ "$ADMIN_SERVICE_IMAGE" != "$BACKEND_IMAGE" ]] || { echo 'Não foi possível derivar ADMIN_SERVICE_IMAGE de BACKEND_IMAGE.' >&2; exit 1; }
+  export ADMIN_SERVICE_IMAGE
+fi
+if [[ -z "${ADMIN_WEB_IMAGE:-}" ]]; then
+  ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-web}"
+  [[ "$ADMIN_WEB_IMAGE" != "$FRONTEND_IMAGE" ]] || { echo 'Não foi possível derivar ADMIN_WEB_IMAGE de FRONTEND_IMAGE.' >&2; exit 1; }
+  export ADMIN_WEB_IMAGE
+fi
 : "${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}"
 : "${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}"
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --profile auth)
 storage_public_endpoint="$(awk -F= '$1 == "STORAGE_PUBLIC_ENDPOINT" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 if [[ -z "$storage_public_endpoint" || "$storage_public_endpoint" =~ ^https?://(localhost|127\.0\.0\.1)(:|/|$) || "$storage_public_endpoint" != https://* ]]; then
@@ -23,6 +39,14 @@ storage_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.S
 if [[ "$storage_health" != healthy ]]; then
   echo 'SeaweedFS não está provisionado/saudável. Execute o procedimento inicial de infraestrutura antes do deploy.' >&2
   exit 1
+fi
+if ! docker image inspect "$ADMIN_SERVICE_IMAGE" >/dev/null 2>&1; then
+  echo "Imagem $ADMIN_SERVICE_IMAGE ausente; construindo compatibilidade do admin-service." >&2
+  docker build -t "$ADMIN_SERVICE_IMAGE" -f "$repo_dir/services/admin-service/Dockerfile" "$repo_dir"
+fi
+if ! docker image inspect "$ADMIN_WEB_IMAGE" >/dev/null 2>&1; then
+  echo "Imagem $ADMIN_WEB_IMAGE ausente; construindo compatibilidade do admin-web." >&2
+  docker build -t "$ADMIN_WEB_IMAGE" "$repo_dir/admin-web"
 fi
 old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1 2>/dev/null || true)"
 old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1 2>/dev/null || true)"
