@@ -262,6 +262,14 @@ de ser fixo no worker e pode ser ajustado por
 usa `ANALYTICS_NLI_BATCH_SIZE=8` e o runtime rejeita corpos maiores que
 `ANALYTICS_NLI_BATCH_MAX_ITEMS=32`.
 
+Embeddings são retomáveis por lote: antes de solicitar novo trabalho, o worker
+consulta os hashes de entrada já persistidos e tenta recuperar o vetor do
+object storage. Um reinício depois de um lote concluído não precisa repetir a
+inferência desse lote. Se o runtime devolver status inválido, quantidade de
+vetores incompatível ou hashes incompletos, o item falha de forma explícita e
+fica elegível para retry; o worker não marca uma execução parcialmente
+processada como concluída.
+
 O runtime detecta CUDA quando disponível por `ANALYTICS_RUNTIME_DEVICE=auto`,
 mas a imagem padrão continua CPU-only. A utilização da GPU exige uma imagem
 PyTorch CUDA compatível e configuração explícita do runtime/container. O

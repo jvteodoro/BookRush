@@ -1,5 +1,7 @@
 package com.bookrush.analytics.worker;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bookrush.analytics.config.AnalyticsV2GeneratorProperties;
 import com.bookrush.analytics.excerpts.CandidatePruner;
 import com.bookrush.analytics.excerpts.ExcerptCandidateGenerator;
@@ -61,6 +63,7 @@ public final class AnalyticsJobWorker {
   private final com.bookrush.analytics.excerpts.SupervisedCandidateScorer supervisedScorer;
   private final HeuristicRankerConfig heuristicRankerConfig;
   private final NliInferenceAdapter nliInference;
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
@@ -906,13 +909,28 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
         Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_EMBEDDINGS_BATCH_SIZE", "4"))));
     String bucket = System.getenv().getOrDefault("STORAGE_BUCKET_ML", "books-ml");
     int total = candidates.size();
+    var hashes = candidates.stream()
+        .map(candidate -> sha256(candidate.text()))
+        .toList();
+    var persisted = loadPersistedEmbeddings(excerptIds, hashes);
+    vectorsByExcerpt.putAll(persisted);
+    if (!persisted.isEmpty()) {
+      updateProgress(item, "EMBEDDINGS", persisted.size(), total,
+          "Retomando " + persisted.size() + " embeddings já persistidos");
+    }
     for (int offset = 0; offset < candidates.size(); offset += batchSize) {
       int end = Math.min(offset + batchSize, candidates.size());
-      var texts =
-          candidates.subList(offset, end).stream()
-              .map(ExcerptCandidateGenerator.V2Candidate::text)
-              .toList();
-      updateProgress(item, "EMBEDDINGS", offset, total,
+      var pendingIndexes = new java.util.ArrayList<Integer>();
+      var texts = new java.util.ArrayList<String>();
+      for (int index = offset; index < end; index++) {
+        if (!vectorsByExcerpt.containsKey(excerptIds.get(index))) {
+          pendingIndexes.add(index);
+          texts.add(candidates.get(index).text());
+        }
+      }
+      if (texts.isEmpty()) continue;
+      int completedBefore = vectorsByExcerpt.size();
+      updateProgress(item, "EMBEDDINGS", completedBefore, total,
           "Solicitando lote " + (offset + 1) + "-" + end + " de " + total);
       long startedNanos = System.nanoTime();
       var result = linguisticRuntime.embeddings(texts, 8192);
@@ -924,7 +942,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
           || result.inputHashes().size() != texts.size()) {
         updateProgress(item, "EMBEDDINGS", offset, total,
             "Runtime não retornou um lote válido: " + result.status());
-        continue;
+        throw new IllegalStateException("embedding batch invalid: " + result.status());
       }
       var modelId =
           jdbc.query(
@@ -934,6 +952,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
       if (modelId == null) continue;
       for (int i = 0; i < texts.size(); i++) {
         var hash = result.inputHashes().get(i);
+        int candidateIndex = pendingIndexes.get(i);
         String key = "analytics/embeddings/" + version + "/" + hash + ".json";
         String payload =
             "{\"model\":\""
@@ -957,19 +976,62 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
                 + " analytics.excerpt_embedding(id,excerpt_id,embedding_model_id,input_sha256,dimension,storage_provider,bucket,object_key)"
                 + " VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING",
             UUID.randomUUID(),
-            excerptIds.get(offset + i),
+            excerptIds.get(candidateIndex),
             modelId,
             hash,
             result.dimension(),
             bucket,
             key);
-        vectorsByExcerpt.put(excerptIds.get(offset + i), result.vectors().get(i));
+        vectorsByExcerpt.put(excerptIds.get(candidateIndex), result.vectors().get(i));
       }
-      updateProgress(item, "EMBEDDINGS", end, total,
+      updateProgress(item, "EMBEDDINGS", vectorsByExcerpt.size(), total,
           "Lote persistido " + end + "/" + total + " (" + durationMs + " ms)");
     }
     return vectorsByExcerpt;
   }
+
+  private Map<UUID, List<Double>> loadPersistedEmbeddings(
+      List<UUID> excerptIds, List<String> hashes) {
+    if (excerptIds.isEmpty()) return Map.of();
+    String placeholders = String.join(",", java.util.Collections.nCopies(excerptIds.size(), "?"));
+    var rows = jdbc.query(
+        "SELECT excerpt_id,input_sha256,bucket,object_key FROM analytics.excerpt_embedding"
+            + " WHERE excerpt_id IN (" + placeholders + ")",
+        (rs, rowNum) -> new PersistedEmbedding(
+            rs.getObject("excerpt_id", UUID.class),
+            rs.getString("input_sha256"),
+            rs.getString("bucket"),
+            rs.getString("object_key")),
+        excerptIds.toArray());
+    var expected = new java.util.HashMap<UUID, String>();
+    for (int i = 0; i < excerptIds.size(); i++) expected.put(excerptIds.get(i), hashes.get(i));
+    var result = new java.util.LinkedHashMap<UUID, List<Double>>();
+    for (var row : rows) {
+      if (!java.util.Objects.equals(expected.get(row.excerptId()), row.inputSha256())) continue;
+      try {
+        var node = objectMapper.readTree(s3.getObjectAsBytes(GetObjectRequest.builder()
+            .bucket(row.bucket()).key(row.objectKey()).build()).asByteArray());
+        var vector = new java.util.ArrayList<Double>();
+        node.path("vector").forEach(value -> vector.add(value.asDouble()));
+        if (!vector.isEmpty()) result.put(row.excerptId(), List.copyOf(vector));
+      } catch (Exception exception) {
+        log.warn("analytics persisted embedding unavailable excerptId={} key={}",
+            row.excerptId(), row.objectKey());
+      }
+    }
+    return result;
+  }
+
+  private static String sha256(String text) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+          .digest(text.getBytes(StandardCharsets.UTF_8)));
+    } catch (java.security.NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 unavailable", exception);
+    }
+  }
+
+  private record PersistedEmbedding(UUID excerptId, String inputSha256, String bucket, String objectKey) {}
 
   private void updateProgress(Item item, String stage, int completed, int total, String message) {
     jdbc.update(
