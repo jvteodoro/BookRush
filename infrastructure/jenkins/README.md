@@ -87,6 +87,13 @@ Esse gate exige documentação ou contrato para mudanças de código, infraestru
 e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
 executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
 
+No job principal, `scripts/test-portal.sh --validation-only` executa contratos,
+TechDocs, TypeScript, lint e testes sem exportar ou desempacotar uma imagem
+Backstage que não será implantada por esse job. A imagem runtime fica a cargo
+da pipeline dedicada do Backstage. Nela, o runtime mantém dependências como
+somente leitura e concede escrita apenas a `/app/techdocs`, evitando um
+`chown -R` demorado sobre toda a árvore de dependências.
+
 O gate roda em um container Python efêmero. Como o agente Jenkins usa o socket
 Docker e o workspace está no volume nomeado `jenkins_home`, a etapa usa
 `--volumes-from "$HOSTNAME"` para compartilhar o workspace com o container do

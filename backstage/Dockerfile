@@ -69,7 +69,7 @@ FROM build AS runtime
 # The deployed image always runs with the production frontend/auth profile.
 # Local development uses `yarn dev` outside this runtime image.
 ENV NODE_ENV=production
-RUN chmod 0755 entrypoint.sh && mkdir -p /app/techdocs && chown -R node:node /app /repo/backstage
+RUN chmod 0755 entrypoint.sh && install -d -o node -g node /app/techdocs
 USER node
 WORKDIR /repo/backstage/packages/backend
 EXPOSE 7007

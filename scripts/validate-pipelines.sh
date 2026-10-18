@@ -20,6 +20,7 @@ for file in scripts/validate-change.sh scripts/validate-pipelines.sh scripts/tes
 done
 
 grep -Fq 'bash scripts/validate-change.sh --ci' Jenkinsfile || fail 'Jenkinsfile principal sem change gate'
+grep -Fq 'bash scripts/test-portal.sh --validation-only' Jenkinsfile || fail 'pipeline principal exporta imagem Backstage durante validação'
 grep -Fq 'bash scripts/validate-change.sh --ci' infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline Backstage sem change gate'
 grep -Fq 'bash scripts/test-portal.sh' infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline Backstage sem validação do portal'
 grep -Fq 'scripts/test-storage.sh' Jenkinsfile || fail 'pipeline principal sem validação de storage'
