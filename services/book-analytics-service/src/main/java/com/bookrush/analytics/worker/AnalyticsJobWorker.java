@@ -431,6 +431,7 @@ UPDATE analytics.analysis_job_item i
         persistPrototypeScores(selectedRun, excerptIds, selectedCandidates, excerptVectors, scopeEmbeddings, selectedLanguage);
         persistRanks(selectedRun, excerptIds);
         persistNli(selectedRun, excerptIds, selectedCandidates, excerptVectors, selectedLanguage);
+        persistSpoilerComponents(selectedRun, excerptIds);
         return null;
       });
       jdbc.update(
@@ -644,6 +645,50 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
         excerptId,
         value,
         prefix + "." + metric);
+  }
+
+  private void persistSpoilerComponents(UUID run, List<UUID> excerptIds) {
+    if (excerptIds.isEmpty()) return;
+    String placeholders = String.join(",", java.util.Collections.nCopies(excerptIds.size(), "?"));
+    var rows = jdbc.query(
+        "SELECT ef.excerpt_id,fd.code,ef.numeric_value FROM analytics.excerpt_feature ef "
+            + "JOIN analytics.feature_definition fd ON fd.id=ef.feature_definition_id "
+            + "WHERE ef.analysis_run_id=? AND ef.excerpt_id IN (" + placeholders + ") "
+            + "AND fd.code IN ('book_relative_position','narrative.resolution.support',"
+            + "'narrative.revelation.support') AND ef.value_status='VALID'",
+        (rs, ignored) -> new Object[] {
+          rs.getObject("excerpt_id", UUID.class), rs.getString("code"), rs.getObject("numeric_value", Double.class)
+        },
+        concat(run, excerptIds));
+    var values = new java.util.HashMap<UUID, java.util.Map<String, Double>>();
+    for (var row : rows) {
+      values.computeIfAbsent((UUID) row[0], ignored -> new java.util.HashMap<>())
+          .put((String) row[1], (Double) row[2]);
+    }
+    for (var entry : values.entrySet()) {
+      if (!entry.getValue().keySet().containsAll(java.util.Set.of(
+          "book_relative_position", "narrative.resolution.support", "narrative.revelation.support"))) {
+        continue;
+      }
+      var components = com.bookrush.analytics.features.SpoilerHeuristic.components(
+          entry.getValue().get("book_relative_position"),
+          entry.getValue().get("narrative.resolution.support"),
+          entry.getValue().get("narrative.revelation.support"));
+      for (var component : components.entrySet()) {
+        jdbc.update(
+            "INSERT INTO analytics.excerpt_feature(analysis_run_id,feature_definition_id,excerpt_id,numeric_value,value_status,computed_at) "
+                + "SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition fd "
+                + "WHERE fd.code=? ON CONFLICT DO NOTHING",
+            run, entry.getKey(), component.getValue(), "spoiler." + component.getKey());
+      }
+    }
+  }
+
+  private static Object[] concat(UUID run, List<UUID> excerptIds) {
+    var values = new Object[excerptIds.size() + 1];
+    values[0] = run;
+    for (int i = 0; i < excerptIds.size(); i++) values[i + 1] = excerptIds.get(i);
+    return values;
   }
 
   private void persistLanguageValidation(

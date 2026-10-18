@@ -127,6 +127,14 @@ deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+Para a pipeline completa de analytics no host com NVIDIA, o deploy deve usar o
+override `infrastructure/compose.analytics-gpu.yaml` e manter
+`ANALYTICS_NLI_ENABLED=true`, `ANALYTICS_NLI_BATCH_SIZE=8` e
+`ANALYTICS_EMBEDDINGS_BATCH_SIZE=4`. A pipeline deve validar a imagem do
+`book-analytics-runtime` com CUDA e o serviço Java com as migrations antes de
+reativar um lote. O modelo de tópicos permanece experimental e não deve ser
+promovido automaticamente.
+
 ### Pipeline dedicada do SeaweedFS
 
 O bootstrap cria o job `bookrush-seaweedfs` a partir de

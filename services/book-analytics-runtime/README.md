@@ -47,3 +47,8 @@ docker compose --env-file /run/bookrush.env \
 O override não deve ser aplicado a agentes sem GPU. A primeira execução deve
 usar `ANALYTICS_EMBEDDINGS_BATCH_SIZE=4` e `ANALYTICS_NLI_BATCH_SIZE=8`, com
 monitoramento de VRAM e logs de OOM antes de aumentar os lotes.
+
+Esses valores também são os defaults do Compose quando a configuração
+protegida não os substitui: NLI fica habilitado, com lote 8, e embeddings usam
+lote 4. O classificador de tópicos continua experimental e não é ativado no
+worker sem artefato `ACCEPTED` revisado.
