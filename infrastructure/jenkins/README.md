@@ -204,12 +204,16 @@ ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
 deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
-frontend, perfis de leitores e social; isso garante que contratos usados pelo
-frontend sejam implantados na mesma revisão. PostgreSQL, Redis, pgAdmin e
+recommendation-service, reader-bff-service, frontend, perfis de leitores e
+social; isso garante que contratos usados pelo frontend sejam implantados na
+mesma revisão. Alterações no filtro/ranking do feed exigem as imagens de
+recommendation e BFF; deixar esses serviços fora do conjunto mantém um digest
+antigo e pode produzir 502 ou itens sem analytics. PostgreSQL, Redis, pgAdmin e
 Jenkins são preservados.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
-perfil e social para as imagens criadas pela construção atual.
+recommendation, BFF, perfil e social para as imagens criadas pela construção
+atual.
 Quando a thumbnail é protegida, a imagem do catálogo precisa ser atualizada
 junto com o frontend. O Compose configura `CATALOG_PRODUCT_OIDC_ISSUER`,
 `CATALOG_PRODUCT_OIDC_JWK_SET_URI` e `CATALOG_PRODUCT_OIDC_AUDIENCE` para que

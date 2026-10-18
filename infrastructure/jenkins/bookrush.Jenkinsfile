@@ -97,6 +97,8 @@ pipeline {
           env.INGESTION_IMAGE = "${registry}/bookrush/book-ingestion-service:${env.IMAGE_TAG}"
           env.ANALYTICS_IMAGE = "${registry}/bookrush/book-analytics-service:${env.IMAGE_TAG}"
           env.ANALYTICS_RUNTIME_IMAGE = "${registry}/bookrush/book-analytics-runtime:${env.IMAGE_TAG}"
+          env.RECOMMENDATION_IMAGE = "${registry}/bookrush/recommendation-service:${env.IMAGE_TAG}"
+          env.READER_BFF_IMAGE = "${registry}/bookrush/reader-bff-service:${env.IMAGE_TAG}"
           env.READER_PROFILE_IMAGE = "${registry}/bookrush/reader-profile-service:${env.IMAGE_TAG}"
           env.SOCIAL_IMAGE = "${registry}/bookrush/social-service:${env.IMAGE_TAG}"
         }
@@ -107,6 +109,8 @@ pipeline {
         sh 'docker build -t "$INGESTION_IMAGE" -f services/book-ingestion-service/Dockerfile .'
         sh 'docker build -t "$ANALYTICS_IMAGE" services/book-analytics-service'
         sh 'docker build ' + (params.ANALYTICS_GPU ? '--build-arg ANALYTICS_RUNTIME_REQUIREMENTS=requirements.cuda.txt ' : '') + '-t "$ANALYTICS_RUNTIME_IMAGE" services/book-analytics-runtime'
+        sh 'docker build -t "$RECOMMENDATION_IMAGE" -f services/recommendation-service/Dockerfile .'
+        sh 'docker build -t "$READER_BFF_IMAGE" -f services/reader-bff-service/Dockerfile .'
         sh 'docker build -t "$READER_PROFILE_IMAGE" -f services/reader-profile-service/Dockerfile .'
         sh 'docker build -t "$SOCIAL_IMAGE" -f services/social-service/Dockerfile .'
       }
@@ -226,7 +230,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin'
-          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE"'
+          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$RECOMMENDATION_IMAGE" && docker push "$READER_BFF_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE"'
         }
       }
     }
