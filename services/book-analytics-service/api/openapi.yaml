@@ -9,6 +9,42 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    PhaseTimingResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          description: Distribuição agregada por fase e estado persistidos.
+          items:
+            $ref: '#/components/schemas/PhaseTimingRow'
+        total:
+          type: integer
+          minimum: 0
+    PhaseTimingRow:
+      type: object
+      required: [phase, status, samples]
+      properties:
+        phase:
+          type: string
+          description: Nome estável da fase do worker.
+          example: EXCERPT_EMBEDDINGS
+        status:
+          type: string
+          description: Estado persistido da amostra da fase.
+          example: COMPLETED
+        samples:
+          type: integer
+          format: int64
+          minimum: 1
+        mean_ms: {type: number, format: double, nullable: true}
+        min_ms: {type: number, format: double, nullable: true}
+        max_ms: {type: number, format: double, nullable: true}
+        p50_ms: {type: number, format: double, nullable: true}
+        p90_ms: {type: number, format: double, nullable: true}
+        p95_ms: {type: number, format: double, nullable: true}
+        p99_ms: {type: number, format: double, nullable: true}
 servers:
   - url: https://bookrush.jteodoro.tec.br/analytics
 paths:
@@ -28,8 +64,14 @@ paths:
       responses:
         '200':
           description: Aggregated phase timing distributions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhaseTimingResponse'
         '400':
           description: Invalid limit
+        '401': {description: Missing or invalid bearer token}
+        '403': {description: Token lacks bookrush.analytics scope}
   /api/internal/v1/analytics/books/{bookId}/summary:
     get:
       summary: Resumo de analytics

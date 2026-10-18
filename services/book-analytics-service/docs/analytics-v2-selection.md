@@ -43,3 +43,12 @@ the following evidence:
 
 This acceptance does not replace the human-quality gate or authorize a bulk
 500-book run.
+
+## Fail-closed invariants
+
+The Java pipeline rejects a candidate before MMR when its feature status is not
+`VALID`, its embedding is absent or empty, its model identifier differs from
+the registered model, or its vector dimension differs from the first eligible
+vector in the batch. Rejection reasons are returned as stable machine-readable
+codes and must be counted in the batch report. This prevents a malformed
+embedding from silently becoming a zero-similarity candidate.
