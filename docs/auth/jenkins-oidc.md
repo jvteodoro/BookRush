@@ -31,8 +31,10 @@ O realm declara mappers específicos do Jenkins:
 
 O JCasC em `infrastructure/jenkins/casc/jenkins-oidc.yaml` usa
 `preferred_username` como `userNameField` e `groups` como `groupsFieldName`.
-O escopo solicitado é somente `openid`, porque `profile` e `email` não existem
-como client scopes no realm atual.
+O fluxo solicita `openid`; os client scopes padrão `profile` e
+`bookrush.analytics` são anexados pelo Keycloak. O scope analítico é restrito
+ao endpoint administrativo de timings e usa a audience `bookrush-analytics`;
+ele não concede permissões de catálogo, ingestão ou administração de usuários.
 
 ## Variáveis de runtime
 
