@@ -640,7 +640,7 @@ SELECT book_id, MAX(final_score) AS score,
  GROUP BY book_id
 """.formatted(placeholders);
     var rows = jdbc.queryForList(sql, bookIds.toArray());
-    metrics.counter("bookrush.analytics.book_scores", "result", "batch").increment();
+    metrics.bookScoresBatch();
     return ResponseEntity.ok(Map.of("items", rows, "requested", bookIds.size(), "returned", rows.size()));
   }
 

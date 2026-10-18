@@ -65,6 +65,10 @@ O ledger passa a registrar `modelVersion=analytics-aware-v1` e o motivo
 ausência de scores mantém `modelVersion=heuristic-v1`, permitindo identificar
 claramente fallback em produção.
 
+O endpoint também registra a métrica de baixa cardinalidade
+`bookrush.analytics.book_scores{operation="batch"}` para acompanhar o uso do
+novo caminho sem incluir IDs de livros ou conteúdo nos rótulos.
+
 ## Trabalho restante
 
 1. **Executar o gate com dois livros**, um processado e outro sem analytics.
