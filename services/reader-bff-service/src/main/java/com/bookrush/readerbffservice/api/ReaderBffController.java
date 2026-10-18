@@ -166,13 +166,21 @@ public class ReaderBffController {
   private Object get(RestClient client, String path, HttpServletRequest request, Map<String, ?> variables) {
     String bearer = request.getHeader(HttpHeaders.AUTHORIZATION);
     try {
-      return client
-          .get()
-          .uri(builder -> {
-            var uri = builder.path(path);
-            variables.forEach(uri::queryParam);
-            return uri.build(variables);
-          })
+      var requestSpec = client.get();
+      if (variables.isEmpty()) {
+        // Avoid expanding an empty variable map in RestClient's URI builder.
+        // The reader-state endpoints (library/recent/streak) have no query
+        // parameters; using the literal path keeps the request identical to
+        // the direct upstream call and avoids a misleading 502.
+        requestSpec.uri(path);
+      } else {
+        requestSpec.uri(builder -> {
+          var uri = builder.path(path);
+          variables.forEach(uri::queryParam);
+          return uri.build(variables);
+        });
+      }
+      return requestSpec
           .headers(headers -> {
             if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
           })
