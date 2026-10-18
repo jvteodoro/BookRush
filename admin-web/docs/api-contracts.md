@@ -32,6 +32,9 @@ adapter primeiro consulta os assets administrativos do catálogo e seleciona a
 versão `AVAILABLE` do TXT normalizado; nunca envia o UUID abstrato do livro
 como se fosse uma versão textual. O estado é consultado em
 `GET /analytics/api/admin/v1/content-analytics/jobs/{id}`.
+Para acompanhar a fila administrativa, `GET /analytics/api/admin/v1/content-analytics/jobs?limit=100`
+retorna `{ items, limit }`, ordenado pelos jobs mais recentes. O limite aceito
+é de 1 a 200; valores fora desse intervalo retornam `400`.
 Os adapters não expõem URLs permanentes de object storage.
 
 ## Feed Lab

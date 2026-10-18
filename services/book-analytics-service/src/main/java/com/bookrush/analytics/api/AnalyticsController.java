@@ -161,6 +161,28 @@ public class AnalyticsController {
 
   private record ExistingJob(UUID id, String status, int totalItems, String requestHash) {}
 
+  @GetMapping({"/admin/v1/analytics/jobs", "/admin/v1/content-analytics/jobs"})
+  @Operation(
+      summary = "Listar jobs de analytics",
+      description = "Retorna os jobs persistidos mais recentes para acompanhamento administrativo.")
+  public ResponseEntity<Map<String, Object>> jobs(
+      @RequestParam(defaultValue = "100") int limit) {
+    if (limit < 1 || limit > 200)
+      return ResponseEntity.badRequest()
+          .body(Map.of("code", "INVALID_LIMIT", "message", "limit must be between 1 and 200"));
+    var items =
+        jdbc.queryForList(
+            """
+SELECT id, operation_key, status, total_items, processed_items, succeeded_items,
+       failed_items, cancel_requested, created_at, started_at, finished_at
+  FROM analytics.analysis_job
+ ORDER BY created_at DESC, id DESC
+ LIMIT ?
+""",
+            limit);
+    return ResponseEntity.ok(Map.of("items", items, "limit", limit));
+  }
+
   @GetMapping({"/admin/v1/analytics/jobs/{jobId}", "/admin/v1/content-analytics/jobs/{jobId}"})
   @Operation(summary = "Consultar job", description = "Consulta estado e contadores persistidos.")
   public ResponseEntity<Map<String, Object>> job(@PathVariable UUID jobId) {

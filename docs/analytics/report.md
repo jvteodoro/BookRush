@@ -186,6 +186,7 @@ criam e controlam jobs; as internas leem dados ligados ao catálogo.
 | Método | Rota | Finalidade |
 | --- | --- | --- |
 | POST | `/api/admin/v1/content-analytics/jobs` | Cria ou recupera job idempotente. |
+| GET | `/api/admin/v1/content-analytics/jobs?limit=100` | Lista jobs persistidos para acompanhamento administrativo; `limit` varia de 1 a 200. |
 | GET | `/api/admin/v1/content-analytics/jobs/{jobId}` | Estado e contadores persistidos. |
 | POST | `/api/admin/v1/content-analytics/jobs/{jobId}/cancel` | Solicita cancelamento cooperativo. |
 | GET | `/api/admin/v1/content-analytics/jobs/{jobId}/items` | Itens, tentativas e erros sanitizados. |
