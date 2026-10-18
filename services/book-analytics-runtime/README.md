@@ -21,13 +21,17 @@ duplicar observações.
 `ANALYTICS_RUNTIME_DEVICE=auto` usa CUDA quando a imagem contém PyTorch CUDA e
 o dispositivo está disponível; caso contrário usa CPU. Esta imagem ainda é
 construída com `torch==2.7.1+cpu`. A variante CUDA foi construída em
-18/10/2026, mas o PyTorch retornou `torch.cuda.is_available() == false` embora
-`nvidia-smi` funcionasse no host/container; ela não está validada para
-produção. O Compose não assume GPU por padrão para continuar funcionando em
-agentes sem NVIDIA Container Toolkit.
+18/10/2026, a primeira imagem retornou `torch.cuda.is_available() == false`
+porque o host exige runtime NVIDIA explícito. O override foi corrigido e a
+variante usa PyTorch 2.6.0+cu124, pois o BGE-M3 usa `pytorch_model.bin` e o
+`transformers` exige torch >=2.6 para carregá-lo com segurança. A validação
+detectou a GTX 1050 Ti e passou NLI batch e BGE-M3 1024-D. O Compose padrão
+continua sem GPU para agentes sem NVIDIA Container Toolkit.
 
 Para validar a variante CUDA no host com NVIDIA, use o override somente depois
-de confirmar `nvidia-smi` e o runtime NVIDIA:
+de confirmar `nvidia-smi` e o runtime NVIDIA. O override usa o runtime NVIDIA
+explicitamente, `NVIDIA_VISIBLE_DEVICES` e `NVIDIA_DRIVER_CAPABILITIES` porque
+essa configuração é necessária neste host para o PyTorch enxergar a GPU:
 
 ```bash
 docker compose --env-file /run/bookrush.env \

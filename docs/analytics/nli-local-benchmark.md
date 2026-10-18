@@ -74,8 +74,9 @@ controla o tamanho separadamente; começar em 4 é conservador para uma GTX
 
 Em 18/10/2026, `scripts/test-analytics-models.sh` passou com o runtime CPU,
 validando fastText EN/PT, spaCy EN/PT, BGE-M3 1024-D e NLI escalar/batch. A
-imagem CUDA também foi construída, mas o teste isolado retornou
-`torch.cuda.is_available() == false`; como o mesmo host/container executa
-`nvidia-smi`, o próximo passo é investigar o carregamento CUDA do PyTorch. Até
-essa investigação ser concluída, não há evidência para trocar o runtime de
-produção para GPU.
+A imagem CUDA inicial revelou a incompatibilidade do modo `gpus: all` com o
+runtime deste host. O override foi corrigido para runtime NVIDIA explícito e a
+imagem foi atualizada para PyTorch 2.6.0+cu124. Validação em 18/10/2026:
+`torch.cuda.is_available() == true`, GTX 1050 Ti detectada, NLI batch `VALID` e
+BGE-M3 `VALID` com dimensão 1024. Ainda é necessário medir p95 e VRAM com
+lotes representativos antes de aumentar os defaults conservadores.

@@ -265,12 +265,11 @@ usa `ANALYTICS_NLI_BATCH_SIZE=8` e o runtime rejeita corpos maiores que
 O runtime detecta CUDA quando disponível por `ANALYTICS_RUNTIME_DEVICE=auto`,
 mas a imagem padrão continua CPU-only. A utilização da GPU exige uma imagem
 PyTorch CUDA compatível e configuração explícita do runtime/container. O
-override `infrastructure/compose.analytics-gpu.yaml` usa `gpus: all` e a
-variante CUDA baseada em `torch==2.3.1+cu118`, escolhida por compatibilidade
-esperada com a GTX 1050 Ti/driver CUDA 11.8. A imagem foi construída em
-18/10/2026, mas a validação encontrou `nvidia-smi` funcional no host/container
-e `torch.cuda.is_available() == false` na imagem Python. Portanto a variante
-CUDA não está validada para produção e não deve ser ativada até corrigirmos o
-runtime NVIDIA/PyTorch e repetirmos o teste de dispositivo, VRAM, p95, taxa de
-falha, equivalência dos scores e recuperação; um lote grande demais pode ser
-mais lento ou causar OOM.
+override `infrastructure/compose.analytics-gpu.yaml` usa o runtime NVIDIA
+explícito, `NVIDIA_VISIBLE_DEVICES` e `NVIDIA_DRIVER_CAPABILITIES=compute,utility`.
+A variante CUDA baseada em `torch==2.6.0+cu124` satisfaz a exigência de
+segurança do `transformers` ao carregar o BGE-M3 e é compatível com o driver
+CUDA 12.4/580 do host. O override usa runtime NVIDIA explícito porque o modo
+`gpus: all` deste host não expõe compute corretamente. A validação do container
+detectou a GTX 1050 Ti e passou NLI batch e BGE-M3 1024-D; antes de ativar em
+produção, medir VRAM, p95, taxa de falha, equivalência dos scores e recuperação.

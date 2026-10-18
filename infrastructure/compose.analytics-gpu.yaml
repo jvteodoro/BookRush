@@ -6,4 +6,6 @@ services:
         ANALYTICS_RUNTIME_REQUIREMENTS: requirements.cuda.txt
     environment:
       ANALYTICS_RUNTIME_DEVICE: ${ANALYTICS_RUNTIME_DEVICE:-auto}
-    gpus: all
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
+    runtime: nvidia
