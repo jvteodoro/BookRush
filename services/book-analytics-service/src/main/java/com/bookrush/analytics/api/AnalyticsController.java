@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -38,6 +39,8 @@ public class AnalyticsController {
       @NotBlank String operationKey,
       @NotEmpty java.util.List<UUID> inputAssetVersionIds,
       Map<String, Object> configuration) {}
+
+  public record BookScoresRequest(@NotEmpty List<UUID> bookIds) {}
 
   @PostMapping("/internal/v1/behavior/events")
   @Transactional
@@ -592,6 +595,53 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
     metrics.excerptsListed(rows.size());
     return ResponseEntity.ok(
         Map.of("bookId", bookId, "offset", offset, "limit", limit, "items", rows));
+  }
+
+  @PostMapping("/internal/v1/content-analytics/book-scores")
+  @Operation(
+      summary = "Retornar scores analíticos de livros em lote",
+      description = "Retorna o maior score elegível da versão textual atual de cada livro para consumo S2S pelo recommendation-service.")
+  public ResponseEntity<Map<String, Object>> bookScores(@Valid @RequestBody BookScoresRequest request) {
+    var bookIds = request.bookIds() == null ? List.<UUID>of() : request.bookIds().stream().distinct().toList();
+    if (bookIds.isEmpty() || bookIds.size() > 100) {
+      return ResponseEntity.badRequest().body(Map.of(
+          "code", "INVALID_BOOK_IDS",
+          "message", "bookIds must contain between 1 and 100 distinct UUIDs"));
+    }
+    String placeholders = String.join(",", java.util.Collections.nCopies(bookIds.size(), "?"));
+    String sql = """
+WITH latest_asset AS (
+  SELECT DISTINCT ON (a.book_id) a.book_id, v.id AS version_id
+    FROM catalog.book_asset a
+    JOIN catalog.book_asset_version v ON v.book_asset_id = a.id
+   WHERE a.book_id IN (%s)
+     AND a.asset_role IN ('NORMALIZED', 'PROCESSING', 'ANALYTICS')
+     AND a.asset_type IN ('TXT', 'HTML')
+     AND a.status <> 'DELETED'
+     AND v.status = 'AVAILABLE'
+   ORDER BY a.book_id, v.version_number DESC, v.created_at DESC, v.id DESC
+), ranked AS (
+  SELECT la.book_id, er.final_score, er.ranker_version, er.created_at
+    FROM latest_asset la
+    JOIN analytics.excerpt e ON e.source_asset_version_id = la.version_id
+    JOIN LATERAL (
+      SELECT final_score, ranker_version, created_at
+        FROM analytics.excerpt_rank
+       WHERE excerpt_id = e.id
+         AND final_score IS NOT NULL
+       ORDER BY created_at DESC
+       LIMIT 1
+    ) er ON TRUE
+   WHERE e.body_eligible = TRUE AND e.exclusion_reason IS NULL
+)
+SELECT book_id, MAX(final_score) AS score,
+       (ARRAY_AGG(ranker_version ORDER BY final_score DESC, created_at DESC))[1] AS ranker_version
+  FROM ranked
+ GROUP BY book_id
+""".formatted(placeholders);
+    var rows = jdbc.queryForList(sql, bookIds.toArray());
+    metrics.counter("bookrush.analytics.book_scores", "result", "batch").increment();
+    return ResponseEntity.ok(Map.of("items", rows, "requested", bookIds.size(), "returned", rows.size()));
   }
 
   @GetMapping("/internal/v1/content-analytics/asset-versions/{assetVersionId}")

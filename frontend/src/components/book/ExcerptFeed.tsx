@@ -88,7 +88,7 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live }: Props) {
       <div ref={scroll} className="br-feed-scroll" tabIndex={0} aria-label={`${live ? 'Feed de leitura' : 'Trechos demonstrativos'}; role ou use as setas para ver mais livros`}>
         {books.map((book, index) => <article key={book.id} data-book-id={book.id} className={`br-excerpt-card br-excerpt-card--${index % 3}`} aria-label={book.title}>
           <div className="br-excerpt-copy"><div className="br-excerpt-meta"><span>{book.genre}</span><span>{live ? 'Para você' : 'Prévia'} · {index + 1} de {books.length}</span></div>
-            <span className="br-excerpt-quote-mark" aria-hidden="true">“</span><OverflowQuote text={book.description} />
+            <span className="br-excerpt-quote-mark" aria-hidden="true">“</span><OverflowQuote text={book.excerpt?.text || 'Trecho analítico ainda não disponível para este livro.'} />
             <div className="br-excerpt-book"><span className="br-excerpt-mini" aria-hidden="true">{book.coverUrl ? <AuthenticatedImage src={book.coverUrl} alt="" /> : 'B'}</span><div><h2>{book.title}</h2><p>{book.author}</p></div></div>
             <Button disabled={live?.pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora →</Button>
           </div>

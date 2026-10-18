@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.util.List;
 import java.util.Map;
+import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient.BookScore;
 import org.junit.jupiter.api.Test;
 
 class RecommendationHeuristicTest {
@@ -45,5 +46,16 @@ class RecommendationHeuristicTest {
         .map(book -> ((Map<?, ?>) book).get("originalLanguage"))
         .distinct().count();
     assertEquals(2, distinctLanguages);
+  }
+
+  @Test
+  void analyticsScoreOrdersCandidatesBeforeDeterministicFallback() {
+    var books = List.of(book("a", "en"), book("b", "pt"), book("c", "en"));
+    var ranked = RecommendationHeuristic.rank(books, "reader-1", 3,
+        RecommendationHeuristic.Strategy.DIVERSE,
+        Map.of("a", new BookScore(0.2, "EXCERPT_HEURISTIC_RANKER_V1"),
+            "b", new BookScore(0.9, "EXCERPT_HEURISTIC_RANKER_V1")));
+    assertEquals("b", ((Map<?, ?>) ranked.get(0)).get("id"));
+    assertEquals("a", ((Map<?, ?>) ranked.get(1)).get("id"));
   }
 }
