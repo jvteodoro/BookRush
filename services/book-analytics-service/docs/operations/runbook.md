@@ -74,6 +74,9 @@ reclamada. O limite deve ser maior que o pior tempo esperado de uma análise;
 a recuperação não remove itens, jobs, execuções ou objetos do storage. Depois
 de um restart, acompanhe o endpoint de itens do job e confirme que os itens
 recuperados voltaram a `COMPLETED` ou `FAILED` de forma explícita.
+Essa recuperação é parametrizada pelo limite configurado e tem teste que
+confere a quantidade de parâmetros da SQL, evitando que uma alteração no
+histórico de estados desative silenciosamente o scheduler.
 
 Falhas transitórias também retornam automaticamente a `PENDING`: o worker usa
 até `ANALYTICS_WORKER_MAX_ATTEMPTS` (3 por padrão) e backoff progressivo baseado

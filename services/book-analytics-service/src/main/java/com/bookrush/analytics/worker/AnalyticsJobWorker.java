@@ -154,7 +154,7 @@ RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
     int recoveredPhases = jdbc.update(stalePhaseRecoverySql(), staleAfterSeconds);
     int recoveredItems = jdbc.update(
         staleLeaseRecoverySql(), maxAttempts, maxAttempts, maxAttempts, maxAttempts,
-        staleAfterSeconds);
+        maxAttempts, maxAttempts, staleAfterSeconds);
     if (recoveredPhases > 0) {
       log.warn("analytics stale recovery phases={} items={}", recoveredPhases, recoveredItems);
     }

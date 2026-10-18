@@ -10,6 +10,7 @@ class AnalyticsJobWorkerLeaseTest {
   void staleLeaseRecoveryIsBoundedToActiveNonCancelledJobs() {
     var sql = AnalyticsJobWorker.staleLeaseRecoverySql();
 
+    assertEquals(7, sql.chars().filter(character -> character == '?').count());
     assertTrue(sql.contains("i.status='RUNNING'"));
     assertTrue(sql.contains("j.cancel_requested=false"));
     assertTrue(sql.contains("j.status IN ('PENDING','RUNNING')"));
