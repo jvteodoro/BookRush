@@ -36,4 +36,18 @@ class BookReviewControllerTest {
 
     verify(jdbc, times(2)).update(anyString(), any(Object[].class));
   }
+
+  @Test
+  void approvalNeverWritesNullActorWhenPrincipalHasNoName() {
+    JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    doReturn(1).when(jdbc).update(anyString(), any(Object[].class));
+    Principal reviewer = () -> null;
+
+    new BookReviewController(jdbc).approve(UUID.randomUUID(), reviewer);
+
+    var audit = org.mockito.ArgumentCaptor.forClass(Object[].class);
+    verify(jdbc, times(2)).update(anyString(), audit.capture());
+    org.assertj.core.api.Assertions.assertThat(audit.getAllValues().get(1))
+        .contains("unknown");
+  }
 }

@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -27,8 +28,8 @@ public class ReaderBffController {
 
   public ReaderBffController(
       @Value("${bookrush.recommendation-url:http://recommendation-service:8098}") String recommendationUrl,
-      @Value("${bookrush.reader-state-url:http://reader-state-service:8096}") String stateUrl,
-      @Value("${bookrush.content-url:http://book-content-service:8094}") String contentUrl) {
+      @Value("${bookrush.reader-state-url:http://reader-state-service:8094}") String stateUrl,
+      @Value("${bookrush.content-url:http://book-content-service:8093}") String contentUrl) {
     recommendations = client(recommendationUrl);
     state = client(stateUrl);
     content = client(contentUrl);
@@ -177,6 +178,8 @@ public class ReaderBffController {
           })
           .retrieve()
           .body(Object.class);
+    } catch (HttpStatusCodeException exception) {
+      throw translateUpstreamFailure("reader dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "reader dependency unavailable", exception);
     }
@@ -190,6 +193,8 @@ public class ReaderBffController {
         if (body != null) headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
       });
       return body == null ? requestSpec.retrieve().body(Object.class) : requestSpec.body(body).retrieve().body(Object.class);
+    } catch (HttpStatusCodeException exception) {
+      throw translateUpstreamFailure("reader dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "reader dependency unavailable", exception);
     }
@@ -201,8 +206,18 @@ public class ReaderBffController {
       return client.get().uri(path).headers(headers -> {
         if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
       }).retrieve().toEntity(byte[].class);
+    } catch (HttpStatusCodeException exception) {
+      throw translateUpstreamFailure("content dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "content dependency unavailable", exception);
     }
+  }
+
+  ResponseStatusException translateUpstreamFailure(
+      String message, HttpStatusCodeException exception) {
+    if (exception.getStatusCode().is4xxClientError()) {
+      return new ResponseStatusException(exception.getStatusCode(), message, exception);
+    }
+    return new ResponseStatusException(HttpStatus.BAD_GATEWAY, "reader dependency unavailable", exception);
   }
 }

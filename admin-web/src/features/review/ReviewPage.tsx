@@ -2,13 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UseMutationResult } from "@tanstack/react-query";
 import ePub from "epubjs";
 import {
+  ArrowDownAZ,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   Image,
+  Search,
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { services, ReviewAsset, ReviewBook } from "../../lib/services";
 
 type ReviewActionInput = {
@@ -46,12 +50,18 @@ export function ReviewPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState<"queue" | "history">("queue");
   const [page, setPage] = useState(0);
+  const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+  const [sort, setSort] = useState("updatedAt");
+  const [direction, setDirection] = useState<"asc" | "desc">("desc");
+  const [expandedBookId, setExpandedBookId] = useState<string | null>(null);
   const [previewAsset, setPreviewAsset] = useState<AssetPreviewState | null>(
     null,
   );
   const books = useQuery({
-    queryKey: ["review-books", page],
-    queryFn: () => services.listReviewBooks(page),
+    queryKey: ["review-books", page, deferredQuery, sort, direction],
+    queryFn: () =>
+      services.listReviewBooks(page, 25, deferredQuery, sort, direction),
     enabled: tab === "queue",
   });
   const history = useQuery({
@@ -135,13 +145,64 @@ export function ReviewPage() {
         </div>
       )}
       {tab === "queue" ? (
-        <QueueContent
-          books={books.data?.items ?? []}
-          loading={books.isLoading}
-          error={books.error}
-          action={action}
-          openAsset={openAsset}
-        />
+        <>
+          <div className="review-controls" aria-label="Controles da fila">
+            <label className="review-search">
+              <Search size={17} aria-hidden="true" />
+              <span className="sr-only">Pesquisar livros</span>
+              <input
+                value={query}
+                placeholder="Pesquisar por título, idioma ou descrição"
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(0);
+                }}
+              />
+            </label>
+            <label className="review-select">
+              <ArrowDownAZ size={17} aria-hidden="true" />
+              <span className="sr-only">Ordenar por</span>
+              <select
+                value={sort}
+                onChange={(event) => {
+                  setSort(event.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="updatedAt">Mais recentes</option>
+                <option value="title">Título</option>
+                <option value="language">Idioma</option>
+                <option value="year">Ano de publicação</option>
+              </select>
+            </label>
+            <button
+              className="review-sort-direction"
+              type="button"
+              onClick={() => {
+                setDirection((value) => (value === "asc" ? "desc" : "asc"));
+                setPage(0);
+              }}
+              aria-label={
+                direction === "asc" ? "Ordem crescente" : "Ordem decrescente"
+              }
+            >
+              {direction === "asc" ? "A → Z" : "Z → A"}
+            </button>
+          </div>
+          <QueueContent
+            books={books.data?.items ?? []}
+            loading={books.isLoading}
+            error={books.error}
+            action={action}
+            openAsset={openAsset}
+            expandedBookId={expandedBookId}
+            toggleBook={(bookId) =>
+              setExpandedBookId((current) =>
+                current === bookId ? null : bookId,
+              )
+            }
+          />
+        </>
       ) : (
         <HistoryContent
           history={history.data?.items ?? []}
@@ -182,12 +243,16 @@ function QueueContent({
   error,
   action,
   openAsset,
+  expandedBookId,
+  toggleBook,
 }: {
   books: ReviewBook[];
   loading: boolean;
   error: unknown;
   action: ReviewAction;
   openAsset: (book: ReviewBook, asset: ReviewAsset) => void;
+  expandedBookId: string | null;
+  toggleBook: (bookId: string) => void;
 }) {
   if (loading)
     return (
@@ -217,96 +282,119 @@ function QueueContent({
   return (
     <div className="review-list">
       {books.map((book) => (
-        <article className="review-card" key={book.id}>
+        <article
+          className={`review-card ${expandedBookId === book.id ? "expanded" : ""}`}
+          key={book.id}
+        >
           <div className="review-card-head">
-            <div>
-              <span className="source">GUTENBERG / REVIEW_REQUIRED</span>
-              <h2>
-                {book.canonicalTitle ?? book.originalTitle ?? "Obra sem título"}
-              </h2>
-              <p>
-                {book.originalTitle &&
-                book.originalTitle !== book.canonicalTitle
-                  ? book.originalTitle
-                  : ""}{" "}
-                {book.originalLanguage
-                  ? `· ${book.originalLanguage.toUpperCase()}`
-                  : ""}{" "}
-                {book.firstPublicationYear
-                  ? `· ${book.firstPublicationYear}`
-                  : ""}
-              </p>
-            </div>
             <button
-              className="primary-action"
-              disabled={action.isPending}
-              onClick={() => action.mutate({ kind: "book", bookId: book.id })}
+              className="review-card-summary"
+              type="button"
+              aria-expanded={expandedBookId === book.id}
+              onClick={() => toggleBook(book.id)}
             >
-              <ShieldCheck size={16} />
-              Aprovar livro
+              <div>
+                <span className="source">GUTENBERG / REVIEW_REQUIRED</span>
+                <h2>
+                  {book.canonicalTitle ??
+                    book.originalTitle ??
+                    "Obra sem título"}
+                </h2>
+                <p>
+                  {book.originalTitle &&
+                  book.originalTitle !== book.canonicalTitle
+                    ? book.originalTitle
+                    : ""}{" "}
+                  {book.originalLanguage
+                    ? `· ${book.originalLanguage.toUpperCase()}`
+                    : ""}{" "}
+                  {book.firstPublicationYear
+                    ? `· ${book.firstPublicationYear}`
+                    : ""}
+                </p>
+              </div>
+              {expandedBookId === book.id ? (
+                <ChevronUp size={20} />
+              ) : (
+                <ChevronDown size={20} />
+              )}
             </button>
+            <div className="review-card-actions">
+              <button
+                className="primary-action"
+                disabled={action.isPending}
+                onClick={() => action.mutate({ kind: "book", bookId: book.id })}
+              >
+                <ShieldCheck size={16} />
+                Aprovar livro
+              </button>
+            </div>
           </div>
-          {book.description && (
-            <p className="review-description">{book.description}</p>
+          {expandedBookId === book.id && (
+            <>
+              {book.description && (
+                <p className="review-description">{book.description}</p>
+              )}
+              <div className="review-assets">
+                <strong>Assets associados</strong>
+                {book.assets.length === 0 ? (
+                  <p>Nenhum asset encontrado.</p>
+                ) : (
+                  book.assets.map((asset) => (
+                    <div className="review-asset" key={asset.id}>
+                      <div>
+                        <Image size={17} />
+                        <span>
+                          <b>
+                            {asset.assetType} · {asset.assetRole}
+                          </b>
+                          <small>
+                            {asset.contentType ?? "tipo desconhecido"} ·{" "}
+                            {asset.sizeBytes
+                              ? `${Math.round(asset.sizeBytes / 1024)} KB`
+                              : "tamanho desconhecido"}{" "}
+                            · {asset.versionStatus ?? "sem versão"}
+                          </small>
+                        </span>
+                      </div>
+                      <div className="review-asset-actions">
+                        {asset.versionId && (
+                          <button
+                            className="secondary-action"
+                            onClick={() => openAsset(book, asset)}
+                          >
+                            <ExternalLink size={15} />
+                            Abrir para revisão
+                          </button>
+                        )}
+                        {assetReady(asset) ? (
+                          <span className="review-approved">
+                            <CheckCircle2 size={16} />
+                            Aprovado
+                          </span>
+                        ) : (
+                          <button
+                            className="secondary-action"
+                            disabled={action.isPending}
+                            onClick={() =>
+                              action.mutate({
+                                kind: "asset",
+                                bookId: book.id,
+                                assetId: asset.id,
+                              })
+                            }
+                          >
+                            <CheckCircle2 size={16} />
+                            Aprovar asset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
           )}
-          <div className="review-assets">
-            <strong>Assets associados</strong>
-            {book.assets.length === 0 ? (
-              <p>Nenhum asset encontrado.</p>
-            ) : (
-              book.assets.map((asset) => (
-                <div className="review-asset" key={asset.id}>
-                  <div>
-                    <Image size={17} />
-                    <span>
-                      <b>
-                        {asset.assetType} · {asset.assetRole}
-                      </b>
-                      <small>
-                        {asset.contentType ?? "tipo desconhecido"} ·{" "}
-                        {asset.sizeBytes
-                          ? `${Math.round(asset.sizeBytes / 1024)} KB`
-                          : "tamanho desconhecido"}{" "}
-                        · {asset.versionStatus ?? "sem versão"}
-                      </small>
-                    </span>
-                  </div>
-                  <div className="review-asset-actions">
-                    {asset.versionId && (
-                      <button
-                        className="secondary-action"
-                        onClick={() => openAsset(book, asset)}
-                      >
-                        <ExternalLink size={15} />
-                        Abrir para revisão
-                      </button>
-                    )}
-                    {assetReady(asset) ? (
-                      <span className="review-approved">
-                        <CheckCircle2 size={16} />
-                        Aprovado
-                      </span>
-                    ) : (
-                      <button
-                        className="secondary-action"
-                        disabled={action.isPending}
-                        onClick={() =>
-                          action.mutate({
-                            kind: "asset",
-                            bookId: book.id,
-                            assetId: asset.id,
-                          })
-                        }
-                      >
-                        <CheckCircle2 size={16} />
-                        Aprovar asset
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
         </article>
       ))}
     </div>

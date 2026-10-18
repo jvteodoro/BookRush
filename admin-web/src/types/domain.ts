@@ -38,28 +38,23 @@ export interface AnalyticsRun {
   processedItems?: number;
 }
 
-export type AnalyticsJobStatus =
-  | "PENDING"
-  | "RUNNING"
-  | "COMPLETED"
-  | "COMPLETED_WITH_ERRORS"
-  | "FAILED"
-  | "CANCELLED";
-
 export interface AnalyticsJob {
   id: string;
-  operation_key?: string;
-  status: AnalyticsJobStatus;
-  current_stage?: string;
-  total_items: number;
-  processed_items: number;
-  succeeded_items: number;
-  failed_items: number;
-  cancel_requested?: boolean;
-  book_id?: string;
-  created_at?: string;
-  started_at?: string;
-  finished_at?: string;
+  operationKey: string;
+  status: string;
+  totalItems: number;
+  processedItems: number;
+  succeededItems: number;
+  failedItems: number;
+  pendingItems: number;
+  runningItems: number;
+  completedItems: number;
+  cancelRequested: boolean;
+  lastProgressAt?: string;
+  progressStage?: string;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
 }
 
 export interface AnalyticsJobItem {

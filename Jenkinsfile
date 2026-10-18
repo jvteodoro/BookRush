@@ -16,7 +16,7 @@ pipeline {
     string(name: 'INGESTION_BASE_URL', defaultValue: 'https://bookrush.jteodoro.tec.br/ingestion', description: 'Base externa do gateway para o ingestion-service.')
     string(name: 'INGESTION_CREDENTIAL_ID', defaultValue: 'bookrush-ingestion-token', description: 'Credential Jenkins Secret text com token OIDC do operador.')
     booleanParam(name: 'RUN_INGESTION_S2S_E2E', defaultValue: false, description: 'Validar client_credentials e dry-run da ingestão pelo gateway após o deploy.')
-    choice(name: 'GUTENBERG_TIMEOUT_MINUTES', choices: ['5', '15', '30'], description: 'Tempo máximo de polling do job Gutenberg.')
+    choice(name: 'GUTENBERG_TIMEOUT_MINUTES', choices: ['5', '15', '30', '60'], description: 'Tempo máximo de polling do job Gutenberg.')
   }
 
   options { timestamps(); disableConcurrentBuilds(); skipDefaultCheckout(); timeout(time: 30, unit: 'MINUTES'); buildDiscarder(logRotator(numToKeepStr: '20')) }
@@ -95,6 +95,7 @@ pipeline {
           env.FRONTEND_IMAGE = "${registry}/bookrush/frontend:${env.IMAGE_TAG}"
           env.INGESTION_IMAGE = "${registry}/bookrush/book-ingestion-service:${env.IMAGE_TAG}"
           env.ANALYTICS_IMAGE = "${registry}/bookrush/book-analytics-service:${env.IMAGE_TAG}"
+          env.ANALYTICS_RUNTIME_IMAGE = "${registry}/bookrush/book-analytics-runtime:${env.IMAGE_TAG}"
           env.READER_PROFILE_IMAGE = "${registry}/bookrush/reader-profile-service:${env.IMAGE_TAG}"
           env.SOCIAL_IMAGE = "${registry}/bookrush/social-service:${env.IMAGE_TAG}"
         }
@@ -104,6 +105,7 @@ pipeline {
         sh 'docker build -t "$FRONTEND_IMAGE" frontend'
         sh 'docker build -t "$INGESTION_IMAGE" -f services/book-ingestion-service/Dockerfile .'
         sh 'docker build -t "$ANALYTICS_IMAGE" services/book-analytics-service'
+        sh 'docker build -t "$ANALYTICS_RUNTIME_IMAGE" services/book-analytics-runtime'
         sh 'docker build -t "$READER_PROFILE_IMAGE" -f services/reader-profile-service/Dockerfile .'
         sh 'docker build -t "$SOCIAL_IMAGE" -f services/social-service/Dockerfile .'
       }
@@ -150,12 +152,15 @@ pipeline {
                 report=artifacts/gutenberg-import-report.json
                 base="${INGESTION_BASE_URL%/}"
                 token_url="https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/token"
-                token_response=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
-                  -X POST "$token_url" \
-                  --data-urlencode 'grant_type=client_credentials' \
-                  --data-urlencode 'client_id=bookrush-ingestion-admin' \
-                  --data-urlencode "client_secret=$INGESTION_CLIENT_SECRET")
-                INGESTION_TOKEN=$(printf '%s\n' "$token_response" | jq -er '.access_token')
+                fetch_token() {
+                  curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+                    -X POST "$token_url" \
+                    --data-urlencode 'grant_type=client_credentials' \
+                    --data-urlencode 'client_id=bookrush-ingestion-admin' \
+                    --data-urlencode "client_secret=$INGESTION_CLIENT_SECRET" \
+                    | jq -er '.access_token'
+                }
+                INGESTION_TOKEN=$(fetch_token)
                 ids="${GUTENBERG_EXTERNAL_IDS//[[:space:]]/}"
                 test -n "$ids"
                 IFS=',' read -r -a id_array <<< "$ids"
@@ -184,8 +189,19 @@ pipeline {
                 deadline=$(( $(date +%s) + GUTENBERG_TIMEOUT_MINUTES * 60 ))
                 while :; do
                   now=$(date +%s); (( now < deadline )) || { jq '.status="TIMEOUT"' "$report" > "$report.tmp" && mv "$report.tmp" "$report"; exit 1; }
-                  job=$(curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+                  job_response=$(mktemp)
+                  job_status=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+                    -o "$job_response" -w '%{http_code}' \
                     -H "Authorization: Bearer $INGESTION_TOKEN" "$base/api/admin/v1/ingestion/jobs/$job_id")
+                  if [[ "$job_status" == 401 ]]; then
+                    INGESTION_TOKEN=$(fetch_token)
+                    job_status=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+                      -o "$job_response" -w '%{http_code}' \
+                      -H "Authorization: Bearer $INGESTION_TOKEN" "$base/api/admin/v1/ingestion/jobs/$job_id")
+                  fi
+                  [[ "$job_status" =~ ^2[0-9][0-9]$ ]] || { cat "$job_response" >&2; exit 1; }
+                  job=$(cat "$job_response")
+                  rm -f "$job_response"
                   state=$(printf '%s\n' "$job" | jq -r '.status // "UNKNOWN"')
                   jq --arg state "$state" --argjson job "$job" '.lastPoll=$state | .job=$job' "$report" > "$report.tmp" && mv "$report.tmp" "$report"
                   case "$state" in
@@ -209,7 +225,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin'
-          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE"'
+          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE"'
         }
       }
     }

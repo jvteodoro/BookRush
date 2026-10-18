@@ -15,6 +15,12 @@ test -f "$repo_root/compose.yaml"
 test -f "$env_file"
 
 compose=(docker compose --project-name bookrush -f "$repo_root/compose.yaml" --env-file "$env_file" --profile auth)
+compose_env=()
+if [[ "$service" == "book-analytics-service" ]]; then
+  # The protected production env historically sets this to 0. Keep the pilot
+  # bounded on every service-only recreation without mutating that env file.
+  compose_env+=("ANALYTICS_MAX_EXCERPTS_PER_ITEM=500")
+fi
 container="bookrush-${service}-1"
 old_image="$(docker inspect --format '{{.Config.Image}}' "$container" 2>/dev/null || true)"
 local_image="bookrush/${service}:local"
@@ -23,10 +29,10 @@ docker tag "$image" "$local_image"
 rollback() {
   [[ -n "$old_image" ]] || return 0
   docker tag "$old_image" "$local_image"
-  "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "$service" || true
+  env "${compose_env[@]}" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "$service" || true
 }
 
-if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "$service"; then
+if ! env "${compose_env[@]}" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "$service"; then
   echo "Deploy Compose falhou para $service; executando rollback." >&2
   rollback
   exit 1

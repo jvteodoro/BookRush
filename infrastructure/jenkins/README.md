@@ -143,6 +143,10 @@ construída sem alterar o `.env` protegido. O valor padrão continua sendo
 `bookrush/seaweedfs:4.46`. O procedimento, parâmetros e limites estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+Se o container existente estiver parado (`exited`), a pipeline dedicada pode
+recuperá-lo preservando o volume persistente; essa exceção é limitada ao job
+`bookrush-seaweedfs` e não permite substituir um container `unhealthy`.
+
 ### Importação Gutenberg (opt-in)
 
 O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para
@@ -296,3 +300,10 @@ O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
 Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh
 .env`; o script mantém a URL e um token aleatório no `.env` protegido e nunca
 imprime o token.
+
+O deploy Compose preserva um Keycloak já ativo quando o container persistente
+foi criado por uma instalação anterior e não possui os labels atuais do
+Compose. Isso evita o conflito de nome `bookrush-keycloak-1` durante a
+reconciliação ou rollback; o container continua na rede `bookrush_bookrush` e
+os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
+estiver parado, o deploy volta a incluí-lo na operação.

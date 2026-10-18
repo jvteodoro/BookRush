@@ -7,10 +7,10 @@ import {
   feedItems,
 } from "../mocks/data";
 import {
-  AnalyticsRun,
-  AnalyticsItemDetail,
   AnalyticsJob,
+  AnalyticsItemDetail,
   AnalyticsJobItem,
+  AnalyticsRun,
   BookCandidate,
   FeedEvent,
   FeedWeights,
@@ -307,12 +307,18 @@ export const services = {
   async listBooks(query = "", page = 0, size = 50): Promise<BookCandidate[]> {
     return (await this.listBookPage(query, page, size)).items;
   },
-  async listReviewBooks(page = 0, size = 25): Promise<ReviewBookPage> {
+  async listReviewBooks(
+    page = 0,
+    size = 25,
+    query = "",
+    sort = "updatedAt",
+    direction: "asc" | "desc" = "desc",
+  ): Promise<ReviewBookPage> {
     if (config.useMocks)
       return { items: [], page, size, totalItems: 0, last: true };
     try {
       const { data } = await catalogHttp.get("/admin/books/review", {
-        params: { page, size },
+        params: { page, size, q: query, sort, direction },
       });
       return {
         items: data.items ?? [],
@@ -463,15 +469,11 @@ export const services = {
       return structuredClone(mutableRuns);
     }
     try {
-      const [{ data }, { data: jobs }] = await Promise.all([
-        analyticsHttp.get("/api/internal/v1/content-analytics/runs", {
-          params: { limit: 100 },
-        }),
-        analyticsHttp.get("/api/admin/v1/content-analytics/jobs", {
-          params: { limit: 100 },
-        }),
-      ]);
-      const persistedRuns = (data.items ?? []).map(
+      const { data } = await analyticsHttp.get(
+        "/api/admin/v1/content-analytics/runs",
+        { params: { limit: 100 } },
+      );
+      return (data.items ?? []).map(
         (raw: Record<string, unknown>): AnalyticsRun => ({
           id: String(raw.id),
           bookId: String(raw.book_id ?? raw.bookId),
@@ -503,41 +505,50 @@ export const services = {
             : [],
         }),
       );
-      const jobRuns = (jobs.items ?? []).map(
-        (raw: Record<string, unknown>): AnalyticsRun => ({
-          id: String(raw.id),
-          bookId: String(raw.book_id ?? raw.bookId ?? ""),
-          status: (String(raw.status ?? "PENDING") === "COMPLETED"
-            ? "SUCCEEDED"
-            : ["FAILED", "COMPLETED_WITH_ERRORS", "CANCELLED"].includes(
-                  String(raw.status),
-                )
-              ? "FAILED"
-              : String(raw.status ?? "PENDING")) as AnalyticsRun["status"],
-          modelVersion: `analytics-job · ${String(raw.current_stage ?? "queued")}`,
-          startedAt: String(
-            raw.started_at ??
-              raw.startedAt ??
-              raw.created_at ??
-              new Date().toISOString(),
-          ),
-          finishedAt: raw.finished_at ? String(raw.finished_at) : undefined,
-          metrics: [],
-          operationKey: raw.operation_key
-            ? String(raw.operation_key)
-            : undefined,
-          totalItems: Number(raw.total_items ?? raw.totalItems ?? 0),
-          processedItems: Number(
-            raw.processed_items ?? raw.processedItems ?? 0,
-          ),
-        }),
-      );
-      return [...jobRuns, ...persistedRuns];
     } catch (error) {
       throw problem(
         error,
         "Não foi possível consultar as métricas persistidas.",
       );
+    }
+  },
+  async listAnalyticsJobs(): Promise<AnalyticsJob[]> {
+    if (config.useMocks) return [];
+    try {
+      const { data } = await analyticsHttp.get(
+        "/api/admin/v1/content-analytics/jobs",
+        {
+          params: { limit: 100 },
+        },
+      );
+      return (data.items ?? []).map((raw: Record<string, unknown>) => ({
+        id: String(raw.id),
+        operationKey: String(raw.operation_key ?? raw.operationKey ?? ""),
+        status: String(raw.status ?? "UNKNOWN"),
+        totalItems: Number(raw.total_items ?? raw.totalItems ?? 0),
+        processedItems: Number(raw.processed_items ?? raw.processedItems ?? 0),
+        succeededItems: Number(raw.succeeded_items ?? raw.succeededItems ?? 0),
+        failedItems: Number(raw.failed_items ?? raw.failedItems ?? 0),
+        pendingItems: Number(raw.pending_items ?? raw.pendingItems ?? 0),
+        runningItems: Number(raw.running_items ?? raw.runningItems ?? 0),
+        completedItems: Number(raw.completed_items ?? raw.completedItems ?? 0),
+        cancelRequested: Boolean(raw.cancel_requested ?? raw.cancelRequested),
+        lastProgressAt: raw.last_progress_at
+          ? String(raw.last_progress_at)
+          : raw.lastProgressAt
+            ? String(raw.lastProgressAt)
+            : undefined,
+        progressStage: raw.progress_stage
+          ? String(raw.progress_stage)
+          : raw.progressStage
+            ? String(raw.progressStage)
+            : undefined,
+        createdAt: raw.created_at ? String(raw.created_at) : undefined,
+        startedAt: raw.started_at ? String(raw.started_at) : undefined,
+        finishedAt: raw.finished_at ? String(raw.finished_at) : undefined,
+      }));
+    } catch (error) {
+      throw problem(error, "Não foi possível listar os jobs de analytics.");
     }
   },
   async runAnalytics(
@@ -567,7 +578,7 @@ export const services = {
     try {
       const resolvedBookId = canonicalBookId ?? bookId;
       const { data: input } = await analyticsHttp.get(
-        `/api/internal/v1/content-analytics/books/${resolvedBookId}/input`,
+        `/api/admin/v1/content-analytics/books/${resolvedBookId}/input`,
       );
       const version = (input.items ?? [])[0];
       if (!version?.version_id)
@@ -615,37 +626,29 @@ export const services = {
       throw problem(error, "Não foi possível consultar o job de analytics.");
     }
   },
-  async listAnalyticsJobs(): Promise<AnalyticsJob[]> {
-    if (config.useMocks) return [];
-    try {
-      const { data } = await analyticsHttp.get(
-        "/api/admin/v1/content-analytics/jobs",
-        { params: { limit: 200 } },
-      );
-      return (data.items ?? []) as AnalyticsJob[];
-    } catch (error) {
-      throw problem(error, "Não foi possível consultar os jobs de analytics.");
-    }
-  },
   async getAnalyticsJobItems(
     jobId: string,
     params: { offset?: number; limit?: number; status?: string } = {},
   ): Promise<{ items: AnalyticsJobItem[]; hasMore: boolean }> {
     if (config.useMocks) return { items: [], hasMore: false };
-    const { data } = await analyticsHttp.get(
-      `/api/admin/v1/content-analytics/jobs/${jobId}/items`,
-      { params },
-    );
-    return {
-      items: (data.items ?? data) as AnalyticsJobItem[],
-      hasMore: Boolean(data.hasMore),
-    };
+    try {
+      const { data } = await analyticsHttp.get(
+        `/api/admin/v1/content-analytics/jobs/${jobId}/items`,
+        { params },
+      );
+      return {
+        items: (data.items ?? data) as AnalyticsJobItem[],
+        hasMore: Boolean(data.hasMore),
+      };
+    } catch (error) {
+      throw problem(error, "Não foi possível listar os itens do job.");
+    }
   },
   async getAnalyticsItemDetail(
     jobId: string,
     itemId: string,
   ): Promise<AnalyticsItemDetail> {
-    if (config.useMocks)
+    if (config.useMocks) {
       return {
         item: {
           id: itemId,
@@ -658,10 +661,15 @@ export const services = {
         statistics: {},
         remainingPhases: [],
       };
-    const { data } = await analyticsHttp.get(
-      `/api/admin/v1/content-analytics/jobs/${jobId}/items/${itemId}`,
-    );
-    return data as AnalyticsItemDetail;
+    }
+    try {
+      const { data } = await analyticsHttp.get(
+        `/api/admin/v1/content-analytics/jobs/${jobId}/items/${itemId}`,
+      );
+      return data as AnalyticsItemDetail;
+    } catch (error) {
+      throw problem(error, "Não foi possível consultar o item do job.");
+    }
   },
   async createSession(
     userId: string,

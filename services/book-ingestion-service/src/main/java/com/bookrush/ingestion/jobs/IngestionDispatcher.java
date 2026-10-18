@@ -1,9 +1,15 @@
 package com.bookrush.ingestion.jobs;
 
 import com.bookrush.ingestion.retry.FailureClassifier;
+import com.bookrush.ingestion.config.IngestionProperties;
+import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -24,16 +30,25 @@ public class IngestionDispatcher {
   private final LeaseCoordinator leases;
   private final GutenbergImportService gutenberg;
   private final Executor executor;
+  private final IngestionProperties properties;
+  private final ScheduledExecutorService heartbeatExecutor = Executors.newScheduledThreadPool(2);
 
   public IngestionDispatcher(
       JdbcTemplate jdbc,
       LeaseCoordinator leases,
       GutenbergImportService gutenberg,
-      Executor ingestionExecutor) {
+      Executor ingestionExecutor,
+      IngestionProperties properties) {
     this.jdbc = jdbc;
     this.leases = leases;
     this.gutenberg = gutenberg;
     this.executor = ingestionExecutor;
+    this.properties = properties;
+  }
+
+  @PreDestroy
+  void stopHeartbeatExecutor() {
+    heartbeatExecutor.shutdownNow();
   }
 
   public void dispatch(UUID jobId) {
@@ -93,8 +108,24 @@ public class IngestionDispatcher {
             + " clock_timestamp()), updated_at=clock_timestamp() WHERE id=? AND status='PENDING'",
         jobId);
     while (true) {
-      var lease = leases.claim("ingestion-" + UUID.randomUUID(), Duration.ofMinutes(2), jobId);
+      var lease =
+          leases.claim(
+              "ingestion-" + UUID.randomUUID(),
+              Duration.ofSeconds(properties.leaseSeconds()),
+              jobId);
       if (lease.isEmpty()) break;
+      ScheduledFuture<?> heartbeat =
+          heartbeatExecutor.scheduleAtFixedRate(
+              () -> {
+                try {
+                  leases.heartbeat(lease.get(), Duration.ofSeconds(properties.leaseSeconds()));
+                } catch (RuntimeException failure) {
+                  log.warn("Ingestion task {} heartbeat failed", lease.get().taskId(), failure);
+                }
+              },
+              properties.heartbeatSeconds(),
+              properties.heartbeatSeconds(),
+              TimeUnit.SECONDS);
       try {
         gutenberg.process(lease.get());
         leases.complete(lease.get(), "SUCCEEDED", "IMPORTED");
@@ -131,6 +162,8 @@ public class IngestionDispatcher {
             detail,
             lease.get().taskId());
         updateCounters(jobId);
+      } finally {
+        heartbeat.cancel(false);
       }
     }
     jdbc.update(

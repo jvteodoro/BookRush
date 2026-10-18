@@ -36,19 +36,19 @@ export function AnalyticsPage() {
         (job) =>
           !normalized ||
           job.id.toLowerCase().includes(normalized) ||
-          job.operation_key?.toLowerCase().includes(normalized),
+          job.operationKey?.toLowerCase().includes(normalized),
       )
       .sort((left, right) => {
         if (sort === "status") return left.status.localeCompare(right.status);
         if (sort === "id") return left.id.localeCompare(right.id);
         if (sort === "progress")
           return (
-            right.processed_items / Math.max(1, right.total_items) -
-            left.processed_items / Math.max(1, left.total_items)
+            right.processedItems / Math.max(1, right.totalItems) -
+            left.processedItems / Math.max(1, left.totalItems)
           );
         return (
-          new Date(right.created_at ?? 0).getTime() -
-          new Date(left.created_at ?? 0).getTime()
+          new Date(right.createdAt ?? 0).getTime() -
+          new Date(left.createdAt ?? 0).getTime()
         );
       });
   }, [jobs.data, query, sort, status]);
@@ -139,14 +139,14 @@ export function AnalyticsPage() {
 
 function JobRow({ job }: { job: AnalyticsJob }) {
   const progress = Math.round(
-    (job.processed_items / Math.max(1, job.total_items)) * 100,
+    (job.processedItems / Math.max(1, job.totalItems)) * 100,
   );
   return (
     <tr>
       <td>
         <Link className="table-link" to={`/analytics/jobs/${job.id}`}>
           <strong>{job.id.slice(0, 8)}</strong>
-          <small>{job.operation_key ?? "sem operation key"}</small>
+          <small>{job.operationKey ?? "sem operation key"}</small>
         </Link>
       </td>
       <td>
@@ -156,14 +156,14 @@ function JobRow({ job }: { job: AnalyticsJob }) {
       </td>
       <td className="progress-cell">
         <span>
-          {job.processed_items}/{job.total_items}
+          {job.processedItems}/{job.totalItems}
         </span>
         <div className="mini-progress">
           <i style={{ width: `${progress}%` }} />
         </div>
       </td>
-      <td>{job.current_stage ?? "—"}</td>
-      <td>{formatDate(job.created_at)}</td>
+      <td>{job.progressStage ?? "—"}</td>
+      <td>{formatDate(job.createdAt)}</td>
       <td>
         <Link className="row-action" to={`/analytics/jobs/${job.id}`}>
           Abrir

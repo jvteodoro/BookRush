@@ -169,6 +169,13 @@ def linguistic(request: AnalyzeRequest):
   tokens=[t for t in doc if not t.is_space]
   if not tokens: return AnalyzeResponse(status='INSUFFICIENT_SAMPLE',language=request.language,warning='no tokens')
   total=len(tokens); pos=Counter(t.pos_ for t in tokens); entities=list(doc.ents)
+  entity_starts={e.start for e in entities}
+  demonstratives={'this','that','these','those','este','esta','estes','estas','esse','essa','esses','essas','aquele','aquela','aqueles','aquelas'}
+  backward_connectives={'however','therefore','thus','but','yet','nevertheless','contudo','porém','portanto','assim','entretanto','todavia','mas'}
+  referential_tokens=[t for t in tokens if t.pos_=='PRON' or t.lemma_.lower() in demonstratives]
+  unresolved_reference=sum(
+   1 for t in referential_tokens if not any(index < t.i for index in entity_starts)
+  )
   depths=[]; distances=[]; subordinate=0
   for t in tokens:
    seen=set(); cursor=t; depth=0
@@ -190,6 +197,10 @@ def linguistic(request: AnalyzeRequest):
    'person_entity_density_per_100_words':100*sum(e.label_=='PERSON' for e in entities)/total,
    'subordinate_clause_ratio':subordinate/total,
    'opening_pronoun_ratio':sum(t.pos_=='PRON' for t in tokens[:min(20,total)])/min(20,total),
+   # This is a conservative discourse proxy, not coreference resolution:
+   # referential tokens before any detected named entity in the excerpt.
+   'unresolved_reference_proxy':unresolved_reference/total,
+   'backward_connective_ratio':sum(t.lemma_.lower() in backward_connectives for t in tokens)/total,
   }
   return AnalyzeResponse(status='VALID',language=request.language,values=values)
  except Exception as exc: return AnalyzeResponse(status='ERROR',language=request.language,warning=type(exc).__name__)

@@ -3,6 +3,7 @@ package com.bookrush.behaviorservice;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
+
 class BehaviorSecurityConfigurationTest {
   @Test
   void corsConfigurationUsesOnlyConfiguredOrigins() {
