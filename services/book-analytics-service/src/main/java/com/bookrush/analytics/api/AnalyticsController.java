@@ -362,10 +362,11 @@ public class AnalyticsController {
     statistics.put("embeddings", 0);
     if (runId != null) {
       statistics.putAll(jdbc.queryForMap(
-          "SELECT (SELECT count(*) FROM analytics.excerpt WHERE analysis_run_id=?) AS excerpts,"
+          "SELECT (SELECT count(DISTINCT excerpt_id) FROM analytics.excerpt_feature WHERE analysis_run_id=?) AS excerpts,"
               + " (SELECT count(*) FROM analytics.excerpt_feature WHERE analysis_run_id=?) AS features,"
-              + " (SELECT count(*) FROM analytics.excerpt_embedding ee JOIN analytics.excerpt e ON e.id=ee.excerpt_id"
-              + " WHERE e.analysis_run_id=?) AS embeddings",
+              + " (SELECT count(*) FROM analytics.excerpt_embedding ee"
+              + " WHERE EXISTS (SELECT 1 FROM analytics.excerpt_feature ef"
+              + " WHERE ef.analysis_run_id=? AND ef.excerpt_id=ee.excerpt_id)) AS embeddings",
           runId, runId, runId));
     }
     var completed = phases.stream().filter(row -> "COMPLETED".equals(row.get("status")))

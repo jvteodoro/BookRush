@@ -60,6 +60,12 @@ de progresso e histórico de eventos. Fases antigas sem eventos continuam
 visíveis com sua duração persistida, mas não podem ser retroativamente
 detalhadas.
 
+As estatísticas `excerpts`, `features` e `embeddings` são calculadas pelo
+`analysis_run_id` através das tabelas de features do run. Excerpts são
+reutilizáveis por versão de asset e, por isso, não possuem `analysis_run_id`
+direto; a consulta do detalhe não deve assumir essa coluna em
+`analytics.excerpt`.
+
 Os endpoints administrativos usados nessa navegação são:
 
 - `GET /api/admin/v1/content-analytics/jobs?limit=200&offset=0`
