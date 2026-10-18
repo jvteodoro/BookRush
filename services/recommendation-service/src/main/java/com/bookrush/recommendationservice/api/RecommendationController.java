@@ -74,43 +74,55 @@ public class RecommendationController {
     var candidateIds = books.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
     var scoreById = analyticsScores.find(candidateIds).entrySet().stream()
         .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue));
+    boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
     List<?> rankedBooks = RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById);
-    boolean analyticsRanked = !scoreById.isEmpty();
-    String modelVersion = analyticsRanked ? rankingProperties.modelVersion() : MODEL_VERSION;
+    if (analyticsRequired) {
+      rankedBooks = rankedBooks.stream()
+          .filter(book -> scoreById.containsKey(String.valueOf(bookId(book))))
+          .toList();
+    }
+    boolean analyticsRanked = analyticsRequired && !scoreById.isEmpty();
+    String modelVersion = analyticsRequired ? rankingProperties.modelVersion() : MODEL_VERSION;
     UUID requestId = UUID.randomUUID();
-    jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
-        requestId, subject, modelVersion, strategy, subject.hashCode(), "{}");
-    List<Map<String, Object>> items = new ArrayList<>();
-    int rank = 1;
+    List<Map<String, Object>> candidates = new ArrayList<>();
+    int candidateRank = 1;
     for (Object book : rankedBooks) {
       Object bookId = book instanceof Map<?, ?> map ? map.get("id") : null;
       if (bookId == null) continue;
-      UUID parsedBookId = UUID.fromString(String.valueOf(bookId));
-      UUID itemId = UUID.randomUUID();
-      int currentRank = rank;
       String reason = analyticsRanked && scoreById.containsKey(String.valueOf(bookId)) ? "analytics-score"
           : selectedStrategy == Strategy.COLD_START ? "popular-cold-start"
           : selectedStrategy == Strategy.LUCKY ? "lucky-exploration" : "diversity-heuristic";
-      jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
-          itemId, requestId, parsedBookId, currentRank, 1.0 / currentRank,
-          "{\"strategy\":\"" + reason + "\",\"rankerVersion\":\""
-              + (analyticsRanked ? rankingProperties.modelVersion() : MODEL_VERSION) + "\"}");
-      UUID impressionId = UUID.randomUUID();
-      jdbc.update("INSERT INTO recommendation.impression(id, request_id, book_id, rank) "
-          + "VALUES (?, ?, ?, ?)", impressionId, requestId, parsedBookId, currentRank);
-      jdbc.update("UPDATE recommendation.impression SET item_id=? WHERE id=?", itemId, impressionId);
       var item = new java.util.LinkedHashMap<String, Object>();
       item.put("book", book);
-      item.put("recommendationRequestId", requestId);
-      item.put("impressionId", impressionId);
       item.put("modelVersion", modelVersion);
-      item.put("rank", rank++);
+      item.put("rank", candidateRank++);
       item.put("reason", reason);
-      items.add(item);
+      candidates.add(item);
     }
     behavior.publish("RECOMMENDATION_REQUEST", null, Map.of("size", limit, "modelVersion", modelVersion),
         request.getHeader("Authorization"));
-    excerptEnrichment.enrich(items);
+    excerptEnrichment.enrich(candidates);
+    List<Map<String, Object>> items = analyticsRequired
+        ? new ArrayList<>(FeedEligibility.retainAnalyticsReady(candidates))
+        : candidates;
+    jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
+        requestId, subject, modelVersion, strategy, subject.hashCode(), "{}");
+    int rank = 1;
+    for (Map<String, Object> item : items) {
+      UUID parsedBookId = UUID.fromString(String.valueOf(((Map<?, ?>) item.get("book")).get("id")));
+      UUID itemId = UUID.randomUUID();
+      UUID impressionId = UUID.randomUUID();
+      item.put("recommendationRequestId", requestId);
+      item.put("impressionId", impressionId);
+      item.put("rank", rank);
+      jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
+          itemId, requestId, parsedBookId, rank, 1.0 / rank,
+          "{\"strategy\":\"" + item.get("reason") + "\",\"rankerVersion\":\""
+              + modelVersion + "\"}");
+      jdbc.update("INSERT INTO recommendation.impression(id, request_id, book_id, rank, item_id) "
+          + "VALUES (?, ?, ?, ?, ?)", impressionId, requestId, parsedBookId, rank, itemId);
+      rank++;
+    }
     return Map.of("requestId", requestId, "modelVersion", modelVersion,
         "rankingVersion", modelVersion, "strategy", strategy,
         "generatedAt", Instant.now(), "items", items);

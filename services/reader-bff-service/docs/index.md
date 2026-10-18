@@ -13,6 +13,12 @@ The feed endpoint requires the caller principal and forwards the bearer token
 to the recommendation service. A request is therefore ledgered under the
 authenticated subject rather than an anonymous shared identity.
 
+With analytics ranking enabled, the recommendation service returns only books
+with an eligible analytics score and persisted excerpt. An empty `items` array
+is a valid result while the analytics batch is still being processed; it is not
+filled with catalog metadata or placeholder excerpts. The BFF allows up to 15
+seconds for this bounded batch so normal load does not become a spurious 502.
+
 The BFF also exposes authenticated composition routes for recommendations,
 library, recent books, streak, progress, bookmarks, opened events,
 recommendation impressions, publication manifests and EPUB resources. It

@@ -281,7 +281,10 @@ fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
 O feed usa `GET /api/v1/reader/feed` e registra viewability em
 `POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
-livro.
+livro. Com o ranking analytics ativado, o backend só envia livros que já têm
+score elegível e excerpt textual persistido; a interface não cria cards para
+livros ainda em processamento nem usa descrição/licença como trecho. Uma
+resposta vazia é um estado válido enquanto o lote de analytics avança.
 Na aba Buscar, `searchCatalog` chama `GET /api/v1/books?q=...&page=...&size=20`
 com debounce e paginação; não baixa mais os primeiros 50 livros para filtrar
 localmente.

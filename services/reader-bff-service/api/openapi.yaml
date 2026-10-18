@@ -9,7 +9,7 @@ paths:
       parameters:
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
-        '200': { description: Composed recommendation feed }
+        '200': { description: Composed analytics-ready recommendation feed; when analytics ranking is enabled, books without an eligible score and non-empty excerpt are omitted }
         '401': { description: Authentication required }
         '502': { description: Recommendation service unavailable }
   /api/v1/reader/recommendations:

@@ -159,7 +159,10 @@ public class ReaderBffController {
   private RestClient client(String baseUrl) {
     var requestFactory = new JdkClientHttpRequestFactory(
         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
-    requestFactory.setReadTimeout(Duration.ofSeconds(5));
+    // Recommendation requests persist a bounded ledger and enrich a batch. Keep
+    // the gateway budget above the normal batch latency so load does not turn
+    // a slow but healthy feed into an opaque 502.
+    requestFactory.setReadTimeout(Duration.ofSeconds(15));
     return RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
