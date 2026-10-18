@@ -26,11 +26,11 @@ usando `--volumes-from "$HOSTNAME"`; não substitua isso por um bind mount de
 do agente. Um bind mount incorreto faz o gate receber um `/repo` vazio e falhar
 com `scripts/validate-change.sh: No such file or directory`.
 
-O teste do runtime de modelos consulta o IP da rede Docker do container
-temporário, em vez de assumir que `127.0.0.1` do agente é o mesmo namespace do
-runtime. O mapeamento de porta continua disponível para uso local. Se o
-healthcheck falhar, os logs do runtime são emitidos pelo próprio script para
-evitar diagnóstico por timeout.
+O teste do runtime de modelos executa os probes via `docker exec` dentro do
+container temporário. Isso evita assumir que o `127.0.0.1` do agente, o IP da
+bridge Docker e o namespace do runtime são roteáveis entre si. Se o healthcheck
+falhar, os logs do runtime são emitidos pelo próprio script para evitar
+diagnóstico por timeout.
 2. Confirme que `https://jenkins-bookrush.jteodoro.tec.br` resolve e responde.
    HTTP 403 sem sessão é esperado; falha de DNS ou HTTP 5xx indica problema de
    infraestrutura, não de pipeline.

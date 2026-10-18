@@ -4,10 +4,8 @@ set -euo pipefail
 root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 image=${ANALYTICS_RUNTIME_TEST_IMAGE:-bookrush/book-analytics-runtime:validation}
 volume=${ANALYTICS_MODEL_VOLUME:-bookrush_analytics_models}
-port=${ANALYTICS_RUNTIME_TEST_PORT:-18092}
 container="bookrush-analytics-models-test-$$"
 tmp_dir=$(mktemp -d)
-run_args=(-p "${port}:8092")
 
 cleanup() {
   docker rm -f "$container" >/dev/null 2>&1 || true
@@ -16,16 +14,25 @@ cleanup() {
 trap cleanup EXIT
 
 docker build -t "$image" "$root_dir/services/book-analytics-runtime"
-docker run -d --rm --name "$container" "${run_args[@]}" \
+docker run -d --rm --name "$container" \
   -e ANALYTICS_OFFLINE=true \
   -v "${volume}:/var/lib/bookrush/models:ro" \
   "$image" >/dev/null
 
-runtime_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container")"
-runtime_url="http://${runtime_ip}:8092"
+runtime_get() {
+  docker exec "$container" python -c \
+    'import sys,urllib.request; print(urllib.request.urlopen("http://127.0.0.1:8092" + sys.argv[1], timeout=10).read().decode())' \
+    "$1"
+}
+
+runtime_post() {
+  docker exec "$container" python -c \
+    'import sys,urllib.request; request=urllib.request.Request("http://127.0.0.1:8092" + sys.argv[1], data=sys.argv[2].encode(), headers={"Content-Type":"application/json"}, method="POST"); print(urllib.request.urlopen(request, timeout=60).read().decode())' \
+    "$1" "$2"
+}
 
 for _ in $(seq 1 120); do
-  if curl -fsS "$runtime_url/health" >"$tmp_dir/health.json"; then break; fi
+  if runtime_get /health >"$tmp_dir/health.json"; then break; fi
   sleep 1
 done
 if ! test -s "$tmp_dir/health.json"; then
@@ -34,18 +41,12 @@ if ! test -s "$tmp_dir/health.json"; then
   exit 1
 fi
 
-curl -fsS -X POST "$runtime_url/v1/language" -H 'Content-Type: application/json' \
-  --data '{"text":"The old house stood beside the quiet harbor."}' >"$tmp_dir/language-en.json"
-curl -fsS -X POST "$runtime_url/v1/language" -H 'Content-Type: application/json' \
-  --data '{"text":"A casa antiga ficava perto do porto silencioso."}' >"$tmp_dir/language-pt.json"
-curl -fsS -X POST "$runtime_url/v1/linguistic" -H 'Content-Type: application/json' \
-  --data '{"language":"en","text":"The old house stood beside the quiet harbor."}' >"$tmp_dir/linguistic-en.json"
-curl -fsS -X POST "$runtime_url/v1/linguistic" -H 'Content-Type: application/json' \
-  --data '{"language":"pt","text":"A casa antiga ficava perto do porto silencioso."}' >"$tmp_dir/linguistic-pt.json"
-curl -fsS -X POST "$runtime_url/v1/embeddings" -H 'Content-Type: application/json' \
-  --data '{"texts":["The old house stood beside the quiet harbor.","A casa antiga ficava perto do porto silencioso."],"max_tokens":8192}' >"$tmp_dir/embeddings.json"
-curl -fsS -X POST "$runtime_url/v1/nli" -H 'Content-Type: application/json' \
-  --data '{"text":"The travelers reached the harbor before the storm.","hypothesis":"The passage describes an external event."}' >"$tmp_dir/nli.json"
+runtime_post /v1/language '{"text":"The old house stood beside the quiet harbor."}' >"$tmp_dir/language-en.json"
+runtime_post /v1/language '{"text":"A casa antiga ficava perto do porto silencioso."}' >"$tmp_dir/language-pt.json"
+runtime_post /v1/linguistic '{"language":"en","text":"The old house stood beside the quiet harbor."}' >"$tmp_dir/linguistic-en.json"
+runtime_post /v1/linguistic '{"language":"pt","text":"A casa antiga ficava perto do porto silencioso."}' >"$tmp_dir/linguistic-pt.json"
+runtime_post /v1/embeddings '{"texts":["The old house stood beside the quiet harbor.","A casa antiga ficava perto do porto silencioso."],"max_tokens":8192}' >"$tmp_dir/embeddings.json"
+runtime_post /v1/nli '{"text":"The travelers reached the harbor before the storm.","hypothesis":"The passage describes an external event."}' >"$tmp_dir/nli.json"
 
 python3 - "$tmp_dir" <<'PY'
 import json
