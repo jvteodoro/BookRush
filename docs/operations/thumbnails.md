@@ -21,6 +21,8 @@ Houve quatro falhas independentes que se combinaram:
 - O fluxo de ingestão continua usando `processAssets=true`; escopos S2S vazios no Compose significam usar os default client scopes do Keycloak. Escopos fixos só devem ser configurados quando estiverem realmente presentes no token.
 - O cliente `labsoft-admin-web` agora recebe `bookrush.catalog.read`, `bookrush.catalog.write`, `bookrush.assets.write` e a audiência `bookrush-catalog-admin`. Após reconciliar o realm, o admin pode consultar e aprovar a fila.
 - O admin ganhou a rota **Review Queue**. Ela lista livros `REVIEW_REQUIRED`, mostra estado do asset/versão e permite aprovar livro e thumbnail separadamente. A API correspondente é `GET /api/admin/books/review`, `POST /api/admin/books/{bookId}/approve` e o endpoint existente `POST /api/admin/books/{bookId}/assets/{assetId}/approve`.
+- A fila agora pesquisa no banco por título, idioma e descrição, ordena por atualização, título, idioma ou ano e exibe uma lista compacta. Clicar no resumo expande o card do livro e seus assets, mantendo a inspeção no contexto da página.
+- A aprovação usa um fallback transacional para o identificador do ator (`unknown`) quando o principal autenticado não fornece `getName()`. Antes, o status era atualizado dentro da transação, mas a auditoria falhava no `NOT NULL actor_subject`; o erro abortava a transação e aparecia no cliente como falha de aprovação.
 
 ## Checklist de diagnóstico
 

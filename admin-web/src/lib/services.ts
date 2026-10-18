@@ -305,12 +305,18 @@ export const services = {
   async listBooks(query = "", page = 0, size = 50): Promise<BookCandidate[]> {
     return (await this.listBookPage(query, page, size)).items;
   },
-  async listReviewBooks(page = 0, size = 25): Promise<ReviewBookPage> {
+  async listReviewBooks(
+    page = 0,
+    size = 25,
+    query = "",
+    sort = "updatedAt",
+    direction: "asc" | "desc" = "desc",
+  ): Promise<ReviewBookPage> {
     if (config.useMocks)
       return { items: [], page, size, totalItems: 0, last: true };
     try {
       const { data } = await catalogHttp.get("/admin/books/review", {
-        params: { page, size },
+        params: { page, size, q: query, sort, direction },
       });
       return {
         items: data.items ?? [],

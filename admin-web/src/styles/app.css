@@ -1018,6 +1018,57 @@ input {
   display: grid;
   gap: 16px;
 }
+.review-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0;
+  flex-wrap: wrap;
+}
+.review-search,
+.review-select {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #263752;
+  border-radius: 10px;
+  color: #78e9c7;
+  background: #101727;
+}
+.review-search {
+  flex: 1 1 320px;
+}
+.review-search input,
+.review-select select {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #e8ecf7;
+  background: transparent;
+  font: inherit;
+}
+.review-select select {
+  min-width: 150px;
+}
+.review-select option {
+  color: #e8ecf7;
+  background: #101727;
+}
+.review-sort-direction {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid #263752;
+  border-radius: 10px;
+  color: #b9c7da;
+  background: #101727;
+}
+.review-sort-direction:hover,
+.review-sort-direction:focus-visible {
+  border-color: #78e9c7;
+  color: #78e9c7;
+}
 .review-card {
   background: #101727;
   border: 1px solid #1c2940;
@@ -1029,6 +1080,35 @@ input {
   justify-content: space-between;
   align-items: flex-start;
   gap: 18px;
+}
+.review-card-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex: 1;
+  gap: 16px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+}
+.review-card-summary > div {
+  min-width: 0;
+}
+.review-card-summary > svg {
+  flex: 0 0 auto;
+  margin-top: 24px;
+  color: #78e9c7;
+}
+.review-card-summary:hover h2,
+.review-card-summary:focus-visible h2 {
+  color: #78e9c7;
+}
+.review-card-actions {
+  display: flex;
+  flex: 0 0 auto;
 }
 .review-card-head h2 {
   font: 600 22px "Space Grotesk";
@@ -1115,6 +1195,17 @@ input {
 }
 .review-card button {
   white-space: nowrap;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .review-history {
   display: grid;
