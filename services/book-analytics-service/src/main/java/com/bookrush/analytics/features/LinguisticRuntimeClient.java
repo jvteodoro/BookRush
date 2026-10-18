@@ -120,6 +120,15 @@ public final class LinguisticRuntimeClient {
     }
   }
 
+  public record NliBatchInput(String id, String text, String hypothesis) {}
+
+  public record NliBatchResult(
+      String status, String id, double entailment, double neutral, double contradiction, String warning) {
+    public NliScore score() {
+      return new NliScore(entailment, neutral, contradiction);
+    }
+  }
+
   @SuppressWarnings("unchecked")
   public NliResult nli(String text, String hypothesis) {
     try {
@@ -139,6 +148,33 @@ public final class LinguisticRuntimeClient {
           (String) body.get("warning"));
     } catch (Exception e) {
       return new NliResult("MODEL_UNAVAILABLE", 0, 0, 0, "runtime unavailable");
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  public java.util.List<NliBatchResult> nliBatch(
+      java.util.List<NliBatchInput> inputs, int batchSize) {
+    if (inputs == null || inputs.isEmpty()) return java.util.List.of();
+    try {
+      var body = client.post().uri("/v1/nli/batch")
+          .contentType(MediaType.APPLICATION_JSON)
+          .body(Map.of("items", inputs, "batch_size", Math.max(1, Math.min(32, batchSize))))
+          .retrieve().body(Map.class);
+      var rows = (java.util.List<Map<String, Object>>) body.getOrDefault("results", java.util.List.of());
+      var result = new java.util.ArrayList<NliBatchResult>(rows.size());
+      for (var row : rows) {
+        result.add(new NliBatchResult(
+            String.valueOf(row.getOrDefault("status", body.getOrDefault("status", "ERROR"))),
+            String.valueOf(row.getOrDefault("id", "")), number(row.get("entailment")),
+            number(row.get("neutral")), number(row.get("contradiction")),
+            (String) row.get("warning")));
+      }
+      return java.util.List.copyOf(result);
+    } catch (Exception e) {
+      return inputs.stream()
+          .map(input -> new NliBatchResult("MODEL_UNAVAILABLE", input.id(), 0, 0, 0,
+              "runtime unavailable"))
+          .toList();
     }
   }
 

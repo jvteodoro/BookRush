@@ -55,3 +55,27 @@ hardware de produção, com o número real de workers e a concorrência prevista
 O NLI permanece desligado por padrão (`ANALYTICS_NLI_ENABLED=false`) e limitado
 por `ANALYTICS_NLI_MAX_EXCERPTS`; o benchmark não inicia jobs nem processamento
 em massa.
+
+## Benchmark do endpoint batch
+
+O benchmark scalar acima mede uma requisição por par. A comparação batch deve
+usar os mesmos pares com `POST /v1/nli/batch`, mantendo texto, hipótese e
+modelo aquecidos. Registre `batch_size`, dispositivo (`cpu`/`cuda`), memória,
+latência e equivalência dos três scores com tolerância numérica. O ganho
+esperado é principalmente menor overhead e melhor ocupação da GPU; não se
+deve extrapolar ganho linear.
+
+O worker usa `ANALYTICS_NLI_BATCH_SIZE=8` e divide requisições maiores em
+chunks de no máximo 32 pares. Para BGE, `ANALYTICS_EMBEDDINGS_BATCH_SIZE`
+controla o tamanho separadamente; começar em 4 é conservador para uma GTX
+1050 Ti de 4 GB e aumentar somente após medir VRAM e timeout.
+
+### Evidência desta implementação
+
+Em 18/10/2026, `scripts/test-analytics-models.sh` passou com o runtime CPU,
+validando fastText EN/PT, spaCy EN/PT, BGE-M3 1024-D e NLI escalar/batch. A
+imagem CUDA também foi construída, mas o teste isolado retornou
+`torch.cuda.is_available() == false`; como o mesmo host/container executa
+`nvidia-smi`, o próximo passo é investigar o carregamento CUDA do PyTorch. Até
+essa investigação ser concluída, não há evidência para trocar o runtime de
+produção para GPU.

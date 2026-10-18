@@ -247,3 +247,30 @@ O processamento em lote só deve ser promovido a gate de capacidade quando:
 Esse critério separa confiabilidade operacional, desempenho e qualidade do
 modelo. Um lote que termina não é automaticamente um lote editorialmente
 aprovado.
+
+## Batching NLI e embeddings
+
+O runtime agora possui `POST /v1/nli/batch`. Cada item tem um identificador
+estável, texto e hipótese; a resposta mantém a associação e o status de cada
+item. O cliente Java divide as 16 hipóteses por excerpt em chunks, faz uma
+chamada por chunk e persiste apenas resultados válidos. Isso permite retomar
+um chunk sem repetir observações já persistidas.
+
+O endpoint de embeddings já aceitava múltiplos textos. O tamanho do lote deixou
+de ser fixo no worker e pode ser ajustado por
+`ANALYTICS_EMBEDDINGS_BATCH_SIZE`; o padrão permanece conservador (`4`). O NLI
+usa `ANALYTICS_NLI_BATCH_SIZE=8` e o runtime rejeita corpos maiores que
+`ANALYTICS_NLI_BATCH_MAX_ITEMS=32`.
+
+O runtime detecta CUDA quando disponível por `ANALYTICS_RUNTIME_DEVICE=auto`,
+mas a imagem padrão continua CPU-only. A utilização da GPU exige uma imagem
+PyTorch CUDA compatível e configuração explícita do runtime/container. O
+override `infrastructure/compose.analytics-gpu.yaml` usa `gpus: all` e a
+variante CUDA baseada em `torch==2.3.1+cu118`, escolhida por compatibilidade
+esperada com a GTX 1050 Ti/driver CUDA 11.8. A imagem foi construída em
+18/10/2026, mas a validação encontrou `nvidia-smi` funcional no host/container
+e `torch.cuda.is_available() == false` na imagem Python. Portanto a variante
+CUDA não está validada para produção e não deve ser ativada até corrigirmos o
+runtime NVIDIA/PyTorch e repetirmos o teste de dispositivo, VRAM, p95, taxa de
+falha, equivalência dos scores e recuperação; um lote grande demais pode ser
+mais lento ou causar OOM.

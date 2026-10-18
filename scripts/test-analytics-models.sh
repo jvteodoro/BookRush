@@ -22,7 +22,7 @@ docker run -d --rm --name "$container" \
 runtime_get() {
   docker exec "$container" python -c \
     'import sys,urllib.request; print(urllib.request.urlopen("http://127.0.0.1:8092" + sys.argv[1], timeout=10).read().decode())' \
-    "$1"
+    "$1" 2>/dev/null
 }
 
 runtime_post() {
@@ -47,6 +47,7 @@ runtime_post /v1/linguistic '{"language":"en","text":"The old house stood beside
 runtime_post /v1/linguistic '{"language":"pt","text":"A casa antiga ficava perto do porto silencioso."}' >"$tmp_dir/linguistic-pt.json"
 runtime_post /v1/embeddings '{"texts":["The old house stood beside the quiet harbor.","A casa antiga ficava perto do porto silencioso."],"max_tokens":8192}' >"$tmp_dir/embeddings.json"
 runtime_post /v1/nli '{"text":"The travelers reached the harbor before the storm.","hypothesis":"The passage describes an external event."}' >"$tmp_dir/nli.json"
+runtime_post /v1/nli/batch '{"batch_size":2,"items":[{"id":"a","text":"The travelers reached the harbor before the storm.","hypothesis":"The passage describes an external event."},{"id":"b","text":"The old house stood beside the quiet harbor.","hypothesis":"The passage describes a setting."}]}' >"$tmp_dir/nli-batch.json"
 
 python3 - "$tmp_dir" <<'PY'
 import json
@@ -84,5 +85,11 @@ assert nli["status"] == "VALID", nli
 scores = [nli["entailment"], nli["neutral"], nli["contradiction"]]
 assert all(0 <= value <= 1 for value in scores), nli
 assert abs(sum(scores) - 1.0) < 1e-5, nli
-print("analytics model runtime passed: fastText EN/PT, spaCy EN/PT, BGE-M3 1024-D and NLI")
+batch = read("nli-batch.json")
+assert batch["status"] == "VALID" and len(batch["results"]) == 2, batch
+assert [row["id"] for row in batch["results"]] == ["a", "b"], batch
+for row in batch["results"]:
+    assert row["status"] == "VALID", row
+    assert abs(sum(row[key] for key in ("entailment", "neutral", "contradiction")) - 1.0) < 1e-5, row
+print("analytics model runtime passed: fastText EN/PT, spaCy EN/PT, BGE-M3 1024-D and scalar/batch NLI")
 PY

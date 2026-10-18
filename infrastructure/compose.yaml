@@ -383,10 +383,14 @@ services:
     image: ${ANALYTICS_RUNTIME_IMAGE:-bookrush/book-analytics-runtime:local}
     build:
       context: ../services/book-analytics-runtime
+      args:
+        ANALYTICS_RUNTIME_REQUIREMENTS: ${ANALYTICS_RUNTIME_REQUIREMENTS:-requirements.txt}
     environment:
       ANALYTICS_OFFLINE: ${ANALYTICS_OFFLINE:-true}
       ANALYTICS_MODEL_CACHE_DIR: /var/lib/bookrush/models
       ANALYTICS_RUNTIME_MAX_CHARS: ${ANALYTICS_RUNTIME_MAX_CHARS:-100000}
+      ANALYTICS_RUNTIME_DEVICE: ${ANALYTICS_RUNTIME_DEVICE:-auto}
+      ANALYTICS_NLI_BATCH_MAX_ITEMS: ${ANALYTICS_NLI_BATCH_MAX_ITEMS:-32}
     volumes:
       - analytics_models:/var/lib/bookrush/models:ro
     healthcheck:

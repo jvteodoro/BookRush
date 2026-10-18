@@ -601,22 +601,23 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
         TopNliCandidateSelector.select(candidates, excerptIds, embeddings, limit).stream()
             .map(TopNliCandidateSelector.Selection::excerptId)
             .toList();
-      for (UUID excerptId : selected) {
-      String text =
-          jdbc.query(
-              "SELECT text FROM analytics.excerpt WHERE id=?",
-              rs -> rs.next() ? rs.getString(1) : null,
-              excerptId);
-      if (text == null) continue;
-      for (var observation : nliInference.infer(text, language)) {
-        if (!"VALID".equals(observation.status())) continue;
-        String prefix = observation.kind() + "." + observation.key();
-        persistNliValue(run, excerptId, prefix, "entailment", observation.entailment());
-        persistNliValue(run, excerptId, prefix, "neutral", observation.neutral());
-        persistNliValue(run, excerptId, prefix, "contradiction", observation.contradiction());
-        persistNliValue(run, excerptId, prefix, "support", observation.support());
-        persistNliValue(run, excerptId, prefix, "confidence", observation.confidence());
-      }
+    var inputs = new java.util.ArrayList<NliInferenceAdapter.Input>();
+    for (UUID excerptId : selected) {
+      String text = jdbc.query("SELECT text FROM analytics.excerpt WHERE id=?",
+          rs -> rs.next() ? rs.getString(1) : null, excerptId);
+      if (text != null) inputs.add(new NliInferenceAdapter.Input(excerptId.toString(), text, language));
+    }
+    int batchSize = Math.max(1, Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_NLI_BATCH_SIZE", "8")));
+    for (var result : nliInference.inferBatch(inputs, batchSize)) {
+      var observation = result.observation();
+      if (!"VALID".equals(observation.status())) continue;
+      UUID excerptId = UUID.fromString(result.id());
+      String prefix = observation.kind() + "." + observation.key();
+      persistNliValue(run, excerptId, prefix, "entailment", observation.entailment());
+      persistNliValue(run, excerptId, prefix, "neutral", observation.neutral());
+      persistNliValue(run, excerptId, prefix, "contradiction", observation.contradiction());
+      persistNliValue(run, excerptId, prefix, "support", observation.support());
+      persistNliValue(run, excerptId, prefix, "confidence", observation.confidence());
     }
   }
 
@@ -901,7 +902,8 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
     // per-excerpt idempotency through the input hash/object key.
     // CPU-only BGE inference is deliberately kept small; larger batches can
     // exceed the runtime read timeout even though the request is valid.
-    final int batchSize = 4;
+    final int batchSize = Math.max(1, Math.min(32,
+        Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_EMBEDDINGS_BATCH_SIZE", "4"))));
     String bucket = System.getenv().getOrDefault("STORAGE_BUCKET_ML", "books-ml");
     int total = candidates.size();
     for (int offset = 0; offset < candidates.size(); offset += batchSize) {

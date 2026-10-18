@@ -1,0 +1,9 @@
+services:
+  book-analytics-runtime:
+    build:
+      context: ../services/book-analytics-runtime
+      args:
+        ANALYTICS_RUNTIME_REQUIREMENTS: requirements.cuda.txt
+    environment:
+      ANALYTICS_RUNTIME_DEVICE: ${ANALYTICS_RUNTIME_DEVICE:-auto}
+    gpus: all

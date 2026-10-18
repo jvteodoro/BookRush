@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 WORKDIR /app
-COPY requirements.txt .
+ARG ANALYTICS_RUNTIME_REQUIREMENTS=requirements.txt
+COPY ${ANALYTICS_RUNTIME_REQUIREMENTS} requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app app
 RUN useradd --system --create-home analytics
