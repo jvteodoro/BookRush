@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -17,8 +18,33 @@ const phaseLabel = (phase: string) =>
     .toLowerCase()
     .replace(/(^|\s)\S/g, (letter: string) => letter.toUpperCase());
 
+const formatDuration = (duration?: number | null) => {
+  if (typeof duration !== "number" || !Number.isFinite(duration)) {
+    return "em curso";
+  }
+  if (duration < 1000) return `${Math.round(duration)} ms`;
+
+  const totalSeconds = Math.round(duration / 1000);
+  if (totalSeconds < 60) return `${totalSeconds} s`;
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds ? `${minutes}m ${seconds}s` : `${minutes}m`;
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours < 24) {
+    return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+};
+
 export function AnalyticsItemPage() {
   const { jobId = "", itemId = "" } = useParams();
+  const [selectedAttempt, setSelectedAttempt] = useState<number | null>(null);
   const detail = useQuery({
     queryKey: ["analytics-item", jobId, itemId],
     queryFn: () => services.getAnalyticsItemDetail(jobId, itemId),
@@ -33,6 +59,27 @@ export function AnalyticsItemPage() {
       </section>
     );
   const { item, phases, statistics, remainingPhases } = detail.data;
+  const phasesByAttempt = phases.reduce<Map<number, typeof phases>>(
+    (groups, phase) => {
+      const attempt = phase.attempt_count || 1;
+      const group = groups.get(attempt) ?? [];
+      group.push(phase);
+      groups.set(attempt, group);
+      return groups;
+    },
+    new Map(),
+  );
+  const attempts = [...phasesByAttempt.entries()].sort(
+    ([left], [right]) => right - left,
+  );
+  const activeAttempt =
+    selectedAttempt ?? item.attempt_count ?? attempts[0]?.[0] ?? 1;
+  const selectedPhases = phasesByAttempt.get(activeAttempt) ?? [];
+  const hasHistoricalFailure = attempts.some(
+    ([attempt, attemptPhases]) =>
+      attempt < item.attempt_count &&
+      attemptPhases.some((phase) => phase.status === "FAILED"),
+  );
   return (
     <section className="analytics-console">
       <div className="analytics-breadcrumb">
@@ -69,8 +116,39 @@ export function AnalyticsItemPage() {
               <span>Histórico por tentativa e duração persistida.</span>
             </div>
           </div>
-          <div className="phase-list">
-            {phases.map((phase) => (
+          {hasHistoricalFailure && (
+            <div className="phase-history-note">
+              Falhas de tentativas anteriores são mantidas para auditoria e não
+              representam o estado da tentativa atual.
+            </div>
+          )}
+          <div className="phase-tabs" role="tablist" aria-label="Tentativas">
+            {attempts.map(([attempt, attemptPhases]) => {
+              const failed = attemptPhases.some(
+                (phase) => phase.status === "FAILED",
+              );
+              return (
+                <button
+                  className={`phase-tab ${
+                    activeAttempt === attempt ? "active" : ""
+                  }`}
+                  key={attempt}
+                  onClick={() => setSelectedAttempt(attempt)}
+                  role="tab"
+                  aria-selected={activeAttempt === attempt}
+                  type="button"
+                >
+                  <span>Tentativa {attempt}</span>
+                  <small>
+                    {attempt === item.attempt_count ? "atual" : "histórico"}
+                    {failed ? " · falhou" : ""}
+                  </small>
+                </button>
+              );
+            })}
+          </div>
+          <div className="phase-list" role="tabpanel">
+            {selectedPhases.map((phase) => (
               <div className="phase-row" key={phase.id}>
                 <PhaseIcon status={phase.status} />
                 <div>
@@ -80,11 +158,7 @@ export function AnalyticsItemPage() {
                     {formatDate(phase.finished_at)}
                   </small>
                 </div>
-                <b>
-                  {phase.duration_ms !== undefined
-                    ? `${phase.duration_ms} ms`
-                    : "em curso"}
-                </b>
+                <b>{formatDuration(phase.duration_ms)}</b>
               </div>
             ))}
             {phases.length === 0 && (

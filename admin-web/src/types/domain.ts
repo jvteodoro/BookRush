@@ -83,7 +83,7 @@ export interface AnalyticsPhase {
   status: string;
   started_at: string;
   finished_at?: string;
-  duration_ms?: number;
+  duration_ms?: number | null;
   error_code?: string;
   metadata?: Record<string, unknown>;
 }
