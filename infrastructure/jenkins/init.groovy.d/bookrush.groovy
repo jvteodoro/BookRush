@@ -142,15 +142,15 @@ if (!(job.getDefinition() instanceof CpsFlowDefinition) || job.getDefinition().g
     job.setDefinition(new CpsFlowDefinition(pipelineScript, true))
     job.save()
 }
-if (job.getProperty(ParametersDefinitionProperty.class) == null) {
-    job.addProperty(new ParametersDefinitionProperty([
-        new StringParameterDefinition('BRANCH', 'main', 'Branch a compilar e implantar.'),
-        new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação após o build.'),
-        new ChoiceParameterDefinition('DEPLOY_TARGET', ['compose', 'kubernetes'] as String[], 'Destino.'),
-        new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git HTTPS opcional.'),
-        new StringParameterDefinition('REGISTRY', '', 'Registry opcional para Compose.'),
-        new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential do registry.'),
-        new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Kubeconfig.')
-    ]))
-    job.save()
-}
+job.removeProperty(ParametersDefinitionProperty.class)
+job.addProperty(new ParametersDefinitionProperty([
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a compilar e implantar.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação após o build.'),
+    new BooleanParameterDefinition('ANALYTICS_GPU', false, 'Construir e implantar o runtime analytics com PyTorch CUDA e override NVIDIA.'),
+    new ChoiceParameterDefinition('DEPLOY_TARGET', ['compose', 'kubernetes'] as String[], 'Destino.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git HTTPS opcional.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry opcional para Compose.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential do registry.'),
+    new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Kubeconfig.')
+]))
+job.save()
