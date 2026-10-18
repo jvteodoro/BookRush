@@ -36,9 +36,11 @@ A evidência é consistente com corrupção, truncamento ou invalidação do mma
 
 ### 1. Dumps da JVM
 
-Os arquivos foram extraídos dos containers parados com `docker cp` e mantidos
-no host de investigação, fora do Git. Os hashes permitem correlacionar o
-relatório com os arquivos brutos caso sejam arquivados pelo operador:
+Os arquivos foram extraídos dos containers parados com `docker cp` e estão
+disponíveis localmente em
+`docs/operations/incidents/evidence/raw/`. Essa pasta é explicitamente ignorada
+pelo Git; os hashes permitem correlacionar o relatório com os arquivos brutos
+sem publicá-los:
 
 | Serviço | Arquivo bruto | SHA-256 |
 | --- | --- | --- |
@@ -219,7 +221,7 @@ restrito e registrar somente o hash no incidente.
   healthcheck, deploy e smoke público.
 - `bookrush-vunc` no Beads: histórico sanitizado da investigação e do incidente
   do feed.
-- Dumps brutos referenciados pelos hashes acima: capturados de
+- `docs/operations/incidents/evidence/raw/`: dumps brutos capturados de
   `bookrush-recommendation-service-1` e `bookrush-reader-bff-service-1` em
-  2026-10-18; não são armazenados no Git por conterem detalhes de runtime do
-  host.
+  2026-10-18. A pasta é ignorada pelo Git por conter detalhes de runtime do
+  host, mas permanece disponível na árvore local.
