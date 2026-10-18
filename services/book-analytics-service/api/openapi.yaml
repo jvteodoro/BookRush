@@ -57,6 +57,7 @@ paths:
           name: jobId
           required: false
           schema: {type: string, format: uuid}
+          description: If omitted, aggregate all persisted jobs.
         - in: query
           name: limit
           required: false

@@ -272,7 +272,7 @@ public class AnalyticsController {
             + " percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_ms) AS p95_ms,"
             + " percentile_cont(0.99) WITHIN GROUP (ORDER BY duration_ms) AS p99_ms"
             + " FROM analytics.analysis_phase_timing"
-            + " WHERE duration_ms IS NOT NULL AND (? IS NULL OR job_id=?)"
+            + " WHERE duration_ms IS NOT NULL AND (CAST(? AS uuid) IS NULL OR job_id=?)"
             + " GROUP BY phase, status ORDER BY phase, status LIMIT ?",
         jobId, jobId, limit);
     return ResponseEntity.ok(Map.of("items", rows, "total", rows.size()));

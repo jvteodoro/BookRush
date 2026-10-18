@@ -29,3 +29,7 @@ Exemplo de agrupamento para uma tabela: filtrar `phase = EXCERPT_EMBEDDINGS`,
 ordenar por `p95_ms` decrescente e separar `COMPLETED` de `FAILED`. O endpoint
 é histórico e não substitui o heartbeat/estado do job; use a API de jobs para
 acompanhar progresso corrente.
+
+Quando `jobId` não é informado, o serviço aplica um filtro UUID nulo tipado
+explicitamente. Isso mantém a agregação global válida no PostgreSQL sem deixar
+o driver inferir o tipo de um parâmetro nulo.
