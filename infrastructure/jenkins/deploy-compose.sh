@@ -24,7 +24,7 @@ old_ingestion="$(docker inspect --format '{{.Config.Image}}' bookrush-book-inges
 old_analytics="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analytics-service-1 2>/dev/null || true)"
 old_reader_profile="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-profile-service-1 2>/dev/null || true)"
 old_social="$(docker inspect --format '{{.Config.Image}}' bookrush-social-service-1 2>/dev/null || true)"
-old_keycloak="$(docker inspect --format '{{.Config.Image}}' bookrush-keycloak-1 2>/dev/null || true)"
+keycloak_state="$(docker inspect --format '{{.State.Status}}' bookrush-keycloak-1 2>/dev/null || true)"
 diagnose() {
   for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-frontend-1; do
     echo "--- diagnóstico $service ---" >&2
@@ -32,22 +32,37 @@ diagnose() {
     docker logs --tail=120 --timestamps "$service" >&2 || true
   done
 }
+compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-service reader-profile-service social-service frontend)
+if [[ -n "$keycloak_state" ]]; then
+  if [[ "$keycloak_state" != running ]]; then
+    docker start bookrush-keycloak-1 >/dev/null
+  fi
+  keycloak_networked="$(docker network inspect bookrush_bookrush --format '{{range .Containers}}{{if eq .Name \"bookrush-keycloak-1\"}}yes{{end}}{{end}}' 2>/dev/null || true)"
+  if [[ -z "$keycloak_networked" ]]; then
+    # A stale Compose view can race with the daemon's endpoint list. If the
+    # endpoint already exists, the container is effectively connected and the
+    # deploy must continue without trying to recreate Keycloak.
+    docker network connect bookrush_bookrush bookrush-keycloak-1 2>&1 || true
+  fi
+  echo 'Keycloak persistente existente detectado; preservando o container durante este deploy.' >&2
+else
+  compose_services=(keycloak "${compose_services[@]}")
+fi
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
   if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_reader_profile" && -n "$old_social" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 keycloak reverse-proxy catalog-service frontend book-ingestion-service book-analytics-service reader-profile-service social-service
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
   else
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 keycloak reverse-proxy catalog-service frontend
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
   fi
 }
 
-deploy_services=(keycloak reverse-proxy catalog-service book-ingestion-service book-analytics-service reader-profile-service social-service frontend)
 echo "Iniciando deploy das imagens:" >&2
 printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${FRONTEND_IMAGE}" >&2
 
 # Não usar somente trap ERR: docker compose pode falhar durante --wait e o
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.
-if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${deploy_services[@]}"; then
+if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"; then
   echo 'Falha ao iniciar ou aguardar os serviços novos.' >&2
   diagnose
   rollback
