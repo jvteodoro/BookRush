@@ -45,7 +45,8 @@ O primeiro passo da integração é o endpoint interno em lote:
 
 com `{ "bookIds": ["..."] }`. Ele retorna no máximo um score por livro,
 calculado a partir do maior `analytics.excerpt_rank.final_score` elegível da
-versão textual atual, junto com `rankerVersion`. O recommendation-service faz
+versão apontada por `catalog.book_asset.current_version_id`, junto com
+`rankerVersion`. O recommendation-service faz
 uma única chamada por feed, aplica cache e ordena os candidatos por score
 analítico antes do desempate heurístico e da diversidade de idioma. Se o
 analytics, o token S2S ou o timeout falhar, o resultado volta integralmente ao

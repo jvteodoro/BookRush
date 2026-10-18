@@ -613,13 +613,13 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
 WITH latest_asset AS (
   SELECT DISTINCT ON (a.book_id) a.book_id, v.id AS version_id
     FROM catalog.book_asset a
-    JOIN catalog.book_asset_version v ON v.book_asset_id = a.id
+    JOIN catalog.book_asset_version v ON v.id = a.current_version_id
    WHERE a.book_id IN (%s)
      AND a.asset_role IN ('NORMALIZED', 'PROCESSING', 'ANALYTICS')
      AND a.asset_type IN ('TXT', 'HTML')
      AND a.status <> 'DELETED'
      AND v.status = 'AVAILABLE'
-   ORDER BY a.book_id, v.version_number DESC, v.created_at DESC, v.id DESC
+   ORDER BY a.book_id, a.updated_at DESC, a.id DESC
 ), ranked AS (
   SELECT la.book_id, er.final_score, er.ranker_version, er.created_at
     FROM latest_asset la
