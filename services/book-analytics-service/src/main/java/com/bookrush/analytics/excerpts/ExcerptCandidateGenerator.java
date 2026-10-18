@@ -154,7 +154,10 @@ public final class ExcerptCandidateGenerator {
       String raw = matcher.group();
       int leadingUtf16 = leadingUtf16(raw);
       int trailingUtf16 = trailingUtf16(raw);
-      if (leadingUtf16 == trailingUtf16) continue;
+      // A matcher can contain only whitespace (for example an EPUB paragraph
+      // separator). It has no valid half-open interval and must not produce
+      // start > end offsets for the downstream slicer.
+      if (leadingUtf16 >= trailingUtf16) continue;
       int sentenceStart =
           startCodepoint + section.codePointCount(0, matcher.start() + leadingUtf16);
       int sentenceEnd = startCodepoint + section.codePointCount(0, matcher.start() + trailingUtf16);

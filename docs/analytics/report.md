@@ -238,6 +238,11 @@ minutos em CPU, especialmente em livros longos; ausência de alteração de
 janela de segurança, itens `RUNNING` com erro deixados por uma recriação do
 container; isso evita que uma execução interrompida bloqueie o lote. Não conclua que o job terminou apenas
 porque um container está saudável.
+
+O gerador de excerpts também descarta sentenças compostas apenas por
+separadores/whitespace. Esses intervalos não têm conteúdo e, se fossem
+persistidos, poderiam inverter os offsets Unicode (`start > end`) e interromper
+um livro inteiro durante a geração de candidatos.
 estágio, mas não devem registrar tokens, segredos, URLs assinadas ou o texto
 integral do livro.
 
