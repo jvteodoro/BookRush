@@ -6,7 +6,9 @@
 
 `GET /api/v1/admin/users?search=&page=0&size=25` pesquisa e pagina todas as
 contas do realm de produto, inclusive aquelas sem perfil local. Somente tokens
-do realm de plataforma com grupo de operador podem chamar a rota.
+do realm de plataforma com os papéis canônicos `platform-admin` ou
+`platform-operator` — ou com os grupos legados `platform-admins` e `operators`
+— podem chamar a rota.
 
 `POST /api/v1/admin/users/{subjectKey}/disable` e `/enable` recebem
 `{"reason":"..."}`. A alteração é confirmada no Keycloak antes da auditoria;

@@ -2,6 +2,7 @@ package com.bookrush.adminservice;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -53,7 +54,7 @@ public class AdminSecurityConfiguration {
     return decoder;
   }
 
-  private JwtAuthenticationConverter groupsConverter() {
+  JwtAuthenticationConverter groupsConverter() {
     var converter = new JwtAuthenticationConverter();
     converter.setJwtGrantedAuthoritiesConverter(jwt -> {
       var authorities = new java.util.ArrayList<GrantedAuthority>();
@@ -62,6 +63,12 @@ public class AdminSecurityConfiguration {
         if (!scope.isBlank()) authorities.add(new SimpleGrantedAuthority("SCOPE_" + scope));
       var groups = jwt.getClaimAsStringList("groups");
       if (groups != null) groups.forEach(group -> authorities.add(new SimpleGrantedAuthority("ROLE_" + group)));
+      Object realmAccess = jwt.getClaim("realm_access");
+      if (realmAccess instanceof Map<?, ?> access && access.get("roles") instanceof List<?> roles) {
+        roles.stream().filter(String.class::isInstance).map(String.class::cast)
+            .filter(role -> !role.isBlank())
+            .forEach(role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role)));
+      }
       return authorities;
     });
     return converter;

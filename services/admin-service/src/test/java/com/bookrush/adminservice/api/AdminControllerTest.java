@@ -24,7 +24,7 @@ class AdminControllerTest {
   private final AdminController controller = new AdminController(jdbc, keycloak);
   private final Principal principal = () -> "operator-1";
   private final TestingAuthenticationToken operator =
-      new TestingAuthenticationToken(principal, "credentials", "ROLE_platform-admins");
+      new TestingAuthenticationToken(principal, "credentials", "ROLE_platform-admin");
 
   @Test
   void rejectsReaderFromUserManagement() {
@@ -32,6 +32,20 @@ class AdminControllerTest {
     assertThrows(ResponseStatusException.class, () -> controller.users("", 0, 25, principal, reader));
     assertThrows(ResponseStatusException.class, () -> controller.disable(
         "subject-2", new AdminController.UserStatusChange("abuse"), principal, reader));
+  }
+
+  @Test
+  void acceptsCanonicalPlatformOperatorRole() {
+    var realmOperator = new TestingAuthenticationToken(
+        principal, "credentials", "ROLE_platform-operator");
+    when(keycloak.users("", 0, 25)).thenReturn(List.of());
+    when(keycloak.count("")).thenReturn(0L);
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> page =
+        (Map<String, Object>) controller.users("", 0, 25, principal, realmOperator);
+
+    assertEquals(0L, page.get("totalItems"));
   }
 
   @Test

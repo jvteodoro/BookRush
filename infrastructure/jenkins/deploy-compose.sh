@@ -108,6 +108,37 @@ if [[ -z "${KEYCLOAK_ADMIN_CLIENT_SECRET:-}" ]]; then
   if $xtrace_was_enabled; then set -x; fi
 fi
 
+probe_user_management() {
+  local xtrace_was_enabled=false admin_user admin_password probe_secret probe_token rc
+  [[ $- == *x* ]] && xtrace_was_enabled=true
+  set +x
+  admin_user="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
+  admin_password="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
+  admin_user="${admin_user:-admin}"
+  if [[ -z "$admin_password" ]]; then
+    echo 'Smoke de usuários: KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD ausente.' >&2
+    return 1
+  fi
+  probe_secret="$(docker run --rm -i --network bookrush_bookrush \
+    -e KEYCLOAK_URL=http://keycloak:8080 \
+    -e KEYCLOAK_REALM=bookrush-platform \
+    -e KEYCLOAK_CLIENT_ID=bookrush-ingestion-admin \
+    -e KEYCLOAK_USER="$admin_user" \
+    -e KEYCLOAK_PASSWORD="$admin_password" \
+    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py")" || return 1
+  probe_token="$(docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 -fsS -X POST \
+    http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
+    -d grant_type=client_credentials -d client_id=bookrush-ingestion-admin \
+    --data-urlencode "client_secret=$probe_secret" | jq -er '.access_token')" || return 1
+  docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 -fsS \
+    -H "Authorization: Bearer $probe_token" \
+    'http://admin-service:8100/api/v1/admin/users?page=0&size=1' >/dev/null
+  rc=$?
+  unset admin_password probe_secret probe_token
+  if $xtrace_was_enabled; then set -x; fi
+  return "$rc"
+}
+
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
   if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
@@ -127,6 +158,14 @@ printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMA
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.
 if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"; then
   echo 'Falha ao iniciar ou aguardar os serviços novos.' >&2
+  diagnose
+  rollback
+  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  exit 1
+fi
+
+if ! probe_user_management; then
+  echo 'Smoke test autenticado de gerenciamento de usuários falhou.' >&2
   diagnose
   rollback
   echo 'Rollback concluído; o deploy será marcado como falho.' >&2

@@ -192,6 +192,12 @@ frontend, perfis de leitores, social, `admin-service` e `admin-web`; isso garant
 que contratos usados pelas interfaces sejam implantados na mesma revisão.
 PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
 
+Antes de aceitar a revisão, o deploy também obtém um token técnico do realm
+administrativo e consulta `/api/v1/admin/users` pelo `admin-service`. Esse smoke
+autenticado valida, em uma única chamada, os papéis do operador técnico, o
+segredo do cliente de gerenciamento e o acesso ao realm de usuários; qualquer
+falha aciona diagnóstico e rollback.
+
 Um job parametrizado pode carregar o Jenkinsfile da `main` antes de fazer o
 checkout de uma feature. Enquanto a `main` ainda não conhecer as imagens
 administrativas, `deploy-compose.sh` deriva suas tags das imagens de catálogo e

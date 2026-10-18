@@ -39,6 +39,8 @@ public class AdminController {
     if (authentication == null || authentication.getAuthorities().stream()
         .noneMatch(authority -> authority.getAuthority().equals("ROLE_platform-admins")
             || authority.getAuthority().equals("ROLE_operators")
+            || authority.getAuthority().equals("ROLE_platform-admin")
+            || authority.getAuthority().equals("ROLE_platform-operator")
             || authority.getAuthority().equals("ROLE_OPERATOR"))) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "operator permission required");
     }
