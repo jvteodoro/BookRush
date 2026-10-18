@@ -12,6 +12,12 @@ fi
 : "${SOCIAL_IMAGE:?Imagem social ausente}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --profile auth)
+if [[ "${ANALYTICS_GPU:-false}" == "true" ]]; then
+  compose+=( -f "${script_dir}/../compose.analytics-gpu.yaml" )
+  export ANALYTICS_NLI_ENABLED=true
+  export ANALYTICS_NLI_BATCH_SIZE="${ANALYTICS_NLI_BATCH_SIZE:-8}"
+  export ANALYTICS_EMBEDDINGS_BATCH_SIZE="${ANALYTICS_EMBEDDINGS_BATCH_SIZE:-4}"
+fi
 storage_public_endpoint="$(awk -F= '$1 == "STORAGE_PUBLIC_ENDPOINT" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 if [[ -z "$storage_public_endpoint" || "$storage_public_endpoint" =~ ^https?://(localhost|127\.0\.0\.1)(:|/|$) || "$storage_public_endpoint" != https://* ]]; then
   echo 'STORAGE_PUBLIC_ENDPOINT deve ser uma URL HTTPS pública do endpoint S3; localhost não pode ser usado em produção.' >&2
