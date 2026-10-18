@@ -1761,3 +1761,154 @@ table td {
   box-shadow: var(--br-shadow);
   cursor: pointer;
 }
+
+/* Review queue: keep the list on the same light, high-contrast surface as
+   the rest of the admin instead of inheriting the legacy dark palette. */
+.review-controls {
+  align-items: stretch;
+  margin: 1.5rem 0;
+  gap: 0.75rem;
+}
+
+.review-search,
+.review-select,
+.review-sort-direction {
+  min-height: 48px;
+  border: 2px solid var(--br-ink);
+  border-radius: 12px;
+  background: var(--br-surface);
+  color: var(--br-ink);
+  box-shadow: 3px 3px 0 var(--br-outline-soft);
+}
+
+.review-search,
+.review-select {
+  padding: 0 0.9rem;
+}
+
+.review-search > svg,
+.review-select > svg {
+  color: var(--br-teal);
+}
+
+.review-search input,
+.review-select select {
+  color: var(--br-ink);
+  background: transparent;
+}
+
+.review-search input::placeholder {
+  color: #756d5f;
+}
+
+.review-select option {
+  color: var(--br-ink);
+  background: var(--br-surface);
+}
+
+.review-sort-direction {
+  padding: 0 1rem;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.review-sort-direction:hover,
+.review-sort-direction:focus-visible {
+  background: var(--br-gold);
+  border-color: var(--br-ink);
+  color: var(--br-ink);
+}
+
+.review-card {
+  background: var(--br-surface);
+  border: 2px solid var(--br-ink);
+  border-radius: 14px;
+  box-shadow: var(--br-shadow-soft);
+  color: var(--br-ink);
+}
+
+.review-card.expanded {
+  box-shadow: var(--br-shadow);
+}
+
+.review-card-summary {
+  color: var(--br-ink);
+}
+
+.review-card-summary > svg {
+  color: var(--br-teal);
+}
+
+.review-card-summary:hover h2,
+.review-card-summary:focus-visible h2 {
+  color: var(--br-red);
+}
+
+.review-card-head h2 {
+  color: var(--br-ink);
+  font-family: var(--br-font-display);
+}
+
+.review-card-head p,
+.review-description {
+  color: #6b6455;
+}
+
+.review-description,
+.review-assets {
+  border-color: var(--br-outline-soft);
+}
+
+.review-assets > strong {
+  color: var(--br-teal);
+  font-family: var(--br-font-sans);
+}
+
+.review-asset {
+  background: var(--br-surface-2);
+  border: 2px solid var(--br-outline-soft);
+  color: var(--br-ink);
+}
+
+.review-asset > div:first-child {
+  color: var(--br-teal);
+}
+
+.review-asset span {
+  color: var(--br-ink);
+}
+
+.review-asset small {
+  color: #6b6455;
+}
+
+.review-approved {
+  color: var(--br-teal) !important;
+}
+
+.review-tabs button {
+  background: var(--br-surface);
+  border: 2px solid var(--br-outline-soft);
+  color: #6b6455;
+}
+
+.review-tabs button.active {
+  background: var(--br-surface-2);
+  border-color: var(--br-red);
+  color: var(--br-red);
+}
+
+@media (max-width: 700px) {
+  .review-card-head {
+    flex-direction: column;
+  }
+
+  .review-card-actions,
+  .review-card-actions button {
+    width: 100%;
+  }
+
+  .review-sort-direction {
+    width: 100%;
+  }
+}
