@@ -11,6 +11,7 @@ import com.bookrush.analytics.observability.AnalyticsMetrics;
 import com.bookrush.analytics.storage.TextAssetReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
@@ -52,6 +53,7 @@ public final class AnalyticsJobWorker {
   private final int retryDelaySeconds;
   private final ExecutorService processingExecutor;
   private final Semaphore processingSlots;
+  private final com.bookrush.analytics.excerpts.SupervisedCandidateScorer supervisedScorer;
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
@@ -62,7 +64,10 @@ public final class AnalyticsJobWorker {
       @Value("${analytics.worker.stale-after-seconds:900}") int staleAfterSeconds,
       @Value("${analytics.worker.max-attempts:3}") int maxAttempts,
       @Value("${analytics.worker.retry-delay-seconds:30}") int retryDelaySeconds,
-      @Value("${analytics.worker.concurrency:1}") int concurrency) {
+      @Value("${analytics.worker.concurrency:1}") int concurrency,
+      @Value("${analytics.scorer.enabled:false}") boolean scorerEnabled,
+      @Value("${analytics.scorer.artifact:${analytics.models.cache-dir}/candidate-scorer.json}") String scorerArtifact,
+      @Value("${analytics.scorer.allow-experimental:false}") boolean allowExperimentalScorer) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
@@ -78,6 +83,16 @@ public final class AnalyticsJobWorker {
       thread.setDaemon(true);
       return thread;
     });
+    this.supervisedScorer = loadSupervisedScorer(scorerEnabled, scorerArtifact, allowExperimentalScorer);
+  }
+
+  private com.bookrush.analytics.excerpts.SupervisedCandidateScorer loadSupervisedScorer(
+      boolean enabled, String artifact, boolean allowExperimental) {
+    if (!enabled) return null;
+    var scorer = com.bookrush.analytics.excerpts.SupervisedCandidateScorer.load(Path.of(artifact), allowExperimental);
+    log.info("analytics supervised scorer enabled code={} version={} artifact={}",
+        "EXCERPT_SUPERVISED_SCORER_V1", "configured", artifact);
+    return scorer;
   }
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
@@ -319,11 +334,13 @@ UPDATE analytics.analysis_job_item i
           "2");
       var chapters = timed(item, "CHAPTER_DISCOVERY",
           () -> chapters(item.inputVersion(), TextAssetReader.codePointLength(text)));
-      String language = languageFor(item.inputVersion());
+      String catalogLanguage = languageFor(item.inputVersion());
+      String language = catalogLanguage;
       var detected = timed(item, "LANGUAGE_VALIDATION", () -> linguisticRuntime.language(text));
       if ("VALID".equals(detected.status())
           && ("en".equals(detected.language()) || "pt".equals(detected.language()))
           && detected.confidence() >= 0.60d) language = detected.language();
+      persistLanguageValidation(run, item.inputVersion(), catalogLanguage, detected);
       var chapterById =
           chapters.stream()
               .collect(
@@ -492,9 +509,13 @@ UPDATE analytics.analysis_job_item i
               values.features(),
               new com.bookrush.analytics.excerpts.ExcerptRanker.Weights(
                   "EXCERPT_HEURISTIC_RANKER_V1", weights));
-      var dimensions =
-          com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.from(
-              values.features(), values.statuses());
+      var supervised = supervisedScorer == null ? null : supervisedScorer.score(values.features());
+      var dimensions = supervised == null
+          ? com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.from(values.features(), values.statuses())
+          : supervised.dimensions();
+      String rankerCode = supervised == null ? "EXCERPT_HEURISTIC_RANKER" : supervised.code();
+      String rankerVersion = supervised == null ? ranked.version() : supervised.version();
+      double finalScore = supervised == null ? ranked.score() : supervised.score();
       String components =
           "{"
               + ranked.contributions().entrySet().stream()
@@ -502,6 +523,7 @@ UPDATE analytics.analysis_job_item i
                   .collect(java.util.stream.Collectors.joining(","))
               + ",\"dimensions\":"
               + dimensionsJson(dimensions)
+              + (supervised == null ? "" : ",\"artifact_sha256\":\"" + supervised.artifactSha256() + "\"")
               + "}";
       jdbc.update(
           """
@@ -510,12 +532,12 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
 """,
           UUID.randomUUID(),
           excerptId,
-          "EXCERPT_HEURISTIC_RANKER",
-          ranked.version(),
-          sha256(weightJson),
+          rankerCode,
+          rankerVersion,
+          supervised == null ? sha256(weightJson) : supervised.artifactSha256(),
           components,
           weightJson,
-          ranked.score());
+          finalScore);
     }
   }
 
@@ -605,6 +627,59 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
         excerptId,
         value,
         prefix + "." + metric);
+  }
+
+  private void persistLanguageValidation(
+      UUID run,
+      UUID inputVersion,
+      String catalogLanguage,
+      LinguisticRuntimeClient.LanguageResult detected) {
+    String status = switch (detected.status()) {
+      case "VALID", "MODEL_UNAVAILABLE", "INVALID_INPUT", "INSUFFICIENT_SAMPLE", "ERROR" -> detected.status();
+      default -> "UNSUPPORTED";
+    };
+    jdbc.update(
+        """
+INSERT INTO analytics.document_feature
+  (analysis_run_id,feature_definition_id,input_asset_version_id,text_value,value_status,confidence,sample_size,warning,computed_at)
+SELECT ?,fd.id,?,?,?, ?,NULL,?,clock_timestamp()
+FROM analytics.feature_definition fd WHERE fd.code='language.detected'
+ON CONFLICT (analysis_run_id,feature_definition_id)
+DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
+  text_value=EXCLUDED.text_value,value_status=EXCLUDED.value_status,
+  confidence=EXCLUDED.confidence,sample_size=EXCLUDED.sample_size,
+  warning=EXCLUDED.warning,computed_at=EXCLUDED.computed_at
+""",
+        run, inputVersion, detected.language(), status,
+        "VALID".equals(status) ? detected.confidence() : null, detected.warning());
+    jdbc.update(
+        """
+INSERT INTO analytics.document_feature
+  (analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,confidence,sample_size,warning,computed_at)
+SELECT ?,fd.id,?,?,?, ?,NULL,?,clock_timestamp()
+FROM analytics.feature_definition fd WHERE fd.code='language.confidence'
+ON CONFLICT (analysis_run_id,feature_definition_id)
+DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
+  numeric_value=EXCLUDED.numeric_value,value_status=EXCLUDED.value_status,
+  confidence=EXCLUDED.confidence,sample_size=EXCLUDED.sample_size,
+  warning=EXCLUDED.warning,computed_at=EXCLUDED.computed_at
+""",
+        run, inputVersion, detected.confidence(), status,
+        "VALID".equals(status) ? detected.confidence() : null, detected.warning());
+    if ("VALID".equals(status) && catalogLanguage != null && detected.language() != null) {
+      jdbc.update(
+          """
+INSERT INTO analytics.document_feature
+  (analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,confidence,computed_at)
+SELECT ?,fd.id,?,?, 'VALID',1,clock_timestamp()
+FROM analytics.feature_definition fd WHERE fd.code='language.agreement'
+ON CONFLICT (analysis_run_id,feature_definition_id)
+DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
+  numeric_value=EXCLUDED.numeric_value,value_status=EXCLUDED.value_status,
+  confidence=EXCLUDED.confidence,computed_at=EXCLUDED.computed_at
+""",
+          run, inputVersion, catalogLanguage.equalsIgnoreCase(detected.language()) ? 1d : 0d);
+    }
   }
 
   private static Map<String, String> nliHypotheses(String language) {
