@@ -106,9 +106,12 @@ Obras sem
 projeção textual disponível permanecem indisponíveis até a ingestão concluir o
 artifact autorizado.
 
-O perfil autenticado é carregado de `GET /api/v1/profile`; nome, bio e estado
-público deixam de depender da lista de usuários do protótipo. A edição e a
-privacidade persistem por `PUT /api/v1/profile`. A administração exibe somente
+O perfil autenticado é carregado de `GET /api/v1/profile`; nome e bio deixam de
+depender da lista de usuários do protótipo. As cinco preferências de privacidade
+são lidas e persistidas em `GET/PUT /api/v1/profile/privacy`: perfil, atividade,
+biblioteca, leituras recentes e grafo social aceitam `PUBLIC`, `FOLLOWERS` ou
+`PRIVATE`. O campo legado `isPublic` continua compatível e corresponde à
+visibilidade do perfil. A administração exibe somente
 usuários e denúncias retornados pela facade, e decisões são registradas por
 `POST /api/v1/admin/moderation`; não há bloqueios ou métricas simuladas no
 cliente.
@@ -144,9 +147,11 @@ Respostas `401` de endpoints opcionais (administração/publicador) não removem
 Comentários preservam `subject_key` como identidade técnica, mas resolvem o nome de exibição público no `reader-profile-service`. O valor é salvo como snapshot no comentário e também atualizado na leitura quando o perfil público estiver disponível; email nunca é usado como chave.
 
 O contrato `GET /api/v1/profile/public?subject=...` retorna `displayName` e
-`bio` somente quando `is_public=true`; o `social-service` encaminha o bearer do
-usuário ao consultar esse contrato e expõe o nome como `authorName` nos
-comentários.
+`bio` somente quando `profileVisibility=PUBLIC` (com fallback para o legado
+`is_public` quando ainda não existe política); o `social-service` encaminha o
+bearer do usuário ao consultar esse contrato e expõe o nome como `authorName`
+nos comentários. `FOLLOWERS` é mantido fechado nesse contrato público; a
+aplicação da audiência exige um consumidor que conheça a relação social.
 
 No cliente web, o nome e o avatar do autor no painel de comentários abrem
 `/usuarios/{subject_key}`. A rota consulta o mesmo perfil público usando o

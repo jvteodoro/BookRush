@@ -110,7 +110,7 @@ paths:
         - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
         - {name: status, in: query, schema: {type: string}}
       responses:
-        '200': {description: Itens persistidos do job com paginação; cada item inclui book_id, book_title e input_asset_version_id}
+        '200': {description: "Itens persistidos do job com paginação; cada item inclui book_id, book_title e input_asset_version_id"}
         '404': {description: Job inexistente}
   /api/admin/v1/analytics/jobs/{jobId}/items/{itemId}:
     get:
