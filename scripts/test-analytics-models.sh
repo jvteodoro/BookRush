@@ -7,6 +7,14 @@ volume=${ANALYTICS_MODEL_VOLUME:-bookrush_analytics_models}
 port=${ANALYTICS_RUNTIME_TEST_PORT:-18092}
 container="bookrush-analytics-models-test-$$"
 tmp_dir=$(mktemp -d)
+run_args=(-p "${port}:8092")
+
+# Jenkins runs the agent in a container while Docker creates this runtime as a
+# sibling through the host daemon. Share the agent namespace there so the
+# loopback probes reach the runtime; keep the published port for local runs.
+if [[ -n "${HOSTNAME:-}" ]] && docker inspect "$HOSTNAME" >/dev/null 2>&1; then
+  run_args=(--network "container:$HOSTNAME")
+fi
 
 cleanup() {
   docker rm -f "$container" >/dev/null 2>&1 || true
@@ -15,7 +23,7 @@ cleanup() {
 trap cleanup EXIT
 
 docker build -t "$image" "$root_dir/services/book-analytics-runtime"
-docker run -d --rm --name "$container" -p "${port}:8092" \
+docker run -d --rm --name "$container" "${run_args[@]}" \
   -e ANALYTICS_OFFLINE=true \
   -v "${volume}:/var/lib/bookrush/models:ro" \
   "$image" >/dev/null
@@ -24,7 +32,11 @@ for _ in $(seq 1 120); do
   if curl -fsS "http://127.0.0.1:${port}/health" >"$tmp_dir/health.json"; then break; fi
   sleep 1
 done
-test -s "$tmp_dir/health.json"
+if ! test -s "$tmp_dir/health.json"; then
+  echo "analytics runtime did not become healthy" >&2
+  docker logs "$container" >&2 || true
+  exit 1
+fi
 
 curl -fsS -X POST "http://127.0.0.1:${port}/v1/language" -H 'Content-Type: application/json' \
   --data '{"text":"The old house stood beside the quiet harbor."}' >"$tmp_dir/language-en.json"

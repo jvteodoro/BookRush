@@ -25,6 +25,12 @@ usando `--volumes-from "$HOSTNAME"`; não substitua isso por um bind mount de
 `$PWD`, pois o caminho do workspace existe no daemon Docker e não no processo
 do agente. Um bind mount incorreto faz o gate receber um `/repo` vazio e falhar
 com `scripts/validate-change.sh: No such file or directory`.
+
+O teste do runtime de modelos usa a mesma regra de namespace: quando executado
+no agente, o container temporário do runtime compartilha a rede do agente para
+que os probes em `127.0.0.1` atinjam o processo correto. Fora do Jenkins, o
+script mantém o mapeamento de porta local. Se o healthcheck falhar, os logs do
+runtime são emitidos pelo próprio script para evitar diagnóstico por timeout.
 2. Confirme que `https://jenkins-bookrush.jteodoro.tec.br` resolve e responde.
    HTTP 403 sem sessão é esperado; falha de DNS ou HTTP 5xx indica problema de
    infraestrutura, não de pipeline.
