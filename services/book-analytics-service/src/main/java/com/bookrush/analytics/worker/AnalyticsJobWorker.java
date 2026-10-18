@@ -155,10 +155,12 @@ RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
     int recoveredItems = jdbc.update(
         staleLeaseRecoverySql(), maxAttempts, maxAttempts, maxAttempts, maxAttempts,
         maxAttempts, maxAttempts, staleAfterSeconds);
-    if (recoveredPhases > 0) {
-      log.warn("analytics stale recovery phases={} items={}", recoveredPhases, recoveredItems);
+    int exhaustedItems = jdbc.update(exhaustedPendingRecoverySql(), maxAttempts);
+    if (recoveredPhases > 0 || recoveredItems > 0 || exhaustedItems > 0) {
+      log.warn("analytics stale recovery phases={} items={} exhaustedPending={}",
+          recoveredPhases, recoveredItems, exhaustedItems);
     }
-    return recoveredItems;
+    return recoveredItems + exhaustedItems;
   }
 
   static int normalizeStaleAfterSeconds(int seconds) {
@@ -206,6 +208,24 @@ UPDATE analytics.analysis_phase_timing p
    AND j.cancel_requested=false
    AND j.status IN ('PENDING','RUNNING')
    AND COALESCE(i.progress_updated_at, i.started_at) < clock_timestamp() - (? * INTERVAL '1 second')
+""";
+  }
+
+  static String exhaustedPendingRecoverySql() {
+    return """
+UPDATE analytics.analysis_job_item i
+   SET status='FAILED', finished_at=COALESCE(i.finished_at, clock_timestamp()),
+       progress_stage='FAILED',
+       progress_message='Item pendente atingiu o limite de tentativas',
+       progress_updated_at=clock_timestamp(),
+       error_code='WORKER_RESTART_RECOVERY',
+       error_message='Item não pode ser reclamado após o limite de tentativas'
+  FROM analytics.analysis_job j
+ WHERE i.job_id=j.id
+   AND i.status='PENDING'
+   AND i.attempt_count >= ?
+   AND j.cancel_requested=false
+   AND j.status IN ('PENDING','RUNNING')
 """;
   }
 

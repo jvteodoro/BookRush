@@ -34,4 +34,14 @@ class AnalyticsJobWorkerLeaseTest {
     assertTrue(sql.contains("WORKER_RESTART_RECOVERY"));
     assertTrue(sql.contains("p.attempt_count=i.attempt_count"));
   }
+
+  @Test
+  void exhaustedPendingRecoveryCannotLeaveAnUnclaimableItemInQueue() {
+    var sql = AnalyticsJobWorker.exhaustedPendingRecoverySql();
+
+    assertTrue(sql.contains("i.status='PENDING'"));
+    assertTrue(sql.contains("i.attempt_count >= ?"));
+    assertTrue(sql.contains("status='FAILED'"));
+    assertTrue(sql.contains("WORKER_RESTART_RECOVERY"));
+  }
 }

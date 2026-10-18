@@ -77,6 +77,9 @@ recuperados voltaram a `COMPLETED` ou `FAILED` de forma explícita.
 Essa recuperação é parametrizada pelo limite configurado e tem teste que
 confere a quantidade de parâmetros da SQL, evitando que uma alteração no
 histórico de estados desative silenciosamente o scheduler.
+Itens `PENDING` legados que já atingiram o limite também são convertidos para
+`FAILED` com o mesmo código de recuperação; isso elimina estados impossíveis de
+reclamar deixados por versões anteriores do worker.
 
 Falhas transitórias também retornam automaticamente a `PENDING`: o worker usa
 até `ANALYTICS_WORKER_MAX_ATTEMPTS` (3 por padrão) e backoff progressivo baseado
