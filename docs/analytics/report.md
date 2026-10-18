@@ -60,6 +60,12 @@ de progresso e histórico de eventos. Fases antigas sem eventos continuam
 visíveis com sua duração persistida, mas não podem ser retroativamente
 detalhadas.
 
+O número da tentativa é monotônico por item. Durante o claim, o worker usa o
+maior `attempt_count` já persistido nas fases, e não apenas o contador atual do
+item. A migration V24 também renumera execuções históricas quando um requeue
+manual antigo reutilizou números; isso impede que duas execuções sejam
+agrupadas na mesma aba do admin e evita burlar `max-attempts`.
+
 As estatísticas `excerpts`, `features` e `embeddings` são calculadas pelo
 `analysis_run_id` através das tabelas de features do run. Excerpts são
 reutilizáveis por versão de asset e, por isso, não possuem `analysis_run_id`

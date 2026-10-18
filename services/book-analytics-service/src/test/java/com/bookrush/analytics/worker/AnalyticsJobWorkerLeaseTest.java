@@ -20,6 +20,16 @@ class AnalyticsJobWorkerLeaseTest {
   }
 
   @Test
+  void claimUsesTheHighestPersistedAttemptWhenItemCounterWasReset() {
+    var sql = AnalyticsJobWorker.claimSql();
+
+    assertTrue(sql.contains("MAX(p.attempt_count)"));
+    assertTrue(sql.contains("n.effective_attempt_count+1"));
+    assertTrue(sql.contains("GREATEST(i.attempt_count"));
+    assertTrue(!sql.contains("WHERE i.status='PENDING' AND i.attempt_count < ?"));
+  }
+
+  @Test
   void staleLeaseThresholdCannotDisableRecovery() {
     assertEquals(1, AnalyticsJobWorker.normalizeStaleAfterSeconds(0));
     assertEquals(900, AnalyticsJobWorker.normalizeStaleAfterSeconds(900));

@@ -115,24 +115,7 @@ public final class AnalyticsJobWorker {
 
   private Item claimOne() {
     return jdbc.query(
-        """
-WITH next_item AS (
-  SELECT i.id FROM analytics.analysis_job_item i
-  JOIN analytics.analysis_job j ON j.id=i.job_id
-  WHERE i.status='PENDING' AND i.attempt_count < ?
-    AND (i.finished_at IS NULL OR i.finished_at <= clock_timestamp() -
-      (? * GREATEST(i.attempt_count, 1) * INTERVAL '1 second'))
-    AND j.cancel_requested=false AND j.status IN ('PENDING','RUNNING')
-  ORDER BY i.created_at, i.id FOR UPDATE SKIP LOCKED LIMIT 1
-)
-UPDATE analytics.analysis_job_item i
-   SET status='RUNNING', attempt_count=i.attempt_count+1, started_at=clock_timestamp(), finished_at=NULL,
-       error_code=NULL, error_message=NULL,
-       progress_stage='CLAIMED', progress_completed=0, progress_total=0,
-       progress_message='Item atribuído ao worker', progress_updated_at=clock_timestamp()
-  FROM next_item n WHERE i.id=n.id
-RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
-""",
+        claimSql(),
         rs ->
             rs.next()
                 ? new Item(
@@ -143,6 +126,34 @@ RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
                 : null,
         maxAttempts,
         retryDelaySeconds);
+  }
+
+  static String claimSql() {
+    return """
+WITH next_item AS (
+  SELECT i.id,
+         GREATEST(i.attempt_count, COALESCE((SELECT MAX(p.attempt_count)
+           FROM analytics.analysis_phase_timing p WHERE p.job_item_id=i.id), 0)) AS effective_attempt_count
+    FROM analytics.analysis_job_item i
+    JOIN analytics.analysis_job j ON j.id=i.job_id
+   WHERE i.status='PENDING'
+     AND GREATEST(i.attempt_count, COALESCE((SELECT MAX(p.attempt_count)
+       FROM analytics.analysis_phase_timing p WHERE p.job_item_id=i.id), 0)) < ?
+     AND (i.finished_at IS NULL OR i.finished_at <= clock_timestamp() -
+       (? * GREATEST(GREATEST(i.attempt_count, COALESCE((SELECT MAX(p.attempt_count)
+         FROM analytics.analysis_phase_timing p WHERE p.job_item_id=i.id), 0)), 1)
+         * INTERVAL '1 second'))
+     AND j.cancel_requested=false AND j.status IN ('PENDING','RUNNING')
+  ORDER BY i.created_at, i.id FOR UPDATE SKIP LOCKED LIMIT 1
+)
+UPDATE analytics.analysis_job_item i
+   SET status='RUNNING', attempt_count=n.effective_attempt_count+1, started_at=clock_timestamp(), finished_at=NULL,
+       error_code=NULL, error_message=NULL,
+       progress_stage='CLAIMED', progress_completed=0, progress_total=0,
+       progress_message='Item atribuído ao worker', progress_updated_at=clock_timestamp()
+  FROM next_item n WHERE i.id=n.id
+RETURNING i.id, i.job_id, i.input_asset_version_id, i.attempt_count
+""";
   }
 
   /**
