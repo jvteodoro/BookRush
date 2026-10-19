@@ -696,6 +696,9 @@ services:
         VITE_BASE_PATH: ${ADMIN_WEB_BASE_PATH:-/admin/}
     ports:
       - "127.0.0.1:${BOOKRUSH_ADMIN_WEB_PORT:-18084}:80"
+    depends_on:
+      admin-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1/healthz"]
       interval: 10s

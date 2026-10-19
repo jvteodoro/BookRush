@@ -27,6 +27,7 @@ grep -Fq 'scripts/test-storage.sh' Jenkinsfile || fail 'pipeline principal sem v
 grep -Fq 'bash scripts/test-keycloak-reconcile.sh' Jenkinsfile || fail 'pipeline principal sem validação de reconcile Keycloak'
 grep -Fq 'bash scripts/test-keycloak-access-lifecycle.sh' Jenkinsfile || fail 'pipeline principal sem validação de ciclo de acesso Keycloak'
 grep -Fq 'bash scripts/test-keycloak-user-management.sh' Jenkinsfile || fail 'pipeline principal sem validação de gerenciamento de usuários Keycloak'
+grep -Fq 'proxy_pass http://admin-service:8100;' admin-web/nginx.conf || fail 'admin-web sem proxy para a API administrativa'
 grep -Fq 'ADMIN_SERVICE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/admin-service}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-service'
 grep -Fq 'ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-web}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-web'
 test -f infrastructure/keycloak/read-client-secret.py || fail 'resolvedor seguro do segredo admin-service ausente'
