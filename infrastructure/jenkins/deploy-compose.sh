@@ -101,6 +101,14 @@ fi
 keycloak_admin_user="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_password="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_user="${keycloak_admin_user:-admin}"
+# The admin-service manages product users. Keep every step (role repair,
+# secret lookup and Compose interpolation) pinned to that same realm/client;
+# stale protected-env values must not redirect only the application to the
+# platform realm after the product-realm preflight has succeeded.
+KEYCLOAK_ADMIN_TOKEN_URI=http://keycloak:8080/realms/bookrush/protocol/openid-connect/token
+KEYCLOAK_ADMIN_BASE=http://keycloak:8080/admin/realms/bookrush
+KEYCLOAK_ADMIN_CLIENT_ID=bookrush-admin-service
+export KEYCLOAK_ADMIN_TOKEN_URI KEYCLOAK_ADMIN_BASE KEYCLOAK_ADMIN_CLIENT_ID
 live_admin_client_secret=""
 if [[ -n "$keycloak_admin_password" ]]; then
   # config-cli can leave role mappings unchanged for an existing service
@@ -114,7 +122,7 @@ if [[ -n "$keycloak_admin_password" ]]; then
   live_admin_client_secret="$(docker run --rm -i --network bookrush_bookrush \
     -e KEYCLOAK_URL=http://keycloak:8080 \
     -e KEYCLOAK_REALM=bookrush \
-    -e KEYCLOAK_CLIENT_ID="${KEYCLOAK_ADMIN_CLIENT_ID:-bookrush-admin-service}" \
+    -e KEYCLOAK_CLIENT_ID="$KEYCLOAK_ADMIN_CLIENT_ID" \
     -e KEYCLOAK_USER="$keycloak_admin_user" \
     -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
     python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py" 2>/dev/null || true)"
@@ -184,6 +192,31 @@ probe_user_management() {
   [[ "$status" == 200 ]]
 }
 
+verify_admin_runtime_config() {
+  local xtrace_was_enabled=false runtime_env runtime_token_uri runtime_admin_base
+  local runtime_client_id runtime_client_secret
+  [[ $- == *x* ]] && xtrace_was_enabled=true
+  set +x
+  runtime_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' bookrush-admin-service-1)"
+  runtime_token_uri="$(awk -F= '$1 == "KEYCLOAK_ADMIN_TOKEN_URI" {sub(/^[^=]*=/, ""); print; exit}' <<<"$runtime_env")"
+  runtime_admin_base="$(awk -F= '$1 == "KEYCLOAK_ADMIN_BASE" {sub(/^[^=]*=/, ""); print; exit}' <<<"$runtime_env")"
+  runtime_client_id="$(awk -F= '$1 == "KEYCLOAK_ADMIN_CLIENT_ID" {sub(/^[^=]*=/, ""); print; exit}' <<<"$runtime_env")"
+  runtime_client_secret="$(awk -F= '$1 == "KEYCLOAK_ADMIN_CLIENT_SECRET" {sub(/^[^=]*=/, ""); print; exit}' <<<"$runtime_env")"
+  unset runtime_env
+  local matches=true
+  [[ "$runtime_token_uri" == "$KEYCLOAK_ADMIN_TOKEN_URI" ]] || matches=false
+  [[ "$runtime_admin_base" == "$KEYCLOAK_ADMIN_BASE" ]] || matches=false
+  [[ "$runtime_client_id" == "$KEYCLOAK_ADMIN_CLIENT_ID" ]] || matches=false
+  [[ -n "$runtime_client_secret" && "$runtime_client_secret" == "$KEYCLOAK_ADMIN_CLIENT_SECRET" ]] || matches=false
+  unset runtime_client_secret
+  if $xtrace_was_enabled; then set -x; fi
+  if ! $matches; then
+    echo "Configuração Keycloak divergente no admin-service (tokenUri=$runtime_token_uri adminBase=$runtime_admin_base clientId=$runtime_client_id)." >&2
+    return 1
+  fi
+  echo 'Configuração Keycloak efetiva do admin-service: OK' >&2
+}
+
 probe_catalog() {
   local attempt
   for attempt in {1..12}; do
@@ -215,6 +248,13 @@ printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMA
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.
 if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"; then
   echo 'Falha ao iniciar ou aguardar os serviços novos.' >&2
+  diagnose
+  rollback
+  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  exit 1
+fi
+
+if ! verify_admin_runtime_config; then
   diagnose
   rollback
   echo 'Rollback concluído; o deploy será marcado como falho.' >&2
