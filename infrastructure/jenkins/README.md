@@ -327,6 +327,10 @@ protegido. O valor vigente no Keycloak persistente tem precedência, evitando
 falhas após criação ou rotação da credencial; a cópia configurada permanece
 como fallback se a API administrativa não puder ser consultada.
 
+O Nginx do `admin-web` resolve `admin-service` pelo DNS interno do Docker no
+momento de cada chamada. Assim, o painel pode iniciar enquanto o serviço está
+sendo recriado sem encerrar por uma corrida de DNS durante o deploy Compose.
+
 O usuário permanente `codex-jenkins-agent` também permanece nos grupos
 `operators` e `platform-operators`; a associação é reconciliada no realm e é
 necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.

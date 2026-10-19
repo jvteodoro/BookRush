@@ -35,6 +35,17 @@ docker network create "$network" >/dev/null
 docker run -d --name "$postgres" --network "$network" --network-alias postgres \
   -e POSTGRES_DB=bookrush -e POSTGRES_USER=bookrush -e POSTGRES_PASSWORD=bookrush \
   postgres:16-alpine >/dev/null
+# Reproduce the Compose deployment order that exposed the production race:
+# admin-web must remain running even while admin-service has no DNS record yet.
+docker build -q -t "$web_image" "$repo_dir/admin-web" >/dev/null
+docker run -d --name "$web" --network "$network" --network-alias admin-web \
+  "$web_image" >/dev/null
+sleep 1
+[[ "$(docker inspect --format '{{.State.Running}}' "$web")" == true ]] || {
+  docker logs "$web" >&2
+  echo 'Admin web encerrou antes de o admin-service entrar na rede.' >&2
+  exit 1
+}
 docker create --name "$keycloak" --network "$network" --network-alias keycloak \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD="$admin_password" \
   -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD="$admin_password" \
@@ -77,10 +88,6 @@ for _ in $(seq 1 90); do
   sleep 1
 done
 docker exec "$probe" curl -fsS http://admin-service:8100/actuator/health >/dev/null
-
-docker build -q -t "$web_image" "$repo_dir/admin-web" >/dev/null
-docker run -d --name "$web" --network "$network" --network-alias admin-web \
-  "$web_image" >/dev/null
 
 token="$(docker exec "$probe" curl -fsS -X POST \
   http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
