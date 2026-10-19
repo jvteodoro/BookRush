@@ -11,7 +11,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Keeps SQL alternatives and transaction-scoped JIT control outside the HTTP layer. */
 @Repository
-public final class BookScoresQueryRepository {
+public class BookScoresQueryRepository {
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transaction;
   private final BookScoresQueryProperties properties;
