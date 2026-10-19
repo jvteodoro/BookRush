@@ -1,10 +1,12 @@
 # Feed optimization phase 2
 
-Status: experimental, branch `feature/feed-optimization-phase-2`.
+Status: definitive index implementation prepared for review, branch
+`feature/feed-optimization-phase-2`.
 
-This phase turns the 2026-10-19 characterization into a reproducible code
-path. It does not deploy SQL indexes, change PostgreSQL global settings, or
-materialize scores.
+This document records the characterization and the follow-up implementation.
+The code now includes the definitive Flyway migrations, but those migrations
+have not been applied to the production database. PostgreSQL global settings
+and score materialization remain unchanged.
 
 ## Audit baseline
 
@@ -21,7 +23,11 @@ without stage timers.
 Existing analytics metrics use low-cardinality names under
 `bookrush.analytics.*`; recommendation uses Micrometer through the shared
 observability starter. The analytics service uses PostgreSQL/JDBC and Flyway.
-No production migration is introduced here.
+The definitive migration path uses Flyway 10.10 per-script
+`executeInTransaction=false` configuration and a PostgreSQL session-level
+Flyway lock (`flyway.postgresql.transactional.lock=false`). The latter is
+required because `CREATE INDEX CONCURRENTLY` cannot be used while Flyway holds
+the default transactional advisory lock.
 
 ## Implementation
 
@@ -52,12 +58,25 @@ controller before SQL execution.
 
 ### Experimental indexes
 
-The candidate indexes are in
+The candidate indexes remain available in
 [`scripts/experimental/feed-score-indexes.sql`](../../../scripts/experimental/feed-score-indexes.sql),
 with rollback in `drop-feed-score-indexes.sql`. They are intentionally not
 Flyway migrations and must only be run against a disposable/staging copy.
 The scripts use `CREATE/DROP INDEX CONCURRENTLY`, so they must run outside an
 explicit transaction. No DDL was executed in production by this phase.
+
+### Definitive Flyway migrations
+
+The official schema evolution is now:
+
+- `V28__excerpt_rank_latest_score_idx.sql`
+- `V29__excerpt_eligible_asset_version_idx.sql`
+
+Each migration has a matching `.sql.conf` with `executeInTransaction=false`.
+The stable index names are `excerpt_rank_latest_score_idx` and
+`excerpt_eligible_asset_version_idx`. Rollback is intentionally operational,
+not a Flyway undo migration:
+[`drop-feed-score-indexes-definitive.sql`](../../../scripts/experimental/drop-feed-score-indexes-definitive.sql).
 
 ### Feed observability
 
@@ -79,7 +98,9 @@ configuration.
 `scripts/benchmark-feed-performance.sh` was extended without changing its
 scenario model. It now records `metadata.json` (commit, explicit strategy/JIT
 settings and sample sizes) and calculates `summary.tsv` with mean, standard
-deviation, p50, p95, p99, throughput, error rate and mean items. It no longer
+deviation, p50, p95, p99, throughput based on each battery's wall-clock
+duration (including concurrency), separate HTTP and functional error rates,
+and mean items. It no longer
 uses `curl -k`; configure the host trust chain or `CURL_CA_BUNDLE` in the
 authorized environment. The existing raw request TSV remains the source of
 truth.
@@ -117,7 +138,9 @@ first attempt, the analytics POM inherited Testcontainers 1.19.8/docker-java
 3.3.6 and failed against the current daemon (client API 1.32; daemon minimum
 1.40). The POM now imports the platform Testcontainers BOM at 1.20.2
 (docker-java 3.4.0). The explicit IT was then rerun successfully against
-PostgreSQL 16: 1 test, 0 failures, 0 errors, 8.432 s test time. The test used
+PostgreSQL 16: 3 tests, 0 failures, 0 errors, covering Flyway creation, index
+validity, safe re-execution, SQL equivalence and JIT transaction isolation.
+The test used
 `TESTCONTAINERS_RYUK_DISABLED=true` only to avoid a disposable cleanup sidecar;
 the container itself was removed by the test process and no production volume
 was involved.
@@ -139,16 +162,20 @@ docker build --target build -t bookrush/recommendation-service:feed-optimization
   -f services/recommendation-service/Dockerfile .
 docker run --rm bookrush/recommendation-service:feed-optimization-test mvn -B test
 
-bash -n scripts/benchmark-feed-performance.sh scripts/benchmark-score-jit.sh
+bash -n scripts/benchmark-feed-performance.sh scripts/benchmark-score-jit.sh \
+  scripts/tests/test-benchmark-score-cleanup.sh
+bash scripts/tests/test-benchmark-score-cleanup.sh
 ```
 
 SQL files are not Bash. Validate them in a disposable database with `psql -f`
 and execute the index script only when `SCORE_INDEXES=present` and
 `ALLOW_EXPERIMENTAL_DDL=true` are explicitly set. The score benchmark now
 accepts `SCORE_QUERY_STRATEGY=CURRENT|OPTIMIZED` and
-`SCORE_INDEXES=absent|present`; an index run drops its experimental indexes on
-exit. The service builds in this phase passed: analytics 93 tests plus the
-opt-in SQL integration test and recommendation 12 tests.
+`SCORE_INDEXES=absent|present`; it records which indexes existed before the
+run, never removes definitive or pre-existing experimental indexes, and drops
+only experimental indexes created by that execution. The service builds in
+this phase passed: analytics 93 tests plus the opt-in SQL integration test and
+recommendation 15 tests. Focused client/metrics tests pass 5/5.
 
 ## Current evidence and decision
 
@@ -220,7 +247,9 @@ environment was restored to `CURRENT/DEFAULT`, the analytics worker was left
 running, and no production client traffic was present.
 
 These results support **adopting only the new indexes** after a reviewed
-staging migration and rollout plan. They do not approve a production migration
+staging migration and rollout plan. The definitive migrations are ready for
+that rollout, but they do not approve executing the migration in the
+production database
 or a global JIT change: the query rewrite should remain opt-in, and the JIT
 choice requires a separate operational decision after observing connection,
 write and workload effects.
@@ -231,7 +260,10 @@ write and workload effects.
    `ANALYTICS_BOOK_SCORES_JIT=DEFAULT`.
 2. Restart only the analytics service after a reviewed configuration deploy;
    no data migration is required.
-3. If experimental indexes were created in staging, run
+3. If the definitive indexes must be rolled back after deployment, execute
+   `scripts/experimental/drop-feed-score-indexes-definitive.sql` outside a
+   transaction, then redeploy/restart the analytics service only if required.
+4. If experimental indexes were created in staging, run
    `scripts/experimental/drop-feed-score-indexes.sql` outside a transaction.
-4. Do not change production PostgreSQL settings or run the scripts against the
-   production database as part of this phase.
+5. Do not run either rollback script against production without the approved
+   migration rollback window.
