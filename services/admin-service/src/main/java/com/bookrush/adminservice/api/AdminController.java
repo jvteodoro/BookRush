@@ -106,8 +106,15 @@ public class AdminController {
     UUID id;
     try { id = UUID.fromString(commentId); }
     catch (IllegalArgumentException ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid commentId"); }
-    int updated = jdbc.update("UPDATE social.comment_moderation_state SET visibility=?, reason_code=?, updated_by_subject=?, updated_at=now() WHERE comment_id=?",
-        visibility, String.valueOf(body.getOrDefault("reasonCode", "ADMIN_DECISION")), actor(principal), id);
+    String operator = actor(principal);
+    String reason = String.valueOf(body.getOrDefault("reasonCode", "ADMIN_DECISION"));
+    int updated = jdbc.update("INSERT INTO social.comment_moderation_state "
+        + "(comment_id, visibility, reason_code, updated_by_subject, updated_at) "
+        + "SELECT id, ?, ?, ?, now() FROM social.comments WHERE id=? "
+        + "ON CONFLICT (comment_id) DO UPDATE SET visibility=EXCLUDED.visibility, "
+        + "reason_code=EXCLUDED.reason_code, updated_by_subject=EXCLUDED.updated_by_subject, "
+        + "updated_at=EXCLUDED.updated_at",
+        visibility, reason, operator, id);
     if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "comment not found");
     return Map.of("commentId", id, "visibility", visibility, "updated", true);
   }

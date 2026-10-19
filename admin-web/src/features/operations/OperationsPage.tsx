@@ -1,7 +1,21 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, ShieldAlert, UserCheck, UserX } from "lucide-react";
-import { services } from "../../lib/services";
+import {
+  Eye,
+  EyeOff,
+  Search,
+  ShieldAlert,
+  Trash2,
+  UserCheck,
+  UserX,
+} from "lucide-react";
+import { services, type AdminComment } from "../../lib/services";
+
+const commentStatus = {
+  VISIBLE: { label: "Visível", className: "state-visible" },
+  HIDDEN: { label: "Oculto", className: "state-hidden" },
+  REMOVED: { label: "Removido", className: "state-removed" },
+} as const;
 
 export function OperationsPage() {
   const queryClient = useQueryClient();
@@ -40,8 +54,16 @@ export function OperationsPage() {
   const moderation = useMutation({
     mutationFn: ({ id, visibility }: { id: string; visibility: string }) =>
       services.moderateAdminComment(id, visibility),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ["admin-comments"] }),
+    onSuccess: (_data, variables) => {
+      queryClient.setQueryData<AdminComment[]>(["admin-comments"], (current) =>
+        current?.map((comment) =>
+          comment.id === variables.id
+            ? { ...comment, visibility: variables.visibility }
+            : comment,
+        ),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin-comments"] });
+    },
   });
   return (
     <section>
@@ -116,16 +138,20 @@ export function OperationsPage() {
         ) : (
           users.data?.items.map((user) => (
             <div className="review-asset" key={user.subjectKey}>
-              <span>
+              <span className="moderation-copy">
                 <b>
                   {[user.firstName, user.lastName].filter(Boolean).join(" ") ||
                     user.username}
                 </b>
                 <small>
                   {user.username}
-                  {user.email ? ` · ${user.email}` : ""} ·{" "}
-                  {user.enabled === false ? "desabilitado" : "ativo"}
+                  {user.email ? ` · ${user.email}` : ""}
                 </small>
+                <span
+                  className={`state-badge ${user.enabled ? "state-active" : "state-banned"}`}
+                >
+                  {user.enabled ? "Ativo" : "Banido"}
+                </span>
               </span>
               <button
                 className="secondary-action"
@@ -151,7 +177,7 @@ export function OperationsPage() {
                 ) : (
                   <UserX size={15} />
                 )}
-                {user.enabled === false ? "Habilitar" : "Desabilitar"}
+                {user.enabled === false ? "Desbanir" : "Banir"}
               </button>
             </div>
           ))
@@ -185,55 +211,133 @@ export function OperationsPage() {
         )}
       </div>
       <div className="panel">
-        <h2>Reports</h2>
-        {reports.data?.length ? (
+        <div className="moderation-section-heading">
+          <div>
+            <h2>Denúncias</h2>
+            <p>Comentários e livros denunciados pelos leitores para revisão.</p>
+          </div>
+          {reports.data && (
+            <span className="section-count">{reports.data.length}</span>
+          )}
+        </div>
+        {reports.isLoading ? (
+          <p>Carregando denúncias…</p>
+        ) : reports.isError ? (
+          <p role="alert" className="moderation-error">
+            Não foi possível carregar as denúncias.
+          </p>
+        ) : reports.data?.length ? (
           reports.data.map((report) => (
-            <p key={report.id}>
-              <b>{report.reason}</b> · {report.status} · {report.reporter}
-            </p>
+            <div className="report-card" key={report.id}>
+              <div className="moderation-copy">
+                <b>{report.reason}</b>
+                <small>Enviado por {report.reporter}</small>
+                {report.commentId ? (
+                  <code>Comentário: {report.commentId}</code>
+                ) : (
+                  <code>Livro: {report.bookId ?? "não informado"}</code>
+                )}
+              </div>
+              <span
+                className={`state-badge ${report.status === "OPEN" ? "state-open" : "state-resolved"}`}
+              >
+                {report.status === "OPEN"
+                  ? "Aguardando revisão"
+                  : report.status}
+              </span>
+            </div>
           ))
         ) : (
-          <p>Nenhum report aberto.</p>
+          <p>Nenhuma denúncia registrada.</p>
         )}
       </div>
       <div className="panel">
-        <h2>Comentários</h2>
-        {comments.data?.map((comment) => (
-          <div className="review-asset" key={comment.id}>
-            <span>
-              <b>{comment.body}</b>
-              <small>
-                {comment.subjectKey} · {comment.visibility}
-              </small>
-            </span>
-            <span className="review-asset-actions">
-              <button
-                className="secondary-action"
-                onClick={() =>
-                  moderation.mutate({ id: comment.id, visibility: "VISIBLE" })
-                }
-              >
-                Visível
-              </button>
-              <button
-                className="secondary-action"
-                onClick={() =>
-                  moderation.mutate({ id: comment.id, visibility: "HIDDEN" })
-                }
-              >
-                Ocultar
-              </button>
-              <button
-                className="secondary-action"
-                onClick={() =>
-                  moderation.mutate({ id: comment.id, visibility: "REMOVED" })
-                }
-              >
-                Remover
-              </button>
-            </span>
+        <div className="moderation-section-heading">
+          <div>
+            <h2>Comentários</h2>
+            <p>Altere a visibilidade; o estado atual aparece destacado.</p>
           </div>
-        ))}
+          {comments.data && (
+            <span className="section-count">{comments.data.length}</span>
+          )}
+        </div>
+        {comments.isLoading ? (
+          <p>Carregando comentários…</p>
+        ) : comments.isError ? (
+          <p role="alert" className="moderation-error">
+            Não foi possível carregar os comentários.
+          </p>
+        ) : comments.data?.length === 0 ? (
+          <p>Nenhum comentário publicado.</p>
+        ) : (
+          comments.data?.map((comment) => {
+            const state =
+              commentStatus[comment.visibility as keyof typeof commentStatus] ??
+              commentStatus.VISIBLE;
+            const pending =
+              moderation.isPending && moderation.variables?.id === comment.id;
+            return (
+              <div className="review-asset" key={comment.id}>
+                <span className="moderation-copy">
+                  <b>{comment.body}</b>
+                  <small>Autor: {comment.subjectKey}</small>
+                  <span className={`state-badge ${state.className}`}>
+                    {pending ? "Atualizando…" : state.label}
+                  </span>
+                </span>
+                <span className="review-asset-actions">
+                  <button
+                    className={`secondary-action ${comment.visibility === "VISIBLE" ? "state-action-selected" : ""}`}
+                    disabled={
+                      moderation.isPending || comment.visibility === "VISIBLE"
+                    }
+                    onClick={() =>
+                      moderation.mutate({
+                        id: comment.id,
+                        visibility: "VISIBLE",
+                      })
+                    }
+                  >
+                    <Eye size={15} /> Tornar visível
+                  </button>
+                  <button
+                    className={`secondary-action ${comment.visibility === "HIDDEN" ? "state-action-selected" : ""}`}
+                    disabled={
+                      moderation.isPending || comment.visibility === "HIDDEN"
+                    }
+                    onClick={() =>
+                      moderation.mutate({
+                        id: comment.id,
+                        visibility: "HIDDEN",
+                      })
+                    }
+                  >
+                    <EyeOff size={15} /> Ocultar
+                  </button>
+                  <button
+                    className={`secondary-action danger-action ${comment.visibility === "REMOVED" ? "state-action-selected" : ""}`}
+                    disabled={
+                      moderation.isPending || comment.visibility === "REMOVED"
+                    }
+                    onClick={() =>
+                      moderation.mutate({
+                        id: comment.id,
+                        visibility: "REMOVED",
+                      })
+                    }
+                  >
+                    <Trash2 size={15} /> Remover
+                  </button>
+                </span>
+              </div>
+            );
+          })
+        )}
+        {moderation.isError && (
+          <p role="alert" className="moderation-error">
+            Não foi possível atualizar o comentário. Tente novamente.
+          </p>
+        )}
       </div>
     </section>
   );

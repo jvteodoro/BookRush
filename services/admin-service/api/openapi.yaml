@@ -62,6 +62,42 @@ paths:
         '409': { description: Operator cannot modify their own account }
         '502': { description: Keycloak rejected the operation }
         '503': { description: Product-realm management client is not configured }
+  /api/v1/admin/reports:
+    get:
+      summary: List moderation reports, including reported comments
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Reports ordered from newest to oldest }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+  /api/v1/admin/moderation/comments:
+    get:
+      summary: List comments and their current moderation visibility
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Comments with VISIBLE, HIDDEN or REMOVED state }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+    post:
+      summary: Change comment visibility, creating missing legacy state when needed
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [commentId, visibility]
+              properties:
+                commentId: { type: string, format: uuid }
+                visibility: { type: string, enum: [VISIBLE, HIDDEN, REMOVED] }
+                reasonCode: { type: string, maxLength: 80 }
+      responses:
+        '200': { description: Visibility changed }
+        '400': { description: Invalid comment ID or visibility }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+        '404': { description: Comment not found }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }

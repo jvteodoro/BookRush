@@ -121,6 +121,32 @@ for _ in $(seq 1 90); do
 done
 docker exec "$probe" curl -fsS http://admin-service:8100/actuator/health >/dev/null
 
+# Simulate a comment created before moderation state existed, plus the report
+# that the reader flow persists in the shared social schema.
+legacy_comment_id='11111111-1111-4111-8111-111111111111'
+report_id='22222222-2222-4222-8222-222222222222'
+docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush >/dev/null <<SQL
+CREATE SCHEMA IF NOT EXISTS social;
+CREATE TABLE IF NOT EXISTS social.comments (
+  id UUID PRIMARY KEY, subject_key TEXT NOT NULL, book_id UUID NOT NULL,
+  body TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS social.comment_moderation_state (
+  comment_id UUID PRIMARY KEY REFERENCES social.comments(id),
+  visibility VARCHAR(16) NOT NULL DEFAULT 'VISIBLE', reason_code VARCHAR(80),
+  updated_by_subject TEXT, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS social.reports (
+  id UUID PRIMARY KEY, reporter TEXT NOT NULL, book_id UUID, comment_id UUID,
+  reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO social.comments(id, subject_key, book_id, body)
+VALUES ('$legacy_comment_id', 'reader-1', '33333333-3333-4333-8333-333333333333', 'legacy comment');
+INSERT INTO social.reports(id, reporter, book_id, comment_id, reason)
+VALUES ('$report_id', 'reader-2', '33333333-3333-4333-8333-333333333333', '$legacy_comment_id', 'spam');
+SQL
+
 token="$(docker exec "$probe" curl -fsS -X POST \
   http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
   -d grant_type=password -d client_id=labsoft-admin-web \
@@ -152,4 +178,22 @@ if [[ "$status" != 200 ]]; then
   echo "Admin user management E2E retornou HTTP $status." >&2
   exit 1
 fi
-echo 'Admin user management E2E: human admin-web token -> service -> product realm OK'
+
+for visibility in HIDDEN REMOVED VISIBLE; do
+  response="$(docker exec "$probe" curl -fsS -X POST \
+    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+    --data "{\"commentId\":\"$legacy_comment_id\",\"visibility\":\"$visibility\",\"reasonCode\":\"E2E_REVIEW\"}" \
+    http://admin-web/api/v1/admin/moderation/comments)"
+  [[ "$(jq -r '.visibility' <<<"$response")" == "$visibility" ]]
+  listed_visibility="$(docker exec "$probe" curl -fsS \
+    -H "Authorization: Bearer $token" \
+    http://admin-web/api/v1/admin/moderation/comments \
+    | jq -r --arg id "$legacy_comment_id" '.[] | select(.id == $id) | .visibility')"
+  [[ "$listed_visibility" == "$visibility" ]]
+done
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $token" \
+  http://admin-web/api/v1/admin/reports \
+  | jq -e --arg report "$report_id" --arg comment "$legacy_comment_id" \
+      '.[] | select(.id == $report and .comment_id == $comment and .status == "OPEN")' >/dev/null
+
+echo 'Admin user management E2E: users, legacy comment states and comment reports OK'

@@ -139,11 +139,22 @@ public class SocialController {
 
   @PostMapping("/reports")
   public Object report(@Valid @RequestBody Report report, Principal principal, HttpServletRequest request) {
+    if (report.bookId() == null && report.commentId() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bookId or commentId is required");
+    }
+    if (report.commentId() != null) {
+      Boolean exists = jdbc.queryForObject(
+          "SELECT EXISTS (SELECT 1 FROM social.comments WHERE id = ?)", Boolean.class, report.commentId());
+      if (!Boolean.TRUE.equals(exists)) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "comment not found");
+      }
+    }
     UUID id = UUID.randomUUID();
     jdbc.update("INSERT INTO social.reports(id, reporter, book_id, comment_id, reason) "
         + "VALUES (?, ?, ?, ?, ?)", id, subject(principal), report.bookId(), report.commentId(),
         report.reason());
-    behavior.publish("BOOK_REPORT", report.bookId(), Map.of("reason", report.reason()), request.getHeader(HttpHeaders.AUTHORIZATION));
+    behavior.publish(report.commentId() == null ? "BOOK_REPORT" : "COMMENT_REPORT", report.bookId(),
+        Map.of("reason", report.reason()), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("id", id, "status", "OPEN");
   }
 

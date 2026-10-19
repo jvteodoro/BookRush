@@ -3,6 +3,9 @@
 Likes, follows, comments and reports. Este serviço é um bounded context independente; contratos e ownership estão no ADR 0034.
 
 Também são suportados follows e reports; reports entram como registros OPEN para moderação.
+Comentários podem ser denunciados pelo leitor em `POST /api/v1/social/reports`,
+informando `bookId`, `commentId` e o motivo. O serviço valida a existência do
+comentário antes de adicioná-lo à fila exibida no Admin Console.
 
 Migration V3 adiciona follows e reports, mantendo report como fila de moderação.
 

@@ -86,4 +86,21 @@ class AdminControllerTest {
         eq("ADMIN_DISABLE"), eq("operator-1"), org.mockito.ArgumentMatchers.any(),
         eq(false), eq("policy violation"));
   }
+
+  @Test
+  void moderationCreatesMissingLegacyStateOrUpdatesExistingState() {
+    var commentId = java.util.UUID.randomUUID();
+    when(jdbc.update(contains("INSERT INTO social.comment_moderation_state"),
+        eq("HIDDEN"), eq("ADMIN_REVIEW"), eq("operator-1"), eq(commentId))).thenReturn(1);
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> result = (Map<String, Object>) controller.moderateComment(
+        Map.of("commentId", commentId.toString(), "visibility", "HIDDEN", "reasonCode", "ADMIN_REVIEW"),
+        principal, operator);
+
+    assertEquals("HIDDEN", result.get("visibility"));
+    assertEquals(true, result.get("updated"));
+    verify(jdbc).update(contains("ON CONFLICT (comment_id) DO UPDATE"),
+        eq("HIDDEN"), eq("ADMIN_REVIEW"), eq("operator-1"), eq(commentId));
+  }
 }
