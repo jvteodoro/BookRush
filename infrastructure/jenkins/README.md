@@ -327,6 +327,11 @@ protegido. O valor vigente no Keycloak persistente tem precedência, evitando
 falhas após criação ou rotação da credencial; a cópia configurada permanece
 como fallback se a API administrativa não puder ser consultada.
 
+Como o `keycloak-config-cli` pode preservar mappings antigos de uma conta de
+serviço já existente, o deploy reaplica idempotentemente as roles mínimas
+`query-users`, `view-users` e `manage-users` antes de iniciar o `admin-service`.
+Essa etapa não rotaciona credenciais e não altera usuários ou sessões.
+
 O Nginx do `admin-web` resolve `admin-service` pelo DNS interno do Docker no
 momento de cada chamada. Assim, o painel pode iniciar enquanto o serviço está
 sendo recriado sem encerrar por uma corrida de DNS durante o deploy Compose.

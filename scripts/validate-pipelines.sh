@@ -33,6 +33,7 @@ grep -Fq 'proxy_pass $admin_service;' admin-web/nginx.conf || fail 'admin-web se
 grep -Fq 'ADMIN_SERVICE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/admin-service}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-service'
 grep -Fq 'ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-web}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-web'
 test -f infrastructure/keycloak/read-client-secret.py || fail 'resolvedor seguro do segredo admin-service ausente'
+grep -Fq 'grant-user-management-roles.py' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose não reconcilia roles do gerenciamento de usuários'
 grep -Fq 'live_admin_client_secret="$(docker run' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose não consulta o segredo reconciliado do admin-service'
 grep -Fq 'KEYCLOAK_ADMIN_CLIENT_SECRET="${live_admin_client_secret:-$configured_admin_client_secret}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose não prioriza o segredo vigente do Keycloak'
 grep -Fq 'if ! probe_user_management; then' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem smoke autenticado de gerenciamento de usuários'

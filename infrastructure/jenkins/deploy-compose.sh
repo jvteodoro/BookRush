@@ -103,6 +103,14 @@ keycloak_admin_password="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" {
 keycloak_admin_user="${keycloak_admin_user:-admin}"
 live_admin_client_secret=""
 if [[ -n "$keycloak_admin_password" ]]; then
+  # config-cli can leave role mappings unchanged for an existing service
+  # account. Reapply the minimum product-realm roles immediately before this
+  # revision starts, without rotating credentials or touching users/sessions.
+  docker run --rm -i --network bookrush_bookrush \
+    -e KEYCLOAK_URL=http://keycloak:8080 \
+    -e KEYCLOAK_USER="$keycloak_admin_user" \
+    -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
+    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/grant-user-management-roles.py"
   live_admin_client_secret="$(docker run --rm -i --network bookrush_bookrush \
     -e KEYCLOAK_URL=http://keycloak:8080 \
     -e KEYCLOAK_REALM=bookrush \

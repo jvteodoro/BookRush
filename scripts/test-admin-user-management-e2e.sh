@@ -60,13 +60,14 @@ for _ in $(seq 1 120); do
 done
 docker exec "$probe" curl -fsS http://keycloak:8080/realms/bookrush/.well-known/openid-configuration >/dev/null
 
-admin() { docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh "$@"; }
-admin config credentials --server http://127.0.0.1:8080 --realm master \
-  --user admin --password "$admin_password" >/dev/null
-client_uuid="$(admin get clients -r bookrush -q clientId=bookrush-admin-service --fields id --format csv --noquotes)"
-service_user="$(admin get "clients/$client_uuid/service-account-user" -r bookrush --fields id --format csv --noquotes)"
-admin add-roles -r bookrush --uid "$service_user" --cclientid realm-management \
-  --rolename query-users --rolename view-users --rolename manage-users >/dev/null
+# Exercise twice the same role repair used immediately before deployment,
+# proving that it is safe against an already-reconciled persistent realm.
+for _ in 1 2; do
+  docker run --rm -i --network "$network" \
+    -e KEYCLOAK_URL=http://keycloak:8080 -e KEYCLOAK_USER=admin \
+    -e KEYCLOAK_PASSWORD="$admin_password" \
+    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/grant-user-management-roles.py"
+done
 
 docker build -q -t "$image" -f "$repo_dir/services/admin-service/Dockerfile" "$repo_dir" >/dev/null
 for _ in $(seq 1 60); do
