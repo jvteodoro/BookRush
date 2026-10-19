@@ -109,6 +109,12 @@ uses `curl -k`; configure the host trust chain or `CURL_CA_BUNDLE` in the
 authorized environment. The existing raw request TSV remains the source of
 truth.
 
+Throughput is now `completed_requests / (last_finished_ms -
+first_started_ms)`, rather than `1000 / mean_latency`; this prevents a
+concurrent battery from being reported as if it were sequential. Functional
+failures (`2xx` with fewer than `EXPECTED_MIN_ITEMS`, default `1`) are
+reported separately from HTTP errors.
+
 Run only in an authorized environment with a fresh token supplied through the
 protected env file:
 
