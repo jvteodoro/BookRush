@@ -322,6 +322,11 @@ O valor é capturado com `xtrace` desativado, permanece apenas no processo de
 deploy e é injetado no container do `admin-service`; ele não é gravado no
 workspace nem exibido no log do Jenkins.
 
+Essa consulta também é feita quando já existe uma cópia do segredo no arquivo
+protegido. O valor vigente no Keycloak persistente tem precedência, evitando
+falhas após criação ou rotação da credencial; a cópia configurada permanece
+como fallback se a API administrativa não puder ser consultada.
+
 O usuário permanente `codex-jenkins-agent` também permanece nos grupos
 `operators` e `platform-operators`; a associação é reconciliada no realm e é
 necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.
