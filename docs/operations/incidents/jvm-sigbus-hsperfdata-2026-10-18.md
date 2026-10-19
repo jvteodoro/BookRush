@@ -3,7 +3,7 @@
 **Data da investigação:** 2026-10-18  
 **Ambiente:** produção BookRush, host `minerva`  
 **Serviços afetados:** `recommendation-service` e `reader-bff-service`  
-**Estado:** causa identificada; mitigação ainda não implantada neste registro
+**Estado:** causa operacional confirmada; mitigação JVM ainda não implantada neste registro
 
 ## Resumo executivo
 
@@ -30,7 +30,9 @@ JVM. A imagem Temurin 21.0.12.1 Alpine usada pelos dois serviços inicia com
 JVM normalmente.
 
 A evidência é consistente com corrupção, truncamento ou invalidação do mmap do
-`hsperfdata`, e não com erro no código do feed, falha de banco ou falta de heap.
+`hsperfdata`, causada pela pressão/exaustão do armazenamento usado pelo
+container. Não há evidência de que o código do feed, o banco ou o heap tenham
+sido a causa primária.
 
 ## Evidências primárias
 
@@ -74,7 +76,10 @@ recommendation-service: exit=139, OOMKilled=false
 reader-bff-service:      exit=139, OOMKilled=false
 ```
 
-Não havia `tmpfs` nem volume explícito montado em `/tmp` nesses containers.
+Não havia `tmpfs` nem volume explícito montado em `/tmp` nesses containers. Logo,
+o `/tmp` interno fazia parte do filesystem gravável do container, respaldado
+pelo armazenamento Docker/root. O `/tmp` do host estar disponível não exclui
+falta de espaço no filesystem usado pela camada gravável do container.
 
 ### 3. Recursos do host
 
@@ -87,9 +92,12 @@ Swap: 15 GiB total, 15 GiB available durante a coleta
 kernel.perf_event_paranoid: 2
 ```
 
-A utilização elevada do filesystem raiz é um risco operacional independente e
-deve ser tratada, mas não explica este evento: o arquivo problemático estava em
-`/tmp`, que é um tmpfs com espaço disponível, e os dumps não indicam OOM.
+A utilização elevada do filesystem raiz é compatível com o incidente. A
+recuperação de produção foi realizada após liberar espaço em disco, conforme
+relato operacional, e isso explica a indisponibilidade simultânea dos serviços
+e a invalidação do backing file do mmap. O valor de 96% foi medido depois da
+recuperação, portanto representa o estado da coleta, não necessariamente o
+pico no instante do crash.
 
 ### 4. Imagens e flag padrão
 
@@ -149,17 +157,26 @@ serviço.
 | OOM do container | `OOMKilled=false`; heap residente baixo nos dumps; RAM disponível | descartada como causa primária |
 | Falha de PostgreSQL/feed | frame ocorre no `WatcherThread` nativo antes de qualquer stack de negócio | não explica o crash |
 | Falha exclusiva do recommendation | reader-bff reproduziu o mesmo frame e o mesmo tipo de mmap | enfraquecida |
-| Falta de espaço em `/tmp` | `/tmp` é tmpfs de 32 GiB com 1% usado | enfraquecida |
+| Falta de espaço em `/tmp` | o `/tmp` do host tinha espaço, mas os containers não tinham tmpfs explícito; o `/tmp` interno usa a camada gravável Docker | causa operacional provável/confirmada pela recuperação |
 | Aplicação Java lança exceção não tratada | sinal fatal nativo, sem stack Java de exceção | descartada como causa primária |
 | `perf_event_paranoid` bloqueia a JVM | valor 2 é uma política do kernel, mas a falha está no mmap `hsperfdata` | não há evidência de que seja a causa |
 
-### Fatores de risco secundários
+### Causa operacional confirmada
 
-O filesystem raiz está 96% cheio e o cache Docker possui grande volume
-reclamável. Isso não foi usado como correção automática para preservar dados,
-imagens e volumes. Deve ser acompanhado porque pode causar falhas futuras de
-build, logs ou persistência, mas não deve ser confundido com a causa deste
-`SIGBUS`.
+A produção foi recuperada após a correção de falta de espaço em disco. Isso
+fecha a cadeia causal mais provável:
+
+1. o armazenamento Docker/root atingiu pressão crítica;
+2. o arquivo `hsperfdata_bookrush/1`, localizado no `/tmp` interno sem tmpfs
+   dedicado, perdeu backing válido ou foi truncado/incompletamente atualizado;
+3. o `WatcherThread` acessou a página mmap inválida;
+4. a JVM terminou com `SIGBUS` e os healthchecks passaram a falhar;
+5. recommendation e reader-bff ficaram indisponíveis, produzindo os erros de
+   gateway observados.
+
+A flag `-XX:-UsePerfData` continua sendo uma defesa útil contra este caminho
+   específico, mas não substitui a correção operacional: espaço livre,
+   retenção de logs, limpeza segura de cache Docker e alertas de disco.
 
 ## Mitigação proposta
 
@@ -182,8 +199,24 @@ analytics. Após a alteração, o procedimento de validação deve ser:
 6. acompanhar se os jobs de analytics continuam retomáveis;
 7. manter o rollback para as imagens anteriores caso o healthcheck falhe.
 
-Essa mitigação ainda não foi aplicada neste relatório. Portanto, a produção não
-deve ser considerada corrigida apenas com base nesta investigação.
+Essa mitigação ainda não foi aplicada neste relatório. A produção foi
+recuperada pela liberação de espaço, mas deve receber também monitoramento de
+disco e uma política de retenção/limpeza segura antes de ser considerada
+resiliente.
+
+## Atualização após recuperação de produção
+
+O operador informou que a recuperação ocorreu após resolver falta de espaço em
+disco. Essa informação é compatível com todos os sinais coletados e corrige a
+classificação anterior deste relatório, que tratava a ocupação do filesystem
+como risco secundário. O incidente deve ser atribuído a **pressão de disco
+causando falha do arquivo mmap de `hsperfdata`**, com o crash nativo da JVM como
+efeito.
+
+Ainda não há evidência de que o `SIGBUS` tenha sido reproduzido após a limpeza.
+Para fechar a remediação, é necessário registrar espaço livre antes/depois do
+deploy, confirmar que os containers permanecem saudáveis por uma janela de
+observação e adicionar alertas preventivos para o filesystem Docker/root.
 
 ## Procedimento de reprodução/diagnóstico futuro
 
