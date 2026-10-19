@@ -5,3 +5,7 @@ services:
     image: ${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}
   social-service:
     image: ${SOCIAL_IMAGE:?Imagem social ausente}
+  admin-service:
+    image: ${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}
+  admin-web:
+    image: ${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}

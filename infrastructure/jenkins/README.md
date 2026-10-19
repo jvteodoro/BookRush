@@ -87,6 +87,13 @@ Esse gate exige documentação ou contrato para mudanças de código, infraestru
 e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
 executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
 
+No job principal, `scripts/test-portal.sh --validation-only` executa contratos,
+TechDocs, TypeScript, lint e testes sem exportar ou desempacotar uma imagem
+Backstage que não será implantada por esse job. A imagem runtime fica a cargo
+da pipeline dedicada do Backstage. Nela, o runtime mantém dependências como
+somente leitura e concede escrita apenas a `/app/techdocs`, evitando um
+`chown -R` demorado sobre toda a árvore de dependências.
+
 O gate roda em um container Python efêmero. Como o agente Jenkins usa o socket
 Docker e o workspace está no volume nomeado `jenkins_home`, a etapa usa
 `--volumes-from "$HOSTNAME"` para compartilhar o workspace com o container do
@@ -188,9 +195,31 @@ ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
 deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
-frontend, perfis de leitores e social; isso garante que contratos usados pelo
-frontend sejam implantados na mesma revisão. PostgreSQL, Redis, pgAdmin e
-Jenkins são preservados.
+frontend, perfis de leitores, social, `admin-service` e `admin-web`; isso garante
+que contratos usados pelas interfaces sejam implantados na mesma revisão.
+PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
+
+Antes de aceitar a revisão, o deploy também obtém um token técnico do realm
+administrativo e consulta `/api/v1/admin/users` pelo `admin-service`. Esse smoke
+autenticado valida, em uma única chamada, os papéis do operador técnico, o
+segredo do cliente de gerenciamento e o acesso ao realm de usuários; qualquer
+falha aciona diagnóstico e rollback.
+
+Os smokes aguardam por até um minuto a convergência de DNS, proxy e aplicações
+depois dos healthchecks. A verificação de usuários atravessa o proxy de mesma
+origem empacotado na própria imagem `admin-web` da revisão. Ela não depende do
+`dynamic.yaml` montado no Traefik a partir do checkout estável do host, que pode
+estar temporariamente atrás da branch. O console registra somente o status HTTP
+de tentativas malsucedidas; bearer, secrets e respostas com usuários não são
+expostos. Respostas `401` e `403` encerram as tentativas imediatamente porque
+representam contrato de identidade, não atraso de inicialização.
+
+Um job parametrizado pode carregar o Jenkinsfile da `main` antes de fazer o
+checkout de uma feature. Enquanto a `main` ainda não conhecer as imagens
+administrativas, `deploy-compose.sh` deriva suas tags das imagens de catálogo e
+frontend e constrói localmente somente as que estiverem ausentes. Depois que o
+Jenkinsfile novo estiver na `main`, as imagens são normalmente construídas e
+publicadas no estágio **Imagens**, e esse fallback não executa builds adicionais.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
 perfil e social para as imagens criadas pela construção atual.
@@ -270,7 +299,9 @@ construir as imagens correspondentes depois de uma alteração. O admin-web usa
 `VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for
 ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
 quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
-cliente possui `query-users`/`manage-users` no realm-management.
+cliente possui `query-users`/`view-users`/`manage-users` no `realm-management` do realm de
+produto `bookrush`. A autenticação humana do painel continua no realm separado
+`bookrush-platform`.
 
 Na primeira ativação do `admin-service`, provisionar e validar o cliente sem
 exibir ou versionar o segredo:
@@ -282,8 +313,41 @@ bash scripts/test-keycloak-admin-service-client.sh .env
 ```
 
 O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
-e concede apenas `query-users` e `manage-users` à conta de serviço. O teste
+e concede apenas `query-users`, `view-users` e `manage-users` à conta de serviço. O teste
 valida token, roles e acesso à API de usuários sem imprimir credenciais.
+Quando uma instalação anterior ainda não possui
+`KEYCLOAK_ADMIN_CLIENT_SECRET` no arquivo protegido, a reconciliação cria o
+cliente e o deploy consulta seu segredo pela API administrativa do Keycloak.
+O valor é capturado com `xtrace` desativado, permanece apenas no processo de
+deploy e é injetado no container do `admin-service`; ele não é gravado no
+workspace nem exibido no log do Jenkins.
+
+Essa consulta também é feita quando já existe uma cópia do segredo no arquivo
+protegido. O valor vigente no Keycloak persistente tem precedência, evitando
+falhas após criação ou rotação da credencial; a cópia configurada permanece
+como fallback se a API administrativa não puder ser consultada.
+
+Como o `keycloak-config-cli` pode preservar mappings antigos de uma conta de
+serviço já existente, o deploy reaplica idempotentemente as roles mínimas
+`query-users`, `view-users` e `manage-users` antes de iniciar o `admin-service`.
+Essa etapa não rotaciona credenciais e não altera usuários ou sessões.
+As mesmas três roles são incluídas explicitamente nos scope mappings do cliente,
+portanto a integração também funciona quando `Full Scope Allowed` está
+desabilitado sem liberar todas as demais roles atribuídas à conta de serviço.
+O deploy fixa token URI, Admin API e client ID no realm de produto `bookrush`
+antes de renderizar o Compose. Valores antigos no arquivo protegido não podem,
+portanto, validar um realm no preflight e direcionar o serviço para outro.
+
+`ADMIN_WEB_ADMIN_USERNAME` identifica o usuário humano do realm
+`bookrush-platform` que deve administrar a aplicação. O reconcile o mantém no
+grupo `platform-admins`; após uma primeira concessão, o usuário deve sair e
+entrar novamente para receber a role no access token.
+O mesmo reconcile mantém no cliente `labsoft-admin-web` um mapper explícito de
+`sub`, usado pelo `admin-service` como identidade canônica de auditoria.
+
+O Nginx do `admin-web` resolve `admin-service` pelo DNS interno do Docker no
+momento de cada chamada. Assim, o painel pode iniciar enquanto o serviço está
+sendo recriado sem encerrar por uma corrida de DNS durante o deploy Compose.
 
 O usuário permanente `codex-jenkins-agent` também permanece nos grupos
 `operators` e `platform-operators`; a associação é reconciliada no realm e é
