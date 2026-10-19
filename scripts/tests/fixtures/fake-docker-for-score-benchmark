@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+state="${FAKE_DOCKER_STATE:?}"
+log="${FAKE_DOCKER_LOG:?}"
+command="${*: -1}"
+printf '%s\n' "$*" >> "$log"
+
+if [[ "$*" == *"SELECT 1 FROM pg_class"* ]]; then
+  [[ "$*" == *"relname='feed_score_rank_latest_experiment_idx'"* ]] && grep -qx exp_rank "$state" && echo 1 || true
+  [[ "$*" == *"relname='feed_score_excerpt_eligible_experiment_idx'"* ]] && grep -qx exp_excerpt "$state" && echo 1 || true
+  [[ "$*" == *"relname='excerpt_rank_latest_score_idx'"* ]] && grep -qx def_rank "$state" && echo 1 || true
+  [[ "$*" == *"relname='excerpt_eligible_asset_version_idx'"* ]] && grep -qx def_excerpt "$state" && echo 1 || true
+elif [[ "$*" == *"CREATE INDEX CONCURRENTLY feed_score_rank_latest_experiment_idx"* ]]; then
+  echo exp_rank >> "$state"
+elif [[ "$*" == *"CREATE INDEX CONCURRENTLY feed_score_excerpt_eligible_experiment_idx"* ]]; then
+  echo exp_excerpt >> "$state"
+elif [[ "$*" == *"DROP INDEX CONCURRENTLY IF EXISTS analytics.feed_score_rank_latest_experiment_idx"* ]]; then
+  sed -i '/^exp_rank$/d' "$state"
+elif [[ "$*" == *"DROP INDEX CONCURRENTLY IF EXISTS analytics.feed_score_excerpt_eligible_experiment_idx"* ]]; then
+  sed -i '/^exp_excerpt$/d' "$state"
+elif [[ "$*" == *"EXPLAIN (ANALYZE"* ]]; then
+  cat >/dev/null
+  printf '[{"Plan":{"Actual Rows":0},"Execution Time":1.0,"JIT":{"Timing":{"Total":0.0}}}]\n'
+fi

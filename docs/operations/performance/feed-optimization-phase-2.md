@@ -183,6 +183,9 @@ run, never removes definitive or pre-existing experimental indexes, and drops
 only experimental indexes created by that execution. The service builds in
 this phase passed: analytics 93 tests plus the opt-in SQL integration test and
 recommendation 15 tests. Focused client/metrics tests pass 5/5.
+The cleanup behavior is covered by `scripts/tests/test-benchmark-score-cleanup.sh`
+using a fake Docker/psql boundary, including definitive and pre-existing
+experimental indexes.
 
 ## Current evidence and decision
 

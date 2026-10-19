@@ -26,15 +26,50 @@ printf 'round\torder\tmode\texecution_ms\tjit_ms\trows\n' >"$results"
 printf 'round\tmode\tworker\texecution_ms\tjit_ms\trows\n' >"$parallel_results"
 
 cleanup_indexes() {
-  if [[ "$indexes" == present ]]; then
-    docker exec -i "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
-      < scripts/experimental/drop-feed-score-indexes.sql >/dev/null
+  if [[ "${created_rank_index:-false}" == true ]]; then
+    docker exec "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+      -c 'DROP INDEX CONCURRENTLY IF EXISTS analytics.feed_score_rank_latest_experiment_idx;' >/dev/null || true
+  fi
+  if [[ "${created_excerpt_index:-false}" == true ]]; then
+    docker exec "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+      -c 'DROP INDEX CONCURRENTLY IF EXISTS analytics.feed_score_excerpt_eligible_experiment_idx;' >/dev/null || true
   fi
 }
 trap cleanup_indexes EXIT
 if [[ "$indexes" == present ]]; then
-  docker exec -i "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
-    < scripts/experimental/feed-score-indexes.sql >/dev/null
+  created_rank_index=false
+  created_excerpt_index=false
+  index_exists() {
+    docker exec "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+      -c "SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='analytics' AND c.relname='$1';" \
+      | grep -qx 1
+  }
+  definitive_rank_index='excerpt_rank_latest_score_idx'
+  definitive_excerpt_index='excerpt_eligible_asset_version_idx'
+  experimental_rank_index='feed_score_rank_latest_experiment_idx'
+  experimental_excerpt_index='feed_score_excerpt_eligible_experiment_idx'
+  if index_exists "$definitive_rank_index" || index_exists "$experimental_rank_index"; then
+    if index_exists "$definitive_rank_index"; then
+      echo "using pre-existing definitive rank index; experimental duplicate skipped" >&2
+    else
+      echo "using pre-existing experimental rank index; it will not be removed" >&2
+    fi
+  else
+    docker exec "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+      -c "CREATE INDEX CONCURRENTLY $experimental_rank_index ON analytics.excerpt_rank (excerpt_id, created_at DESC) WHERE final_score IS NOT NULL;" >/dev/null
+    created_rank_index=true
+  fi
+  if index_exists "$definitive_excerpt_index" || index_exists "$experimental_excerpt_index"; then
+    if index_exists "$definitive_excerpt_index"; then
+      echo "using pre-existing definitive excerpt index; experimental duplicate skipped" >&2
+    else
+      echo "using pre-existing experimental excerpt index; it will not be removed" >&2
+    fi
+  else
+    docker exec "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+      -c "CREATE INDEX CONCURRENTLY $experimental_excerpt_index ON analytics.excerpt (source_asset_version_id, id) WHERE body_eligible = TRUE AND exclusion_reason IS NULL;" >/dev/null
+    created_excerpt_index=true
+  fi
   docker exec "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
     -c 'ANALYZE analytics.excerpt; ANALYZE analytics.excerpt_rank;' >/dev/null
 fi
