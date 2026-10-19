@@ -7,14 +7,39 @@ db_name="${POSTGRES_DB:-bookrush}"
 rounds="${JIT_PAIRED_ROUNDS:-10}"
 parallel_rounds="${JIT_PARALLEL_ROUNDS:-5}"
 parallelism="${JIT_PARALLELISM:-4}"
+strategy="${SCORE_QUERY_STRATEGY:-CURRENT}"
+indexes="${SCORE_INDEXES:-absent}"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 out="${JIT_BENCHMARK_OUTPUT_DIR:-docs/operations/incidents/evidence/raw/feed-benchmark-$stamp/jit-repeat}"
 mkdir -p "$out/raw" "$out/parallel"
 results="$out/results.tsv"
 parallel_results="$out/parallel-results.tsv"
+case "$strategy" in CURRENT|OPTIMIZED) ;; *) echo "SCORE_QUERY_STRATEGY must be CURRENT or OPTIMIZED" >&2; exit 2 ;; esac
+case "$indexes" in absent|present) ;; *) echo "SCORE_INDEXES must be absent or present" >&2; exit 2 ;; esac
+if [[ "$indexes" == present && "${ALLOW_EXPERIMENTAL_DDL:-false}" != true ]]; then
+  echo "refusing experimental DDL without ALLOW_EXPERIMENTAL_DDL=true" >&2
+  exit 2
+fi
+printf '{"strategy":"%s","indexes":"%s","jit_rounds":%s,"parallel_rounds":%s,"parallelism":%s}\n' \
+  "$strategy" "$indexes" "$rounds" "$parallel_rounds" "$parallelism" >"$out/metadata.json"
 printf 'round\torder\tmode\texecution_ms\tjit_ms\trows\n' >"$results"
 printf 'round\tmode\tworker\texecution_ms\tjit_ms\trows\n' >"$parallel_results"
 
+cleanup_indexes() {
+  if [[ "$indexes" == present ]]; then
+    docker exec -i "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+      < scripts/experimental/drop-feed-score-indexes.sql >/dev/null
+  fi
+}
+trap cleanup_indexes EXIT
+if [[ "$indexes" == present ]]; then
+  docker exec -i "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+    < scripts/experimental/feed-score-indexes.sql >/dev/null
+  docker exec "$db_container" psql -X -qAt -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+    -c 'ANALYZE analytics.excerpt; ANALYZE analytics.excerpt_rank;' >/dev/null
+fi
+
+if [[ "$strategy" == CURRENT ]]; then
 query="$(cat <<'SQL'
 WITH requested AS (
   SELECT id AS book_id
@@ -51,6 +76,40 @@ SELECT book_id, MAX(final_score) AS score,
  GROUP BY book_id
 SQL
 )"
+else
+query="$(cat <<'SQL'
+WITH requested(book_id) AS (
+  SELECT id FROM catalog.book ORDER BY canonical_title, id LIMIT 100
+), current_versions AS (
+  SELECT DISTINCT ON (a.book_id) a.book_id, v.id AS version_id
+    FROM catalog.book_asset a
+    JOIN catalog.book_asset_version v ON v.id = a.current_version_id
+    JOIN requested r ON r.book_id = a.book_id
+   WHERE a.asset_role IN ('NORMALIZED', 'PROCESSING', 'ANALYTICS')
+     AND a.asset_type IN ('TXT', 'HTML') AND a.status <> 'DELETED'
+     AND v.status = 'AVAILABLE'
+   ORDER BY a.book_id, a.updated_at DESC, a.id DESC
+), eligible AS (
+  SELECT cv.book_id, e.id AS excerpt_id
+    FROM current_versions cv
+    JOIN analytics.excerpt e ON e.source_asset_version_id = cv.version_id
+   WHERE e.body_eligible = TRUE AND e.exclusion_reason IS NULL
+), ranked AS (
+  SELECT el.book_id, er.final_score, er.ranker_version, er.created_at
+    FROM eligible el
+    JOIN LATERAL (
+      SELECT final_score, ranker_version, created_at
+        FROM analytics.excerpt_rank
+       WHERE excerpt_id = el.excerpt_id AND final_score IS NOT NULL
+       ORDER BY created_at DESC LIMIT 1
+    ) er ON TRUE
+)
+SELECT book_id, MAX(final_score) AS score,
+       (ARRAY_AGG(ranker_version ORDER BY final_score DESC, created_at DESC))[1] AS ranker_version
+  FROM ranked GROUP BY book_id
+SQL
+)"
+fi
 
 run_explain() {
   local mode="$1" output="$2"

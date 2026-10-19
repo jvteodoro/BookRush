@@ -20,9 +20,16 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers
 @EnabledIfEnvironmentVariable(named = "RUN_SQL_INTEGRATION", matches = "true")
 class BookScoresQueryRepositoryIT {
+  static {
+    // docker-java otherwise defaults to API 1.32, rejected by current daemons.
+    System.setProperty("api.version",
+        System.getenv().getOrDefault("TESTCONTAINERS_DOCKER_API_VERSION", "1.40"));
+  }
+
   @Container
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
   static JdbcTemplate jdbc;
+  static String baselineJit;
 
   @BeforeAll
   static void schema() {
@@ -42,7 +49,8 @@ class BookScoresQueryRepositoryIT {
     UUID versionB = UUID.randomUUID();
     UUID excerptA = UUID.randomUUID();
     UUID excerptB = UUID.randomUUID();
-    jdbc.update("INSERT INTO catalog.book VALUES (?), (?)", bookA, bookB);
+    UUID bookWithoutRank = UUID.randomUUID();
+    jdbc.update("INSERT INTO catalog.book VALUES (?), (?), (?)", bookA, bookB, bookWithoutRank);
     jdbc.update("INSERT INTO catalog.book_asset VALUES (?, ?, ?, 'NORMALIZED', 'HTML', 'AVAILABLE', clock_timestamp()), (?, ?, ?, 'NORMALIZED', 'TXT', 'AVAILABLE', clock_timestamp())",
         assetA, bookA, versionA, assetB, bookB, versionB);
     jdbc.update("INSERT INTO catalog.book_asset_version VALUES (?, ?, 'AVAILABLE', 1, clock_timestamp()), (?, ?, 'AVAILABLE', 1, clock_timestamp())",
@@ -50,17 +58,20 @@ class BookScoresQueryRepositoryIT {
     jdbc.update("INSERT INTO analytics.excerpt VALUES (?, ?, true, null), (?, ?, true, null)", excerptA, versionA, excerptB, versionB);
     jdbc.update("INSERT INTO analytics.excerpt_rank VALUES (?, ?, 'v1', now() - interval '1 minute', 0.70), (?, ?, 'v2', now(), 0.90), (?, ?, 'v1', now(), null)",
         UUID.randomUUID(), excerptA, UUID.randomUUID(), excerptA, UUID.randomUUID(), excerptB);
-    POSTGRES.getContainerInfo();
+    baselineJit = jdbc.queryForObject("SHOW jit", String.class);
   }
 
   @Test
   void currentAndOptimizedQueriesAreEquivalentAndJitSettingDoesNotLeak() {
-    var current = repository("CURRENT", "OFF").find(bookIds());
-    var optimized = repository("OPTIMIZED", "OFF").find(bookIds());
+    var requested = bookIds();
+    requested.add(requested.get(0));
+    var current = repository("CURRENT", "OFF").find(requested);
+    var optimized = repository("OPTIMIZED", "OFF").find(requested);
     assertEquals(normalize(current.rows()), normalize(optimized.rows()));
     assertEquals("OFF", current.jit());
     assertEquals("OFF", optimized.jit());
-    assertTrue(jdbc.queryForObject("SHOW jit", String.class) != null);
+    assertEquals(baselineJit, jdbc.queryForObject("SHOW jit", String.class));
+    assertTrue(current.rows().stream().noneMatch(row -> row.get("book_id") == null));
   }
 
   private BookScoresQueryRepository repository(String strategy, String jit) {

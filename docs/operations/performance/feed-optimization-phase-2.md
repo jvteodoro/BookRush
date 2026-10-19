@@ -112,35 +112,43 @@ jit=off` and verifies that the connection's global setting remains available
 after the transaction.
 
 The IT is opt-in (`RUN_SQL_INTEGRATION=true`) because the regular Jenkins
-service test container does not necessarily expose a Docker daemon. In this
-workspace the explicit attempt was blocked by the embedded Docker Java client
-negotiating API 1.32 while the daemon requires 1.40; this is an environment
-limitation, not a passing SQL integration result.
+service test container does not necessarily expose a Docker daemon. During the
+first attempt, the analytics POM inherited Testcontainers 1.19.8/docker-java
+3.3.6 and failed against the current daemon (client API 1.32; daemon minimum
+1.40). The POM now imports the platform Testcontainers BOM at 1.20.2
+(docker-java 3.4.0). The explicit IT was then rerun successfully against
+PostgreSQL 16: 1 test, 0 failures, 0 errors, 8.432 s test time. The test used
+`TESTCONTAINERS_RYUK_DISABLED=true` only to avoid a disposable cleanup sidecar;
+the container itself was removed by the test process and no production volume
+was involved.
 
 Commands:
 
 ```bash
-docker build --target build -t bookrush/book-analytics-service:feed-optimization-test \
+docker build --target build -t bookrush/book-analytics-service:feed-optimization-test-build \
   services/book-analytics-service
-docker run --rm bookrush/book-analytics-service:feed-optimization-test mvn -B test
+docker run --rm bookrush/book-analytics-service:feed-optimization-test-build mvn -B test
 
 docker run --rm -e RUN_SQL_INTEGRATION=true \
+  -e TESTCONTAINERS_RYUK_DISABLED=true \
   -v /var/run/docker.sock:/var/run/docker.sock \
-  bookrush/book-analytics-service:feed-optimization-test \
+  bookrush/book-analytics-service:feed-optimization-test-build \
   mvn -B -Dtest=BookScoresQueryRepositoryIT test
 
 docker build --target build -t bookrush/recommendation-service:feed-optimization-test \
   -f services/recommendation-service/Dockerfile .
 docker run --rm bookrush/recommendation-service:feed-optimization-test mvn -B test
 
-bash -n scripts/benchmark-feed-performance.sh scripts/benchmark-score-jit.sh \
-  scripts/experimental/*.sql 2>/dev/null || true
+bash -n scripts/benchmark-feed-performance.sh scripts/benchmark-score-jit.sh
 ```
 
-SQL files are not Bash and should be validated with `psql` in the disposable
-database, not with `bash -n`; the last command is only suitable for the shell
-scripts. The service builds in this phase passed: analytics 93 tests and
-recommendation 12 tests.
+SQL files are not Bash. Validate them in a disposable database with `psql -f`
+and execute the index script only when `SCORE_INDEXES=present` and
+`ALLOW_EXPERIMENTAL_DDL=true` are explicitly set. The score benchmark now
+accepts `SCORE_QUERY_STRATEGY=CURRENT|OPTIMIZED` and
+`SCORE_INDEXES=absent|present`; an index run drops its experimental indexes on
+exit. The service builds in this phase passed: analytics 93 tests plus the
+opt-in SQL integration test and recommendation 12 tests.
 
 ## Current evidence and decision
 
