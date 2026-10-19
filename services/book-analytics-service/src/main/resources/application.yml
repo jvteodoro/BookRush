@@ -30,6 +30,9 @@ bookrush:
   security.jwk-set-uri: ${ANALYTICS_OIDC_JWK_SET_URI:}
   security.audience: ${ANALYTICS_OIDC_AUDIENCE:bookrush-analytics}
 analytics:
+  book-scores:
+    strategy: ${ANALYTICS_BOOK_SCORES_STRATEGY:CURRENT}
+    jit: ${ANALYTICS_BOOK_SCORES_JIT:DEFAULT}
   models:
     cache-dir: ${ANALYTICS_MODEL_CACHE_DIR:/var/lib/bookrush/models}
     offline: ${ANALYTICS_OFFLINE:true}
