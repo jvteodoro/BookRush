@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
 import com.bookrush.recommendationservice.ranking.AnalyticsRankingProperties;
 import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient;
+import com.bookrush.recommendationservice.observability.FeedMetrics;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
@@ -35,6 +36,7 @@ public class RecommendationController {
   private final BehaviorEventPublisher behavior;
   private final AnalyticsScoreClient analyticsScores;
   private final AnalyticsRankingProperties rankingProperties;
+  private final FeedMetrics feedMetrics;
 
   public RecommendationController(
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
@@ -42,13 +44,15 @@ public class RecommendationController {
       ExcerptEnrichmentService excerptEnrichment,
       BehaviorEventPublisher behavior,
       AnalyticsScoreClient analyticsScores,
-      AnalyticsRankingProperties rankingProperties) {
+      AnalyticsRankingProperties rankingProperties,
+      FeedMetrics feedMetrics) {
     catalog = RestClient.builder().baseUrl(url).build();
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
     this.behavior = behavior;
     this.analyticsScores = analyticsScores;
     this.rankingProperties = rankingProperties;
+    this.feedMetrics = feedMetrics;
   }
 
   private String subject(Principal principal) {
@@ -61,21 +65,24 @@ public class RecommendationController {
   @GetMapping("/feed")
   public Map<String, Object> feed(@RequestParam(defaultValue = "20") int size, Principal principal,
       HttpServletRequest request) {
+    var totalSample = feedMetrics.start();
     String subject = subject(principal);
     int limit = Math.max(1, Math.min(size, 100));
-    long previousImpressions = jdbc.queryForObject(
+    long previousImpressions = feedMetrics.time("history_count", () -> jdbc.queryForObject(
         "SELECT count(*) FROM recommendation.impression i JOIN recommendation.request r ON r.id=i.request_id WHERE r.subject_key=?",
-        Long.class, subject);
+        Long.class, subject));
     Strategy selectedStrategy = RecommendationHeuristic.strategyFor(previousImpressions);
     String strategy = selectedStrategy.name();
-    Map<?, ?> result = catalog.get().uri("/api/v1/books?page=0&size=" + Math.min(100, Math.max(limit * 3, 20)))
-        .retrieve().body(Map.class);
+    Map<?, ?> result = feedMetrics.time("catalog_fetch", () -> catalog.get()
+        .uri("/api/v1/books?page=0&size=" + Math.min(100, Math.max(limit * 3, 20)))
+        .retrieve().body(Map.class));
     List<?> books = result != null && result.get("items") instanceof List<?> list ? list : List.of();
     var candidateIds = books.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
-    var scoreById = analyticsScores.find(candidateIds).entrySet().stream()
-        .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue));
+    var scoreById = feedMetrics.time("analytics_scores", () -> analyticsScores.find(candidateIds).entrySet().stream()
+        .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue)));
     boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
-    List<?> rankedBooks = RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById);
+    List<?> rankedBooks = feedMetrics.time("ranking",
+        () -> RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById));
     if (analyticsRequired) {
       rankedBooks = rankedBooks.stream()
           .filter(book -> scoreById.containsKey(String.valueOf(bookId(book))))
@@ -99,30 +106,42 @@ public class RecommendationController {
       item.put("reason", reason);
       candidates.add(item);
     }
-    behavior.publish("RECOMMENDATION_REQUEST", null, Map.of("size", limit, "modelVersion", modelVersion),
-        request.getHeader("Authorization"));
-    excerptEnrichment.enrich(candidates);
+    feedMetrics.time("behavior_publish", () -> {
+      behavior.publish("RECOMMENDATION_REQUEST", null, Map.of("size", limit, "modelVersion", modelVersion),
+          request.getHeader("Authorization"));
+      return null;
+    });
+    feedMetrics.time("excerpt_enrichment", () -> {
+      excerptEnrichment.enrich(candidates);
+      return null;
+    });
     List<Map<String, Object>> items = analyticsRequired
         ? new ArrayList<>(FeedEligibility.retainAnalyticsReady(candidates))
         : candidates;
-    jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
-        requestId, subject, modelVersion, strategy, subject.hashCode(), "{}");
-    int rank = 1;
-    for (Map<String, Object> item : items) {
-      UUID parsedBookId = UUID.fromString(String.valueOf(((Map<?, ?>) item.get("book")).get("id")));
-      UUID itemId = UUID.randomUUID();
-      UUID impressionId = UUID.randomUUID();
-      item.put("recommendationRequestId", requestId);
-      item.put("impressionId", impressionId);
-      item.put("rank", rank);
-      jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
-          itemId, requestId, parsedBookId, rank, 1.0 / rank,
-          "{\"strategy\":\"" + item.get("reason") + "\",\"rankerVersion\":\""
-              + modelVersion + "\"}");
-      jdbc.update("INSERT INTO recommendation.impression(id, request_id, book_id, rank, item_id) "
-          + "VALUES (?, ?, ?, ?, ?)", impressionId, requestId, parsedBookId, rank, itemId);
-      rank++;
-    }
+    feedMetrics.time("ledger_persist", () -> {
+      jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
+          requestId, subject, modelVersion, strategy, subject.hashCode(), "{}");
+      int rank = 1;
+      for (Map<String, Object> item : items) {
+        UUID parsedBookId = UUID.fromString(String.valueOf(((Map<?, ?>) item.get("book")).get("id")));
+        UUID itemId = UUID.randomUUID();
+        UUID impressionId = UUID.randomUUID();
+        item.put("recommendationRequestId", requestId);
+        item.put("impressionId", impressionId);
+        item.put("rank", rank);
+        jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
+            itemId, requestId, parsedBookId, rank, 1.0 / rank,
+            "{\"strategy\":\"" + item.get("reason") + "\",\"rankerVersion\":\""
+                + modelVersion + "\"}");
+        jdbc.update("INSERT INTO recommendation.impression(id, request_id, book_id, rank, item_id) "
+            + "VALUES (?, ?, ?, ?, ?)", impressionId, requestId, parsedBookId, rank, itemId);
+        rank++;
+      }
+      return null;
+    });
+    feedMetrics.observeFeed(candidateIds.size(), scoreById.size(), rankedBooks.size(), items.size(),
+        (int) items.stream().filter(FeedEligibility::hasAnalyticsExcerpt).count());
+    feedMetrics.stopTotal(totalSample);
     return Map.of("requestId", requestId, "modelVersion", modelVersion,
         "rankingVersion", modelVersion, "strategy", strategy,
         "generatedAt", Instant.now(), "items", items);
