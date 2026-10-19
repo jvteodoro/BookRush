@@ -86,6 +86,10 @@ not a Flyway undo migration:
 `history_count`, `catalog_fetch`, `analytics_scores`, `ranking`,
 `behavior_publish`, `excerpt_enrichment`, `ledger_persist`, and `total`.
 
+The controller closes `total` in `finally`, including authentication and
+remote failures, and records one low-cardinality request outcome: `success`,
+`error`, `timeout`, or `empty`.
+
 Counters expose candidate, score, selected, item, excerpt, empty-feed, cache
 hit/miss, timeout/error and returned-score counts. IDs, subjects, tokens and
 payloads are never metric tags. The analytics endpoint additionally records

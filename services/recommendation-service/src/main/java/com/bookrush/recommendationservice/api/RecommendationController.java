@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.server.ResponseStatusException;
 import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
 import com.bookrush.recommendationservice.ranking.AnalyticsRankingProperties;
@@ -66,7 +67,9 @@ public class RecommendationController {
   public Map<String, Object> feed(@RequestParam(defaultValue = "20") int size, Principal principal,
       HttpServletRequest request) {
     var totalSample = feedMetrics.start();
-    String subject = subject(principal);
+    boolean resultRecorded = false;
+    try {
+      String subject = subject(principal);
     int limit = Math.max(1, Math.min(size, 100));
     long previousImpressions = feedMetrics.time("history_count", () -> jdbc.queryForObject(
         "SELECT count(*) FROM recommendation.impression i JOIN recommendation.request r ON r.id=i.request_id WHERE r.subject_key=?",
@@ -141,10 +144,23 @@ public class RecommendationController {
     });
     feedMetrics.observeFeed(candidateIds.size(), scoreById.size(), rankedBooks.size(), items.size(),
         (int) items.stream().filter(FeedEligibility::hasAnalyticsExcerpt).count());
-    feedMetrics.stopTotal(totalSample);
+    feedMetrics.recordResult(items.isEmpty() ? "empty" : "success");
+    resultRecorded = true;
     return Map.of("requestId", requestId, "modelVersion", modelVersion,
         "rankingVersion", modelVersion, "strategy", strategy,
         "generatedAt", Instant.now(), "items", items);
+    } catch (ResourceAccessException timeout) {
+      feedMetrics.recordResult("timeout");
+      resultRecorded = true;
+      throw timeout;
+    } catch (RuntimeException error) {
+      feedMetrics.recordResult("error");
+      resultRecorded = true;
+      throw error;
+    } finally {
+      if (!resultRecorded) feedMetrics.recordResult("error");
+      feedMetrics.stopTotal(totalSample);
+    }
   }
 
   private UUID bookId(Object book) {

@@ -1,6 +1,7 @@
 package com.bookrush.recommendationservice.ranking;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -8,6 +9,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +67,28 @@ class AnalyticsScoreClientTest {
 
     assertEquals(0.87, result.get(scored).score());
     assertEquals(1, result.size());
+    server.verify();
+  }
+
+  @Test
+  void recordsTimeoutAndDurationWhenAnalyticsIsUnavailable() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    var registry = new SimpleMeterRegistry();
+    UUID book = UUID.randomUUID();
+    server.expect(requestTo("http://keycloak/token"))
+        .andRespond(withSuccess("{\"access_token\":\"technical\",\"expires_in\":300}", MediaType.APPLICATION_JSON));
+    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/book-scores"))
+        .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
+            .withException(new IOException("analytics timeout")));
+    var properties = new AnalyticsRankingProperties(true, "analytics-aware-v1", "http://analytics",
+        "http://keycloak/token", "client", "secret", "aud", "scope", Duration.ofMinutes(1),
+        Duration.ofSeconds(1), Duration.ofSeconds(1), 100);
+    var client = new AnalyticsScoreClient(builder, properties, registry, false);
+
+    assertTrue(client.find(List.of(book)).isEmpty());
+    assertEquals(1, registry.counter("bookrush.feed.analytics_scores", "outcome", "timeout").count());
+    assertEquals(1, registry.timer("bookrush.feed.analytics_scores.duration").count());
     server.verify();
   }
 }

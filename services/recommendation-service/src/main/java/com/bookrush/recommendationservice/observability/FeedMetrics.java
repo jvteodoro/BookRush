@@ -34,6 +34,10 @@ public final class FeedMetrics {
     sample.stop(registry.timer("bookrush.feed.stage.duration", "stage", "total"));
   }
 
+  public void recordResult(String outcome) {
+    registry.counter("bookrush.feed.requests", "outcome", outcome).increment();
+  }
+
   public void count(String name, String outcome, double amount) {
     registry.counter(name, "outcome", outcome).increment(amount);
   }
@@ -44,6 +48,5 @@ public final class FeedMetrics {
     count("bookrush.feed.candidates", "selected", selected);
     count("bookrush.feed.items", "returned", items);
     count("bookrush.feed.excerpts", "attached", excerpts);
-    count("bookrush.feed.requests", items == 0 ? "empty" : "with_items", 1);
   }
 }
