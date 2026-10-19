@@ -101,6 +101,8 @@ fi
 keycloak_admin_user="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_password="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_user="${keycloak_admin_user:-admin}"
+admin_web_admin_username="$(awk -F= '$1 == "ADMIN_WEB_ADMIN_USERNAME" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
+admin_web_admin_username="${admin_web_admin_username:-$keycloak_admin_user}"
 # The admin-service manages product users. Keep every step (role repair,
 # secret lookup and Compose interpolation) pinned to that same realm/client;
 # stale protected-env values must not redirect only the application to the
@@ -119,6 +121,12 @@ if [[ -n "$keycloak_admin_password" ]]; then
     -e KEYCLOAK_USER="$keycloak_admin_user" \
     -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
     python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/grant-user-management-roles.py"
+  docker run --rm -i --network bookrush_bookrush \
+    -e KEYCLOAK_URL=http://keycloak:8080 \
+    -e KEYCLOAK_USER="$keycloak_admin_user" \
+    -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
+    -e ADMIN_WEB_ADMIN_USERNAME="$admin_web_admin_username" \
+    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/grant-admin-console-access.py"
   live_admin_client_secret="$(docker run --rm -i --network bookrush_bookrush \
     -e KEYCLOAK_URL=http://keycloak:8080 \
     -e KEYCLOAK_REALM=bookrush \
@@ -128,7 +136,7 @@ if [[ -n "$keycloak_admin_password" ]]; then
     python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py" 2>/dev/null || true)"
 fi
 KEYCLOAK_ADMIN_CLIENT_SECRET="${live_admin_client_secret:-$configured_admin_client_secret}"
-unset keycloak_admin_password live_admin_client_secret configured_admin_client_secret
+unset keycloak_admin_password admin_web_admin_username live_admin_client_secret configured_admin_client_secret
 [[ -n "$KEYCLOAK_ADMIN_CLIENT_SECRET" ]] || { echo 'Não foi possível resolver o segredo vigente do admin-service no Keycloak.' >&2; exit 1; }
 export KEYCLOAK_ADMIN_CLIENT_SECRET
 if $xtrace_was_enabled; then set -x; fi

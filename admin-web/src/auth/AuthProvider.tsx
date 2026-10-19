@@ -39,10 +39,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
         const realmAccess =
           (parsed?.realm_access as { roles?: string[] } | undefined)?.roles ??
           [];
+        const groups = Array.isArray(parsed?.groups)
+          ? parsed.groups.filter(
+              (group): group is string => typeof group === "string",
+            )
+          : [];
         setProfile({
           userId: (parsed?.sub as string) ?? "unknown",
           username: (parsed?.preferred_username as string) ?? "admin",
-          roles: realmAccess,
+          roles: [...new Set([...realmAccess, ...groups])],
         });
         setAccessToken(kc.token);
         setState({ ready: true, authenticated });

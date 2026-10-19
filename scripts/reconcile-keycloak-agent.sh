@@ -60,4 +60,11 @@ docker run --rm -i --network "$BOOKRUSH_NETWORK_NAME" \
   -e KEYCLOAK_PASSWORD="$KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" \
   python:3.12-slim python3 - < infrastructure/keycloak/grant-user-management-roles.py
 
+docker run --rm -i --network "$BOOKRUSH_NETWORK_NAME" \
+  -e KEYCLOAK_URL=http://keycloak:8080 \
+  -e KEYCLOAK_USER="${KEYCLOAK_CONFIG_CLI_ADMIN_USER:-admin}" \
+  -e KEYCLOAK_PASSWORD="$KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" \
+  -e ADMIN_WEB_ADMIN_USERNAME="${ADMIN_WEB_ADMIN_USERNAME:-${KEYCLOAK_CONFIG_CLI_ADMIN_USER:-admin}}" \
+  python:3.12-slim python3 - < infrastructure/keycloak/grant-admin-console-access.py
+
 echo 'Keycloak persistent realm reconciliado pelo volume do agente.'

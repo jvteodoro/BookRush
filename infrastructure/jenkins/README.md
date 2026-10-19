@@ -338,6 +338,13 @@ O deploy fixa token URI, Admin API e client ID no realm de produto `bookrush`
 antes de renderizar o Compose. Valores antigos no arquivo protegido não podem,
 portanto, validar um realm no preflight e direcionar o serviço para outro.
 
+`ADMIN_WEB_ADMIN_USERNAME` identifica o usuário humano do realm
+`bookrush-platform` que deve administrar a aplicação. O reconcile o mantém no
+grupo `platform-admins`; após uma primeira concessão, o usuário deve sair e
+entrar novamente para receber a role no access token.
+O mesmo reconcile mantém no cliente `labsoft-admin-web` um mapper explícito de
+`sub`, usado pelo `admin-service` como identidade canônica de auditoria.
+
 O Nginx do `admin-web` resolve `admin-service` pelo DNS interno do Docker no
 momento de cada chamada. Assim, o painel pode iniciar enquanto o serviço está
 sendo recriado sem encerrar por uma corrida de DNS durante o deploy Compose.

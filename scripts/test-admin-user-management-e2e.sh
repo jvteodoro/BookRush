@@ -13,6 +13,8 @@ service="bookrush-admin-e2e-service-$suffix"
 web="bookrush-admin-e2e-web-$suffix"
 probe="bookrush-admin-e2e-probe-$suffix"
 admin_password='disposable-admin-password'
+human_password='disposable-human-password'
+human_username='disposable-platform-admin'
 product_secret='disposable-product-client-secret'
 platform_secret='disposable-platform-client-secret'
 image="bookrush/admin-service-e2e:$suffix"
@@ -70,6 +72,25 @@ client_uuid="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients -r
 docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" \
   -r bookrush -s fullScopeAllowed=false >/dev/null
 
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh create users -r bookrush-platform \
+  -s username="$human_username" -s firstName=Disposable -s lastName=Administrator \
+  -s email=disposable-platform-admin@bookrush.test -s enabled=true \
+  -s emailVerified=true -s 'requiredActions=[]' >/dev/null
+human_user_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get users \
+  -r bookrush-platform -q username="$human_username" --fields id --format csv --noquotes)"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh update "users/$human_user_id" \
+  -r bookrush-platform -s enabled=true -s emailVerified=true -s 'requiredActions=[]' >/dev/null
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh set-password -r bookrush-platform \
+  --userid "$human_user_id" --new-password "$human_password" >/dev/null
+docker run --rm -i --network "$network" \
+  -e KEYCLOAK_URL=http://keycloak:8080 -e KEYCLOAK_USER=admin \
+  -e KEYCLOAK_PASSWORD="$admin_password" -e ADMIN_WEB_ADMIN_USERNAME="$human_username" \
+  python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/grant-admin-console-access.py"
+admin_web_client_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients \
+  -r bookrush-platform -q clientId=labsoft-admin-web --fields id --format csv --noquotes)"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh update "clients/$admin_web_client_id" \
+  -r bookrush-platform -s directAccessGrantsEnabled=true >/dev/null
+
 # Exercise twice the same role repair used immediately before deployment,
 # proving that it is safe against an already-reconciled persistent realm.
 for _ in 1 2; do
@@ -102,8 +123,19 @@ docker exec "$probe" curl -fsS http://admin-service:8100/actuator/health >/dev/n
 
 token="$(docker exec "$probe" curl -fsS -X POST \
   http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
-  -d grant_type=client_credentials -d client_id=bookrush-ingestion-admin \
-  --data-urlencode "client_secret=$platform_secret" | jq -er '.access_token')"
+  -d grant_type=password -d client_id=labsoft-admin-web \
+  --data-urlencode "username=$human_username" \
+  --data-urlencode "password=$human_password" | jq -er '.access_token')"
+TOKEN="$token" python3 - <<'PY'
+import base64, json, os
+payload = os.environ["TOKEN"].split(".")[1]
+payload += "=" * (-len(payload) % 4)
+claims = json.loads(base64.urlsafe_b64decode(payload))
+assert claims["iss"] == "http://keycloak:8080/realms/bookrush-platform", claims["iss"]
+assert claims.get("sub"), claims
+assert "bookrush-ingestion" in claims.get("aud", []), claims.get("aud")
+assert "platform-admins" in claims.get("groups", []), claims.get("groups")
+PY
 status=000
 for _ in $(seq 1 30); do
   status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
@@ -113,8 +145,11 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 if [[ "$status" != 200 ]]; then
+  docker exec "$probe" curl -sS -D - -o /dev/null \
+    -H "Authorization: Bearer $token" \
+    'http://admin-web/api/v1/admin/users?page=0&size=1' >&2 || true
   docker logs --tail=160 "$service" >&2
   echo "Admin user management E2E retornou HTTP $status." >&2
   exit 1
 fi
-echo 'Admin user management E2E: platform token -> service -> product realm OK'
+echo 'Admin user management E2E: human admin-web token -> service -> product realm OK'

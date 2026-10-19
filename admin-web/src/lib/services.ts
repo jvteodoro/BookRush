@@ -146,8 +146,19 @@ function idempotencyKey(prefix: string, id: string) {
 function problem(error: unknown, fallback: string) {
   if (error && typeof error === "object" && "response" in error) {
     const response = (
-      error as { response?: { data?: { message?: string; detail?: string } } }
+      error as {
+        response?: {
+          status?: number;
+          data?: { message?: string; detail?: string };
+        };
+      }
     ).response;
+    if (response?.status === 401)
+      return new Error("Sua sessão expirou. Entre novamente no Admin Console.");
+    if (response?.status === 403)
+      return new Error(
+        "Sua conta não possui a role platform-admin ou platform-operator. Saia e entre novamente após a concessão do acesso.",
+      );
     return new Error(
       response?.data?.message ?? response?.data?.detail ?? fallback,
     );
