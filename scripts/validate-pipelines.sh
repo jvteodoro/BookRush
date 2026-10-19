@@ -33,6 +33,8 @@ grep -Fq 'ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-w
 test -f infrastructure/keycloak/read-client-secret.py || fail 'resolvedor seguro do segredo admin-service ausente'
 grep -Fq 'KEYCLOAK_ADMIN_CLIENT_SECRET="$(docker run' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose não injeta o segredo reconciliado do admin-service'
 grep -Fq 'if ! probe_user_management; then' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem smoke autenticado de gerenciamento de usuários'
+grep -Fq "'http://reverse-proxy/api/v1/admin/users?page=0&size=1'" infrastructure/jenkins/deploy-compose.sh || fail 'smoke de usuários não atravessa o gateway'
+grep -Fq 'if ! probe_catalog; then' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem retry do smoke de catálogo'
 grep -Fq 'scripts/test-microservice.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem executor'
 grep -Fq 'scripts/test-vertical.sh' infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical sem executor'
 grep -Fq 'scripts/deploy-compose-service.sh' infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço sem deploy Compose'

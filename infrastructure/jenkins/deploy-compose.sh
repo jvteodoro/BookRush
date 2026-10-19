@@ -109,7 +109,8 @@ if [[ -z "${KEYCLOAK_ADMIN_CLIENT_SECRET:-}" ]]; then
 fi
 
 probe_user_management() {
-  local xtrace_was_enabled=false admin_user admin_password probe_secret probe_token rc
+  local xtrace_was_enabled=false admin_user admin_password probe_secret probe_token
+  local attempt status
   [[ $- == *x* ]] && xtrace_was_enabled=true
   set +x
   admin_user="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
@@ -119,24 +120,62 @@ probe_user_management() {
     echo 'Smoke de usuários: KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD ausente.' >&2
     return 1
   fi
-  probe_secret="$(docker run --rm -i --network bookrush_bookrush \
-    -e KEYCLOAK_URL=http://keycloak:8080 \
-    -e KEYCLOAK_REALM=bookrush-platform \
-    -e KEYCLOAK_CLIENT_ID=bookrush-ingestion-admin \
-    -e KEYCLOAK_USER="$admin_user" \
-    -e KEYCLOAK_PASSWORD="$admin_password" \
-    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py")" || return 1
-  probe_token="$(docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 -fsS -X POST \
-    http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
-    -d grant_type=client_credentials -d client_id=bookrush-ingestion-admin \
-    --data-urlencode "client_secret=$probe_secret" | jq -er '.access_token')" || return 1
-  docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 -fsS \
-    -H "Authorization: Bearer $probe_token" \
-    'http://admin-service:8100/api/v1/admin/users?page=0&size=1' >/dev/null
-  rc=$?
+  for attempt in {1..6}; do
+    probe_secret="$(docker run --rm -i --network bookrush_bookrush \
+      -e KEYCLOAK_URL=http://keycloak:8080 \
+      -e KEYCLOAK_REALM=bookrush-platform \
+      -e KEYCLOAK_CLIENT_ID=bookrush-ingestion-admin \
+      -e KEYCLOAK_USER="$admin_user" \
+      -e KEYCLOAK_PASSWORD="$admin_password" \
+      python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py" 2>/dev/null)" && break
+    echo "Smoke de usuários: Keycloak ainda indisponível para resolver o cliente (tentativa $attempt/6)." >&2
+    sleep 5
+  done
+  if [[ -z "$probe_secret" ]]; then
+    echo 'Smoke de usuários: não foi possível resolver o cliente técnico.' >&2
+    return 1
+  fi
+  for attempt in {1..6}; do
+    probe_token="$(docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 -fsS -X POST \
+      http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
+      -d grant_type=client_credentials -d client_id=bookrush-ingestion-admin \
+      --data-urlencode "client_secret=$probe_secret" 2>/dev/null | jq -er '.access_token' 2>/dev/null)" && break
+    echo "Smoke de usuários: token técnico ainda indisponível (tentativa $attempt/6)." >&2
+    sleep 5
+  done
+  if [[ -z "$probe_token" ]]; then
+    echo 'Smoke de usuários: o Keycloak não emitiu o token técnico.' >&2
+    return 1
+  fi
+  status=000
+  for attempt in {1..12}; do
+    # Exercise the same Traefik route and Host used by the browser without
+    # writing the bearer or the returned user data to the Jenkins log.
+    status="$(docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 \
+      -sS -o /dev/null -w '%{http_code}' \
+      -H 'Host: bookrush.jteodoro.tec.br' \
+      -H "Authorization: Bearer $probe_token" \
+      'http://reverse-proxy/api/v1/admin/users?page=0&size=1' 2>/dev/null || true)"
+    [[ "$status" == 200 ]] && break
+    echo "Smoke de usuários: gateway retornou HTTP ${status:-000} (tentativa $attempt/12)." >&2
+    [[ "$status" == 401 || "$status" == 403 ]] && break
+    sleep 5
+  done
   unset admin_password probe_secret probe_token
   if $xtrace_was_enabled; then set -x; fi
-  return "$rc"
+  [[ "$status" == 200 ]]
+}
+
+probe_catalog() {
+  local attempt
+  for attempt in {1..12}; do
+    if "${compose[@]}" exec -T frontend wget -q -O /dev/null http://127.0.0.1:8080/api/status; then
+      return 0
+    fi
+    echo "Smoke do catálogo: frontend ainda indisponível (tentativa $attempt/12)." >&2
+    sleep 5
+  done
+  return 1
 }
 
 rollback() {
@@ -172,7 +211,7 @@ if ! probe_user_management; then
   exit 1
 fi
 
-if ! "${compose[@]}" exec -T frontend wget -q -O - http://127.0.0.1:8080/api/status; then
+if ! probe_catalog; then
   echo 'Smoke test do catálogo pelo frontend falhou.' >&2
   diagnose
   rollback
