@@ -63,6 +63,7 @@ credencial S2S já configurada:
 ```text
 FEED_ANALYTICS_RANKING_ENABLED=true
 FEED_ANALYTICS_RANKING_MODEL_VERSION=analytics-aware-v1
+FEED_ANALYTICS_RANKING_READ_TIMEOUT=2s
 ```
 
 O segredo deve ser injetado explicitamente em

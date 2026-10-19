@@ -33,7 +33,7 @@ feed:
     scope: ${FEED_ANALYTICS_RANKING_SCOPE:bookrush.analytics}
     cache-ttl: ${FEED_ANALYTICS_RANKING_CACHE_TTL:10m}
     connect-timeout: ${FEED_ANALYTICS_RANKING_CONNECT_TIMEOUT:250ms}
-    read-timeout: ${FEED_ANALYTICS_RANKING_READ_TIMEOUT:700ms}
+    read-timeout: ${FEED_ANALYTICS_RANKING_READ_TIMEOUT:2s}
     max-candidates: ${FEED_ANALYTICS_RANKING_MAX_CANDIDATES:100}
   excerpts:
     enabled: ${FEED_EXCERPTS_ENABLED:false}

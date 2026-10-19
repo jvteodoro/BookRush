@@ -29,7 +29,7 @@ public record AnalyticsRankingProperties(
     scope = scope == null || scope.isBlank() ? "bookrush.analytics" : scope;
     cacheTtl = cacheTtl == null ? Duration.ofMinutes(10) : cacheTtl;
     connectTimeout = connectTimeout == null ? Duration.ofMillis(250) : connectTimeout;
-    readTimeout = readTimeout == null ? Duration.ofMillis(700) : readTimeout;
+    readTimeout = readTimeout == null ? Duration.ofSeconds(2) : readTimeout;
     maxCandidates = maxCandidates < 1 ? 100 : Math.min(maxCandidates, 100);
   }
 
