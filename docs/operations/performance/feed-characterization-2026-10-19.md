@@ -263,6 +263,37 @@ Executar uma hipótese por vez, preservando o mesmo corpus e amostra:
 
 ## Conclusão operacional
 
+### Correção do bloqueio de imagem stale — 2026-10-19
+
+O teste do endpoint completo revelou que a amostra anterior não media o
+ranking: o container efetivo estava em
+`local/bookrush/book-analytics-service:173-9373f7a`, sem a rota
+`POST /api/internal/v1/content-analytics/book-scores`, que respondia `404`.
+O código da revisão `0b13579` já continha o controller e o contrato OpenAPI,
+mas a imagem antiga ainda estava implantada.
+
+Foi publicada a branch `feature/analytics-small-batches` e executado o job
+`bookrush-microservice-book-analytics-service #62` com `DEPLOY=true` e
+`DEPLOY_TARGET=compose`, autenticado como `codex-jenkins-agent`. O build
+terminou `SUCCESS` em 56,374 ms. O container efetivo passou a usar
+`bookrush/book-analytics-service:local`, com digest
+`sha256:9007082a0283283226a879b2e45501c8a280aa6faab56728c6475b8376ac92d8`,
+estado `running` e healthcheck `healthy`; o Flyway validou as 27 migrations.
+
+Smoke pós-deploy, sem registrar credenciais:
+
+- chamada S2S sem bearer: `401`;
+- chamada S2S com token novo e cinco livros elegíveis: `200`, quatro scores
+  retornados;
+- feed público sem token: `401`;
+- feed público com login OIDC + PKCE: `200`, `rankingVersion=analytics-aware-v1`
+  e item retornado.
+
+O worker `bookrush-book-analytics-runtime-1` permaneceu `running` e
+`paused=false`. Portanto, o diagnóstico anterior de feed vazio por rota
+ausente foi corrigido; a bateria de latência anterior deve ser repetida agora
+com o endpoint real antes de comparar novas otimizações.
+
 O feed está funcional com o timeout de 2 s e a bateria teve 0% de erros. A
 consulta de scores é o gargalo dominante; o worker de embeddings e a
 concorrência de usuários amplificam a latência. O job dos 500 livros foi
