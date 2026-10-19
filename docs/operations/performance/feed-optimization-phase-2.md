@@ -59,7 +59,7 @@ controller before SQL execution.
 ### Experimental indexes
 
 The candidate indexes remain available in
-[`scripts/experimental/feed-score-indexes.sql`](../../../scripts/experimental/feed-score-indexes.sql),
+`scripts/experimental/feed-score-indexes.sql`,
 with rollback in `drop-feed-score-indexes.sql`. They are intentionally not
 Flyway migrations and must only be run against a disposable/staging copy.
 The scripts use `CREATE/DROP INDEX CONCURRENTLY`, so they must run outside an
@@ -76,7 +76,7 @@ Each migration has a matching `.sql.conf` with `executeInTransaction=false`.
 The stable index names are `excerpt_rank_latest_score_idx` and
 `excerpt_eligible_asset_version_idx`. Rollback is intentionally operational,
 not a Flyway undo migration:
-[`drop-feed-score-indexes-definitive.sql`](../../../scripts/experimental/drop-feed-score-indexes-definitive.sql).
+`drop-feed-score-indexes-definitive.sql`.
 
 ### Feed observability
 
