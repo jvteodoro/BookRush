@@ -206,12 +206,13 @@ segredo do cliente de gerenciamento e o acesso ao realm de usuários; qualquer
 falha aciona diagnóstico e rollback.
 
 Os smokes aguardam por até um minuto a convergência de DNS, proxy e aplicações
-depois dos healthchecks. A verificação de usuários atravessa o `reverse-proxy`
-com o host público, como o navegador, e registra somente o status HTTP de
-tentativas malsucedidas; bearer, secrets e respostas com usuários não são
-enviados ao console do Jenkins. Respostas `401` e `403` encerram as tentativas
-imediatamente porque representam contrato de identidade, não atraso de
-inicialização.
+depois dos healthchecks. A verificação de usuários atravessa o proxy de mesma
+origem empacotado na própria imagem `admin-web` da revisão. Ela não depende do
+`dynamic.yaml` montado no Traefik a partir do checkout estável do host, que pode
+estar temporariamente atrás da branch. O console registra somente o status HTTP
+de tentativas malsucedidas; bearer, secrets e respostas com usuários não são
+expostos. Respostas `401` e `403` encerram as tentativas imediatamente porque
+representam contrato de identidade, não atraso de inicialização.
 
 Um job parametrizado pode carregar o Jenkinsfile da `main` antes de fazer o
 checkout de uma feature. Enquanto a `main` ainda não conhecer as imagens

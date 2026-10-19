@@ -82,6 +82,7 @@ pipeline {
           bash scripts/test-keycloak-reconcile.sh
           bash scripts/test-keycloak-access-lifecycle.sh
           bash scripts/test-keycloak-user-management.sh
+          bash scripts/test-admin-user-management-e2e.sh
           bash scripts/test-keycloak-jwks-rotation.sh
         '''
       }

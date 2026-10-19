@@ -149,15 +149,16 @@ probe_user_management() {
   fi
   status=000
   for attempt in {1..12}; do
-    # Exercise the same Traefik route and Host used by the browser without
-    # writing the bearer or the returned user data to the Jenkins log.
+    # Exercise the same-origin proxy shipped in the admin-web image from this
+    # revision. The host Traefik file comes from a stable checkout outside the
+    # Jenkins workspace and must not make a feature deploy depend on stale
+    # host files.
     status="$(docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 \
       -sS -o /dev/null -w '%{http_code}' \
-      -H 'Host: bookrush.jteodoro.tec.br' \
       -H "Authorization: Bearer $probe_token" \
-      'http://reverse-proxy/api/v1/admin/users?page=0&size=1' 2>/dev/null || true)"
+      'http://admin-web/api/v1/admin/users?page=0&size=1' 2>/dev/null || true)"
     [[ "$status" == 200 ]] && break
-    echo "Smoke de usuários: gateway retornou HTTP ${status:-000} (tentativa $attempt/12)." >&2
+    echo "Smoke de usuários: proxy do admin-web retornou HTTP ${status:-000} (tentativa $attempt/12)." >&2
     [[ "$status" == 401 || "$status" == 403 ]] && break
     sleep 5
   done

@@ -25,6 +25,12 @@ exigem token do realm `bookrush-platform` com grupo `operators` ou
 `realm-management`; o segredo é fornecido somente por
 `KEYCLOAK_ADMIN_CLIENT_SECRET`.
 
+O gate `scripts/test-admin-user-management-e2e.sh` sobe PostgreSQL e os dois
+realms em containers descartáveis e valida o fluxo completo: token técnico do
+realm de plataforma, autorização do `admin-service`, token de serviço do realm
+de produto e consulta de usuários. Nenhuma credencial ou dado persistente é
+usado pelo teste.
+
 `GET /users` consulta diretamente o realm de produto `bookrush`, incluindo
 contas que ainda não criaram perfil, e aceita `search`, `page` e `size`. Os
 endpoints `/users/{subjectKey}/disable|enable` exigem motivo, gravam auditoria e
