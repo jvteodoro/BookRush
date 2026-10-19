@@ -130,7 +130,10 @@ creates only the relevant catalog/analytics tables, inserts multiple assets,
 eligible/ineligible excerpts and multiple rank versions, and asserts that
 `CURRENT` and `OPTIMIZED` return the same rows. It also exercises `SET LOCAL
 jit=off` and verifies that the connection's global setting remains available
-after the transaction.
+after the transaction. The test constructs `JdbcTemplate` and
+`DataSourceTransactionManager` from one shared `DataSource`, checks
+`pg_backend_pid()` inside the transaction, and verifies the setting after both
+commit and rollback.
 
 The IT is opt-in (`RUN_SQL_INTEGRATION=true`) because the regular Jenkins
 service test container does not necessarily expose a Docker daemon. During the

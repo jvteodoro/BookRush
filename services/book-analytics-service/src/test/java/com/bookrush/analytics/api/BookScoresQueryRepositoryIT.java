@@ -2,6 +2,7 @@ package com.bookrush.analytics.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.flywaydb.core.Flyway;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -29,11 +31,14 @@ class BookScoresQueryRepositoryIT {
   @Container
   static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
   static JdbcTemplate jdbc;
+  static DataSource sharedDataSource;
+  static Flyway flyway;
   static String baselineJit;
 
   @BeforeAll
   static void schema() {
-    jdbc = new JdbcTemplate(dataSource());
+    sharedDataSource = dataSource();
+    jdbc = new JdbcTemplate(sharedDataSource);
     jdbc.execute("CREATE SCHEMA catalog");
     jdbc.execute("CREATE SCHEMA analytics");
     jdbc.execute("CREATE TABLE catalog.book(id uuid PRIMARY KEY)");
@@ -59,6 +64,17 @@ class BookScoresQueryRepositoryIT {
     jdbc.update("INSERT INTO analytics.excerpt_rank VALUES (?, ?, 'v1', now() - interval '1 minute', 0.70), (?, ?, 'v2', now(), 0.90), (?, ?, 'v1', now(), null)",
         UUID.randomUUID(), excerptA, UUID.randomUUID(), excerptA, UUID.randomUUID(), excerptB);
     baselineJit = jdbc.queryForObject("SHOW jit", String.class);
+    flyway = Flyway.configure()
+        .dataSource(sharedDataSource)
+        .schemas("analytics")
+        .defaultSchema("analytics")
+        .baselineOnMigrate(true)
+        .baselineVersion("27")
+        .executeInTransaction(false)
+        .configuration(Map.of("flyway.postgresql.transactional.lock", "false"))
+        .locations("classpath:db/migration")
+        .load();
+    flyway.migrate();
   }
 
   @Test
@@ -72,12 +88,58 @@ class BookScoresQueryRepositoryIT {
     assertEquals("OFF", optimized.jit());
     assertEquals(baselineJit, jdbc.queryForObject("SHOW jit", String.class));
     assertTrue(current.rows().stream().noneMatch(row -> row.get("book_id") == null));
+    assertIndex("excerpt_rank_latest_score_idx", "excerpt_id, created_at DESC", "final_score IS NOT NULL");
+    assertIndex("excerpt_eligible_asset_version_idx", "source_asset_version_id, id", "body_eligible = true AND exclusion_reason IS NULL");
+  }
+
+  @Test
+  void localJitUsesTheTransactionConnectionAndDoesNotLeakAfterCommitOrRollback() {
+    var transaction = new org.springframework.transaction.support.TransactionTemplate(
+        new DataSourceTransactionManager(sharedDataSource));
+    String[] pids = new String[2];
+    transaction.executeWithoutResult(status -> {
+      jdbc.execute("SET LOCAL jit = off");
+      pids[0] = jdbc.queryForObject("SELECT pg_backend_pid()", String.class);
+      assertEquals("off", jdbc.queryForObject("SHOW jit", String.class));
+      pids[1] = jdbc.queryForObject("SELECT pg_backend_pid()", String.class);
+    });
+    assertEquals(pids[0], pids[1]);
+    assertEquals(baselineJit, jdbc.queryForObject("SHOW jit", String.class));
+
+    try {
+      transaction.executeWithoutResult(status -> {
+        jdbc.execute("SET LOCAL jit = off");
+        assertEquals("off", jdbc.queryForObject("SHOW jit", String.class));
+        throw new IllegalStateException("rollback probe");
+      });
+    } catch (IllegalStateException expected) {
+      // The transaction must be rolled back without changing the pool default.
+    }
+    assertEquals(baselineJit, jdbc.queryForObject("SHOW jit", String.class));
+  }
+
+  @Test
+  void definitiveIndexMigrationsAreNoOpWhenValidatedAgain() {
+    flyway.migrate();
+    assertEquals(2, jdbc.queryForObject(
+        "SELECT count(*) FROM analytics.flyway_schema_history WHERE version IN ('28', '29')", Integer.class));
   }
 
   private BookScoresQueryRepository repository(String strategy, String jit) {
-    DataSource dataSource = dataSource();
-    return new BookScoresQueryRepository(jdbc, new DataSourceTransactionManager(dataSource),
+    return new BookScoresQueryRepository(jdbc, new DataSourceTransactionManager(sharedDataSource),
         new BookScoresQueryProperties(strategy, jit), new SimpleMeterRegistry());
+  }
+
+  private void assertIndex(String name, String columns, String predicate) {
+    Map<String, Object> row = jdbc.queryForMap(
+        "SELECT indexdef, indisvalid FROM pg_indexes i JOIN pg_class c ON c.relname=i.indexname "
+            + "JOIN pg_index x ON x.indexrelid=c.oid WHERE i.schemaname='analytics' AND i.indexname=?", name);
+    assertNotNull(row.get("indexdef"));
+    assertTrue(String.valueOf(row.get("indexdef")).contains(columns));
+    String normalizedDefinition = String.valueOf(row.get("indexdef")).toLowerCase()
+        .replace("(", "").replace(")", "");
+    assertTrue(normalizedDefinition.contains(predicate.toLowerCase()));
+    assertEquals(true, row.get("indisvalid"));
   }
 
   private static DataSource dataSource() {
