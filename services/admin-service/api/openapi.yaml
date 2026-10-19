@@ -70,6 +70,28 @@ paths:
         '200': { description: Reports ordered from newest to oldest }
         '401': { description: Authentication required }
         '403': { description: Platform operator role required }
+  /api/v1/admin/reports/{reportId}/status:
+    post:
+      summary: Move a report through the audited moderation lifecycle
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: reportId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [OPEN, IN_REVIEW, RESOLVED, DISMISSED] }
+                note: { type: string, maxLength: 200 }
+      responses:
+        '200': { description: Report status changed and audit entry recorded }
+        '400': { description: Invalid status or missing terminal-decision note }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+        '404': { description: Report not found }
   /api/v1/admin/moderation/comments:
     get:
       summary: List comments and their current moderation visibility

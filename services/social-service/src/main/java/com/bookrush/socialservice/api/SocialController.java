@@ -220,8 +220,16 @@ public class SocialController {
   public Object moderationReports(Principal principal, Authentication authentication) {
     requireOperator(authentication);
     subject(principal);
-    return jdbc.queryForList("SELECT id, reporter, book_id, comment_id, reason, status, created_at "
-        + "FROM social.reports ORDER BY created_at DESC LIMIT 250");
+    return jdbc.queryForList("SELECT r.id, r.reporter, "
+        + "COALESCE(NULLIF(reporter_profile.display_name, ''), r.reporter) AS reporter_name, "
+        + "r.book_id, r.comment_id, r.reason, r.status, r.created_at, "
+        + "c.body AS comment_body, "
+        + "COALESCE(NULLIF(c.author_display_name, ''), NULLIF(author_profile.display_name, ''), c.subject_key) "
+        + "AS comment_author_name FROM social.reports r "
+        + "LEFT JOIN social.comments c ON c.id=r.comment_id "
+        + "LEFT JOIN reader_profile.profile reporter_profile ON reporter_profile.subject_key=r.reporter "
+        + "LEFT JOIN reader_profile.profile author_profile ON author_profile.subject_key=c.subject_key "
+        + "ORDER BY r.created_at DESC LIMIT 250");
   }
 
   @PutMapping("/moderation/comments/{commentId}")

@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -80,8 +81,49 @@ public class AdminController {
   public Object reports(Principal principal, Authentication authentication) {
     requireOperator(authentication);
     actor(principal);
-    return jdbc.queryForList("SELECT id, reporter, book_id, comment_id, reason, status, created_at "
-        + "FROM social.reports ORDER BY created_at DESC LIMIT 100");
+    return jdbc.queryForList("SELECT r.id, r.reporter, "
+        + "COALESCE(NULLIF(reporter_profile.display_name, ''), r.reporter) AS reporter_name, "
+        + "r.book_id, r.comment_id, r.reason, r.status, r.created_at, "
+        + "r.reviewed_by_subject, r.reviewed_at, r.resolved_at, r.resolution_note, "
+        + "c.body AS comment_body, "
+        + "COALESCE(NULLIF(c.author_display_name, ''), NULLIF(author_profile.display_name, ''), c.subject_key) "
+        + "AS comment_author_name "
+        + "FROM social.reports r "
+        + "LEFT JOIN social.comments c ON c.id=r.comment_id "
+        + "LEFT JOIN reader_profile.profile reporter_profile ON reporter_profile.subject_key=r.reporter "
+        + "LEFT JOIN reader_profile.profile author_profile ON author_profile.subject_key=c.subject_key "
+        + "ORDER BY r.created_at DESC LIMIT 100");
+  }
+
+  public record ReportStatusChange(String status, String note) {}
+
+  @PostMapping("/reports/{reportId}/status")
+  @Transactional
+  public Object updateReportStatus(@PathVariable UUID reportId,
+      @RequestBody ReportStatusChange change, Principal principal, Authentication authentication) {
+    requireOperator(authentication);
+    if (change == null || !Set.of("OPEN", "IN_REVIEW", "RESOLVED", "DISMISSED").contains(change.status())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported report status");
+    }
+    String note = change.note() == null ? "" : change.note().trim();
+    if ((Set.of("RESOLVED", "DISMISSED").contains(change.status()) && note.length() < 3)
+        || note.length() > 200) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "terminal report decisions require a note with 3 to 200 characters");
+    }
+    String operator = actor(principal);
+    boolean terminal = Set.of("RESOLVED", "DISMISSED").contains(change.status());
+    int updated = jdbc.update("UPDATE social.reports SET status=?, reviewed_by_subject=?, reviewed_at=now(), "
+        + "resolved_at=CASE WHEN ? THEN now() ELSE NULL END, resolution_note=? WHERE id=?",
+        change.status(), operator, terminal, note.isBlank() ? null : note, reportId);
+    if (updated == 0) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "report not found");
+    }
+    jdbc.update("INSERT INTO admin.audit_log(id, actor_subject, action, target, details) "
+        + "VALUES (?, ?, ?, ?, jsonb_build_object('status', ?, 'note', ?))",
+        UUID.randomUUID(), operator, "REPORT_STATUS_CHANGED", reportId.toString(),
+        change.status(), note);
+    return Map.of("reportId", reportId, "status", change.status(), "updated", true);
   }
 
   @GetMapping("/moderation/comments")
@@ -89,8 +131,10 @@ public class AdminController {
     requireOperator(authentication);
     actor(principal);
     return jdbc.queryForList("SELECT c.id, c.book_id, c.subject_key, c.body, c.created_at, "
+        + "COALESCE(NULLIF(c.author_display_name, ''), NULLIF(p.display_name, ''), c.subject_key) AS author_name, "
         + "COALESCE(m.visibility, 'VISIBLE') AS visibility, m.reason_code, m.updated_by_subject, m.updated_at "
         + "FROM social.comments c LEFT JOIN social.comment_moderation_state m ON m.comment_id=c.id "
+        + "LEFT JOIN reader_profile.profile p ON p.subject_key=c.subject_key "
         + "ORDER BY c.created_at DESC LIMIT 250");
   }
 
@@ -189,7 +233,7 @@ public class AdminController {
     actor(principal);
     return Map.of(
         "users", count("SELECT count(*) FROM reader_profile.profile"),
-        "reports", count("SELECT count(*) FROM social.reports WHERE status = 'OPEN'"),
+        "reports", count("SELECT count(*) FROM social.reports WHERE status IN ('OPEN', 'IN_REVIEW')"),
         "comments", count("SELECT count(*) FROM social.comments"),
         "moderationActions", count("SELECT count(*) FROM admin.moderation"),
         "auditEntries", count("SELECT count(*) FROM admin.audit_log"));

@@ -6,6 +6,9 @@ Também são suportados follows e reports; reports entram como registros OPEN pa
 Comentários podem ser denunciados pelo leitor em `POST /api/v1/social/reports`,
 informando `bookId`, `commentId` e o motivo. O serviço valida a existência do
 comentário antes de adicioná-lo à fila exibida no Admin Console.
+O ciclo administrativo usa `OPEN`, `IN_REVIEW`, `RESOLVED` e `DISMISSED`;
+decisões terminais guardam operador, instante e justificativa, além do registro
+imutável no audit log do admin-service.
 
 Migration V3 adiciona follows e reports, mantendo report como fila de moderação.
 

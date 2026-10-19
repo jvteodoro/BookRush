@@ -9,12 +9,23 @@ import {
   UserCheck,
   UserX,
 } from "lucide-react";
-import { services, type AdminComment } from "../../lib/services";
+import {
+  services,
+  type AdminComment,
+  type AdminReport,
+} from "../../lib/services";
 
 const commentStatus = {
   VISIBLE: { label: "Visível", className: "state-visible" },
   HIDDEN: { label: "Oculto", className: "state-hidden" },
   REMOVED: { label: "Removido", className: "state-removed" },
+} as const;
+
+const reportStatus = {
+  OPEN: { label: "Aguardando revisão", className: "state-open" },
+  IN_REVIEW: { label: "Em análise", className: "state-hidden" },
+  RESOLVED: { label: "Resolvida", className: "state-resolved" },
+  DISMISSED: { label: "Ignorada", className: "state-dismissed" },
 } as const;
 
 export function OperationsPage() {
@@ -65,6 +76,46 @@ export function OperationsPage() {
       void queryClient.invalidateQueries({ queryKey: ["admin-comments"] });
     },
   });
+  const reportMutation = useMutation({
+    mutationFn: ({
+      id,
+      status,
+      note,
+    }: {
+      id: string;
+      status: string;
+      note: string;
+    }) => services.updateAdminReportStatus(id, status, note),
+    onSuccess: (_data, variables) => {
+      queryClient.setQueryData<AdminReport[]>(["admin-reports"], (current) =>
+        current?.map((report) =>
+          report.id === variables.id
+            ? {
+                ...report,
+                status: variables.status,
+                resolutionNote: variables.note,
+              }
+            : report,
+        ),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin-reports"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin-kpis"] });
+    },
+  });
+  const changeReportStatus = (id: string, status: string) => {
+    const terminal = status === "RESOLVED" || status === "DISMISSED";
+    const note = terminal
+      ? window
+          .prompt(
+            status === "RESOLVED"
+              ? "Como esta denúncia foi resolvida?"
+              : "Por que esta denúncia deve ser ignorada?",
+          )
+          ?.trim()
+      : "";
+    if (terminal && !note) return;
+    reportMutation.mutate({ id, status, note: note ?? "" });
+  };
   return (
     <section>
       <header className="pagehead">
@@ -227,28 +278,95 @@ export function OperationsPage() {
             Não foi possível carregar as denúncias.
           </p>
         ) : reports.data?.length ? (
-          reports.data.map((report) => (
-            <div className="report-card" key={report.id}>
-              <div className="moderation-copy">
-                <b>{report.reason}</b>
-                <small>Enviado por {report.reporter}</small>
-                {report.commentId ? (
-                  <code>Comentário: {report.commentId}</code>
-                ) : (
-                  <code>Livro: {report.bookId ?? "não informado"}</code>
-                )}
+          reports.data.map((report) => {
+            const state =
+              reportStatus[report.status as keyof typeof reportStatus] ??
+              reportStatus.OPEN;
+            const pending =
+              reportMutation.isPending &&
+              reportMutation.variables?.id === report.id;
+            const actionable =
+              report.status === "OPEN" || report.status === "IN_REVIEW";
+            return (
+              <div className="report-card" key={report.id}>
+                <div className="moderation-copy">
+                  <b>{report.reason}</b>
+                  <small>
+                    Denunciado por: <strong>{report.reporterName}</strong>
+                  </small>
+                  {report.commentId ? (
+                    <>
+                      <small>
+                        Autor do comentário:{" "}
+                        <strong>
+                          {report.commentAuthorName ?? "Não identificado"}
+                        </strong>
+                      </small>
+                      {report.commentBody && (
+                        <blockquote>{report.commentBody}</blockquote>
+                      )}
+                      <code>Comentário: {report.commentId}</code>
+                    </>
+                  ) : (
+                    <code>Livro: {report.bookId ?? "não informado"}</code>
+                  )}
+                  {report.resolutionNote && (
+                    <small>Decisão: {report.resolutionNote}</small>
+                  )}
+                </div>
+                <div className="report-actions">
+                  <span className={`state-badge ${state.className}`}>
+                    {pending ? "Atualizando…" : state.label}
+                  </span>
+                  {report.status === "OPEN" && (
+                    <button
+                      className="secondary-action"
+                      disabled={reportMutation.isPending}
+                      onClick={() => changeReportStatus(report.id, "IN_REVIEW")}
+                    >
+                      Analisar
+                    </button>
+                  )}
+                  {actionable && (
+                    <button
+                      className="secondary-action"
+                      disabled={reportMutation.isPending}
+                      onClick={() => changeReportStatus(report.id, "RESOLVED")}
+                    >
+                      Resolver
+                    </button>
+                  )}
+                  {actionable && (
+                    <button
+                      className="secondary-action"
+                      disabled={reportMutation.isPending}
+                      onClick={() => changeReportStatus(report.id, "DISMISSED")}
+                    >
+                      Ignorar
+                    </button>
+                  )}
+                  {(report.status === "RESOLVED" ||
+                    report.status === "DISMISSED") && (
+                    <button
+                      className="secondary-action"
+                      disabled={reportMutation.isPending}
+                      onClick={() => changeReportStatus(report.id, "OPEN")}
+                    >
+                      Reabrir
+                    </button>
+                  )}
+                </div>
               </div>
-              <span
-                className={`state-badge ${report.status === "OPEN" ? "state-open" : "state-resolved"}`}
-              >
-                {report.status === "OPEN"
-                  ? "Aguardando revisão"
-                  : report.status}
-              </span>
-            </div>
-          ))
+            );
+          })
         ) : (
           <p>Nenhuma denúncia registrada.</p>
+        )}
+        {reportMutation.isError && (
+          <p role="alert" className="moderation-error">
+            Não foi possível atualizar a denúncia. Informe uma justificativa
+            válida e tente novamente.
+          </p>
         )}
       </div>
       <div className="panel">
@@ -280,7 +398,12 @@ export function OperationsPage() {
               <div className="review-asset" key={comment.id}>
                 <span className="moderation-copy">
                   <b>{comment.body}</b>
-                  <small>Autor: {comment.subjectKey}</small>
+                  <small>
+                    Autor: <strong>{comment.authorName}</strong>
+                  </small>
+                  {comment.authorName !== comment.subjectKey && (
+                    <code>{comment.subjectKey}</code>
+                  )}
                   <span className={`state-badge ${state.className}`}>
                     {pending ? "Atualizando…" : state.label}
                   </span>

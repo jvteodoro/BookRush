@@ -10,6 +10,7 @@ network="bookrush-admin-e2e-$suffix"
 keycloak="bookrush-admin-e2e-keycloak-$suffix"
 postgres="bookrush-admin-e2e-postgres-$suffix"
 service="bookrush-admin-e2e-service-$suffix"
+social_service="bookrush-admin-e2e-social-$suffix"
 web="bookrush-admin-e2e-web-$suffix"
 probe="bookrush-admin-e2e-probe-$suffix"
 admin_password='disposable-admin-password'
@@ -18,10 +19,11 @@ human_username='disposable-platform-admin'
 product_secret='disposable-product-client-secret'
 platform_secret='disposable-platform-client-secret'
 image="bookrush/admin-service-e2e:$suffix"
+social_image="bookrush/social-service-e2e:$suffix"
 web_image="bookrush/admin-web-e2e:$suffix"
 cleanup() {
   local rc=$?
-  docker rm -f "$probe" "$web" "$service" "$keycloak" "$postgres" >/dev/null 2>&1 || true
+  docker rm -f "$probe" "$web" "$service" "$social_service" "$keycloak" "$postgres" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
   rm -rf -- "$work_dir"
   exit "$rc"
@@ -101,10 +103,22 @@ for _ in 1 2; do
 done
 
 docker build -q -t "$image" -f "$repo_dir/services/admin-service/Dockerfile" "$repo_dir" >/dev/null
+docker build -q -t "$social_image" -f "$repo_dir/services/social-service/Dockerfile" "$repo_dir" >/dev/null
 for _ in $(seq 1 60); do
   docker exec "$postgres" pg_isready -U bookrush -d bookrush >/dev/null 2>&1 && break
   sleep 1
 done
+docker run -d --name "$social_service" --network "$network" \
+  -e DB_HOST=postgres -e DB_NAME=bookrush -e DB_USERNAME=bookrush -e DB_PASSWORD=bookrush \
+  -e BOOKRUSH_SECURITY_ENABLED=true \
+  -e BOOKRUSH_SECURITY_ISSUER=http://keycloak:8080/realms/bookrush-platform \
+  -e BOOKRUSH_SECURITY_JWK_SET_URI=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs \
+  -e BOOKRUSH_SECURITY_AUDIENCE=bookrush-ingestion "$social_image" >/dev/null
+for _ in $(seq 1 90); do
+  docker exec "$probe" curl -fsS http://"$social_service":8096/actuator/health >/dev/null 2>&1 && break
+  sleep 1
+done
+docker exec "$probe" curl -fsS http://"$social_service":8096/actuator/health >/dev/null
 docker run -d --name "$service" --network "$network" --network-alias admin-service \
   -e DB_HOST=postgres -e DB_NAME=bookrush -e DB_USERNAME=bookrush -e DB_PASSWORD=bookrush \
   -e BOOKRUSH_SECURITY_ENABLED=true \
@@ -127,9 +141,14 @@ legacy_comment_id='11111111-1111-4111-8111-111111111111'
 report_id='22222222-2222-4222-8222-222222222222'
 docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush >/dev/null <<SQL
 CREATE SCHEMA IF NOT EXISTS social;
+CREATE SCHEMA IF NOT EXISTS reader_profile;
+CREATE TABLE IF NOT EXISTS reader_profile.profile (
+  subject_key TEXT PRIMARY KEY, display_name TEXT, bio TEXT,
+  is_public BOOLEAN NOT NULL DEFAULT true, updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS social.comments (
   id UUID PRIMARY KEY, subject_key TEXT NOT NULL, book_id UUID NOT NULL,
-  body TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  author_display_name TEXT, body TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS social.comment_moderation_state (
   comment_id UUID PRIMARY KEY REFERENCES social.comments(id),
@@ -139,10 +158,14 @@ CREATE TABLE IF NOT EXISTS social.comment_moderation_state (
 CREATE TABLE IF NOT EXISTS social.reports (
   id UUID PRIMARY KEY, reporter TEXT NOT NULL, book_id UUID, comment_id UUID,
   reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN',
+  reviewed_by_subject TEXT, reviewed_at TIMESTAMPTZ, resolved_at TIMESTAMPTZ,
+  resolution_note VARCHAR(200),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-INSERT INTO social.comments(id, subject_key, book_id, body)
-VALUES ('$legacy_comment_id', 'reader-1', '33333333-3333-4333-8333-333333333333', 'legacy comment');
+INSERT INTO reader_profile.profile(subject_key, display_name) VALUES
+  ('reader-1', 'Ana Leitora'), ('reader-2', 'Bruno Denunciante');
+INSERT INTO social.comments(id, subject_key, author_display_name, book_id, body)
+VALUES ('$legacy_comment_id', 'reader-1', NULL, '33333333-3333-4333-8333-333333333333', 'legacy comment');
 INSERT INTO social.reports(id, reporter, book_id, comment_id, reason)
 VALUES ('$report_id', 'reader-2', '33333333-3333-4333-8333-333333333333', '$legacy_comment_id', 'spam');
 SQL
@@ -194,6 +217,19 @@ done
 docker exec "$probe" curl -fsS -H "Authorization: Bearer $token" \
   http://admin-web/api/v1/admin/reports \
   | jq -e --arg report "$report_id" --arg comment "$legacy_comment_id" \
-      '.[] | select(.id == $report and .comment_id == $comment and .status == "OPEN")' >/dev/null
+      '.[] | select(.id == $report and .comment_id == $comment and .status == "OPEN" and .reporter_name == "Bruno Denunciante" and .comment_author_name == "Ana Leitora")' >/dev/null
 
-echo 'Admin user management E2E: users, legacy comment states and comment reports OK'
+for transition in 'IN_REVIEW|' 'RESOLVED|comment removed' 'DISMISSED|false positive' 'OPEN|'; do
+  status_name="${transition%%|*}"
+  status_note="${transition#*|}"
+  response="$(docker exec "$probe" curl -fsS -X POST \
+    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+    --data "$(jq -nc --arg status "$status_name" --arg note "$status_note" '{status:$status,note:$note}')" \
+    "http://admin-web/api/v1/admin/reports/$report_id/status")"
+  [[ "$(jq -r '.status' <<<"$response")" == "$status_name" ]]
+done
+docker exec "$postgres" psql -At -U bookrush -d bookrush \
+  -c "SELECT count(*) FROM admin.audit_log WHERE action='REPORT_STATUS_CHANGED' AND target='$report_id'" \
+  | grep -qx '4'
+
+echo 'Admin user management E2E: names, legacy comments, report lifecycle and audit OK'

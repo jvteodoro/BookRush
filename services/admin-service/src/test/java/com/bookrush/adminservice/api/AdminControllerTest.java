@@ -103,4 +103,31 @@ class AdminControllerTest {
     verify(jdbc).update(contains("ON CONFLICT (comment_id) DO UPDATE"),
         eq("HIDDEN"), eq("ADMIN_REVIEW"), eq("operator-1"), eq(commentId));
   }
+
+  @Test
+  void resolvesReportWithRequiredNoteAndAuditTrail() {
+    var reportId = java.util.UUID.randomUUID();
+    when(jdbc.update(contains("UPDATE social.reports"), eq("RESOLVED"), eq("operator-1"),
+        eq(true), eq("comment removed"), eq(reportId))).thenReturn(1);
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> result = (Map<String, Object>) controller.updateReportStatus(reportId,
+        new AdminController.ReportStatusChange("RESOLVED", "comment removed"), principal, operator);
+
+    assertEquals("RESOLVED", result.get("status"));
+    verify(jdbc).update(contains("INSERT INTO admin.audit_log"),
+        org.mockito.ArgumentMatchers.any(), eq("operator-1"), eq("REPORT_STATUS_CHANGED"),
+        eq(reportId.toString()), eq("RESOLVED"), eq("comment removed"));
+  }
+
+  @Test
+  void rejectsTerminalReportDecisionWithoutExplanation() {
+    var reportId = java.util.UUID.randomUUID();
+    assertThrows(ResponseStatusException.class, () -> controller.updateReportStatus(reportId,
+        new AdminController.ReportStatusChange("DISMISSED", ""), principal, operator));
+    verify(jdbc, never()).update(contains("UPDATE social.reports"),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any());
+  }
 }

@@ -2135,6 +2135,10 @@ textarea::placeholder {
   color: #825500 !important;
   background: #fff1c7;
 }
+.state-dismissed {
+  color: #5f5968 !important;
+  background: #efebf4;
+}
 .report-card {
   display: flex;
   align-items: center;
@@ -2145,6 +2149,20 @@ textarea::placeholder {
   border: 2px solid var(--br-outline-soft);
   border-radius: 10px;
   background: var(--br-surface-2);
+}
+.report-card blockquote {
+  margin: 0.25rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--br-outline-soft);
+  color: #494337;
+  font-size: 0.88rem;
+}
+.report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  flex-wrap: wrap;
 }
 .state-action-selected {
   border-color: var(--br-teal) !important;
