@@ -308,6 +308,94 @@ Esta execução confirma o endpoint completo funcional após a troca da imagem;
 os tempos são uma caracterização de validação com 5 repetições, não substituem
 a bateria estatística maior já documentada.
 
+### Bateria controlada da consulta de scores — 2026-10-19
+
+Os índices existentes foram inspecionados antes do experimento. Em
+`analytics.excerpt_rank` há somente a PK e o índice único iniciado por
+`(excerpt_id, ranker_code, ranker_version, configuration_hash)`; não há índice
+dedicado a `(excerpt_id, created_at DESC)`. Em `analytics.excerpt` existe
+`excerpt_body_eligible_idx(source_asset_version_id, body_eligible,
+start_codepoint)`, mas não uma projeção parcial somente de excerpts elegíveis.
+
+#### Consulta atual, JIT on/off
+
+Foram usados os mesmos 100 IDs ordenados por título, com dez execuções por
+modo no PostgreSQL de produção, sem escrita:
+
+| modo | mediana | máximo | resultado |
+| --- | ---: | ---: | --- |
+| JIT ligado | 1.101 ms | 1.279 ms | 21 livros com score |
+| JIT desligado | 599 ms | 768 ms | 21 livros com score |
+
+O JIT acrescentou aproximadamente 502 ms à mediana da consulta. Os resultados
+brutos estão em
+`docs/operations/incidents/evidence/raw/feed-benchmark-20261019T065250Z/score-jit-current/`.
+
+#### Banco descartável e índices candidatos
+
+Foi criado um banco temporário com 100 livros, 406 assets/versões, 94.232
+excerpts e 66.476 ranks. O banco foi removido ao final. Foram testados:
+
+- `excerpt_rank(excerpt_id, created_at DESC) WHERE final_score IS NOT NULL`;
+- `excerpt(source_asset_version_id, id) WHERE body_eligible = true AND exclusion_reason IS NULL`;
+- os dois índices em conjunto.
+
+Com os dois índices, o plano atual usou `Index Only Scan` em excerpts elegíveis
+e `Index Scan` no rank mais recente. A versão reestruturada que primeiro limita
+os excerpts às versões dos livros e só então faz a busca lateral do rank teve,
+no mesmo banco e cinco repetições:
+
+| consulta | JIT ligado | JIT desligado |
+| --- | ---: | ---: |
+| atual + índices candidatos | 768 ms | 214 ms |
+| reestruturada lateral + índices candidatos | 592 ms | 168 ms |
+
+A variante com CTE `MATERIALIZED` para `eligible` foi descartada: o planner
+preferiu varrer `excerpt_rank` inteiro no banco filtrado. No PostgreSQL de
+produção, sem os índices candidatos, a reestruturação lateral ficou em
+1.582 ms com JIT e 840 ms sem JIT, contra 1.368 ms e 893 ms da consulta atual.
+Isso indica que a reestruturação sozinha não é justificativa para deploy; a
+próxima validação deve reproduzir os índices em escala produtiva antes de uma
+migration. Não foi criada tabela materializada.
+
+#### Endpoint S2S frio/quente
+
+Com os mesmos 100 IDs e token S2S novo, a primeira chamada foi tratada como
+fria (primeira requisição da bateria) e dez chamadas subsequentes como quentes:
+
+| classe | mediana | p95/máximo | HTTP | retornados |
+| --- | ---: | ---: | ---: | ---: |
+| primeira chamada | 990 ms | 990 ms | 200 | 21 |
+| chamadas seguintes | 946 ms | 971 ms | 200 | 21 |
+
+Essa definição de “frio” não esvazia o cache de páginas do PostgreSQL nem
+reinicia o serviço; portanto mede frio de requisição/conexão, não cold-start
+completo. Os dados estão em
+`.../feed-benchmark-20261019T065250Z/s2s-score/`.
+
+#### Feed completo e decomposição externa
+
+Cinco repetições pelo gateway autenticado retornaram 21 itens em todas as
+chamadas. A decomposição por probes independentes foi:
+
+| etapa | mediana | p95/máximo | HTTP | itens |
+| --- | ---: | ---: | ---: | ---: |
+| catálogo interno usado pelo recommendation-service | 104 ms | 142 ms | 200 | 100 |
+| scores S2S | 735 ms | 941 ms | 200 | 21 |
+| excerpts para um livro retornado | 357 ms | 525 ms | 200 | 1 |
+| feed completo pelo gateway | 1.001 ms | 1.264 ms | 200 | 21 |
+
+As etapas são probes separados e não devem ser somadas: score e excerpts
+ocorrem dentro do fluxo de recomendação, com cache/concurrency próprios. Os
+resultados e corpos sanitizados estão em
+`docs/operations/incidents/evidence/raw/feed-benchmark-20261019T065250Z/feed-stages/`.
+
+Conclusão: não materializar scores ainda é a decisão correta. O próximo passo
+seguro é uma migration experimental com os dois índices, validada contra um
+snapshot de escala semelhante à produção, seguida de `EXPLAIN` e endpoint S2S.
+JIT desligado continua sendo uma mitigação forte, mas deve ser aplicado por
+sessão/consulta e acompanhado por métricas antes de uma alteração global.
+
 O feed está funcional com o timeout de 2 s e a bateria teve 0% de erros. A
 consulta de scores é o gargalo dominante; o worker de embeddings e a
 concorrência de usuários amplificam a latência. O job dos 500 livros foi
