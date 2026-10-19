@@ -294,6 +294,20 @@ O worker `bookrush-book-analytics-runtime-1` permaneceu `running` e
 ausente foi corrigido; a bateria de latência anterior deve ser repetida agora
 com o endpoint real antes de comparar novas otimizações.
 
+Repetição automatizada pós-deploy, com 32 chamadas e dumps locais em
+`docs/operations/incidents/evidence/raw/feed-benchmark-20261019T065250Z/`:
+
+- sequencial: size 10, 25 e 50 tiveram 5/5 respostas HTTP 200, médias de
+  661,4 ms, 847,6 ms e 1.093,8 ms, respectivamente;
+- concorrência: 12/12 chamadas simultâneas size 50 retornaram HTTP 200, média
+  de 1.391,0 ms e 252 itens agregados;
+- worker pausado: 5/5 chamadas size 50 retornaram HTTP 200, média de 783,8 ms;
+- o worker foi retomado pelo cleanup e terminou `running paused=false`.
+
+Esta execução confirma o endpoint completo funcional após a troca da imagem;
+os tempos são uma caracterização de validação com 5 repetições, não substituem
+a bateria estatística maior já documentada.
+
 O feed está funcional com o timeout de 2 s e a bateria teve 0% de erros. A
 consulta de scores é o gargalo dominante; o worker de embeddings e a
 concorrência de usuários amplificam a latência. O job dos 500 livros foi
