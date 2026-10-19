@@ -147,6 +147,31 @@ em:
 - a execução anterior corrigida, mantida localmente, em
   `docs/operations/incidents/evidence/raw/feed-benchmark-20261019T063332Z/jit-repeat/`.
 
+#### Tentativa de validação no endpoint completo
+
+Foi feita uma tentativa controlada de trocar somente o container de
+`book-analytics-service` por uma instância equivalente com `jit=off` no
+parâmetro JDBC, renovando também o `recommendation-service` para resolver o
+alias Docker. O smoke público respondeu HTTP 200, porém com `items=[]`; por
+isso esses tempos não foram usados como comparação de JIT.
+
+A validação direta após restaurar o container mostrou a causa independente:
+o container atualmente em produção está saudável, mas a imagem
+`local/bookrush/book-analytics-service:173-9373f7a` retorna HTTP 404 para
+`/api/internal/v1/content-analytics/book-scores`, embora esse contrato exista
+na revisão local `ab450f7`. O endpoint ausente faz o recommendation-service
+falhar fechado e explica o feed vazio. Portanto, antes do próximo teste de
+JIT no endpoint completo, é necessário publicar/deployar uma imagem de
+analytics que contenha o endpoint e repetir o smoke com itens reais.
+
+Os artefatos da tentativa, todos locais e ignorados pelo Git, estão em:
+
+`docs/operations/incidents/evidence/raw/feed-benchmark-20261019T063433Z/endpoint-jit-off/`
+
+`docs/operations/incidents/evidence/raw/feed-benchmark-20261019T063433Z/endpoint-jit-off-renewed/`
+
+`docs/operations/incidents/evidence/raw/feed-benchmark-20261019T063433Z/endpoint-restore-smoke/`
+
 Esse custo é estrutural e explica por que 700 ms era insuficiente. O timeout de
 2 s é uma mitigação operacional, não a solução definitiva.
 
@@ -229,9 +254,11 @@ Executar uma hipótese por vez, preservando o mesmo corpus e amostra:
 5. medir cache frio/quente com métricas de hit/miss;
 6. medir catálogo, scores, excerpts e persistência com timers Micrometer;
 7. repetir cargas de 1, 4 e 8 clientes e validar p95/p99 e taxa de erro;
-8. testar `jit=off` na sessão do serviço em ambiente controlado e comparar o
+8. publicar/deployar a imagem de analytics que contém o contrato de scores e
+   validar HTTP 200 com itens reais;
+9. testar `jit=off` na sessão do serviço em ambiente controlado e comparar o
    endpoint completo antes de alterar produção;
-9. somente depois ajustar timeout, concorrência, JIT ou circuit breaker em
+10. somente depois ajustar timeout, concorrência, JIT ou circuit breaker em
    produção.
 
 ## Conclusão operacional
