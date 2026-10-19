@@ -331,6 +331,9 @@ Como o `keycloak-config-cli` pode preservar mappings antigos de uma conta de
 serviço já existente, o deploy reaplica idempotentemente as roles mínimas
 `query-users`, `view-users` e `manage-users` antes de iniciar o `admin-service`.
 Essa etapa não rotaciona credenciais e não altera usuários ou sessões.
+As mesmas três roles são incluídas explicitamente nos scope mappings do cliente,
+portanto a integração também funciona quando `Full Scope Allowed` está
+desabilitado sem liberar todas as demais roles atribuídas à conta de serviço.
 
 O Nginx do `admin-web` resolve `admin-service` pelo DNS interno do Docker no
 momento de cada chamada. Assim, o painel pode iniciar enquanto o serviço está

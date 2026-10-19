@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -60,4 +61,44 @@ status, _ = request(
 )
 if status not in (200, 204):
     raise SystemExit(f"não foi possível aplicar roles de usuários (HTTP {status})")
-print("Keycloak user management service account: roles reconciliadas")
+# A persistent client may have Full Scope Allowed disabled. In that case,
+# service-account assignments alone are not emitted in its access token. Add
+# the same minimal roles to the client's own scope mappings instead of opening
+# the client to every assigned role.
+status, _ = request(
+    f"{base}/admin/realms/{realm}/clients/{client_id}/scope-mappings/clients/{realm_management_id}",
+    method="POST",
+    token=token,
+    body=roles,
+)
+if status not in (200, 204):
+    raise SystemExit(f"não foi possível aplicar scope mappings de usuários (HTTP {status})")
+
+# Validate the exact client-credentials path used by admin-service before the
+# Compose revision is started. Credentials and tokens remain process-local.
+_, raw = request(f"{base}/admin/realms/{realm}/clients/{client_id}/client-secret", token=token)
+client_secret = json.loads(raw).get("value", "")
+if not client_secret:
+    raise SystemExit("segredo do cliente bookrush-admin-service ausente")
+service_token_body = urllib.parse.urlencode(
+    {
+        "grant_type": "client_credentials",
+        "client_id": "bookrush-admin-service",
+        "client_secret": client_secret,
+    }
+).encode()
+service_token_request = urllib.request.Request(
+    f"{base}/realms/{realm}/protocol/openid-connect/token",
+    data=service_token_body,
+    headers={"Content-Type": "application/x-www-form-urlencoded"},
+    method="POST",
+)
+with urllib.request.urlopen(service_token_request, timeout=20) as response:
+    service_token = json.loads(response.read())["access_token"]
+try:
+    request(f"{base}/admin/realms/{realm}/users?first=0&max=1", token=service_token)
+except urllib.error.HTTPError as error:
+    raise SystemExit(
+        f"validação da API de usuários falhou após reconcile (HTTP {error.code})"
+    ) from error
+print("Keycloak user management: roles, scopes e API reconciliados")

@@ -60,6 +60,16 @@ for _ in $(seq 1 120); do
 done
 docker exec "$probe" curl -fsS http://keycloak:8080/realms/bookrush/.well-known/openid-configuration >/dev/null
 
+# Match hardened/persistent installations where assigned service-account roles
+# are not automatically included in the token.
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://127.0.0.1:8080 --realm master --user admin \
+  --password "$admin_password" >/dev/null
+client_uuid="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients -r bookrush \
+  -q clientId=bookrush-admin-service --fields id --format csv --noquotes)"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" \
+  -r bookrush -s fullScopeAllowed=false >/dev/null
+
 # Exercise twice the same role repair used immediately before deployment,
 # proving that it is safe against an already-reconciled persistent realm.
 for _ in 1 2; do
