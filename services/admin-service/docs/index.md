@@ -4,6 +4,10 @@ Administrative facade and audit operations. Este serviço é um bounded context 
 
 Consulte [API](api.md) para os endpoints de auditoria.
 
+`GET /api/v1/admin/feed` fornece a visão somente leitura do recommendation
+ledger usada pelo Feed Lab. Ele é autorizado pelo mesmo operador de plataforma
+das demais rotas administrativas e não cria sessões, eventos ou anotações.
+
 A moderação é registrada em `admin.moderation` com actor subject e decisão auditável.
 
 Migration V3 adiciona o registro de decisões de moderação e endpoints de consulta.

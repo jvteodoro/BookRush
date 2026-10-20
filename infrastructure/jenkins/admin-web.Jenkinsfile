@@ -21,7 +21,7 @@ pipeline {
     ADMIN_WEB_CATALOG_API_URL = '/api'
     ADMIN_WEB_INGESTION_API_URL = '/ingestion'
     ADMIN_WEB_ANALYTICS_API_URL = '/analytics'
-    ADMIN_WEB_FEED_API_URL = '/feed'
+    ADMIN_WEB_FEED_API_URL = '/api/v1'
   }
 
   stages {

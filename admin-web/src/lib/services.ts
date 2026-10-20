@@ -773,11 +773,16 @@ export const services = {
     }
     try {
       const { data } = await feedHttp.get("/admin/feed", {
-        params: { sessionId },
+        params: { sessionId, limit: 50 },
       });
       const metadata = (data.personalization ?? {}) as Record<string, unknown>;
       return (data.items ?? data).map((item: Record<string, unknown>) => ({
         ...item,
+        excerptId: String(item.excerptId ?? item.excerpt_id ?? ""),
+        bookId: String(item.bookId ?? item.book_id ?? ""),
+        bookTitle: String(item.bookTitle ?? item.book_title ?? "Untitled"),
+        author: String(item.author ?? "Unknown author"),
+        text: String(item.text ?? ""),
         modelVersion: String(item.modelVersion ?? item.model_version ?? ""),
         rankingVersion: String(
           item.rankingVersion ?? item.ranking_version ?? "",
@@ -806,11 +811,9 @@ export const services = {
             item.final_score ??
             0,
         ),
-        features:
-          item.features ??
-          item.scoreDecomposition ??
-          item.score_decomposition ??
-          {},
+        features: normalizeFeatures(
+          item.features ?? item.scoreDecomposition ?? item.score_decomposition,
+        ),
       }));
     } catch (error) {
       throw problem(error, "Não foi possível carregar o feed.");
@@ -1008,3 +1011,15 @@ export const services = {
     return data;
   },
 };
+
+function normalizeFeatures(value: unknown): Record<string, number> {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .map(([key, item]) => [key, Number(item)])
+        .filter(([, item]) => Number.isFinite(item)),
+    );
+  }
+  return {};
+}

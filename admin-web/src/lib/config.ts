@@ -24,7 +24,7 @@ export const config = {
     catalog: envOr(import.meta.env.VITE_CATALOG_API_URL, "/api"),
     ingestion: envOr(import.meta.env.VITE_INGESTION_API_URL, "/ingestion"),
     analytics: envOr(import.meta.env.VITE_ANALYTICS_API_URL, "/analytics"),
-    feed: envOr(import.meta.env.VITE_FEED_API_URL, "/feed"),
+    feed: envOr(import.meta.env.VITE_FEED_API_URL, "/api/v1"),
     admin: envOr(import.meta.env.VITE_ADMIN_API_URL, "/"),
   },
 };

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../auth/useAuth";
+import { config } from "../../lib/config";
 import { defaultWeights } from "../../mocks/data";
 import { services } from "../../lib/services";
 import { FeedWeights, TrainingSession } from "../../types/domain";
@@ -32,7 +33,9 @@ export function FeedLabPage() {
   const initialWeights = useRef(weights).current;
   const [index, setIndex] = useState(0);
   useEffect(() => {
-    void services.createSession(auth.userId, initialWeights).then(setSession);
+    if (config.useMocks) {
+      void services.createSession(auth.userId, initialWeights).then(setSession);
+    }
   }, [auth.userId, initialWeights]);
   const item = feed.data?.[index % Math.max(feed.data?.length ?? 1, 1)];
   useEffect(() => {
@@ -129,8 +132,8 @@ export function FeedLabPage() {
           <span className="eyebrow">RECOMMENDATION LAB</span>
           <h1>Feed Lab</h1>
           <p>
-            Use usuários administrativos como população inicial para gerar
-            eventos de interação e calibrar o ranking.
+            Inspecione decisões reais do ledger de recomendações, com
+            proveniência e componentes agregados. Esta tela é somente leitura.
           </p>
         </div>
         <div className="sessionbadge">
