@@ -79,3 +79,22 @@ behavior without production traffic.
 tie-breaking, and records the selected candidate's redundancy/rationale. A
 missing embedding has a documented zero-similarity fallback and never produces
 NaN. This is intentionally separate from excerpt-level analytics MMR.
+
+## Personalized serving gate
+
+`PersonalizedFeedGate` is the rollout boundary for PFV1. It is configured with
+`FEED_PERSONALIZED_MODE=OFF|SHADOW|ON` and minimum `coverage`/`confidence`
+thresholds. `OFF` keeps the existing analytics-aware/heuristic feed; `SHADOW`
+records the intended path without changing the response; `ON` may only proceed
+when behavior signals, the semantic snapshot and a `READY` profile satisfy the
+configured thresholds. Missing prerequisites are classified and fall back
+without a 5xx.
+
+The recommendation controller currently supplies no live profile or behavior
+serving client, so the safe integration records `FALLBACK` with the explicit
+reason `behavior-unavailable` when `ON` is selected. This is intentional: the
+flag is not evidence that personalization is active. The request ledger stores
+`personalizationPath` and `personalizationReason` alongside the candidate-set
+hash, and `bookrush.feed.personalized.path` provides a low-cardinality rollout
+metric. A follow-up serving integration must provide the profile and replace
+the conservative `behavior-unavailable` input before `ON` can satisfy PFV1.

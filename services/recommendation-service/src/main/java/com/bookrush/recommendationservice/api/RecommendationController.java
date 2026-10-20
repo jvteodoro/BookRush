@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
 import com.bookrush.recommendationservice.ranking.AnalyticsRankingProperties;
 import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient;
+import com.bookrush.recommendationservice.ranking.PersonalizedFeedGate;
 import com.bookrush.recommendationservice.observability.FeedMetrics;
 import com.bookrush.recommendationservice.fatigue.ExposureFatigue;
 import com.bookrush.recommendationservice.retrieval.CandidateRetriever;
@@ -41,6 +42,7 @@ public class RecommendationController {
   private final FeedMetrics feedMetrics;
   private final ObjectMapper mapper;
   private final ExposureFatigue fatiguePolicy;
+  private final PersonalizedFeedGate personalizedFeedGate;
 
   public RecommendationController(
       CandidateRetriever candidateRetriever,
@@ -51,7 +53,8 @@ public class RecommendationController {
       AnalyticsRankingProperties rankingProperties,
       FeedMetrics feedMetrics,
       ObjectMapper mapper,
-      ExposureFatigue fatiguePolicy) {
+      ExposureFatigue fatiguePolicy,
+      PersonalizedFeedGate personalizedFeedGate) {
     this.candidateRetriever = candidateRetriever;
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
@@ -61,6 +64,7 @@ public class RecommendationController {
     this.feedMetrics = feedMetrics;
     this.mapper = mapper;
     this.fatiguePolicy = fatiguePolicy;
+    this.personalizedFeedGate = personalizedFeedGate;
   }
 
   private String subject(Principal principal) {
@@ -89,6 +93,9 @@ public class RecommendationController {
     var candidateIds = books.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
     var scoreById = feedMetrics.time("analytics_scores", () -> analyticsScores.find(candidateIds).entrySet().stream()
         .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue)));
+    var personalizationDecision = personalizedFeedGate.decide(null, false, !scoreById.isEmpty());
+    feedMetrics.count("bookrush.feed.personalized.path",
+        personalizationDecision.path().name().toLowerCase(java.util.Locale.ROOT), 1);
     var fatigueById = loadFatigue(subject, candidateIds);
     boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
     List<?> rankedBooks = feedMetrics.time("ranking",
@@ -135,7 +142,11 @@ public class RecommendationController {
     feedMetrics.time("ledger_persist", () -> {
       jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
           requestId, subject, modelVersion, strategy, subject.hashCode(),
-          mapper.createObjectNode().put("candidateSetHash", candidateSetHash).toString());
+          mapper.createObjectNode()
+              .put("candidateSetHash", candidateSetHash)
+              .put("personalizationPath", personalizationDecision.path().name())
+              .put("personalizationReason", personalizationDecision.reason())
+              .toString());
       jdbc.update("UPDATE recommendation.request SET candidate_set_hash=? WHERE id=?",
           candidateSetHash, requestId);
       int rank = 1;

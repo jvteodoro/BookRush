@@ -22,6 +22,10 @@ bookrush:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
 feed:
+  personalized:
+    mode: ${FEED_PERSONALIZED_MODE:OFF}
+    min-coverage: ${FEED_PERSONALIZED_MIN_COVERAGE:0.5}
+    min-confidence: ${FEED_PERSONALIZED_MIN_CONFIDENCE:0.5}
   retrieval:
     max-candidates: ${FEED_RETRIEVAL_MAX_CANDIDATES:500}
     page-size: ${FEED_RETRIEVAL_PAGE_SIZE:100}
