@@ -11,7 +11,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bookrush.recommendationservice.BehaviorEventPublisher;
 import com.bookrush.recommendationservice.RecommendationHeuristic;
 import com.bookrush.recommendationservice.RecommendationHeuristic.Strategy;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,19 +19,19 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.server.ResponseStatusException;
 import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
 import com.bookrush.recommendationservice.ranking.AnalyticsRankingProperties;
 import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient;
 import com.bookrush.recommendationservice.observability.FeedMetrics;
+import com.bookrush.recommendationservice.retrieval.CandidateRetriever;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
 public class RecommendationController {
   private static final String MODEL_VERSION = "heuristic-v1";
-  private final RestClient catalog;
+  private final CandidateRetriever candidateRetriever;
   private final JdbcTemplate jdbc;
   private final ExcerptEnrichmentService excerptEnrichment;
   private final BehaviorEventPublisher behavior;
@@ -42,7 +41,7 @@ public class RecommendationController {
   private final ObjectMapper mapper;
 
   public RecommendationController(
-      @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
+      CandidateRetriever candidateRetriever,
       JdbcTemplate jdbc,
       ExcerptEnrichmentService excerptEnrichment,
       BehaviorEventPublisher behavior,
@@ -50,7 +49,7 @@ public class RecommendationController {
       AnalyticsRankingProperties rankingProperties,
       FeedMetrics feedMetrics,
       ObjectMapper mapper) {
-    catalog = RestClient.builder().baseUrl(url).build();
+    this.candidateRetriever = candidateRetriever;
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
     this.behavior = behavior;
@@ -80,10 +79,9 @@ public class RecommendationController {
         Long.class, subject));
     Strategy selectedStrategy = RecommendationHeuristic.strategyFor(previousImpressions);
     String strategy = selectedStrategy.name();
-    Map<?, ?> result = feedMetrics.time("catalog_fetch", () -> catalog.get()
-        .uri("/api/v1/books?page=0&size=" + Math.min(100, Math.max(limit * 3, 20)))
-        .retrieve().body(Map.class));
-    List<?> books = result != null && result.get("items") instanceof List<?> list ? list : List.of();
+    var candidateSet = feedMetrics.time("catalog_fetch", () ->
+        candidateRetriever.retrieve(Math.max(limit * 3, 20)));
+    List<?> books = candidateSet.books();
     var candidateIds = books.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
     var scoreById = feedMetrics.time("analytics_scores", () -> analyticsScores.find(candidateIds).entrySet().stream()
         .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue)));
@@ -97,7 +95,7 @@ public class RecommendationController {
     }
     boolean analyticsRanked = analyticsRequired && !scoreById.isEmpty();
     String modelVersion = analyticsRequired ? rankingProperties.modelVersion() : MODEL_VERSION;
-    String candidateSetHash = RecommendationProvenance.candidateSetHash(books, scoreById, modelVersion);
+    String candidateSetHash = RecommendationProvenance.candidateSetHash(candidateSet, scoreById, modelVersion);
     UUID requestId = UUID.randomUUID();
     List<Map<String, Object>> candidates = new ArrayList<>();
     int candidateRank = 1;

@@ -22,6 +22,11 @@ bookrush:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
 feed:
+  retrieval:
+    max-candidates: ${FEED_RETRIEVAL_MAX_CANDIDATES:500}
+    page-size: ${FEED_RETRIEVAL_PAGE_SIZE:100}
+    max-pages: ${FEED_RETRIEVAL_MAX_PAGES:5}
+    version: ${FEED_RETRIEVAL_VERSION:catalog-page-v1}
   ranking:
     enabled: ${FEED_ANALYTICS_RANKING_ENABLED:${FEED_EXCERPTS_ENABLED:false}}
     model-version: ${FEED_ANALYTICS_RANKING_MODEL_VERSION:analytics-aware-v1}

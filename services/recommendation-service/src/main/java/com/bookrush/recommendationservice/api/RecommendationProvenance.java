@@ -1,6 +1,7 @@
 package com.bookrush.recommendationservice.api;
 
 import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient.BookScore;
+import com.bookrush.recommendationservice.retrieval.CandidateSet;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Comparator;
@@ -28,6 +29,18 @@ final class RecommendationProvenance {
         })
         .collect(java.util.stream.Collectors.joining("|"));
     return sha256(modelVersion + "\n" + canonical);
+  }
+
+  static String candidateSetHash(CandidateSet candidateSet, Map<String, BookScore> scores,
+      String modelVersion) {
+    String canonical = candidateSet.canonicalBookIds().stream().map(id -> {
+      BookScore score = scores.get(id);
+      String value = score == null ? "null"
+          : Double.toString(score.score()) + ":" + String.valueOf(score.rankerVersion());
+      return id + "=" + value;
+    }).collect(java.util.stream.Collectors.joining("|"));
+    return sha256(modelVersion + "\n" + candidateSet.version() + "\n"
+        + candidateSet.configurationHash() + "\n" + candidateSet.source() + "\n" + canonical);
   }
 
   static String bookId(Object book) {
