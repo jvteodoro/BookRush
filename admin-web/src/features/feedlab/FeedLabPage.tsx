@@ -204,6 +204,31 @@ export function FeedLabPage() {
             <code>{session?.parameterVersion ?? "creating..."}</code>
           </div>
           <div className="featurebox">
+            <span>Decision provenance</span>
+            <div>
+              <span>Model</span>
+              <strong>{item.modelVersion || item.rankingVersion || "—"}</strong>
+            </div>
+            <div>
+              <span>Reason</span>
+              <strong>{item.reason || "—"}</strong>
+            </div>
+            <div>
+              <span>Candidate set</span>
+              <code>{item.candidateSetHash || "—"}</code>
+            </div>
+            <div>
+              <span>Request</span>
+              <code>{item.recommendationRequestId || "—"}</code>
+            </div>
+            <div>
+              <span>Item / impression</span>
+              <code>
+                {item.recommendationItemId || "—"} / {item.impressionId || "—"}
+              </code>
+            </div>
+          </div>
+          <div className="featurebox">
             <span>Score decomposition</span>
             {Object.entries(item.features).map(([k, v]) => (
               <div key={k}>

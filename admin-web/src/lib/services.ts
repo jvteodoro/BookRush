@@ -777,6 +777,21 @@ export const services = {
       });
       return (data.items ?? data).map((item: Record<string, unknown>) => ({
         ...item,
+        modelVersion: String(item.modelVersion ?? item.model_version ?? ""),
+        rankingVersion: String(
+          item.rankingVersion ?? item.ranking_version ?? "",
+        ),
+        candidateSetHash: String(
+          item.candidateSetHash ?? item.candidate_set_hash ?? "",
+        ),
+        recommendationRequestId: String(
+          item.recommendationRequestId ?? item.recommendation_request_id ?? "",
+        ),
+        recommendationItemId: String(
+          item.recommendationItemId ?? item.recommendation_item_id ?? "",
+        ),
+        impressionId: String(item.impressionId ?? item.impression_id ?? ""),
+        reason: String(item.reason ?? ""),
         rankScore: Number(
           item.rankScore ??
             item.rank_score ??

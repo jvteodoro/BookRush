@@ -25,6 +25,7 @@ import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
 import com.bookrush.recommendationservice.ranking.AnalyticsRankingProperties;
 import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient;
 import com.bookrush.recommendationservice.ranking.PersonalizedFeedGate;
+import com.bookrush.recommendationservice.ranking.PersonalizedDecisionReplay;
 import com.bookrush.recommendationservice.ranking.PersonalizedProfileService;
 import com.bookrush.recommendationservice.ranking.PersonalizedRankerV1;
 import com.bookrush.recommendationservice.ranking.BookDiversityMmr;
@@ -52,6 +53,7 @@ public class RecommendationController {
   private final PersonalizedRankerV1 personalizedRanker;
   private final BookDiversityMmr bookDiversityMmr;
   private final ExplorationPolicy explorationPolicy;
+  private final PersonalizedDecisionReplay decisionReplay;
 
   public RecommendationController(
       CandidateRetriever candidateRetriever,
@@ -67,7 +69,8 @@ public class RecommendationController {
       PersonalizedProfileService personalizedProfiles,
       PersonalizedRankerV1 personalizedRanker,
       BookDiversityMmr bookDiversityMmr,
-      ExplorationPolicy explorationPolicy) {
+      ExplorationPolicy explorationPolicy,
+      PersonalizedDecisionReplay decisionReplay) {
     this.candidateRetriever = candidateRetriever;
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
@@ -82,6 +85,7 @@ public class RecommendationController {
     this.personalizedRanker = personalizedRanker;
     this.bookDiversityMmr = bookDiversityMmr;
     this.explorationPolicy = explorationPolicy;
+    this.decisionReplay = decisionReplay;
   }
 
   private String subject(Principal principal) {
@@ -114,9 +118,7 @@ public class RecommendationController {
         ? new PersonalizedProfileService.Result(null, false, false, List.of(), Map.of())
         : feedMetrics.time("personalized_profile", () -> personalizedProfiles.load(subject));
     var personalizationDecision = personalizedFeedGate.decide(profileResult.profile(),
-        profileResult.behaviorAvailable(), profileResult.snapshotAvailable());
-    feedMetrics.count("bookrush.feed.personalized.path",
-        personalizationDecision.path().name().toLowerCase(java.util.Locale.ROOT), 1);
+        profileResult.behaviorAvailable(), profileResult.snapshotAvailable(), subject);
     boolean personalized = personalizationDecision.path() == PersonalizedFeedGate.Path.PERSONALIZED;
     var fatigueById = loadFatigue(subject, candidateIds);
     boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
@@ -139,6 +141,26 @@ public class RecommendationController {
     String modelVersion = personalized ? PersonalizedRankerV1.MODEL_VERSION
         : analyticsRequired ? rankingProperties.modelVersion() : MODEL_VERSION;
     String candidateSetHash = RecommendationProvenance.candidateSetHash(candidateSet, scoreById, modelVersion);
+    if (personalizationDecision.path() == PersonalizedFeedGate.Path.SHADOW) {
+      var shadowRanking = personalizedRank(rankedBooks, scoreById, fatigueById,
+          profileResult, subject, limit);
+      var baselineIds = rankedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull)
+          .map(UUID::toString).limit(limit).toList();
+      var shadowIds = shadowRanking.books().stream().map(this::bookId).filter(java.util.Objects::nonNull)
+          .map(UUID::toString).limit(limit).toList();
+      int overlap = (int) shadowIds.stream().filter(baselineIds::contains).count();
+      decisionReplay.replayIds(shadowIds,
+          profileResult.profile() == null ? "" : profileResult.profile().profileVersion(),
+          RecommendationProvenance.candidateSetHash(candidateSet, scoreById,
+              PersonalizedRankerV1.MODEL_VERSION), personalizedRanker.configurationHash());
+      feedMetrics.observePersonalization(personalizationDecision.path().name(),
+          personalizationDecision.reason(), profileResult.profile() == null ? 0 : profileResult.profile().confidence(),
+          profileResult.signals().size(), overlap, 1);
+    } else {
+      feedMetrics.observePersonalization(personalizationDecision.path().name(),
+          personalizationDecision.reason(), profileResult.profile() == null ? 0 : profileResult.profile().confidence(),
+          profileResult.signals().size(), 0, 0);
+    }
     UUID requestId = UUID.randomUUID();
     List<Map<String, Object>> candidates = new ArrayList<>();
     int candidateRank = 1;

@@ -57,7 +57,7 @@ components:
               score: {type: number, nullable: true}
               reason:
                 type: string
-                enum: [popular-cold-start, diversity-heuristic, lucky-exploration, analytics-score]
+                enum: [popular-cold-start, diversity-heuristic, lucky-exploration, analytics-score, personalized-score, personalized-exploration]
               excerpt:
                 $ref: '#/components/schemas/FeedExcerpt'
     FeedExcerpt:

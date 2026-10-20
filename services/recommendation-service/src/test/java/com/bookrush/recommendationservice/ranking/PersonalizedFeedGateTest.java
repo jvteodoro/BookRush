@@ -31,4 +31,13 @@ class PersonalizedFeedGateTest {
         new PersonalizedFeedGate(new PersonalizedFeedGate.Properties(
             PersonalizedFeedGate.Mode.SHADOW, 0, 0)).decide(READY, true, true).path());
   }
+
+  @Test
+  void rolloutBucketIsStableAndCanExcludeUsersWithoutChangingFallbackSemantics() {
+    var gate = new PersonalizedFeedGate(new PersonalizedFeedGate.Properties(
+        PersonalizedFeedGate.Mode.ON, 0, 0, 0));
+    assertEquals("rollout-excluded", gate.decide(READY, true, true, "user-a").reason());
+    assertEquals(gate.decide(READY, true, true, "user-b"),
+        gate.decide(READY, true, true, "user-b"));
+  }
 }

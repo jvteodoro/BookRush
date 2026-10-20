@@ -26,6 +26,7 @@ feed:
     mode: ${FEED_PERSONALIZED_MODE:OFF}
     min-coverage: ${FEED_PERSONALIZED_MIN_COVERAGE:0.5}
     min-confidence: ${FEED_PERSONALIZED_MIN_CONFIDENCE:0.5}
+    rollout-percentage: ${FEED_PERSONALIZED_ROLLOUT_PERCENTAGE:100}
     behavior:
       url: ${FEED_PERSONALIZED_BEHAVIOR_URL:http://behavior-service:8097}
       token-uri: ${FEED_PERSONALIZED_BEHAVIOR_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}

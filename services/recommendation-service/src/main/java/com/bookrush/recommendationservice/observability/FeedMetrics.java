@@ -49,4 +49,25 @@ public final class FeedMetrics {
     count("bookrush.feed.items", "returned", items);
     count("bookrush.feed.excerpts", "attached", excerpts);
   }
+
+  public void observePersonalization(String path, String reason, double confidence,
+      int profileSignals, int shadowOverlap, int shadowCompared) {
+    count("bookrush.feed.personalized.path", safe(path), 1);
+    count("bookrush.feed.personalized.reason", safe(reason), 1);
+    count("bookrush.feed.personalized.profile.signals", "count", profileSignals);
+    count("bookrush.feed.personalized.shadow.compared", "count", shadowCompared);
+    count("bookrush.feed.personalized.shadow.overlap", "count", shadowOverlap);
+    count("bookrush.feed.personalized.profile.confidence", confidenceBucket(confidence), 1);
+  }
+
+  private static String safe(String value) {
+    return value == null || value.isBlank() ? "unknown" : value.toLowerCase(java.util.Locale.ROOT);
+  }
+
+  private static String confidenceBucket(double value) {
+    if (!Double.isFinite(value) || value < .25) return "0-25";
+    if (value < .5) return "25-50";
+    if (value < .75) return "50-75";
+    return "75-100";
+  }
 }

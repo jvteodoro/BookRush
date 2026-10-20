@@ -22,6 +22,11 @@ public class PersonalizedFeedConfiguration {
   }
 
   @Bean
+  PersonalizedDecisionReplay personalizedDecisionReplay() {
+    return new PersonalizedDecisionReplay();
+  }
+
+  @Bean
   BookDiversityMmr bookDiversityMmr() {
     return new BookDiversityMmr(new BookDiversityMmr.Config("book-mmr-v1", .85));
   }
@@ -34,15 +39,21 @@ public class PersonalizedFeedConfiguration {
   @Bean
   PersonalizedFeedGate personalizedFeedGate(Properties properties) {
     return new PersonalizedFeedGate(new PersonalizedFeedGate.Properties(
-        properties.mode(), properties.minCoverage(), properties.minConfidence()));
+        properties.mode(), properties.minCoverage(), properties.minConfidence(), properties.rolloutPercentage()));
   }
 
   @ConfigurationProperties(prefix = "feed.personalized")
-  public record Properties(PersonalizedFeedGate.Mode mode, double minCoverage, double minConfidence) {
+  public record Properties(PersonalizedFeedGate.Mode mode, double minCoverage, double minConfidence,
+      double rolloutPercentage) {
+    public Properties(PersonalizedFeedGate.Mode mode, double minCoverage, double minConfidence) {
+      this(mode, minCoverage, minConfidence, 100);
+    }
+
     public Properties {
       mode = mode == null ? PersonalizedFeedGate.Mode.OFF : mode;
       minCoverage = minCoverage < 0 ? .5 : minCoverage;
       minConfidence = minConfidence < 0 ? .5 : minConfidence;
+      rolloutPercentage = rolloutPercentage < 0 ? 100 : rolloutPercentage;
     }
   }
 }

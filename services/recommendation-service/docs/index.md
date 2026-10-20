@@ -40,3 +40,14 @@ available for controlled development environments.
 The reader BFF allows up to 15 seconds for the bounded recommendation batch;
 this avoids converting normal batch latency into a 502 while preserving the
 recommendation service's own bounded analytics clients.
+
+## Personalized Feed V1
+
+The safe default remains `FEED_PERSONALIZED_MODE=OFF`, serving the existing
+analytics-aware/heuristic path. `SHADOW` calculates `PERSONALIZED_V1` without
+changing the control response. `ON` serves it only after behavior, snapshot,
+coverage and confidence gates pass. `FEED_PERSONALIZED_ROLLOUT_PERCENTAGE`
+provides deterministic staged activation and setting the mode back to `OFF` is
+the immediate rollback. See
+`docs/recommendation/personalized-feed-v1-operations.md` for replay, metrics
+and the read-only dataset handoff.

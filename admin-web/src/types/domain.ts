@@ -125,6 +125,13 @@ export interface FeedItem {
   text: string;
   rankScore: number;
   features: Record<string, number>;
+  modelVersion?: string;
+  rankingVersion?: string;
+  candidateSetHash?: string;
+  recommendationRequestId?: string;
+  recommendationItemId?: string;
+  impressionId?: string;
+  reason?: string;
 }
 
 export type FeedEventType =
