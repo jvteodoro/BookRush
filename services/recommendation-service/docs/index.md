@@ -29,6 +29,14 @@ client-credentials token. The user bearer is never sent to analytics. Enable
 reconciling `bookrush-recommendation-s2s` in the administrative realm and
 providing its protected secret in `.env`.
 
-Missing analytics, expired credentials, missing processing and structural
-exclusions degrade to a normal feed item. The BFF passes the nullable field
-through and the browser never calls an analytics endpoint.
+When analytics ranking is enabled and its S2S credentials are configured, the
+feed is fail-closed: a book must have both an eligible analytics score and a
+non-empty persisted excerpt to enter the response. Missing processing,
+expired credentials and structural exclusions therefore remove the book from
+that feed instead of producing a card with a misleading placeholder. If the
+analytics ranking flag is disabled, the legacy heuristic feed remains
+available for controlled development environments.
+
+The reader BFF allows up to 15 seconds for the bounded recommendation batch;
+this avoids converting normal batch latency into a 502 while preserving the
+recommendation service's own bounded analytics clients.

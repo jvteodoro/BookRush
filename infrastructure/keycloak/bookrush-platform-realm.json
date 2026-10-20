@@ -128,7 +128,8 @@
     }
       ],
       "defaultClientScopes": [
-        "profile"
+        "profile",
+        "bookrush.analytics"
       ],
       "optionalClientScopes": []
     },

@@ -15,6 +15,8 @@ O serviço continua sendo o único dono do schema `analytics`. O worker Java coo
   `author_id::work_id`, seed, baseline por dimensão, GBDT determinístico de
   stumps residuais, métricas holdout, importância explicável e hash;
 - observabilidade de baixa cardinalidade, sem IDs de livros em labels.
+- contrato operacional documentado para gates de elegibilidade, provenance do
+  ranker e seleção MMR em `docs/analytics-v2-selection.md`.
 
 ## Preparação de modelos
 
@@ -104,3 +106,15 @@ com observações linguísticas produzidas pelo pipeline para publicar a
 normalização de estilo PT. O classificador supervisionado também permanece
 bloqueado até existir dataset rotulado suficiente, com divisão por obra e
 avaliação reproduzível.
+
+## Hipóteses NLI versionadas
+
+As hipóteses narrativas e emocionais são carregadas de
+`nli-hypotheses-v1.json`, com o código e a versão do conjunto registrados pelo
+`NliInferenceAdapter`. O catálogo mantém nove conceitos narrativos e sete
+emoções independentes para cada idioma suportado; não há tradução automática
+ou softmax entre emoções. O adaptador conserva o triplo bruto
+entailment/neutral/contradiction e os derivados support/confidence somente
+quando o runtime local retorna `VALID`. Alterações do texto devem criar uma
+nova versão do artefato, permitindo comparar execuções sem reescrever
+proveniência histórica.

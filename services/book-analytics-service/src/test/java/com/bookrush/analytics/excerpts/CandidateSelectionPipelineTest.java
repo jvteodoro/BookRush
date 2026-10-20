@@ -33,4 +33,43 @@ class CandidateSelectionPipelineTest {
         result.rejected().stream().collect(java.util.stream.Collectors.toMap(
             CandidateSelectionPipeline.Rejected::id, CandidateSelectionPipeline.Rejected::reason)));
   }
+
+  @Test
+  void rejectsEmptyAndMismatchedEmbeddingDimensionsWithoutEnteringMmr() {
+    var valid = input("valid", new float[] {1, 0});
+    var empty = input("empty", new float[] {});
+    var mismatched = input("mismatched", new float[] {1, 0, 0});
+
+    var result =
+        CandidateSelectionPipeline.select(
+            List.of(valid, empty, mismatched), BOUNDS, "bge-m3-dense-v1", 3, 1, 1);
+
+    assertEquals(List.of("valid"), result.selected().stream().map(MMRDiversitySelector.Candidate::id).toList());
+    assertEquals(
+        Map.of("empty", "EMBEDDING_EMPTY", "mismatched", "EMBEDDING_DIMENSION_MISMATCH"),
+        result.rejected().stream().collect(java.util.stream.Collectors.toMap(
+            CandidateSelectionPipeline.Rejected::id, CandidateSelectionPipeline.Rejected::reason)));
+  }
+
+  @Test
+  void replayWithSameInputsKeepsOrderAndSelectionScores() {
+    var inputs =
+        List.of(input("z", new float[] {1, 0}), input("a", new float[] {1, 0}), input("m", new float[] {0, 1}));
+
+    var first = CandidateSelectionPipeline.select(inputs, BOUNDS, "bge-m3-dense-v1", 3, 1, 1);
+    var replay = CandidateSelectionPipeline.select(inputs, BOUNDS, "bge-m3-dense-v1", 3, 1, 1);
+
+    assertEquals(
+        first.selected().stream().map(MMRDiversitySelector.Candidate::id).toList(),
+        replay.selected().stream().map(MMRDiversitySelector.Candidate::id).toList());
+    assertArrayEquals(first.selected().stream().mapToDouble(MMRDiversitySelector.Candidate::selectionScore).toArray(),
+        replay.selected().stream().mapToDouble(MMRDiversitySelector.Candidate::selectionScore).toArray());
+    assertEquals(List.of("a", "m", "z"), first.selected().stream().map(MMRDiversitySelector.Candidate::id).toList());
+  }
+
+  private static CandidateSelectionPipeline.Input input(String id, float[] embedding) {
+    return new CandidateSelectionPipeline.Input(
+        id, .8, Map.of("word_count", 40d, "narrative.autonomy", .8), Map.of(), embedding,
+        "bge-m3-dense-v1");
+  }
 }

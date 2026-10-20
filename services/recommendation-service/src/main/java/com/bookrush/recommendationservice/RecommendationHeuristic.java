@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient.BookScore;
 
 /** Deterministic heuristic-v1 policy kept independent from HTTP and JDBC. */
 public final class RecommendationHeuristic {
@@ -19,9 +20,19 @@ public final class RecommendationHeuristic {
   }
 
   public static List<?> rank(List<?> books, String subject, int limit, Strategy strategy) {
+    return rank(books, subject, limit, strategy, Map.of());
+  }
+
+  public static List<?> rank(List<?> books, String subject, int limit, Strategy strategy,
+      Map<String, BookScore> analyticsScores) {
     int boundedLimit = Math.max(1, limit);
     var candidates = new ArrayList<>(books);
-    candidates.sort(Comparator.comparingLong(book -> score(book, subject, strategy)));
+    candidates.sort((left, right) -> {
+      int analyticsOrder = Double.compare(analyticsScore(right, analyticsScores),
+          analyticsScore(left, analyticsScores));
+      if (analyticsOrder != 0) return analyticsOrder;
+      return Long.compare(score(left, subject, strategy), score(right, subject, strategy));
+    });
     var selected = new ArrayList<Object>();
     Set<String> seenKeys = new HashSet<>();
     for (Object candidate : candidates) {
@@ -37,6 +48,12 @@ public final class RecommendationHeuristic {
       }
     }
     return selected;
+  }
+
+  private static double analyticsScore(Object book, Map<String, BookScore> analyticsScores) {
+    Object id = book instanceof Map<?, ?> map ? map.get("id") : book;
+    BookScore score = analyticsScores.get(String.valueOf(id));
+    return score == null ? Double.NEGATIVE_INFINITY : score.score();
   }
 
   private static long score(Object book, String subject, Strategy strategy) {

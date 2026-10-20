@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
+import com.bookrush.recommendationservice.ranking.AnalyticsRankingProperties;
+import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
@@ -31,16 +33,22 @@ public class RecommendationController {
   private final JdbcTemplate jdbc;
   private final ExcerptEnrichmentService excerptEnrichment;
   private final BehaviorEventPublisher behavior;
+  private final AnalyticsScoreClient analyticsScores;
+  private final AnalyticsRankingProperties rankingProperties;
 
   public RecommendationController(
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
       JdbcTemplate jdbc,
       ExcerptEnrichmentService excerptEnrichment,
-      BehaviorEventPublisher behavior) {
+      BehaviorEventPublisher behavior,
+      AnalyticsScoreClient analyticsScores,
+      AnalyticsRankingProperties rankingProperties) {
     catalog = RestClient.builder().baseUrl(url).build();
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
     this.behavior = behavior;
+    this.analyticsScores = analyticsScores;
+    this.rankingProperties = rankingProperties;
   }
 
   private String subject(Principal principal) {
@@ -63,41 +71,70 @@ public class RecommendationController {
     Map<?, ?> result = catalog.get().uri("/api/v1/books?page=0&size=" + Math.min(100, Math.max(limit * 3, 20)))
         .retrieve().body(Map.class);
     List<?> books = result != null && result.get("items") instanceof List<?> list ? list : List.of();
-    List<?> rankedBooks = RecommendationHeuristic.rank(books, subject, limit, selectedStrategy);
+    var candidateIds = books.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
+    var scoreById = analyticsScores.find(candidateIds).entrySet().stream()
+        .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue));
+    boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
+    List<?> rankedBooks = RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById);
+    if (analyticsRequired) {
+      rankedBooks = rankedBooks.stream()
+          .filter(book -> scoreById.containsKey(String.valueOf(bookId(book))))
+          .toList();
+    }
+    boolean analyticsRanked = analyticsRequired && !scoreById.isEmpty();
+    String modelVersion = analyticsRequired ? rankingProperties.modelVersion() : MODEL_VERSION;
     UUID requestId = UUID.randomUUID();
-    jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
-        requestId, subject, MODEL_VERSION, strategy, subject.hashCode(), "{}");
-    List<Map<String, Object>> items = new ArrayList<>();
-    int rank = 1;
+    List<Map<String, Object>> candidates = new ArrayList<>();
+    int candidateRank = 1;
     for (Object book : rankedBooks) {
       Object bookId = book instanceof Map<?, ?> map ? map.get("id") : null;
       if (bookId == null) continue;
-      UUID parsedBookId = UUID.fromString(String.valueOf(bookId));
-      UUID itemId = UUID.randomUUID();
-      int currentRank = rank;
-      String reason = selectedStrategy == Strategy.COLD_START ? "popular-cold-start"
+      String reason = analyticsRanked && scoreById.containsKey(String.valueOf(bookId)) ? "analytics-score"
+          : selectedStrategy == Strategy.COLD_START ? "popular-cold-start"
           : selectedStrategy == Strategy.LUCKY ? "lucky-exploration" : "diversity-heuristic";
-      jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
-          itemId, requestId, parsedBookId, currentRank, 1.0 / currentRank,
-          "{\"strategy\":\"" + reason + "\"}");
-      UUID impressionId = UUID.randomUUID();
-      jdbc.update("INSERT INTO recommendation.impression(id, request_id, book_id, rank) "
-          + "VALUES (?, ?, ?, ?)", impressionId, requestId, parsedBookId, currentRank);
-      jdbc.update("UPDATE recommendation.impression SET item_id=? WHERE id=?", itemId, impressionId);
       var item = new java.util.LinkedHashMap<String, Object>();
       item.put("book", book);
+      item.put("modelVersion", modelVersion);
+      item.put("rank", candidateRank++);
+      item.put("reason", reason);
+      candidates.add(item);
+    }
+    behavior.publish("RECOMMENDATION_REQUEST", null, Map.of("size", limit, "modelVersion", modelVersion),
+        request.getHeader("Authorization"));
+    excerptEnrichment.enrich(candidates);
+    List<Map<String, Object>> items = analyticsRequired
+        ? new ArrayList<>(FeedEligibility.retainAnalyticsReady(candidates))
+        : candidates;
+    jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
+        requestId, subject, modelVersion, strategy, subject.hashCode(), "{}");
+    int rank = 1;
+    for (Map<String, Object> item : items) {
+      UUID parsedBookId = UUID.fromString(String.valueOf(((Map<?, ?>) item.get("book")).get("id")));
+      UUID itemId = UUID.randomUUID();
+      UUID impressionId = UUID.randomUUID();
       item.put("recommendationRequestId", requestId);
       item.put("impressionId", impressionId);
-      item.put("modelVersion", MODEL_VERSION);
-      item.put("rank", rank++);
-      item.put("reason", reason);
-      items.add(item);
+      item.put("rank", rank);
+      jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
+          itemId, requestId, parsedBookId, rank, 1.0 / rank,
+          "{\"strategy\":\"" + item.get("reason") + "\",\"rankerVersion\":\""
+              + modelVersion + "\"}");
+      jdbc.update("INSERT INTO recommendation.impression(id, request_id, book_id, rank, item_id) "
+          + "VALUES (?, ?, ?, ?, ?)", impressionId, requestId, parsedBookId, rank, itemId);
+      rank++;
     }
-    behavior.publish("RECOMMENDATION_REQUEST", null, Map.of("size", limit, "modelVersion", MODEL_VERSION),
-        request.getHeader("Authorization"));
-    excerptEnrichment.enrich(items);
-    return Map.of("requestId", requestId, "modelVersion", MODEL_VERSION, "strategy", strategy,
+    return Map.of("requestId", requestId, "modelVersion", modelVersion,
+        "rankingVersion", modelVersion, "strategy", strategy,
         "generatedAt", Instant.now(), "items", items);
+  }
+
+  private UUID bookId(Object book) {
+    if (!(book instanceof Map<?, ?> map) || map.get("id") == null) return null;
+    try {
+      return UUID.fromString(String.valueOf(map.get("id")));
+    } catch (IllegalArgumentException ignored) {
+      return null;
+    }
   }
 
   @PostMapping("/impressions/{impressionId}/viewable")

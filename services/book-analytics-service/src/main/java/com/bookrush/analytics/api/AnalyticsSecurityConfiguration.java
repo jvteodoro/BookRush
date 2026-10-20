@@ -61,7 +61,7 @@ public class AnalyticsSecurityConfiguration {
       OAuth2TokenValidator<Jwt> issuerValidator = new JwtIssuerValidator(issuer);
       OAuth2TokenValidator<Jwt> audienceValidator =
           token ->
-              token.getAudience().contains(audience)
+              token.getAudience() != null && token.getAudience().contains(audience)
                   ? OAuth2TokenValidatorResult.success()
                   : OAuth2TokenValidatorResult.failure(
                       new OAuth2Error("invalid_token", "required audience is missing", null));

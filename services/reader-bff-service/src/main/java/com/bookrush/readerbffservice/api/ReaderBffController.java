@@ -159,20 +159,31 @@ public class ReaderBffController {
   private RestClient client(String baseUrl) {
     var requestFactory = new JdkClientHttpRequestFactory(
         HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build());
-    requestFactory.setReadTimeout(Duration.ofSeconds(5));
+    // Recommendation requests persist a bounded ledger and enrich a batch. Keep
+    // the gateway budget above the normal batch latency so load does not turn
+    // a slow but healthy feed into an opaque 502.
+    requestFactory.setReadTimeout(Duration.ofSeconds(15));
     return RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
   private Object get(RestClient client, String path, HttpServletRequest request, Map<String, ?> variables) {
     String bearer = request.getHeader(HttpHeaders.AUTHORIZATION);
     try {
-      return client
-          .get()
-          .uri(builder -> {
-            var uri = builder.path(path);
-            variables.forEach(uri::queryParam);
-            return uri.build(variables);
-          })
+      var requestSpec = client.get();
+      if (variables.isEmpty()) {
+        // Avoid expanding an empty variable map in RestClient's URI builder.
+        // The reader-state endpoints (library/recent/streak) have no query
+        // parameters; using the literal path keeps the request identical to
+        // the direct upstream call and avoids a misleading 502.
+        requestSpec.uri(path);
+      } else {
+        requestSpec.uri(builder -> {
+          var uri = builder.path(path);
+          variables.forEach(uri::queryParam);
+          return uri.build(variables);
+        });
+      }
+      return requestSpec
           .headers(headers -> {
             if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
           })

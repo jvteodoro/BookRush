@@ -9,9 +9,73 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    analyticsServiceBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: S2S token with audience bookrush-analytics and scope bookrush.analytics.
+  schemas:
+    PhaseTimingResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          description: Distribuição agregada por fase e estado persistidos.
+          items:
+            $ref: '#/components/schemas/PhaseTimingRow'
+        total:
+          type: integer
+          minimum: 0
+    PhaseTimingRow:
+      type: object
+      required: [phase, status, samples]
+      properties:
+        phase:
+          type: string
+          description: Nome estável da fase do worker.
+          example: EXCERPT_EMBEDDINGS
+        status:
+          type: string
+          description: Estado persistido da amostra da fase.
+          example: COMPLETED
+        samples:
+          type: integer
+          format: int64
+          minimum: 1
+        mean_ms: {type: number, format: double, nullable: true}
+        min_ms: {type: number, format: double, nullable: true}
+        max_ms: {type: number, format: double, nullable: true}
+        p50_ms: {type: number, format: double, nullable: true}
+        p90_ms: {type: number, format: double, nullable: true}
+        p95_ms: {type: number, format: double, nullable: true}
+        p99_ms: {type: number, format: double, nullable: true}
 servers:
   - url: https://bookrush.jteodoro.tec.br/analytics
 paths:
+  /api/internal/v1/content-analytics/book-scores:
+    post:
+      summary: Retornar scores analíticos em lote para candidatos do feed
+      description: Endpoint interno S2S que retorna o maior score elegível da versão textual atual de cada livro. O score é técnico e não substitui a política de produto do recommendation-service.
+      security:
+        - analyticsServiceBearer: [bookrush.analytics]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookIds]
+              properties:
+                bookIds:
+                  type: array
+                  maxItems: 100
+                  items: {type: string, format: uuid}
+      responses:
+        '200': {description: Scores encontrados para os livros informados}
+        '400': {description: Lista inválida ou maior que 100 livros}
+        '401': {description: Bearer ausente ou inválido}
+        '403': {description: Token sem scope bookrush.analytics}
   /api/admin/v1/content-analytics/phase-timings:
     get:
       summary: Distribution of persisted analytics phase durations
@@ -21,6 +85,7 @@ paths:
           name: jobId
           required: false
           schema: {type: string, format: uuid}
+          description: If omitted, aggregate all persisted jobs.
         - in: query
           name: limit
           required: false
@@ -28,8 +93,14 @@ paths:
       responses:
         '200':
           description: Aggregated phase timing distributions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhaseTimingResponse'
         '400':
           description: Invalid limit
+        '401': {description: Missing or invalid bearer token}
+        '403': {description: Token lacks bookrush.analytics scope}
   /api/internal/v1/analytics/books/{bookId}/summary:
     get:
       summary: Resumo de analytics

@@ -247,3 +247,37 @@ O processamento em lote só deve ser promovido a gate de capacidade quando:
 Esse critério separa confiabilidade operacional, desempenho e qualidade do
 modelo. Um lote que termina não é automaticamente um lote editorialmente
 aprovado.
+
+## Batching NLI e embeddings
+
+O runtime agora possui `POST /v1/nli/batch`. Cada item tem um identificador
+estável, texto e hipótese; a resposta mantém a associação e o status de cada
+item. O cliente Java divide as 16 hipóteses por excerpt em chunks, faz uma
+chamada por chunk e persiste apenas resultados válidos. Isso permite retomar
+um chunk sem repetir observações já persistidas.
+
+O endpoint de embeddings já aceitava múltiplos textos. O tamanho do lote deixou
+de ser fixo no worker e pode ser ajustado por
+`ANALYTICS_EMBEDDINGS_BATCH_SIZE`; o padrão permanece conservador (`4`). O NLI
+usa `ANALYTICS_NLI_BATCH_SIZE=8` e o runtime rejeita corpos maiores que
+`ANALYTICS_NLI_BATCH_MAX_ITEMS=32`.
+
+Embeddings são retomáveis por lote: antes de solicitar novo trabalho, o worker
+consulta os hashes de entrada já persistidos e tenta recuperar o vetor do
+object storage. Um reinício depois de um lote concluído não precisa repetir a
+inferência desse lote. Se o runtime devolver status inválido, quantidade de
+vetores incompatível ou hashes incompletos, o item falha de forma explícita e
+fica elegível para retry; o worker não marca uma execução parcialmente
+processada como concluída.
+
+O runtime detecta CUDA quando disponível por `ANALYTICS_RUNTIME_DEVICE=auto`,
+mas a imagem padrão continua CPU-only. A utilização da GPU exige uma imagem
+PyTorch CUDA compatível e configuração explícita do runtime/container. O
+override `infrastructure/compose.analytics-gpu.yaml` usa o runtime NVIDIA
+explícito, `NVIDIA_VISIBLE_DEVICES` e `NVIDIA_DRIVER_CAPABILITIES=compute,utility`.
+A variante CUDA baseada em `torch==2.6.0+cu124` satisfaz a exigência de
+segurança do `transformers` ao carregar o BGE-M3 e é compatível com o driver
+CUDA 12.4/580 do host. O override usa runtime NVIDIA explícito porque o modo
+`gpus: all` deste host não expõe compute corretamente. A validação do container
+detectou a GTX 1050 Ti e passou NLI batch e BGE-M3 1024-D; antes de ativar em
+produção, medir VRAM, p95, taxa de falha, equivalência dos scores e recuperação.

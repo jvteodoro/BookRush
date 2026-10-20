@@ -25,6 +25,12 @@ O BFF repassa `Authorization: Bearer` ao serviço dono. Falhas de dependência
 retornam `502 Bad Gateway` para que o cliente diferencie indisponibilidade de
 uma resposta vazia válida.
 
+As consultas sem parâmetros (`library`, `recent` e `streak`) são encaminhadas
+como o caminho literal ao serviço de estado. Isso preserva respostas válidas
+como `200 []`; elas não devem ser tratadas como uma URI com mapa de variáveis
+vazio. Uma chamada manual sem `Authorization: Bearer` continua retornando
+`401`; `JSESSIONID` não substitui o token OIDC do realm `bookrush`.
+
 As chamadas de navegador aceitam somente as origens configuradas em
 `BOOKRUSH_CORS_ALLOWED_ORIGINS` (registrado como `corsConfigurationSource`). O preflight `OPTIONS` é permitido sem bearer,
 mas todas as operações de negócio continuam exigindo um JWT válido com a

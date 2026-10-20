@@ -140,6 +140,15 @@ ingestão, analytics, perfil do leitor e frontend juntos. A imagem
 `READER_PROFILE_IMAGE` é obrigatória no contrato do deploy Compose e deve ser
 gerada e publicada pela mesma execução que atualiza os demais serviços.
 
+### Runtime analytics com GPU
+
+No host com NVIDIA, marque `ANALYTICS_GPU=true` no `bookrush-deploy`. A
+pipeline então constrói o runtime com `requirements.cuda.txt`, aplica
+`compose.analytics-gpu.yaml` no deploy e exporta `ANALYTICS_NLI_ENABLED=true`,
+`ANALYTICS_NLI_BATCH_SIZE=8` e `ANALYTICS_EMBEDDINGS_BATCH_SIZE=4`. O modo
+falha se o host não possuir NVIDIA Container Toolkit saudável. O modo padrão
+continua CPU e não altera o ambiente protegido.
+
 Em uma instalação existente, é necessário reconstruir/recriar somente o
 container Jenkins para que o `init.groovy.d` e os Jenkinsfiles novos sejam
 carregados; o volume `jenkins_home` é preservado. Os jobs existentes não são

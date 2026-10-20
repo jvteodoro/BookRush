@@ -1,0 +1,13 @@
+{
+  "code": "EXCERPT_HEURISTIC_RANKER",
+  "version": "EXCERPT_HEURISTIC_RANKER_V1",
+  "state": "UNVALIDATED",
+  "weights": {
+    "question_ratio": 0.20,
+    "dialogue_ratio": 0.20,
+    "punctuation_density": 0.10,
+    "short_sentence_ratio": 0.15,
+    "sentence_length_cv": 0.15,
+    "lex.ttr": 0.20
+  }
+}

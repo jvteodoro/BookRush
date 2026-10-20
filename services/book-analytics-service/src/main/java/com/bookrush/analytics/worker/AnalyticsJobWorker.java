@@ -1,16 +1,24 @@
 package com.bookrush.analytics.worker;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bookrush.analytics.config.AnalyticsV2GeneratorProperties;
 import com.bookrush.analytics.excerpts.CandidatePruner;
 import com.bookrush.analytics.excerpts.ExcerptCandidateGenerator;
+import com.bookrush.analytics.excerpts.HeuristicRankerConfig;
 import com.bookrush.analytics.features.EmbeddingMath;
 import com.bookrush.analytics.features.LinguisticRuntimeClient;
+import com.bookrush.analytics.features.LanguageEvidence;
+import com.bookrush.analytics.features.LanguageValidation;
 import com.bookrush.analytics.features.TextFeatureCalculator;
 import com.bookrush.analytics.llm.TopNliCandidateSelector;
+import com.bookrush.analytics.llm.NliHypothesisCatalog;
+import com.bookrush.analytics.llm.NliInferenceAdapter;
 import com.bookrush.analytics.observability.AnalyticsMetrics;
 import com.bookrush.analytics.storage.TextAssetReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
@@ -24,6 +32,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.core.io.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
@@ -52,6 +61,10 @@ public final class AnalyticsJobWorker {
   private final int retryDelaySeconds;
   private final ExecutorService processingExecutor;
   private final Semaphore processingSlots;
+  private final com.bookrush.analytics.excerpts.SupervisedCandidateScorer supervisedScorer;
+  private final HeuristicRankerConfig heuristicRankerConfig;
+  private final NliInferenceAdapter nliInference;
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
   public AnalyticsJobWorker(
       JdbcTemplate jdbc,
@@ -62,7 +75,12 @@ public final class AnalyticsJobWorker {
       @Value("${analytics.worker.stale-after-seconds:900}") int staleAfterSeconds,
       @Value("${analytics.worker.max-attempts:3}") int maxAttempts,
       @Value("${analytics.worker.retry-delay-seconds:30}") int retryDelaySeconds,
-      @Value("${analytics.worker.concurrency:1}") int concurrency) {
+      @Value("${analytics.worker.concurrency:1}") int concurrency,
+      @Value("${analytics.scorer.enabled:false}") boolean scorerEnabled,
+      @Value("${analytics.scorer.artifact:${analytics.models.cache-dir}/candidate-scorer.json}") String scorerArtifact,
+      @Value("${analytics.scorer.allow-experimental:false}") boolean allowExperimentalScorer,
+      @Value("${analytics.ranker.config:classpath:analytics-ranker-v1.json}") Resource rankerConfigResource,
+      @Value("${analytics.nli.hypotheses:classpath:nli-hypotheses-v1.json}") Resource nliHypothesisResource) {
     this.jdbc = jdbc;
     this.s3 = s3;
     this.metrics = metrics;
@@ -78,6 +96,40 @@ public final class AnalyticsJobWorker {
       thread.setDaemon(true);
       return thread;
     });
+    this.heuristicRankerConfig = loadHeuristicRankerConfig(rankerConfigResource);
+    this.supervisedScorer = loadSupervisedScorer(scorerEnabled, scorerArtifact, allowExperimentalScorer);
+    this.nliInference = new NliInferenceAdapter(this.linguisticRuntime, loadNliHypotheses(nliHypothesisResource));
+  }
+
+  private NliHypothesisCatalog loadNliHypotheses(Resource resource) {
+    try {
+      var catalog = NliHypothesisCatalog.load(resource.getInputStream());
+      log.info("analytics NLI hypotheses configured code={} version={} languages={}",
+          catalog.code(), catalog.version(), catalog.sets().keySet());
+      return catalog;
+    } catch (IOException e) {
+      throw new IllegalStateException("unable to load NLI hypothesis catalog", e);
+    }
+  }
+
+  private HeuristicRankerConfig loadHeuristicRankerConfig(Resource resource) {
+    try {
+      var config = HeuristicRankerConfig.load(resource.getInputStream());
+      log.info("analytics heuristic ranker configured code={} version={} state={}",
+          config.code(), config.version(), config.state());
+      return config;
+    } catch (IOException e) {
+      throw new IllegalStateException("unable to load analytics ranker configuration", e);
+    }
+  }
+
+  private com.bookrush.analytics.excerpts.SupervisedCandidateScorer loadSupervisedScorer(
+      boolean enabled, String artifact, boolean allowExperimental) {
+    if (!enabled) return null;
+    var scorer = com.bookrush.analytics.excerpts.SupervisedCandidateScorer.load(Path.of(artifact), allowExperimental);
+    log.info("analytics supervised scorer enabled code={} version={} artifact={}",
+        "EXCERPT_SUPERVISED_SCORER_V1", "configured", artifact);
+    return scorer;
   }
 
   @Scheduled(fixedDelayString = "${analytics.worker.poll-delay-ms:1000}")
@@ -291,7 +343,7 @@ UPDATE analytics.analysis_job_item i
       }
     });
     var generatorConfig = generatorProperties.candidateConfig();
-    var configuration = configurationJson(generatorConfig);
+    var configuration = configurationJson(generatorConfig, nliInference);
     var configurationHash = sha256(configuration);
     var analyzer =
         jdbc.queryForObject(
@@ -319,11 +371,20 @@ UPDATE analytics.analysis_job_item i
           "2");
       var chapters = timed(item, "CHAPTER_DISCOVERY",
           () -> chapters(item.inputVersion(), TextAssetReader.codePointLength(text)));
-      String language = languageFor(item.inputVersion());
-      var detected = timed(item, "LANGUAGE_VALIDATION", () -> linguisticRuntime.language(text));
+      String catalogLanguage = languageFor(item.inputVersion());
+      String language = catalogLanguage;
+      var detected = timed(item, "LANGUAGE_VALIDATION", () -> {
+        var invalidInput = LanguageValidation.validateInputText(text);
+        if (invalidInput != null) {
+          return new LinguisticRuntimeClient.LanguageResult(
+              invalidInput.status().name(), null, invalidInput.confidence(), invalidInput.warning());
+        }
+        return linguisticRuntime.language(text);
+      });
       if ("VALID".equals(detected.status())
           && ("en".equals(detected.language()) || "pt".equals(detected.language()))
           && detected.confidence() >= 0.60d) language = detected.language();
+      persistLanguageValidation(run, item.inputVersion(), LanguageEvidence.from(catalogLanguage, detected));
       var chapterById =
           chapters.stream()
               .collect(
@@ -370,6 +431,7 @@ UPDATE analytics.analysis_job_item i
         persistPrototypeScores(selectedRun, excerptIds, selectedCandidates, excerptVectors, scopeEmbeddings, selectedLanguage);
         persistRanks(selectedRun, excerptIds);
         persistNli(selectedRun, excerptIds, selectedCandidates, excerptVectors, selectedLanguage);
+        persistSpoilerComponents(selectedRun, excerptIds);
         return null;
       });
       jdbc.update(
@@ -452,22 +514,11 @@ UPDATE analytics.analysis_job_item i
   }
 
   private void persistRanks(UUID run, List<UUID> excerptIds) {
-    var weights =
-        Map.of(
-            "question_ratio",
-            .20d,
-            "dialogue_ratio",
-            .20d,
-            "punctuation_density",
-            .10d,
-            "short_sentence_ratio",
-            .15d,
-            "sentence_length_cv",
-            .15d,
-            "lex.ttr",
-            .20d);
-    String weightJson =
-        "{\"question_ratio\":0.2,\"dialogue_ratio\":0.2,\"punctuation_density\":0.1,\"short_sentence_ratio\":0.15,\"sentence_length_cv\":0.15,\"lex.ttr\":0.2}";
+    var weights = heuristicRankerConfig.weights();
+    String weightJson = weights.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .map(entry -> "\"" + entry.getKey() + "\":" + entry.getValue())
+        .collect(java.util.stream.Collectors.joining(",", "{", "}"));
     for (UUID excerptId : excerptIds) {
       var values =
           jdbc.query(
@@ -490,11 +541,14 @@ UPDATE analytics.analysis_job_item i
       var ranked =
           com.bookrush.analytics.excerpts.ExcerptRanker.rank(
               values.features(),
-              new com.bookrush.analytics.excerpts.ExcerptRanker.Weights(
-                  "EXCERPT_HEURISTIC_RANKER_V1", weights));
-      var dimensions =
-          com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.from(
-              values.features(), values.statuses());
+              heuristicRankerConfig.asWeights());
+      var supervised = supervisedScorer == null ? null : supervisedScorer.score(values.features());
+      var dimensions = supervised == null
+          ? com.bookrush.analytics.excerpts.CandidateDimensionSnapshot.from(values.features(), values.statuses())
+          : supervised.dimensions();
+      String rankerCode = supervised == null ? heuristicRankerConfig.code() : supervised.code();
+      String rankerVersion = supervised == null ? ranked.version() : supervised.version();
+      double finalScore = supervised == null ? ranked.score() : supervised.score();
       String components =
           "{"
               + ranked.contributions().entrySet().stream()
@@ -502,6 +556,7 @@ UPDATE analytics.analysis_job_item i
                   .collect(java.util.stream.Collectors.joining(","))
               + ",\"dimensions\":"
               + dimensionsJson(dimensions)
+              + (supervised == null ? "" : ",\"artifact_sha256\":\"" + supervised.artifactSha256() + "\"")
               + "}";
       jdbc.update(
           """
@@ -510,12 +565,12 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
 """,
           UUID.randomUUID(),
           excerptId,
-          "EXCERPT_HEURISTIC_RANKER",
-          ranked.version(),
-          sha256(weightJson),
+          rankerCode,
+          rankerVersion,
+          supervised == null ? sha256(weightJson) : supervised.artifactSha256(),
           components,
           weightJson,
-          ranked.score());
+          finalScore);
     }
   }
 
@@ -558,38 +613,23 @@ VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?) ON CONFLICT DO NOTHING
         TopNliCandidateSelector.select(candidates, excerptIds, embeddings, limit).stream()
             .map(TopNliCandidateSelector.Selection::excerptId)
             .toList();
-    var hypotheses = nliHypotheses(language);
+    var inputs = new java.util.ArrayList<NliInferenceAdapter.Input>();
     for (UUID excerptId : selected) {
-      String text =
-          jdbc.query(
-              "SELECT text FROM analytics.excerpt WHERE id=?",
-              rs -> rs.next() ? rs.getString(1) : null,
-              excerptId);
-      if (text == null) continue;
-      for (var entry : hypotheses.entrySet()) {
-        var result = linguisticRuntime.nli(text, entry.getValue());
-        if (!"VALID".equals(result.status())) continue;
-        var score = result.score();
-        persistNliValue(
-            run, excerptId, "narrative." + entry.getKey(), "entailment", score.entailment());
-        persistNliValue(run, excerptId, "narrative." + entry.getKey(), "neutral", score.neutral());
-        persistNliValue(
-            run, excerptId, "narrative." + entry.getKey(), "contradiction", score.contradiction());
-        persistNliValue(run, excerptId, "narrative." + entry.getKey(), "support", score.support());
-        persistNliValue(
-            run, excerptId, "narrative." + entry.getKey(), "confidence", score.confidence());
-      }
-      for (var entry : emotionHypotheses(language).entrySet()) {
-        var result = linguisticRuntime.nli(text, entry.getValue());
-        if (!"VALID".equals(result.status())) continue;
-        var score = result.score();
-        String prefix = "emotion." + entry.getKey();
-        persistNliValue(run, excerptId, prefix, "entailment", score.entailment());
-        persistNliValue(run, excerptId, prefix, "neutral", score.neutral());
-        persistNliValue(run, excerptId, prefix, "contradiction", score.contradiction());
-        persistNliValue(run, excerptId, prefix, "support", score.support());
-        persistNliValue(run, excerptId, prefix, "confidence", score.confidence());
-      }
+      String text = jdbc.query("SELECT text FROM analytics.excerpt WHERE id=?",
+          rs -> rs.next() ? rs.getString(1) : null, excerptId);
+      if (text != null) inputs.add(new NliInferenceAdapter.Input(excerptId.toString(), text, language));
+    }
+    int batchSize = Math.max(1, Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_NLI_BATCH_SIZE", "8")));
+    for (var result : nliInference.inferBatch(inputs, batchSize)) {
+      var observation = result.observation();
+      if (!"VALID".equals(observation.status())) continue;
+      UUID excerptId = UUID.fromString(result.id());
+      String prefix = observation.kind() + "." + observation.key();
+      persistNliValue(run, excerptId, prefix, "entailment", observation.entailment());
+      persistNliValue(run, excerptId, prefix, "neutral", observation.neutral());
+      persistNliValue(run, excerptId, prefix, "contradiction", observation.contradiction());
+      persistNliValue(run, excerptId, prefix, "support", observation.support());
+      persistNliValue(run, excerptId, prefix, "confidence", observation.confidence());
     }
   }
 
@@ -605,6 +645,99 @@ SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition 
         excerptId,
         value,
         prefix + "." + metric);
+  }
+
+  private void persistSpoilerComponents(UUID run, List<UUID> excerptIds) {
+    if (excerptIds.isEmpty()) return;
+    String placeholders = String.join(",", java.util.Collections.nCopies(excerptIds.size(), "?"));
+    var rows = jdbc.query(
+        "SELECT ef.excerpt_id,fd.code,ef.numeric_value FROM analytics.excerpt_feature ef "
+            + "JOIN analytics.feature_definition fd ON fd.id=ef.feature_definition_id "
+            + "WHERE ef.analysis_run_id=? AND ef.excerpt_id IN (" + placeholders + ") "
+            + "AND fd.code IN ('book_relative_position','narrative.resolution.support',"
+            + "'narrative.revelation.support') AND ef.value_status='VALID'",
+        (rs, ignored) -> new Object[] {
+          rs.getObject("excerpt_id", UUID.class), rs.getString("code"), rs.getObject("numeric_value", Double.class)
+        },
+        concat(run, excerptIds));
+    var values = new java.util.HashMap<UUID, java.util.Map<String, Double>>();
+    for (var row : rows) {
+      values.computeIfAbsent((UUID) row[0], ignored -> new java.util.HashMap<>())
+          .put((String) row[1], (Double) row[2]);
+    }
+    for (var entry : values.entrySet()) {
+      if (!entry.getValue().keySet().containsAll(java.util.Set.of(
+          "book_relative_position", "narrative.resolution.support", "narrative.revelation.support"))) {
+        continue;
+      }
+      var components = com.bookrush.analytics.features.SpoilerHeuristic.components(
+          entry.getValue().get("book_relative_position"),
+          entry.getValue().get("narrative.resolution.support"),
+          entry.getValue().get("narrative.revelation.support"));
+      for (var component : components.entrySet()) {
+        jdbc.update(
+            "INSERT INTO analytics.excerpt_feature(analysis_run_id,feature_definition_id,excerpt_id,numeric_value,value_status,computed_at) "
+                + "SELECT ?,fd.id,?,?, 'VALID',clock_timestamp() FROM analytics.feature_definition fd "
+                + "WHERE fd.code=? ON CONFLICT DO NOTHING",
+            run, entry.getKey(), component.getValue(), "spoiler." + component.getKey());
+      }
+    }
+  }
+
+  private static Object[] concat(UUID run, List<UUID> excerptIds) {
+    var values = new Object[excerptIds.size() + 1];
+    values[0] = run;
+    for (int i = 0; i < excerptIds.size(); i++) values[i + 1] = excerptIds.get(i);
+    return values;
+  }
+
+  private void persistLanguageValidation(
+      UUID run,
+      UUID inputVersion,
+      LanguageEvidence evidence) {
+    String status = evidence.status();
+    jdbc.update(
+        """
+INSERT INTO analytics.document_feature
+  (analysis_run_id,feature_definition_id,input_asset_version_id,text_value,value_status,confidence,sample_size,warning,computed_at)
+SELECT ?,fd.id,?,?,?, ?,NULL,?,clock_timestamp()
+FROM analytics.feature_definition fd WHERE fd.code='language.detected'
+ON CONFLICT (analysis_run_id,feature_definition_id)
+DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
+  text_value=EXCLUDED.text_value,value_status=EXCLUDED.value_status,
+  confidence=EXCLUDED.confidence,sample_size=EXCLUDED.sample_size,
+  warning=EXCLUDED.warning,computed_at=EXCLUDED.computed_at
+""",
+        run, inputVersion, evidence.detectedLanguage(), status,
+        "VALID".equals(status) ? evidence.confidence() : null, evidence.warning());
+    jdbc.update(
+        """
+INSERT INTO analytics.document_feature
+  (analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,confidence,sample_size,warning,computed_at)
+SELECT ?,fd.id,?,?,?, ?,NULL,?,clock_timestamp()
+FROM analytics.feature_definition fd WHERE fd.code='language.confidence'
+ON CONFLICT (analysis_run_id,feature_definition_id)
+DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
+  numeric_value=EXCLUDED.numeric_value,value_status=EXCLUDED.value_status,
+  confidence=EXCLUDED.confidence,sample_size=EXCLUDED.sample_size,
+  warning=EXCLUDED.warning,computed_at=EXCLUDED.computed_at
+""",
+        run, inputVersion, evidence.confidence(), status,
+        "VALID".equals(status) ? evidence.confidence() : null, evidence.warning());
+    if (evidence.agreement() != null) {
+      jdbc.update(
+          """
+INSERT INTO analytics.document_feature
+  (analysis_run_id,feature_definition_id,input_asset_version_id,numeric_value,value_status,confidence,computed_at)
+SELECT ?,fd.id,?,?, 'VALID',1,clock_timestamp()
+FROM analytics.feature_definition fd WHERE fd.code='language.agreement'
+ON CONFLICT (analysis_run_id,feature_definition_id)
+DO UPDATE SET input_asset_version_id=EXCLUDED.input_asset_version_id,
+  numeric_value=EXCLUDED.numeric_value,value_status=EXCLUDED.value_status,
+  confidence=EXCLUDED.confidence,computed_at=EXCLUDED.computed_at
+""",
+          run, inputVersion, evidence.agreement());
+    }
   }
 
   private static Map<String, String> nliHypotheses(String language) {
@@ -825,16 +958,32 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
     // per-excerpt idempotency through the input hash/object key.
     // CPU-only BGE inference is deliberately kept small; larger batches can
     // exceed the runtime read timeout even though the request is valid.
-    final int batchSize = 4;
+    final int batchSize = Math.max(1, Math.min(32,
+        Integer.parseInt(System.getenv().getOrDefault("ANALYTICS_EMBEDDINGS_BATCH_SIZE", "4"))));
     String bucket = System.getenv().getOrDefault("STORAGE_BUCKET_ML", "books-ml");
     int total = candidates.size();
+    var hashes = candidates.stream()
+        .map(candidate -> sha256(candidate.text()))
+        .toList();
+    var persisted = loadPersistedEmbeddings(excerptIds, hashes);
+    vectorsByExcerpt.putAll(persisted);
+    if (!persisted.isEmpty()) {
+      updateProgress(item, "EMBEDDINGS", persisted.size(), total,
+          "Retomando " + persisted.size() + " embeddings já persistidos");
+    }
     for (int offset = 0; offset < candidates.size(); offset += batchSize) {
       int end = Math.min(offset + batchSize, candidates.size());
-      var texts =
-          candidates.subList(offset, end).stream()
-              .map(ExcerptCandidateGenerator.V2Candidate::text)
-              .toList();
-      updateProgress(item, "EMBEDDINGS", offset, total,
+      var pendingIndexes = new java.util.ArrayList<Integer>();
+      var texts = new java.util.ArrayList<String>();
+      for (var index : EmbeddingResumePlanner.pendingIndexes(
+          excerptIds.subList(offset, end), vectorsByExcerpt)) {
+        int candidateIndex = offset + index;
+        pendingIndexes.add(candidateIndex);
+        texts.add(candidates.get(candidateIndex).text());
+      }
+      if (texts.isEmpty()) continue;
+      int completedBefore = vectorsByExcerpt.size();
+      updateProgress(item, "EMBEDDINGS", completedBefore, total,
           "Solicitando lote " + (offset + 1) + "-" + end + " de " + total);
       long startedNanos = System.nanoTime();
       var result = linguisticRuntime.embeddings(texts, 8192);
@@ -846,7 +995,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
           || result.inputHashes().size() != texts.size()) {
         updateProgress(item, "EMBEDDINGS", offset, total,
             "Runtime não retornou um lote válido: " + result.status());
-        continue;
+        throw new IllegalStateException("embedding batch invalid: " + result.status());
       }
       var modelId =
           jdbc.query(
@@ -856,6 +1005,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
       if (modelId == null) continue;
       for (int i = 0; i < texts.size(); i++) {
         var hash = result.inputHashes().get(i);
+        int candidateIndex = pendingIndexes.get(i);
         String key = "analytics/embeddings/" + version + "/" + hash + ".json";
         String payload =
             "{\"model\":\""
@@ -879,19 +1029,53 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
                 + " analytics.excerpt_embedding(id,excerpt_id,embedding_model_id,input_sha256,dimension,storage_provider,bucket,object_key)"
                 + " VALUES (?,?,?,?,?,'S3',?,?) ON CONFLICT DO NOTHING",
             UUID.randomUUID(),
-            excerptIds.get(offset + i),
+            excerptIds.get(candidateIndex),
             modelId,
             hash,
             result.dimension(),
             bucket,
             key);
-        vectorsByExcerpt.put(excerptIds.get(offset + i), result.vectors().get(i));
+        vectorsByExcerpt.put(excerptIds.get(candidateIndex), result.vectors().get(i));
       }
-      updateProgress(item, "EMBEDDINGS", end, total,
+      updateProgress(item, "EMBEDDINGS", vectorsByExcerpt.size(), total,
           "Lote persistido " + end + "/" + total + " (" + durationMs + " ms)");
     }
     return vectorsByExcerpt;
   }
+
+  private Map<UUID, List<Double>> loadPersistedEmbeddings(
+      List<UUID> excerptIds, List<String> hashes) {
+    if (excerptIds.isEmpty()) return Map.of();
+    String placeholders = String.join(",", java.util.Collections.nCopies(excerptIds.size(), "?"));
+    var rows = jdbc.query(
+        "SELECT excerpt_id,input_sha256,bucket,object_key FROM analytics.excerpt_embedding"
+            + " WHERE excerpt_id IN (" + placeholders + ")",
+        (rs, rowNum) -> new PersistedEmbedding(
+            rs.getObject("excerpt_id", UUID.class),
+            rs.getString("input_sha256"),
+            rs.getString("bucket"),
+            rs.getString("object_key")),
+        excerptIds.toArray());
+    var expected = new java.util.HashMap<UUID, String>();
+    for (int i = 0; i < excerptIds.size(); i++) expected.put(excerptIds.get(i), hashes.get(i));
+    var result = new java.util.LinkedHashMap<UUID, List<Double>>();
+    for (var row : rows) {
+      if (!java.util.Objects.equals(expected.get(row.excerptId()), row.inputSha256())) continue;
+      try {
+        var node = objectMapper.readTree(s3.getObjectAsBytes(GetObjectRequest.builder()
+            .bucket(row.bucket()).key(row.objectKey()).build()).asByteArray());
+        var vector = new java.util.ArrayList<Double>();
+        node.path("vector").forEach(value -> vector.add(value.asDouble()));
+        if (!vector.isEmpty()) result.put(row.excerptId(), List.copyOf(vector));
+      } catch (Exception exception) {
+        log.warn("analytics persisted embedding unavailable excerptId={} key={}",
+            row.excerptId(), row.objectKey());
+      }
+    }
+    return result;
+  }
+
+  private record PersistedEmbedding(UUID excerptId, String inputSha256, String bucket, String objectKey) {}
 
   private void updateProgress(Item item, String stage, int completed, int total, String message) {
     jdbc.update(
@@ -1246,7 +1430,8 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         || code.contains("ResourceAccess");
   }
 
-  private static String configurationJson(ExcerptCandidateGenerator.V2Config config) {
+  private static String configurationJson(
+      ExcerptCandidateGenerator.V2Config config, NliInferenceAdapter nliInference) {
     String profiles =
         config.windowProfiles().stream()
             .map(profile -> "[" + profile.targetWords() + "," + profile.sentenceStride() + "]")
@@ -1261,7 +1446,11 @@ UPDATE analytics.analysis_job j SET processed_items=(SELECT count(*) FROM analyt
         + config.maxWords()
         + ",\"crossChapter\":"
         + config.crossChapter()
-        + "}";
+        + ",\"nliHypothesisSet\":{\"code\":\""
+        + nliInference.hypothesisSetCode()
+        + "\",\"version\":\""
+        + nliInference.hypothesisSetVersion()
+        + "\"}}";
   }
 
   private static String sha256(String value) {

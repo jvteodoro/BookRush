@@ -1,0 +1,16 @@
+{
+  "version": "book-subjects-v1",
+  "description": "Canonical, metadata-derived topic labels for the experimental document classifier.",
+  "labels": [
+    {"code": "fiction", "name": "Fiction", "source": "gutenberg.subject", "minimum_support": 5},
+    {"code": "poetry", "name": "Poetry", "source": "gutenberg.subject", "minimum_support": 5},
+    {"code": "drama", "name": "Drama", "source": "gutenberg.subject", "minimum_support": 5},
+    {"code": "history", "name": "History", "source": "gutenberg.subject", "minimum_support": 5},
+    {"code": "science", "name": "Science", "source": "gutenberg.subject", "minimum_support": 5},
+    {"code": "philosophy", "name": "Philosophy", "source": "gutenberg.subject", "minimum_support": 5},
+    {"code": "religion", "name": "Religion", "source": "gutenberg.subject", "minimum_support": 5}
+  ],
+  "label_policy": "multi_label_metadata_only",
+  "split_policy": "group_by_work_id",
+  "promotion_policy": "human_review_required"
+}

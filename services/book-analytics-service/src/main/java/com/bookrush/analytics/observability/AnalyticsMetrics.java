@@ -15,6 +15,7 @@ public final class AnalyticsMetrics {
   private final Counter excerptsListed;
   private final Counter analysisFailures;
   private final Counter generatedExcerpts;
+  private final Counter bookScoresBatches;
   private final Timer analyzerDuration;
   private final MeterRegistry registry;
 
@@ -26,6 +27,7 @@ public final class AnalyticsMetrics {
     excerptsListed = registry.counter("bookrush.analytics.excerpts", "operation", "listed");
     analysisFailures = registry.counter("bookrush.analytics.failures", "stage", "analysis");
     generatedExcerpts = registry.counter("bookrush.analytics.excerpts", "operation", "generated");
+    bookScoresBatches = registry.counter("bookrush.analytics.book_scores", "operation", "batch");
     analyzerDuration = registry.timer("bookrush.analytics.analyzer.duration");
   }
 
@@ -51,6 +53,10 @@ public final class AnalyticsMetrics {
 
   public void excerptsGenerated(int count) {
     generatedExcerpts.increment(Math.max(0, count));
+  }
+
+  public void bookScoresBatch() {
+    bookScoresBatches.increment();
   }
 
   public void jobItemFailed(String code) {

@@ -20,6 +20,11 @@ A [implementação e operação V2](analytics-v2-implementation.md) documenta o
 runtime Python local, preparação explícita de modelos, gates, scorer experimental
 e os limites para iniciar um piloto de corpus.
 
+Os contratos de [validação linguística V1](linguistic-validation-v1.md) e de
+[seleção de candidates V2](analytics-v2-selection.md) documentam os estados
+explícitos, a ordem fail-closed, a proveniência do ranker e os critérios de
+aceitação em lotes pequenos.
+
 O [relatório de estado de 2026-10-01](analytics-status-2026-10-01.md) consolida
 as evidências reais, comandos de reprodução e pendências que ainda exigem dados
 rotulados ou aprovação antes do processamento em massa.

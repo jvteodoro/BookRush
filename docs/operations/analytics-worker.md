@@ -39,3 +39,24 @@ Não interrompa um worker ativo apenas por uma duração alta: verifique se
 `progress_updated_at` e os logs de lote continuam avançando. Se não houver
 avanço além do lease, a recuperação assíncrona evita que esse item bloqueie os
 demais.
+
+## Validação em lotes pequenos
+
+Para desenvolvimento, use `scripts/run-analytics-pilot.py --allow-small-batch`
+com 8–32 livros. O resultado `GO_SMALL_BATCH_RUNTIME` confirma apenas o
+contrato dos adaptadores e a integridade do lote; não substitui o gate de
+capacidade de 500 livros. O modo padrão continua exigindo pelo menos 500
+livros, evitando que um smoke test seja confundido com evidência operacional.
+
+O scorer supervisionado é opt-in e permanece desativado por padrão. Quando
+ativado, o worker valida versão, estado e SHA-256 do artefato antes de gravar
+dimensões H/C/A/I/Q e sua proveniência em `analytics.excerpt_rank`.
+
+O ranker heurístico também usa configuração versionada no classpath; a
+variável `ANALYTICS_RANKER_CONFIG` só deve apontar para artefatos com estado
+`UNVALIDATED` até existir um processo formal de promoção.
+
+A validação fastText é normalizada em `LanguageEvidence` antes da persistência:
+predição, confiança, idioma declarado, concordância e warning permanecem
+separados. `MODEL_UNAVAILABLE` e outros estados não são convertidos em valores
+válidos ou em concordância artificial.

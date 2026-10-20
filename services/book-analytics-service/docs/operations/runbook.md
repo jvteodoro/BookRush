@@ -153,6 +153,28 @@ Cada observação grava entailment, neutral,
 contradiction, support e confidence como scores de modelo; nenhum deles é uma
 probabilidade comportamental. A migration V11 cria as definições tipadas.
 
+O worker também possui um adapter offline para o artefato
+`EXCERPT_SUPERVISED_SCORER_V1`. Ele valida checksum, versão e estado do JSON
+antes de calcular H/C/A/I/Q e registrar a proveniência no `excerpt_rank`. A
+execução é opt-in e permanece desativada por padrão:
+
+```dotenv
+ANALYTICS_SUPERVISED_SCORER_ENABLED=true
+ANALYTICS_SUPERVISED_SCORER_ARTIFACT=/var/lib/bookrush/models/candidate-scorer.json
+ANALYTICS_SUPERVISED_SCORER_ALLOW_EXPERIMENTAL=false
+```
+
+Artefatos experimentais só podem ser usados em testes locais controlados com
+`ALLOW_EXPERIMENTAL=true`. A ativação em produção exige artefato `VALIDATED`,
+checksum verificado e um lote pequeno de aceitação; não depende do piloto de
+500 livros.
+
+O ranker heurístico bootstrap é carregado do artefato versionado
+`analytics-ranker-v1.json`, com estado explícito `UNVALIDATED`. A variável
+`ANALYTICS_RANKER_CONFIG` permite apontar para outro artefato compatível, mas o
+worker rejeita estados diferentes de `UNVALIDATED` para impedir promoção
+silenciosa da configuração experimental.
+
 O runtime também expõe `/v1/language`, usando o artefato fastText `lid.176.bin`
 somente do cache local. O worker aceita o idioma detectado apenas para `en` ou
 `pt` com confiança mínima de 0,60; caso contrário mantém o idioma canônico ou
@@ -208,6 +230,20 @@ de idioma, spaCy e NLI. O container monta o cache em somente leitura e o
 relatório declara explicitamente `writes_to_production=false` e
 `quality_gate=NOT_ASSESSED`.
 
+Para regressões rápidas durante o desenvolvimento, o harness também aceita um
+lote explicitamente pequeno sem alterar o gate padrão:
+
+```bash
+python3 scripts/run-analytics-pilot.py --books 8 --allow-small-batch \
+  --base-url http://127.0.0.1:18093 \
+  --output /tmp/analytics-small-batch.json
+```
+
+Esse modo retorna `GO_SMALL_BATCH_RUNTIME` e identifica o relatório como
+`SMALL_BATCH_SMOKE`; não deve ser usado como evidência de capacidade para
+500–1000 livros. Sem `--allow-small-batch`, lotes menores que 500 continuam
+falhando cedo para evitar confundir um smoke test com o gate de prontidão.
+
 Execução de 2026-10-17: `GO_RUNTIME_CAPACITY`, 500/500 embeddings válidos,
 40/40 amostras válidas em fastText, spaCy e NLI, 6.000 candidatos estruturais,
 334,358 s e 1,495 livros/s. Esse resultado prova capacidade e integridade dos
@@ -242,3 +278,10 @@ O gateway público estava em HTTP 502 e o SeaweedFS local parado, portanto a
 fonte textual foi Gutenberg público a partir da proveniência do snapshot; o
 resultado não é um gate de produção nem cobre qualidade humana, PT ou escrita
 de analytics.
+
+O NLI usa o artefato versionado `ANALYTICS_NLI_HYPOTHESES` (por padrão,
+`classpath:nli-hypotheses-v1.json`). O `NliInferenceAdapter` envia cada
+hipótese no idioma detectado ao runtime local e só persiste observações com
+status `VALID`; falhas do runtime não são convertidas em zero. Para trocar o
+conjunto, publique um novo artefato e altere a variável no ambiente do serviço,
+sem editar o arquivo histórico nem misturar hipóteses de idiomas.

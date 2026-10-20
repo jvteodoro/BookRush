@@ -60,6 +60,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:18093")
     parser.add_argument("--books", type=int, default=500)
+    parser.add_argument("--allow-small-batch", action="store_true",
+                        help="run a bounded runtime smoke batch; this is not the 500-book readiness gate")
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--input-jsonl", type=Path,
                         help="sanitized records {book_id, language, text}; bypasses synthetic minimum")
@@ -67,8 +69,10 @@ def main() -> None:
     parser.add_argument("--embedding-batch-size", type=int, default=32)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if not args.input_jsonl and args.books < 500:
-        raise SystemExit("the V1 pilot requires at least 500 books")
+    if not args.input_jsonl and args.books < 500 and not args.allow_small_batch:
+        raise SystemExit("the V1 readiness pilot requires at least 500 books; use --allow-small-batch for a bounded smoke batch")
+    if args.books < 1:
+        raise SystemExit("books must be positive")
 
     started = time.perf_counter()
     if args.input_jsonl:
@@ -121,7 +125,14 @@ def main() -> None:
     duration = time.perf_counter() - started
     result = {
         "pilot": "analytics-v1-runtime",
-        "status": "GO_RUNTIME_CAPACITY" if embedding_valid == len(books) and language_valid == len(sample) and linguistic_valid == len(sample) and nli_valid == len(sample) else "NO_GO",
+        "status": (
+            "GO_SMALL_BATCH_RUNTIME" if args.allow_small_batch and embedding_valid == len(books)
+            and language_valid == len(sample) and linguistic_valid == len(sample) and nli_valid == len(sample)
+            else "GO_RUNTIME_CAPACITY" if embedding_valid == len(books)
+            and language_valid == len(sample) and linguistic_valid == len(sample) and nli_valid == len(sample)
+            else "NO_GO"
+        ),
+        "gate": "SMALL_BATCH_SMOKE" if args.allow_small_batch else "V1_RUNTIME_CAPACITY",
         "quality_gate": "NOT_ASSESSED",
         "seed": args.seed,
         "source": args.source,
@@ -146,7 +157,7 @@ def main() -> None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
-    if result["status"] != "GO_RUNTIME_CAPACITY":
+    if result["status"] not in {"GO_RUNTIME_CAPACITY", "GO_SMALL_BATCH_RUNTIME"}:
         raise SystemExit(1)
 
 

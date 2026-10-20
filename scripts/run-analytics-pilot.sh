@@ -17,4 +17,6 @@ for _ in $(seq 1 120); do
   if curl -fsS "http://127.0.0.1:${port}/health" >/dev/null; then break; fi
   sleep 1
 done
-python3 "$root_dir/scripts/run-analytics-pilot.py" --base-url "http://127.0.0.1:${port}" --output "$output"
+# Extra arguments are intentionally forwarded so local development can use the
+# explicit --allow-small-batch mode without changing the 500-book default gate.
+python3 "$root_dir/scripts/run-analytics-pilot.py" --base-url "http://127.0.0.1:${port}" --output "$output" "$@"

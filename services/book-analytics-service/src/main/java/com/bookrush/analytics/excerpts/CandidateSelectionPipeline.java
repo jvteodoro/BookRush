@@ -19,6 +19,7 @@ public final class CandidateSelectionPipeline {
       throw new IllegalArgumentException("registered embedding model is required");
     var eligible = new ArrayList<MMRDiversitySelector.Candidate>();
     var rejected = new ArrayList<Rejected>();
+    Integer expectedEmbeddingDimension = null;
     for (var input : inputs) {
       var gate = EligibilityGate.evaluate(input.features(), input.statuses(), bounds);
       if (!gate.eligible()) {
@@ -31,6 +32,16 @@ public final class CandidateSelectionPipeline {
       }
       if (input.embedding() == null) {
         rejected.add(new Rejected(input.id(), "EMBEDDING_UNAVAILABLE"));
+        continue;
+      }
+      int dimension = input.embedding().length;
+      if (dimension == 0) {
+        rejected.add(new Rejected(input.id(), "EMBEDDING_EMPTY"));
+        continue;
+      }
+      if (expectedEmbeddingDimension == null) expectedEmbeddingDimension = dimension;
+      else if (dimension != expectedEmbeddingDimension) {
+        rejected.add(new Rejected(input.id(), "EMBEDDING_DIMENSION_MISMATCH"));
         continue;
       }
       eligible.add(new MMRDiversitySelector.Candidate(input.id(), input.relevance(), input.embedding()));

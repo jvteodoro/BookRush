@@ -87,13 +87,6 @@ Esse gate exige documentação ou contrato para mudanças de código, infraestru
 e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
 executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
 
-No job principal, `scripts/test-portal.sh --validation-only` executa contratos,
-TechDocs, TypeScript, lint e testes sem exportar ou desempacotar uma imagem
-Backstage que não será implantada por esse job. A imagem runtime fica a cargo
-da pipeline dedicada do Backstage. Nela, o runtime mantém dependências como
-somente leitura e concede escrita apenas a `/app/techdocs`, evitando um
-`chown -R` demorado sobre toda a árvore de dependências.
-
 O gate roda em um container Python efêmero. Como o agente Jenkins usa o socket
 Docker e o workspace está no volume nomeado `jenkins_home`, a etapa usa
 `--volumes-from "$HOSTNAME"` para compartilhar o workspace com o container do
@@ -133,6 +126,22 @@ validação; com `PUBLISH=true` publicam as imagens e com `DEPLOY=true` fazem
 deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
+
+Para a pipeline completa de analytics no host com NVIDIA, o deploy deve usar o
+override `infrastructure/compose.analytics-gpu.yaml` e manter
+`ANALYTICS_NLI_ENABLED=true`, `ANALYTICS_NLI_BATCH_SIZE=8` e
+`ANALYTICS_EMBEDDINGS_BATCH_SIZE=4`. A pipeline deve validar a imagem do
+`book-analytics-runtime` com CUDA e o serviço Java com as migrations antes de
+reativar um lote. O modelo de tópicos permanece experimental e não deve ser
+promovido automaticamente.
+
+O ranking analítico do feed é ativado explicitamente pela variável
+`FEED_ANALYTICS_RANKING_ENABLED=true` no `recommendation-service`. A pipeline
+vertical `bookrush-vertical-analytics` deve publicar/deployar
+`book-analytics-service` e `recommendation-service` juntos. A validação pós-
+deploy deve chamar o feed autenticado e confirmar `rankingVersion`/
+`modelVersion=analytics-aware-v1` quando houver scores elegíveis; em caso de
+indisponibilidade do analytics, o fallback esperado é `heuristic-v1`.
 
 ### Pipeline dedicada do SeaweedFS
 
@@ -195,9 +204,12 @@ ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
 deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
-frontend, perfis de leitores, social, `admin-service` e `admin-web`; isso garante
-que contratos usados pelas interfaces sejam implantados na mesma revisão.
-PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
+recommendation-service, reader-bff-service, frontend, perfis de leitores e
+social; isso garante que contratos usados pelo frontend sejam implantados na
+mesma revisão. Alterações no filtro/ranking do feed exigem as imagens de
+recommendation e BFF; deixar esses serviços fora do conjunto mantém um digest
+antigo e pode produzir 502 ou itens sem analytics. PostgreSQL, Redis, pgAdmin e
+Jenkins são preservados.
 
 Antes de aceitar a revisão, o deploy também obtém um token técnico do realm
 administrativo e consulta `/api/v1/admin/users` pelo `admin-service`. Esse smoke
@@ -222,7 +234,8 @@ Jenkinsfile novo estiver na `main`, as imagens são normalmente construídas e
 publicadas no estágio **Imagens**, e esse fallback não executa builds adicionais.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
-perfil e social para as imagens criadas pela construção atual.
+recommendation, BFF, perfil, social, `admin-service` e `admin-web` para as
+imagens criadas pela construção atual.
 Quando a thumbnail é protegida, a imagem do catálogo precisa ser atualizada
 junto com o frontend. O Compose configura `CATALOG_PRODUCT_OIDC_ISSUER`,
 `CATALOG_PRODUCT_OIDC_JWK_SET_URI` e `CATALOG_PRODUCT_OIDC_AUDIENCE` para que
@@ -249,8 +262,13 @@ Kubernetes exige registry e a credencial de kubeconfig descrita em
 
 `Jenkinsfile` é a fonte da pipeline. `bookrush.Jenkinsfile` é sua cópia de
 bootstrap na imagem e precisa permanecer idêntica. O script de inicialização
-não sobrescreve jobs existentes. Para alterar a pipeline de um job existente,
-cole o novo `Jenkinsfile` em **Configure → Pipeline script** (sandbox ativado).
+reconcilia a definição de parâmetros do job existente em cada inicialização do
+Jenkins. Isso evita que parâmetros novos, como `ANALYTICS_GPU`, sejam
+silenciosamente descartados por uma definição persistida antiga. Depois de
+publicar uma alteração desse tipo, reinicie somente o container Jenkins quando
+não houver builds em andamento e confirme na API/UI que o parâmetro aparece
+antes de disparar o deploy. Para alterar a pipeline de um job existente, cole
+o novo `Jenkinsfile` em **Configure → Pipeline script** (sandbox ativado).
 Alternativamente, depois de publicar o arquivo, configure **Pipeline script
 from SCM**, repositório `https://github.com/jvteodoro/BookRush.git`, branch
 `*/main`, Script Path `Jenkinsfile`. Essa branch fornece a definição da pipeline;
@@ -299,9 +317,7 @@ construir as imagens correspondentes depois de uma alteração. O admin-web usa
 `VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for
 ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
 quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
-cliente possui `query-users`/`view-users`/`manage-users` no `realm-management` do realm de
-produto `bookrush`. A autenticação humana do painel continua no realm separado
-`bookrush-platform`.
+cliente possui `query-users`/`manage-users` no realm-management.
 
 Na primeira ativação do `admin-service`, provisionar e validar o cliente sem
 exibir ou versionar o segredo:
@@ -313,41 +329,8 @@ bash scripts/test-keycloak-admin-service-client.sh .env
 ```
 
 O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
-e concede apenas `query-users`, `view-users` e `manage-users` à conta de serviço. O teste
+e concede apenas `query-users` e `manage-users` à conta de serviço. O teste
 valida token, roles e acesso à API de usuários sem imprimir credenciais.
-Quando uma instalação anterior ainda não possui
-`KEYCLOAK_ADMIN_CLIENT_SECRET` no arquivo protegido, a reconciliação cria o
-cliente e o deploy consulta seu segredo pela API administrativa do Keycloak.
-O valor é capturado com `xtrace` desativado, permanece apenas no processo de
-deploy e é injetado no container do `admin-service`; ele não é gravado no
-workspace nem exibido no log do Jenkins.
-
-Essa consulta também é feita quando já existe uma cópia do segredo no arquivo
-protegido. O valor vigente no Keycloak persistente tem precedência, evitando
-falhas após criação ou rotação da credencial; a cópia configurada permanece
-como fallback se a API administrativa não puder ser consultada.
-
-Como o `keycloak-config-cli` pode preservar mappings antigos de uma conta de
-serviço já existente, o deploy reaplica idempotentemente as roles mínimas
-`query-users`, `view-users` e `manage-users` antes de iniciar o `admin-service`.
-Essa etapa não rotaciona credenciais e não altera usuários ou sessões.
-As mesmas três roles são incluídas explicitamente nos scope mappings do cliente,
-portanto a integração também funciona quando `Full Scope Allowed` está
-desabilitado sem liberar todas as demais roles atribuídas à conta de serviço.
-O deploy fixa token URI, Admin API e client ID no realm de produto `bookrush`
-antes de renderizar o Compose. Valores antigos no arquivo protegido não podem,
-portanto, validar um realm no preflight e direcionar o serviço para outro.
-
-`ADMIN_WEB_ADMIN_USERNAME` identifica o usuário humano do realm
-`bookrush-platform` que deve administrar a aplicação. O reconcile o mantém no
-grupo `platform-admins`; após uma primeira concessão, o usuário deve sair e
-entrar novamente para receber a role no access token.
-O mesmo reconcile mantém no cliente `labsoft-admin-web` um mapper explícito de
-`sub`, usado pelo `admin-service` como identidade canônica de auditoria.
-
-O Nginx do `admin-web` resolve `admin-service` pelo DNS interno do Docker no
-momento de cada chamada. Assim, o painel pode iniciar enquanto o serviço está
-sendo recriado sem encerrar por uma corrida de DNS durante o deploy Compose.
 
 O usuário permanente `codex-jenkins-agent` também permanece nos grupos
 `operators` e `platform-operators`; a associação é reconciliada no realm e é

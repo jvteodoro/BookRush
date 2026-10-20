@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 CACHE=Path(os.getenv('ANALYTICS_MODEL_CACHE_DIR','/var/lib/bookrush/models'))
 MAX_CHARS=int(os.getenv('ANALYTICS_RUNTIME_MAX_CHARS','100000'))
+NLI_BATCH_MAX_ITEMS=int(os.getenv('ANALYTICS_NLI_BATCH_MAX_ITEMS','32'))
+RUNTIME_DEVICE=os.getenv('ANALYTICS_RUNTIME_DEVICE','auto').lower()
 app=FastAPI(title='BookRush Analytics Runtime', version='v2')
 _embedding_model = None
 _embedding_tokenizer = None
@@ -46,6 +48,17 @@ class NliResponse(BaseModel):
  contradiction: float = 0.0
  model: str = 'mdeberta-v3-mnli-xnli'
  warning: str|None = None
+class NliBatchItem(BaseModel):
+ id: str = Field(min_length=1, max_length=200)
+ text: str = Field(min_length=1)
+ hypothesis: str = Field(min_length=1)
+class NliBatchRequest(BaseModel):
+ items: list[NliBatchItem] = Field(min_length=1)
+ batch_size: int = Field(default=8, ge=1, le=32)
+class NliBatchResponse(BaseModel):
+ status: str
+ results: list[dict] = []
+ warning: str|None = None
 
 class LanguageRequest(BaseModel):
  text: str = Field(min_length=1)
@@ -59,7 +72,21 @@ class LanguageResponse(BaseModel):
 MODELS={'en':'spacy-en-core-web-sm-v1/en_core_web_sm-3.8.0-py3-none-any.whl','pt':'spacy-pt-core-news-sm-v1/pt_core_news_sm-3.8.0-py3-none-any.whl'}
 def unavailable(language, reason): return AnalyzeResponse(status='MODEL_UNAVAILABLE',language=language,warning=reason)
 @app.get('/health')
-def health(): return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true'}
+def health():
+ try:
+  import torch
+  cuda = bool(torch.cuda.is_available())
+  device = str(_torch_device(torch))
+  details = {'cuda': cuda, 'device': device}
+  if cuda:
+   details['device_name'] = torch.cuda.get_device_name(0)
+   details['memory_allocated_bytes'] = int(torch.cuda.memory_allocated(0))
+   details['memory_reserved_bytes'] = int(torch.cuda.memory_reserved(0))
+   details['memory_total_bytes'] = int(torch.cuda.get_device_properties(0).total_memory)
+  return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true', **details}
+ except Exception as exc:
+  return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true',
+          'cuda': False, 'device': 'cpu', 'warning': type(exc).__name__}
 
 def _load_embedding_model():
  global _embedding_model, _embedding_tokenizer
@@ -67,9 +94,10 @@ def _load_embedding_model():
  model_dir=CACHE/'bge-m3-dense-v1'
  if not model_dir.is_dir(): return None
  try:
+  import torch
   from transformers import AutoModel, AutoTokenizer
   _embedding_tokenizer=AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
-  _embedding_model=AutoModel.from_pretrained(model_dir, local_files_only=True)
+  _embedding_model=AutoModel.from_pretrained(model_dir, local_files_only=True).to(_torch_device(torch))
   _embedding_model.eval()
   return _embedding_tokenizer, _embedding_model
  except Exception: return None
@@ -82,6 +110,7 @@ def embeddings(request: EmbeddingRequest):
  try:
   import torch
   encoded=tokenizer(request.texts, padding=True, truncation=True, max_length=request.max_tokens, return_tensors='pt')
+  encoded={key: value.to(_torch_device(torch)) for key, value in encoded.items()}
   with torch.inference_mode(): output=model(**encoded).last_hidden_state
   mask=encoded['attention_mask'].unsqueeze(-1)
   pooled=(output*mask).sum(1)/mask.sum(1).clamp(min=1)
@@ -89,6 +118,10 @@ def embeddings(request: EmbeddingRequest):
   vectors=normalized.cpu().tolist()
   return EmbeddingResponse(status='VALID',model='bge-m3-dense-v1',dimension=len(vectors[0]),vectors=vectors,input_hashes=[hashlib.sha256(t.encode('utf-8')).hexdigest() for t in request.texts])
  except Exception as exc:
+  try:
+   import torch
+   if torch.cuda.is_available(): torch.cuda.empty_cache()
+  except Exception: pass
   return EmbeddingResponse(status='ERROR',model='bge-m3-dense-v1',warning=type(exc).__name__)
 
 def _load_nli():
@@ -97,10 +130,18 @@ def _load_nli():
  model_dir=CACHE/'mdeberta-nli-v1'
  if not model_dir.is_dir(): return None
  try:
+  import torch
   from transformers import pipeline
-  _nli_pipeline=pipeline('text-classification',model=str(model_dir),tokenizer=str(model_dir),top_k=None)
+  device=0 if _torch_device(torch).type == 'cuda' else -1
+  _nli_pipeline=pipeline('text-classification',model=str(model_dir),tokenizer=str(model_dir),top_k=None,device=device)
   return _nli_pipeline
  except Exception: return None
+
+def _torch_device(torch):
+ if RUNTIME_DEVICE == 'cpu': return torch.device('cpu')
+ if RUNTIME_DEVICE.startswith('cuda') and torch.cuda.is_available(): return torch.device(RUNTIME_DEVICE)
+ if RUNTIME_DEVICE == 'auto' and torch.cuda.is_available(): return torch.device('cuda')
+ return torch.device('cpu')
 
 def _load_language_model():
  global _language_model
@@ -127,18 +168,51 @@ def language(request: LanguageRequest):
  except Exception as exc:
   return LanguageResponse(status='ERROR',warning=type(exc).__name__)
 
+def _nli_scores(result):
+ items=result[0] if result and isinstance(result[0],list) else result
+ scores={str(item['label']).lower():float(item['score']) for item in items if isinstance(item,dict)}
+ def find(name): return next((v for k,v in scores.items() if name in k),0.0)
+ return find('entail'), find('neutral'), find('contrad')
+
+def _nli_error(status, warning):
+ return {'status': status, 'entailment': 0.0, 'neutral': 0.0, 'contradiction': 0.0, 'warning': warning}
+
 @app.post('/v1/nli', response_model=NliResponse)
 def nli(request: NliRequest):
- if len(request.text)>MAX_CHARS or len(request.hypothesis)>MAX_CHARS: raise HTTPException(413,'text exceeds configured runtime limit')
+ response=nli_batch(NliBatchRequest(items=[NliBatchItem(id='single', text=request.text, hypothesis=request.hypothesis)], batch_size=1))
+ result=response.results[0] if response.results else _nli_error(response.status, response.warning)
+ return NliResponse(status=result.get('status', response.status), entailment=result.get('entailment',0.0),
+                    neutral=result.get('neutral',0.0), contradiction=result.get('contradiction',0.0),
+                    warning=result.get('warning'))
+
+@app.post('/v1/nli/batch', response_model=NliBatchResponse)
+def nli_batch(request: NliBatchRequest):
+ if len(request.items)>NLI_BATCH_MAX_ITEMS:
+  raise HTTPException(413, f'batch exceeds configured limit of {NLI_BATCH_MAX_ITEMS}')
+ if any(len(item.text)>MAX_CHARS or len(item.hypothesis)>MAX_CHARS for item in request.items):
+  raise HTTPException(413,'text exceeds configured runtime limit')
  model=_load_nli()
- if model is None: return NliResponse(status='MODEL_UNAVAILABLE',warning='pinned NLI cache is not prepared')
+ if model is None:
+  return NliBatchResponse(status='MODEL_UNAVAILABLE', results=[
+   {'id': item.id, **_nli_error('MODEL_UNAVAILABLE','pinned NLI cache is not prepared')}
+   for item in request.items])
  try:
-  result=model({'text':request.text, 'text_pair':request.hypothesis})
-  items=result[0] if result and isinstance(result[0],list) else result
-  scores={str(item['label']).lower():float(item['score']) for item in items if isinstance(item,dict)}
-  def find(name): return next((v for k,v in scores.items() if name in k),0.0)
-  return NliResponse(status='VALID',entailment=find('entail'),neutral=find('neutral'),contradiction=find('contrad'))
- except Exception as exc: return NliResponse(status='ERROR',warning=f'{type(exc).__name__}: {str(exc)[:180]}')
+  raw=model([{'text': item.text, 'text_pair': item.hypothesis} for item in request.items],
+            batch_size=request.batch_size)
+  results=[]
+  for item, result in zip(request.items, raw):
+   entailment, neutral, contradiction=_nli_scores(result)
+   results.append({'id': item.id, 'status': 'VALID', 'entailment': entailment,
+                   'neutral': neutral, 'contradiction': contradiction})
+  return NliBatchResponse(status='VALID', results=results)
+ except Exception as exc:
+  try:
+   import torch
+   if torch.cuda.is_available(): torch.cuda.empty_cache()
+  except Exception: pass
+  warning=f'{type(exc).__name__}: {str(exc)[:180]}'
+  return NliBatchResponse(status='ERROR', results=[
+   {'id': item.id, **_nli_error('ERROR', warning)} for item in request.items], warning=warning)
 @app.post('/v1/linguistic', response_model=AnalyzeResponse)
 def linguistic(request: AnalyzeRequest):
  if request.language not in MODELS: return AnalyzeResponse(status='UNSUPPORTED',language=request.language,warning='spaCy V2 supports only en and pt')

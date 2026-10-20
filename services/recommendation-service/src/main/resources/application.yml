@@ -22,6 +22,19 @@ bookrush:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
 feed:
+  ranking:
+    enabled: ${FEED_ANALYTICS_RANKING_ENABLED:${FEED_EXCERPTS_ENABLED:false}}
+    model-version: ${FEED_ANALYTICS_RANKING_MODEL_VERSION:analytics-aware-v1}
+    analytics-url: ${FEED_ANALYTICS_RANKING_URL:http://book-analytics-service:8091}
+    token-uri: ${FEED_ANALYTICS_RANKING_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+    client-id: ${FEED_ANALYTICS_RANKING_CLIENT_ID:bookrush-recommendation-s2s}
+    client-secret: ${FEED_ANALYTICS_RANKING_CLIENT_SECRET:${FEED_EXCERPTS_CLIENT_SECRET:}}
+    audience: ${FEED_ANALYTICS_RANKING_AUDIENCE:bookrush-analytics}
+    scope: ${FEED_ANALYTICS_RANKING_SCOPE:bookrush.analytics}
+    cache-ttl: ${FEED_ANALYTICS_RANKING_CACHE_TTL:10m}
+    connect-timeout: ${FEED_ANALYTICS_RANKING_CONNECT_TIMEOUT:250ms}
+    read-timeout: ${FEED_ANALYTICS_RANKING_READ_TIMEOUT:2s}
+    max-candidates: ${FEED_ANALYTICS_RANKING_MAX_CANDIDATES:100}
   excerpts:
     enabled: ${FEED_EXCERPTS_ENABLED:false}
     percentage: ${FEED_EXCERPTS_PERCENTAGE:0}

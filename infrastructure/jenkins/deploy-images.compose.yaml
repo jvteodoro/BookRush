@@ -1,4 +1,8 @@
 services:
+  recommendation-service:
+    image: ${RECOMMENDATION_IMAGE:?Imagem recommendation ausente}
+  reader-bff-service:
+    image: ${READER_BFF_IMAGE:?Imagem reader-bff ausente}
   book-analytics-runtime:
     image: ${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}
   reader-profile-service:

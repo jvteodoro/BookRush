@@ -1,0 +1,42 @@
+{
+  "code": "BOOKRUSH_NLI_HYPOTHESES",
+  "version": "1.0.0",
+  "sets": {
+    "en": [
+      {"kind":"narrative","key":"conflict","text":"This passage depicts a conflict, opposition, or struggle between people, goals, or forces."},
+      {"kind":"narrative","key":"suspense","text":"This passage creates suspense by delaying important information or an outcome."},
+      {"kind":"narrative","key":"introspection","text":"This passage contains reflection on thoughts, feelings, motives, or inner experience."},
+      {"kind":"narrative","key":"self_containment","text":"This passage can be understood on its own without needing important information from the surrounding text."},
+      {"kind":"narrative","key":"curiosity_gap","text":"This passage leaves an important unresolved question or missing piece of information that encourages continued reading."},
+      {"kind":"narrative","key":"cliffhanger","text":"The ending of this passage deliberately leaves an event or outcome unresolved."},
+      {"kind":"narrative","key":"revelation","text":"This passage reveals important information that was previously hidden, unknown, or misunderstood."},
+      {"kind":"narrative","key":"resolution","text":"This passage resolves an important conflict, uncertainty, or narrative question."},
+      {"kind":"narrative","key":"quotability","text":"This passage contains a memorable statement that is meaningful and understandable when quoted on its own."},
+      {"kind":"emotion","key":"joy","text":"This passage expresses or depicts joy, happiness, delight, or celebration."},
+      {"kind":"emotion","key":"sadness","text":"This passage expresses or depicts sadness, sorrow, grief, or emotional loss."},
+      {"kind":"emotion","key":"fear","text":"This passage expresses or depicts fear, dread, anxiety, or threat."},
+      {"kind":"emotion","key":"anger","text":"This passage expresses or depicts anger, rage, resentment, or hostility."},
+      {"kind":"emotion","key":"surprise","text":"This passage expresses or depicts surprise, shock, or an unexpected development."},
+      {"kind":"emotion","key":"disgust","text":"This passage expresses or depicts disgust, revulsion, or strong aversion."},
+      {"kind":"emotion","key":"affection","text":"This passage expresses or depicts affection, tenderness, love, or emotional closeness."}
+    ],
+    "pt": [
+      {"kind":"narrative","key":"conflict","text":"Este trecho retrata um conflito, oposição ou disputa entre pessoas, objetivos ou forças."},
+      {"kind":"narrative","key":"suspense","text":"Este trecho cria suspense ao adiar uma informação importante ou um desfecho."},
+      {"kind":"narrative","key":"introspection","text":"Este trecho contém reflexão sobre pensamentos, sentimentos, motivos ou experiência interior."},
+      {"kind":"narrative","key":"self_containment","text":"Este trecho pode ser compreendido isoladamente sem informações importantes do contexto ao redor."},
+      {"kind":"narrative","key":"curiosity_gap","text":"Este trecho deixa uma pergunta importante ou informação ausente em aberto e incentiva a continuação da leitura."},
+      {"kind":"narrative","key":"cliffhanger","text":"O final deste trecho deixa deliberadamente um evento ou resultado sem resolução."},
+      {"kind":"narrative","key":"revelation","text":"Este trecho revela uma informação importante que estava oculta, desconhecida ou mal compreendida."},
+      {"kind":"narrative","key":"resolution","text":"Este trecho resolve um conflito, uma incerteza ou uma questão narrativa importante."},
+      {"kind":"narrative","key":"quotability","text":"Este trecho contém uma frase memorável, significativa e compreensível quando citada isoladamente."},
+      {"kind":"emotion","key":"joy","text":"Este trecho expressa ou retrata alegria, felicidade, prazer ou celebração."},
+      {"kind":"emotion","key":"sadness","text":"Este trecho expressa ou retrata tristeza, pesar, luto ou perda emocional."},
+      {"kind":"emotion","key":"fear","text":"Este trecho expressa ou retrata medo, pavor, ansiedade ou ameaça."},
+      {"kind":"emotion","key":"anger","text":"Este trecho expressa ou retrata raiva, fúria, ressentimento ou hostilidade."},
+      {"kind":"emotion","key":"surprise","text":"Este trecho expressa ou retrata surpresa, choque ou um acontecimento inesperado."},
+      {"kind":"emotion","key":"disgust","text":"Este trecho expressa ou retrata nojo, repulsa ou forte aversão."},
+      {"kind":"emotion","key":"affection","text":"Este trecho expressa ou retrata afeto, ternura, amor ou proximidade emocional."}
+    ]
+  }
+}

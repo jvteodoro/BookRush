@@ -5,13 +5,13 @@ info:
 paths:
   /api/v1/recommendations/feed:
     get:
-      summary: Generate an authenticated heuristic feed
+      summary: Generate an authenticated analytics-ready reader feed
       security: [{bearerAuth: []}]
       parameters:
         - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
       responses:
         '200':
-          description: Feed with request, impression, heuristic strategy and optional analytics excerpt lineage
+          description: Feed with request, impression, versioned ranking strategy and analytics-ready excerpt lineage. When analytics ranking is enabled, only books with an eligible score and persisted non-empty excerpt are returned.
           content:
             application/json:
               schema:
@@ -37,6 +37,7 @@ components:
       properties:
         requestId: {type: string, format: uuid}
         modelVersion: {type: string}
+        rankingVersion: {type: string}
         strategy:
           type: string
           enum: [COLD_START, DIVERSE, LUCKY]
@@ -53,7 +54,7 @@ components:
               rank: {type: integer}
               reason:
                 type: string
-                enum: [popular-cold-start, diversity-heuristic, lucky-exploration]
+                enum: [popular-cold-start, diversity-heuristic, lucky-exploration, analytics-score]
               excerpt:
                 $ref: '#/components/schemas/FeedExcerpt'
     FeedExcerpt:

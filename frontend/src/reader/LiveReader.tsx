@@ -10,6 +10,7 @@ import { SearchPage } from "./SearchPage";
 import { RecommendationsPage } from "./RecommendationsPage";
 import { CommentsDrawer } from "./CommentsDrawer";
 import { AccountPage } from "./AccountPages";
+import type { FeedExcerpt } from "../app/types";
 
 type SourceBook = {
   id: string;
@@ -21,7 +22,7 @@ type SourceBook = {
   likes?: number;
   comments?: number;
   thumbnailUrl?: string | null;
-  excerpt?: unknown;
+  excerpt?: FeedExcerpt | null;
   impressionId?: string;
 };
 type SocialCounts = { likes: number; comments: number; liked: boolean };
@@ -147,7 +148,8 @@ export function LiveReader({
         genre: book.genre,
         progress: book.progress,
         minutes: 0,
-        description: book.quote,
+        description: book.excerpt?.text ?? "",
+        excerpt: book.excerpt ?? null,
         coverUrl: book.thumbnailUrl ?? undefined,
       })),
     [],
