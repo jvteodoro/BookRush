@@ -44,3 +44,11 @@ lookup indexes are installed by `V5__fatigue_lookup_indexes.sql`.
 The effective score and the persisted `reason` include the fatigue component,
 so a ranking decision can be explained and replayed. Configuration is
 versioned through `FEED_FATIGUE_*` and the behavior is covered by unit tests.
+
+`PersonalizedRankerV1` is the next serving contract. It combines normalized
+affinity, quality, trend, exploration, and fatigue components and returns the
+full `Breakdown` alongside the score. Missing features use an explicit policy
+(`RENORMALIZE`, `ZERO`, or `EXCLUDE`), and tie-breaking is deterministic from a
+seed. Its weights are bootstrap/unvalidated and must not be interpreted as
+probabilities. The class is covered independently until the live profile and
+source providers are wired into the HTTP feed.
