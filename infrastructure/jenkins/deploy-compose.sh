@@ -108,6 +108,10 @@ configured_admin_client_secret="${KEYCLOAK_ADMIN_CLIENT_SECRET:-}"
 if [[ -z "$configured_admin_client_secret" ]]; then
   configured_admin_client_secret="$(awk -F= '$1 == "KEYCLOAK_ADMIN_CLIENT_SECRET" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 fi
+configured_behavior_s2s_client_secret="${BEHAVIOR_S2S_CLIENT_SECRET:-}"
+if [[ -z "$configured_behavior_s2s_client_secret" ]]; then
+  configured_behavior_s2s_client_secret="$(awk -F= '$1 == "BEHAVIOR_S2S_CLIENT_SECRET" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
+fi
 keycloak_admin_user="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_password="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_user="${keycloak_admin_user:-admin}"
@@ -122,6 +126,7 @@ KEYCLOAK_ADMIN_BASE=http://keycloak:8080/admin/realms/bookrush
 KEYCLOAK_ADMIN_CLIENT_ID=bookrush-admin-service
 export KEYCLOAK_ADMIN_TOKEN_URI KEYCLOAK_ADMIN_BASE KEYCLOAK_ADMIN_CLIENT_ID
 live_admin_client_secret=""
+live_behavior_s2s_client_secret=""
 if [[ -n "$keycloak_admin_password" ]]; then
   # config-cli can leave role mappings unchanged for an existing service
   # account. Reapply the minimum product-realm roles immediately before this
@@ -144,11 +149,24 @@ if [[ -n "$keycloak_admin_password" ]]; then
     -e KEYCLOAK_USER="$keycloak_admin_user" \
     -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
     python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py" 2>/dev/null || true)"
+  live_behavior_s2s_client_secret="$(docker run --rm -i --network bookrush_bookrush \
+    -e KEYCLOAK_URL=http://keycloak:8080 \
+    -e KEYCLOAK_REALM=bookrush-platform \
+    -e KEYCLOAK_CLIENT_ID=bookrush-recommendation-behavior-s2s \
+    -e KEYCLOAK_USER="$keycloak_admin_user" \
+    -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
+    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py" 2>/dev/null || true)"
 fi
 KEYCLOAK_ADMIN_CLIENT_SECRET="${live_admin_client_secret:-$configured_admin_client_secret}"
-unset keycloak_admin_password admin_web_admin_username live_admin_client_secret configured_admin_client_secret
+BEHAVIOR_S2S_CLIENT_SECRET="${live_behavior_s2s_client_secret:-$configured_behavior_s2s_client_secret}"
+if [[ "${FEED_PERSONALIZED_MODE:-OFF}" == ON && -z "$BEHAVIOR_S2S_CLIENT_SECRET" ]]; then
+  echo 'Não foi possível resolver o segredo vigente do cliente S2S do behavior-service.' >&2
+  exit 1
+fi
+unset keycloak_admin_password admin_web_admin_username live_admin_client_secret live_behavior_s2s_client_secret configured_admin_client_secret configured_behavior_s2s_client_secret
 [[ -n "$KEYCLOAK_ADMIN_CLIENT_SECRET" ]] || { echo 'Não foi possível resolver o segredo vigente do admin-service no Keycloak.' >&2; exit 1; }
 export KEYCLOAK_ADMIN_CLIENT_SECRET
+export BEHAVIOR_S2S_CLIENT_SECRET
 if $xtrace_was_enabled; then set -x; fi
 
 probe_user_management() {
