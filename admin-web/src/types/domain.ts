@@ -132,6 +132,11 @@ export interface FeedItem {
   recommendationItemId?: string;
   impressionId?: string;
   reason?: string;
+  personalizationPath?: string;
+  personalizationReason?: string;
+  profileVersion?: string;
+  profileCoverage?: number;
+  profileConfidence?: number;
 }
 
 export type FeedEventType =

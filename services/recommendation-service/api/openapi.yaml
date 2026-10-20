@@ -33,12 +33,25 @@ components:
   schemas:
     FeedResponse:
       type: object
-      required: [requestId, modelVersion, items]
+      required: [requestId, modelVersion, items, personalization]
       properties:
         requestId: {type: string, format: uuid}
         modelVersion: {type: string}
         rankingVersion: {type: string}
         candidateSetHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        personalization:
+          type: object
+          description: Privacy-safe decision provenance; no subject, text or embedding is returned.
+          required: [path, reason, profileVersion, profileCoverage, profileConfidence]
+          properties:
+            path: {type: string, enum: [FALLBACK, SHADOW, PERSONALIZED]}
+            reason: {type: string}
+            profileVersion: {type: string}
+            profileCoverage: {type: number, minimum: 0, maximum: 1}
+            profileConfidence: {type: number, minimum: 0, maximum: 1}
+            rankerConfigHash: {type: string}
+            mmrConfigHash: {type: string}
+            explorationPolicy: {type: string}
         strategy:
           type: string
           enum: [COLD_START, DIVERSE, LUCKY]

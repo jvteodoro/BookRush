@@ -775,6 +775,7 @@ export const services = {
       const { data } = await feedHttp.get("/admin/feed", {
         params: { sessionId },
       });
+      const metadata = (data.personalization ?? {}) as Record<string, unknown>;
       return (data.items ?? data).map((item: Record<string, unknown>) => ({
         ...item,
         modelVersion: String(item.modelVersion ?? item.model_version ?? ""),
@@ -792,6 +793,11 @@ export const services = {
         ),
         impressionId: String(item.impressionId ?? item.impression_id ?? ""),
         reason: String(item.reason ?? ""),
+        personalizationPath: String(metadata.path ?? ""),
+        personalizationReason: String(metadata.reason ?? ""),
+        profileVersion: String(metadata.profileVersion ?? ""),
+        profileCoverage: Number(metadata.profileCoverage ?? 0),
+        profileConfidence: Number(metadata.profileConfidence ?? 0),
         rankScore: Number(
           item.rankScore ??
             item.rank_score ??

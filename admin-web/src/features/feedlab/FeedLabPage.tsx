@@ -214,6 +214,20 @@ export function FeedLabPage() {
               <strong>{item.reason || "—"}</strong>
             </div>
             <div>
+              <span>Personalization</span>
+              <strong>
+                {item.personalizationPath || "—"} ·{" "}
+                {item.personalizationReason || "—"}
+              </strong>
+            </div>
+            <div>
+              <span>Profile</span>
+              <strong>
+                {item.profileVersion || "—"} · confidence{" "}
+                {(item.profileConfidence ?? 0).toFixed(2)}
+              </strong>
+            </div>
+            <div>
               <span>Candidate set</span>
               <code>{item.candidateSetHash || "—"}</code>
             </div>

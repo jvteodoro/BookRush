@@ -267,9 +267,19 @@ public class RecommendationController {
         (int) items.stream().filter(FeedEligibility::hasAnalyticsExcerpt).count());
     feedMetrics.recordResult(items.isEmpty() ? "empty" : "success");
     resultRecorded = true;
+    var personalizationMetadata = Map.of(
+        "path", personalizationDecision.path().name(),
+        "reason", personalizationDecision.reason(),
+        "profileVersion", profileResult.profile() == null ? "" : profileResult.profile().profileVersion(),
+        "profileCoverage", profileResult.profile() == null ? 0 : profileResult.profile().coverage(),
+        "profileConfidence", profileResult.profile() == null ? 0 : profileResult.profile().confidence(),
+        "rankerConfigHash", personalized ? personalizedRanker.configurationHash() : "",
+        "mmrConfigHash", personalized ? bookDiversityMmr.configurationHash() : "",
+        "explorationPolicy", personalized ? explorationPolicy.policyVersion() : "");
     return Map.of("requestId", requestId, "modelVersion", modelVersion,
         "rankingVersion", modelVersion, "strategy", strategy,
-        "candidateSetHash", candidateSetHash, "generatedAt", Instant.now(), "items", items);
+        "candidateSetHash", candidateSetHash, "personalization", personalizationMetadata,
+        "generatedAt", Instant.now(), "items", items);
     } catch (ResourceAccessException timeout) {
       feedMetrics.recordResult("timeout");
       resultRecorded = true;
