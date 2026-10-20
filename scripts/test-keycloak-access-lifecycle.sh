@@ -6,6 +6,10 @@ set -Eeuo pipefail
 # real user.
 command -v docker >/dev/null || { echo 'Docker ausente.' >&2; exit 2; }
 docker info >/dev/null 2>&1 || { echo 'Usuário sem acesso ao Docker.' >&2; exit 2; }
+command -v python3 >/dev/null || { echo 'Python 3 ausente.' >&2; exit 2; }
+json_access_token() {
+  python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])'
+}
 name="bookrush-keycloak-access-$RANDOM"
 probe="bookrush-keycloak-access-probe-$RANDOM"
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -93,7 +97,7 @@ token_response="$(docker exec "$probe" curl -sS -w '\n%{http_code}' -X POST "$to
   -d grant_type=password -d client_id="$client_id" -d username="$token_user_name" -d password='disposable-user-password')"
 grep -q '^200$' <<<"$token_response"
 grep -q 'access_token' <<<"$token_response"
-access_token="$(sed -n '1p' <<<"$token_response" | jq -er '.access_token')"
+access_token="$(sed -n '1p' <<<"$token_response" | json_access_token)"
 unset access_token
 
 admin_web_client_id="$(admin get clients -r bookrush-platform -q clientId=labsoft-admin-web --fields id --format csv --noquotes)"
@@ -102,7 +106,7 @@ admin update "clients/$admin_web_client_id" -r bookrush-platform -s directAccess
 admin_web_token_response="$(docker exec "$probe" curl -fsS -X POST "$token_url" \
   -d grant_type=password -d client_id=labsoft-admin-web \
   -d username="$token_user_name" -d password='disposable-user-password')"
-access_token="$(jq -er '.access_token' <<<"$admin_web_token_response")"
+access_token="$(json_access_token <<<"$admin_web_token_response")"
 ACCESS_TOKEN="$access_token" python3 - <<'PY'
 import base64, json, os
 payload = os.environ["ACCESS_TOKEN"].split(".")[1]
