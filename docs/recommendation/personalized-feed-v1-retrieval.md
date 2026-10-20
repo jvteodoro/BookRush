@@ -31,3 +31,16 @@ until those providers are connected; no fake trending signal is generated.
 Validation is covered by `CatalogCandidateRetrieverTest`, including a book
 returned beyond the former first-page boundary, duplicate IDs, missing
 embeddings, and bounded pagination.
+
+## Repeat-exposure fatigue
+
+`ExposureFatigue` uses only viewable impressions for the initial signal. A
+recently viewable book receives a bounded penalty proportional to its count;
+the penalty decays exponentially from the last viewable timestamp. A request
+that was never marked viewable therefore contributes no fatigue. The
+recommendation ledger query is bounded to the current candidate IDs and the
+lookup indexes are installed by `V5__fatigue_lookup_indexes.sql`.
+
+The effective score and the persisted `reason` include the fatigue component,
+so a ranking decision can be explained and replayed. Configuration is
+versioned through `FEED_FATIGUE_*` and the behavior is covered by unit tests.

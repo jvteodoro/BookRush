@@ -25,6 +25,7 @@ import com.bookrush.recommendationservice.excerpt.ExcerptEnrichmentService;
 import com.bookrush.recommendationservice.ranking.AnalyticsRankingProperties;
 import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient;
 import com.bookrush.recommendationservice.observability.FeedMetrics;
+import com.bookrush.recommendationservice.fatigue.ExposureFatigue;
 import com.bookrush.recommendationservice.retrieval.CandidateRetriever;
 
 @RestController
@@ -39,6 +40,7 @@ public class RecommendationController {
   private final AnalyticsRankingProperties rankingProperties;
   private final FeedMetrics feedMetrics;
   private final ObjectMapper mapper;
+  private final ExposureFatigue fatiguePolicy;
 
   public RecommendationController(
       CandidateRetriever candidateRetriever,
@@ -48,7 +50,8 @@ public class RecommendationController {
       AnalyticsScoreClient analyticsScores,
       AnalyticsRankingProperties rankingProperties,
       FeedMetrics feedMetrics,
-      ObjectMapper mapper) {
+      ObjectMapper mapper,
+      ExposureFatigue fatiguePolicy) {
     this.candidateRetriever = candidateRetriever;
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
@@ -57,6 +60,7 @@ public class RecommendationController {
     this.rankingProperties = rankingProperties;
     this.feedMetrics = feedMetrics;
     this.mapper = mapper;
+    this.fatiguePolicy = fatiguePolicy;
   }
 
   private String subject(Principal principal) {
@@ -85,9 +89,11 @@ public class RecommendationController {
     var candidateIds = books.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
     var scoreById = feedMetrics.time("analytics_scores", () -> analyticsScores.find(candidateIds).entrySet().stream()
         .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue)));
+    var fatigueById = loadFatigue(subject, candidateIds);
     boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
     List<?> rankedBooks = feedMetrics.time("ranking",
-        () -> RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById));
+        () -> RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById,
+            fatigueById, Instant.now(), fatiguePolicy));
     if (analyticsRequired) {
       rankedBooks = rankedBooks.stream()
           .filter(book -> scoreById.containsKey(String.valueOf(bookId(book))))
@@ -150,6 +156,12 @@ public class RecommendationController {
         reasonPayload.put("rankerVersion", modelVersion);
         if (item.get("score") != null) reasonPayload.put("score", item.get("score"));
         reasonPayload.put("candidateSetHash", candidateSetHash);
+        var fatigue = fatigueById.get(String.valueOf(parsedBookId));
+        if (fatigue != null) {
+          reasonPayload.put("fatigueViewableCount", fatigue.viewableCount());
+          reasonPayload.put("fatigueLastViewableAt", fatigue.lastViewableAt());
+          reasonPayload.put("fatiguePenalty", fatiguePolicy.penalty(fatigue, Instant.now()));
+        }
         jdbc.update("INSERT INTO recommendation.item(id, request_id, book_id, excerpt_id, rank, score, reason) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb)",
             itemId, requestId, parsedBookId, excerptId, rank, item.get("score"),
             json(reasonPayload));
@@ -178,6 +190,28 @@ public class RecommendationController {
       if (!resultRecorded) feedMetrics.recordResult("error");
       feedMetrics.stopTotal(totalSample);
     }
+  }
+
+  private Map<String, ExposureFatigue.Signal> loadFatigue(String subject, List<UUID> bookIds) {
+    if (bookIds.isEmpty()) return Map.of();
+    String placeholders = String.join(",", java.util.Collections.nCopies(bookIds.size(), "?"));
+    var args = new Object[bookIds.size() + 1];
+    args[0] = subject;
+    for (int i = 0; i < bookIds.size(); i++) args[i + 1] = bookIds.get(i);
+    String sql = """
+        SELECT i.book_id, count(*) FILTER (WHERE i.viewable) AS viewable_count,
+               max(i.shown_at) FILTER (WHERE i.viewable) AS last_viewable_at
+        FROM recommendation.impression i
+        JOIN recommendation.request r ON r.id = i.request_id
+        WHERE r.subject_key = ? AND i.book_id IN (""" + placeholders + """
+        )
+        GROUP BY i.book_id
+        """;
+    return jdbc.query(sql, args, (rs, rowNum) -> Map.entry(
+            rs.getString("book_id"), new ExposureFatigue.Signal(rs.getLong("viewable_count"),
+                rs.getTimestamp("last_viewable_at") == null ? null
+                    : rs.getTimestamp("last_viewable_at").toInstant())))
+        .stream().collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   private UUID bookId(Object book) {

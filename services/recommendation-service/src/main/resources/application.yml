@@ -32,6 +32,11 @@ feed:
     global-quota: ${FEED_RETRIEVAL_GLOBAL_QUOTA:150}
     trending-quota: ${FEED_RETRIEVAL_TRENDING_QUOTA:100}
     exploration-quota: ${FEED_RETRIEVAL_EXPLORATION_QUOTA:50}
+  fatigue:
+    version: ${FEED_FATIGUE_VERSION:fatigue-v1}
+    half-life: ${FEED_FATIGUE_HALF_LIFE:7d}
+    per-exposure-penalty: ${FEED_FATIGUE_PER_EXPOSURE_PENALTY:0.15}
+    max-penalty: ${FEED_FATIGUE_MAX_PENALTY:0.8}
   ranking:
     enabled: ${FEED_ANALYTICS_RANKING_ENABLED:${FEED_EXCERPTS_ENABLED:false}}
     model-version: ${FEED_ANALYTICS_RANKING_MODEL_VERSION:analytics-aware-v1}
