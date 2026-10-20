@@ -40,8 +40,19 @@ cardinalidade:
 - `bookrush.analytics.recommendation_snapshot.returned`
 
 O consumo pelo recommendation-service deve ser introduzido em uma etapa
-posterior com cache por versão de asset/modelo. Até lá, o endpoint é uma fonte
-S2S versionada e auditável, sem alterar o caminho atual do feed.
+posterior com cache por versão de asset/modelo. Essa projeção foi implementada
+no `AnalyticsScoreClient`: o refresh é feito em lote, a troca do mapa é
+atômica, e cada entrada é indexada logicamente por `bookId`,
+`sourceAssetVersionId` e modelo do embedding. Uma nova versão remove a entrada
+anterior daquele livro antes da publicação da nova. Até lá, o endpoint é uma
+fonte S2S versionada e auditável, sem alterar o caminho atual do feed.
+
+Quando o refresh expira e o analytics fica indisponível, o último snapshot
+válido é usado somente como fallback stale; nenhum vetor zero ou score
+inventado é criado. As métricas `bookrush.feed.book_features.cache` e
+`bookrush.feed.book_features` mostram hit/miss, stale-on-error, cobertura e
+quantidade de embeddings. O TTL usa a configuração já existente
+`FEED_ANALYTICS_RANKING_CACHE_TTL`.
 
 ## Validação
 
@@ -54,4 +65,3 @@ Execute com:
 RUN_SQL_INTEGRATION=true TESTCONTAINERS_DOCKER_API_VERSION=1.40 \
   mvn -q -Dtest=RecommendationSnapshotQueryRepositoryIT test
 ```
-

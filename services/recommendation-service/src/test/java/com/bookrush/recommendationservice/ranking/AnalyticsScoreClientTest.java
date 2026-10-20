@@ -28,12 +28,12 @@ class AnalyticsScoreClientTest {
     server.expect(requestTo("http://keycloak/token"))
         .andExpect(method(HttpMethod.POST))
         .andRespond(withSuccess("{\"access_token\":\"technical\",\"expires_in\":300}", MediaType.APPLICATION_JSON));
-    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/book-scores"))
+    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/recommendation-snapshot"))
         .andExpect(method(HttpMethod.POST))
         .andExpect(header("Authorization", "Bearer technical"))
-        .andExpect(content().json("{\"bookIds\":[\"" + book + "\"]}"))
+        .andExpect(content().json("{\"bookIds\":[\"" + book + "\"],\"offset\":0,\"limit\":1}"))
         .andRespond(withSuccess("{\"items\":[{\"bookId\":\"" + book
-            + "\",\"score\":0.87,\"rankerVersion\":\"EXCERPT_HEURISTIC_RANKER_V1\"}]}", MediaType.APPLICATION_JSON));
+            + "\",\"score\":0.87,\"rankerVersion\":\"EXCERPT_HEURISTIC_RANKER_V1\",\"embedding\":null}]}", MediaType.APPLICATION_JSON));
     var properties = new AnalyticsRankingProperties(true, "analytics-aware-v1", "http://analytics",
         "http://keycloak/token", "client", "secret", "aud", "scope", Duration.ofMinutes(1),
         Duration.ofSeconds(1), Duration.ofSeconds(1), 100);
@@ -55,9 +55,9 @@ class AnalyticsScoreClientTest {
     UUID unscored = UUID.randomUUID();
     server.expect(requestTo("http://keycloak/token"))
         .andRespond(withSuccess("{\"access_token\":\"technical\",\"expires_in\":300}", MediaType.APPLICATION_JSON));
-    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/book-scores"))
+    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/recommendation-snapshot"))
         .andRespond(withSuccess("{\"items\":[{\"bookId\":\"" + scored
-            + "\",\"score\":0.87}]}", MediaType.APPLICATION_JSON));
+            + "\",\"score\":0.87,\"embedding\":null}]}", MediaType.APPLICATION_JSON));
     var properties = new AnalyticsRankingProperties(true, "analytics-aware-v1", "http://analytics",
         "http://keycloak/token", "client", "secret", "aud", "scope", Duration.ofMinutes(1),
         Duration.ofSeconds(1), Duration.ofSeconds(1), 100);
@@ -78,7 +78,7 @@ class AnalyticsScoreClientTest {
     UUID book = UUID.randomUUID();
     server.expect(requestTo("http://keycloak/token"))
         .andRespond(withSuccess("{\"access_token\":\"technical\",\"expires_in\":300}", MediaType.APPLICATION_JSON));
-    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/book-scores"))
+    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/recommendation-snapshot"))
         .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
             .withException(new IOException("analytics timeout")));
     var properties = new AnalyticsRankingProperties(true, "analytics-aware-v1", "http://analytics",
@@ -89,6 +89,34 @@ class AnalyticsScoreClientTest {
     assertTrue(client.find(List.of(book)).isEmpty());
     assertEquals(1, registry.counter("bookrush.feed.analytics_scores", "outcome", "timeout").count());
     assertEquals(1, registry.timer("bookrush.feed.analytics_scores.duration").count());
+    server.verify();
+  }
+
+  @Test
+  void keepsLastVersionedSnapshotWhenRefreshFails() throws InterruptedException {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    UUID book = UUID.randomUUID();
+    UUID version = UUID.randomUUID();
+    var registry = new SimpleMeterRegistry();
+    server.expect(requestTo("http://keycloak/token"))
+        .andRespond(withSuccess("{\"access_token\":\"technical\",\"expires_in\":300}", MediaType.APPLICATION_JSON));
+    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/recommendation-snapshot"))
+        .andRespond(withSuccess("{\"items\":[{\"bookId\":\"" + book
+            + "\",\"sourceAssetVersionId\":\"" + version
+            + "\",\"score\":0.77,\"rankerVersion\":\"v1\",\"embedding\":null}]}", MediaType.APPLICATION_JSON));
+    server.expect(requestTo("http://analytics/api/internal/v1/content-analytics/recommendation-snapshot"))
+        .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
+            .withException(new IOException("refresh failed")));
+    var properties = new AnalyticsRankingProperties(true, "analytics-aware-v1", "http://analytics",
+        "http://keycloak/token", "client", "secret", "aud", "scope", Duration.ofMillis(1),
+        Duration.ofSeconds(1), Duration.ofSeconds(1), 100);
+    var client = new AnalyticsScoreClient(builder, properties, registry, false);
+
+    assertEquals(version, client.findSnapshots(List.of(book)).get(book).sourceAssetVersionId());
+    Thread.sleep(10);
+    assertEquals(0.77, client.find(List.of(book)).get(book).score());
+    assertTrue(registry.counter("bookrush.feed.book_features", "outcome", "stale_on_error").count() >= 1);
     server.verify();
   }
 }
