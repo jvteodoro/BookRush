@@ -20,6 +20,8 @@ public final class PersonalizedFeedGate {
     return new Decision(Path.PERSONALIZED, "ready");
   }
 
+  public Mode mode() { return properties.mode(); }
+
   public enum Mode { OFF, SHADOW, ON }
   public enum Path { FALLBACK, SHADOW, PERSONALIZED }
   public record Decision(Path path, String reason) { }

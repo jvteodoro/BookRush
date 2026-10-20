@@ -6,8 +6,31 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(PersonalizedFeedConfiguration.Properties.class)
+@EnableConfigurationProperties({PersonalizedFeedConfiguration.Properties.class, BehaviorSignalsProperties.class})
 public class PersonalizedFeedConfiguration {
+  @Bean
+  BehaviorSignalsClient behaviorSignalsClient(org.springframework.web.client.RestClient.Builder builder,
+      BehaviorSignalsProperties properties, io.micrometer.core.instrument.MeterRegistry metrics) {
+    return new BehaviorSignalsClient(builder, properties, metrics);
+  }
+
+  @Bean
+  PersonalizedRankerV1 personalizedRanker() {
+    return new PersonalizedRankerV1(new PersonalizedRankerV1.Config(
+        PersonalizedRankerV1.MODEL_VERSION, .55, .25, 0, .10, .10,
+        PersonalizedRankerV1.MissingPolicy.RENORMALIZE));
+  }
+
+  @Bean
+  BookDiversityMmr bookDiversityMmr() {
+    return new BookDiversityMmr(new BookDiversityMmr.Config("book-mmr-v1", .85));
+  }
+
+  @Bean
+  ExplorationPolicy explorationPolicy() {
+    return new ExplorationPolicy(new ExplorationPolicy.Config("exploration-v1", true, .10, 1));
+  }
+
   @Bean
   PersonalizedFeedGate personalizedFeedGate(Properties properties) {
     return new PersonalizedFeedGate(new PersonalizedFeedGate.Properties(

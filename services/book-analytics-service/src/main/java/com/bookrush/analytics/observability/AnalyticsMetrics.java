@@ -87,6 +87,11 @@ public final class AnalyticsMetrics {
     registry.counter("bookrush.analytics.recommendation_snapshot.returned").increment(returned);
   }
 
+  public void embeddingUnavailable() {
+    registry.counter("bookrush.analytics.recommendation_snapshot", "outcome", "embedding_unavailable")
+        .increment();
+  }
+
   public void jobItemFailed(String code) {
     analysisFailures.increment();
   }

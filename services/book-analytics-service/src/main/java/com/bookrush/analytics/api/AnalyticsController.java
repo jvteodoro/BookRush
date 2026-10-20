@@ -15,12 +15,16 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.time.OffsetDateTime;
+import java.util.Optional;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 @RestController
 @RequestMapping("/api")
@@ -31,15 +35,18 @@ public class AnalyticsController {
   private final AnalyticsMetrics metrics;
   private final BookScoresQueryRepository bookScoresQuery;
   private final RecommendationSnapshotQueryRepository recommendationSnapshotQuery;
+  private final ObjectProvider<S3Client> analyticsStorage;
 
   public AnalyticsController(JdbcTemplate jdbc, ObjectMapper mapper, AnalyticsMetrics metrics,
       BookScoresQueryRepository bookScoresQuery,
-      RecommendationSnapshotQueryRepository recommendationSnapshotQuery) {
+      RecommendationSnapshotQueryRepository recommendationSnapshotQuery,
+      ObjectProvider<S3Client> analyticsStorage) {
     this.jdbc = jdbc;
     this.mapper = mapper;
     this.metrics = metrics;
     this.bookScoresQuery = bookScoresQuery;
     this.recommendationSnapshotQuery = recommendationSnapshotQuery;
+    this.analyticsStorage = analyticsStorage;
   }
 
   public record JobRequest(
@@ -52,7 +59,8 @@ public class AnalyticsController {
   public record RecommendationSnapshotRequest(
       @NotEmpty @Size(max = 100) List<UUID> bookIds,
       Integer offset,
-      Integer limit) {}
+      Integer limit,
+      boolean includeEmbedding) {}
 
   @PostMapping("/internal/v1/behavior/events")
   @Transactional
@@ -672,6 +680,9 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
           embedding.put("storageProvider", row.get("embedding_storage_provider"));
           embedding.put("bucket", row.get("embedding_bucket"));
           embedding.put("objectKey", row.get("embedding_object_key"));
+          if (request.includeEmbedding()) {
+            readEmbedding(row).ifPresent(vector -> embedding.put("vector", vector));
+          }
           item.put("embedding", embedding);
         }
         return item;
@@ -686,6 +697,30 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
           "embeddingModel", query.embeddingModel()));
     } finally {
       metrics.stopRecommendationSnapshot(sample);
+    }
+  }
+
+  private Optional<List<Double>> readEmbedding(Map<String, Object> row) {
+    S3Client client = analyticsStorage.getIfAvailable();
+    if (client == null || row.get("embedding_bucket") == null || row.get("embedding_object_key") == null) {
+      return Optional.empty();
+    }
+    try {
+      var bytes = client.getObjectAsBytes(GetObjectRequest.builder()
+          .bucket(String.valueOf(row.get("embedding_bucket")))
+          .key(String.valueOf(row.get("embedding_object_key"))).build()).asByteArray();
+      var document = mapper.readTree(bytes);
+      var node = document.isArray() ? document : document.path("vector");
+      if (!node.isArray()) return Optional.empty();
+      var vector = new java.util.ArrayList<Double>(node.size());
+      for (var value : node) {
+        if (!value.isNumber() || !Double.isFinite(value.doubleValue())) return Optional.empty();
+        vector.add(value.doubleValue());
+      }
+      return vector.isEmpty() ? Optional.empty() : Optional.of(List.copyOf(vector));
+    } catch (RuntimeException | java.io.IOException exception) {
+      metrics.embeddingUnavailable();
+      return Optional.empty();
     }
   }
 

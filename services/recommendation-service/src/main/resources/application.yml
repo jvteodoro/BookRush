@@ -26,6 +26,17 @@ feed:
     mode: ${FEED_PERSONALIZED_MODE:OFF}
     min-coverage: ${FEED_PERSONALIZED_MIN_COVERAGE:0.5}
     min-confidence: ${FEED_PERSONALIZED_MIN_CONFIDENCE:0.5}
+    behavior:
+      url: ${FEED_PERSONALIZED_BEHAVIOR_URL:http://behavior-service:8097}
+      token-uri: ${FEED_PERSONALIZED_BEHAVIOR_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+      client-id: ${FEED_PERSONALIZED_BEHAVIOR_CLIENT_ID:bookrush-recommendation-behavior-s2s}
+      client-secret: ${FEED_PERSONALIZED_BEHAVIOR_CLIENT_SECRET:}
+      audience: ${FEED_PERSONALIZED_BEHAVIOR_AUDIENCE:bookrush-behavior}
+      scope: ${FEED_PERSONALIZED_BEHAVIOR_SCOPE:bookrush.behavior.read}
+      cache-ttl: ${FEED_PERSONALIZED_BEHAVIOR_CACHE_TTL:2m}
+      connect-timeout: ${FEED_PERSONALIZED_BEHAVIOR_CONNECT_TIMEOUT:250ms}
+      read-timeout: ${FEED_PERSONALIZED_BEHAVIOR_READ_TIMEOUT:1s}
+      max-signals: ${FEED_PERSONALIZED_BEHAVIOR_MAX_SIGNALS:50}
   retrieval:
     max-candidates: ${FEED_RETRIEVAL_MAX_CANDIDATES:500}
     page-size: ${FEED_RETRIEVAL_PAGE_SIZE:100}

@@ -90,11 +90,23 @@ when behavior signals, the semantic snapshot and a `READY` profile satisfy the
 configured thresholds. Missing prerequisites are classified and fall back
 without a 5xx.
 
-The recommendation controller currently supplies no live profile or behavior
-serving client, so the safe integration records `FALLBACK` with the explicit
-reason `behavior-unavailable` when `ON` is selected. This is intentional: the
-flag is not evidence that personalization is active. The request ledger stores
-`personalizationPath` and `personalizationReason` alongside the candidate-set
-hash, and `bookrush.feed.personalized.path` provides a low-cardinality rollout
-metric. A follow-up serving integration must provide the profile and replace
-the conservative `behavior-unavailable` input before `ON` can satisfy PFV1.
+The recommendation controller now loads a bounded profile through the behavior
+service S2S endpoint and the analytics recommendation snapshot. The behavior
+client uses the dedicated `bookrush-recommendation-behavior-s2s` client,
+short-lived client-credentials tokens and a per-subject two-minute cache. The
+analytics request asks for embeddings only for this profile path; ordinary
+score requests remain metadata-only. Missing behavior, missing embeddings,
+timeouts or malformed rows are fail-safe and produce `FALLBACK` without a 5xx.
+
+When `ON` is selected and the configured coverage/confidence thresholds are
+met, `PersonalizedRankerV1` combines bounded affinity, analytics quality and
+exposure fatigue, then `BookDiversityMmr` applies book-level diversity. The
+exploration choice is deterministic from the request seed and is recorded as a
+reason, rather than silently changing the ranking policy. `SHADOW` computes
+the gate/profile path but keeps the existing response ranking.
+
+The request ledger stores the personalization path/reason, candidate-set hash,
+ranker/profile/MMR configuration hashes and exploration policy version. Each
+personalized item also stores the explainable ranker components and MMR
+rationale in its JSON reason. `bookrush.feed.personalized.path` and the
+behavior/profile timers provide low-cardinality rollout observability.

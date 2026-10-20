@@ -39,13 +39,12 @@ cardinalidade:
 - `bookrush.analytics.recommendation_snapshot.requested`
 - `bookrush.analytics.recommendation_snapshot.returned`
 
-O consumo pelo recommendation-service deve ser introduzido em uma etapa
-posterior com cache por versão de asset/modelo. Essa projeção foi implementada
-no `AnalyticsScoreClient`: o refresh é feito em lote, a troca do mapa é
-atômica, e cada entrada é indexada logicamente por `bookId`,
+O recommendation-service consome a projeção com cache por versão de asset/modelo.
+Essa projeção é implementada no `AnalyticsScoreClient`: o refresh é feito em lote,
+a troca do mapa é atômica, e cada entrada é indexada logicamente por `bookId`,
 `sourceAssetVersionId` e modelo do embedding. Uma nova versão remove a entrada
-anterior daquele livro antes da publicação da nova. Até lá, o endpoint é uma
-fonte S2S versionada e auditável, sem alterar o caminho atual do feed.
+anterior daquele livro antes da publicação da nova. O endpoint é uma fonte S2S
+versionada e auditável; o caminho normal de scores permanece metadata-only.
 
 Quando o refresh expira e o analytics fica indisponível, o último snapshot
 válido é usado somente como fallback stale; nenhum vetor zero ou score
@@ -62,9 +61,12 @@ mapa de embeddings já materializados, aplica pesos bounded por livro e decay de
 meia-vida, normaliza a direção e calcula `coverage`/`confidence`. A configuração
 é versionada e recebe `configurationHash`; o perfil sem sinais positivos ou sem
 embedding válido é `EMPTY` com vetor nulo. Impressões isoladas e reversões não
-criam afinidade. A ligação remota que materializa vetores ainda deve ser feita
-em uma etapa posterior, pois o snapshot S2S atual expõe metadados e mantém os
-vetores no storage.
+criam afinidade. A ligação remota que materializa vetores é opt-in no request
+do perfil: o snapshot inclui o vetor somente quando `includeEmbedding=true`, e
+o `AnalyticsController` lê o objeto JSON do storage configurado. O caminho
+normal de scores continua sem download de vetores. Se o worker de
+analytics/storage não estiver habilitado ou o objeto estiver indisponível, o
+perfil fica sem cobertura e o gate retorna ao ranking existente.
 
 As fixtures de `UserTasteProfileBuilderTest` usam vetores ortogonais e horários
 fixos: o replay do mesmo snapshot/configuração é determinístico, sinais

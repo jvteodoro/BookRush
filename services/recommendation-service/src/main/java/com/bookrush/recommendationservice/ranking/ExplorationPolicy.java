@@ -13,6 +13,8 @@ public final class ExplorationPolicy {
 
   public ExplorationPolicy(Config config) { this.config = config; }
 
+  public String policyVersion() { return config.version(); }
+
   public List<Choice> choose(List<String> rankedIds, Set<String> alreadySelected,
       long requestSeed, int feedSize) {
     if (!config.enabled() || rankedIds == null || feedSize < 1) return List.of();

@@ -13,6 +13,8 @@ public final class PersonalizedRankerV1 {
 
   public PersonalizedRankerV1(Config config) { this.config = Objects.requireNonNull(config); }
 
+  public String configurationHash() { return config.hash(); }
+
   public List<ScoredCandidate> rank(List<Candidate> candidates, long seed) {
     return candidates == null ? List.of() : candidates.stream().filter(Objects::nonNull)
         .map(candidate -> score(candidate, seed)).sorted(Comparator

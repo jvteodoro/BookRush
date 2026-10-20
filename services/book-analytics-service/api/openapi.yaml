@@ -97,7 +97,7 @@ paths:
   /api/internal/v1/content-analytics/recommendation-snapshot:
     post:
       summary: Retornar snapshot analítico versionado para recomendações
-      description: Endpoint interno S2S limitado a 100 livros. Fixa a versão textual atual e retorna score/ranker e metadados do embedding documental válido; artefatos ausentes são nulos.
+      description: Endpoint interno S2S limitado a 100 livros. Fixa a versão textual atual e retorna score/ranker e metadados do embedding documental válido; artefatos ausentes são nulos. includeEmbedding é opt-in e retorna o vetor somente para formar perfis de serving em lote.
       security:
         - analyticsServiceBearer: [bookrush.analytics]
       requestBody:
@@ -114,6 +114,7 @@ paths:
                   items: {type: string, format: uuid}
                 offset: {type: integer, minimum: 0, default: 0}
                 limit: {type: integer, minimum: 1, maximum: 100, default: 100}
+                includeEmbedding: {type: boolean, default: false}
       responses:
         '200':
           description: Snapshot versionado, preservando ausência explícita de analytics

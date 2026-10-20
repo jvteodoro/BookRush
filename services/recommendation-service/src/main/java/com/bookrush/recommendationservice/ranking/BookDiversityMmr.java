@@ -13,6 +13,8 @@ public final class BookDiversityMmr {
 
   public BookDiversityMmr(Config config) { this.config = config; }
 
+  public String configurationHash() { return config.hash(); }
+
   public List<Selection> select(List<PersonalizedRankerV1.ScoredCandidate> ranked,
       Map<String, List<Double>> embeddings, int limit) {
     if (ranked == null || limit < 1) return List.of();

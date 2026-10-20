@@ -51,6 +51,10 @@ public final class AnalyticsScoreClient {
 
   @SuppressWarnings("unchecked")
   public Map<UUID, BookFeatureSnapshot> findSnapshots(List<UUID> bookIds) {
+    return findSnapshots(bookIds, false);
+  }
+
+  public Map<UUID, BookFeatureSnapshot> findSnapshots(List<UUID> bookIds, boolean includeEmbedding) {
     if (!properties.enabled() || !properties.configured() || bookIds.isEmpty()) return Map.of();
     var bounded = bookIds.stream().distinct().limit(properties.maxCandidates()).toList();
     var current = cache.get();
@@ -63,7 +67,9 @@ public final class AnalyticsScoreClient {
           .filter(candidate -> candidate.getKey().bookId().equals(id))
           .map(Map.Entry::getValue)
           .findFirst().orElse(null);
-      if (entry != null && entry.expiresAt().isAfter(now)) result.put(id, entry.snapshot());
+      if (entry != null && entry.expiresAt().isAfter(now)
+          && (!includeEmbedding || (entry.snapshot().embedding() != null
+              && entry.snapshot().embedding().vector() != null))) result.put(id, entry.snapshot());
       else {
         missing.add(id);
         if (entry != null) stale.put(id, entry.snapshot());
@@ -80,11 +86,16 @@ public final class AnalyticsScoreClient {
     long started = System.nanoTime();
     try {
       String bearer = accessToken();
+      var requestBody = new java.util.LinkedHashMap<String, Object>();
+      requestBody.put("bookIds", missing);
+      requestBody.put("offset", 0);
+      requestBody.put("limit", missing.size());
+      if (includeEmbedding) requestBody.put("includeEmbedding", true);
       Map<String, Object> body = analytics.post()
           .uri("/api/internal/v1/content-analytics/recommendation-snapshot")
           .contentType(MediaType.APPLICATION_JSON)
           .headers(headers -> headers.setBearerAuth(bearer))
-          .body(Map.of("bookIds", missing, "offset", 0, "limit", missing.size()))
+          .body(requestBody)
           .retrieve().body(Map.class);
       Object rawItems = body == null ? null : body.get("items");
       var updates = new HashMap<CacheKey, CacheEntry>();
@@ -140,7 +151,7 @@ public final class AnalyticsScoreClient {
         embeddingRow.get("dimension") instanceof Number n ? n.intValue() : 0,
         string(embeddingRow.get("inputSha256")), uuid(embeddingRow.get("sourceAssetVersionId")),
         string(embeddingRow.get("storageProvider")), string(embeddingRow.get("bucket")),
-        string(embeddingRow.get("objectKey")));
+        string(embeddingRow.get("objectKey")), vector(embeddingRow.get("vector")));
     return new BookFeatureSnapshot(id, version, score, string(row.get("rankerCode")),
         string(row.get("rankerVersion")), string(row.get("rankConfigurationHash")), embedding);
   }
@@ -152,6 +163,16 @@ public final class AnalyticsScoreClient {
   }
 
   private static String string(Object value) { return value == null ? null : String.valueOf(value); }
+
+  private static List<Double> vector(Object value) {
+    if (!(value instanceof List<?> values)) return null;
+    var result = new java.util.ArrayList<Double>(values.size());
+    for (Object item : values) {
+      if (!(item instanceof Number number) || !Double.isFinite(number.doubleValue())) return null;
+      result.add(number.doubleValue());
+    }
+    return result.isEmpty() ? null : List.copyOf(result);
+  }
 
   private String accessToken() {
     Token current = token;
@@ -184,7 +205,7 @@ public final class AnalyticsScoreClient {
 
   public record EmbeddingMetadata(String model, String modelVersion, int dimension,
       String inputSha256, UUID sourceAssetVersionId, String storageProvider,
-      String bucket, String objectKey) { }
+      String bucket, String objectKey, List<Double> vector) { }
 
   private record Token(String value, Instant expiresAt) { }
   private record CacheKey(UUID bookId, UUID sourceAssetVersionId, String embeddingModel) { }
