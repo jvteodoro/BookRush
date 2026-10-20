@@ -84,6 +84,18 @@ function App() {
         const catalog = await loadCatalog();
         const recommendations = await loadRecommendationFeed();
         if (!active) return;
+        const recommendationFor = (bookId: string) =>
+          recommendations.find((item) => item.book?.id === bookId);
+        const correlationHeaders = (bookId: string): Record<string, string> => {
+          const recommendation = recommendationFor(bookId);
+          const headers: Record<string, string> = {};
+          if (recommendation?.recommendationItemId)
+            headers["X-BookRush-Recommendation-Item"] =
+              recommendation.recommendationItemId;
+          if (recommendation?.impressionId)
+            headers["X-BookRush-Impression"] = recommendation.impressionId;
+          return headers;
+        };
         const byId = new Map(catalog.map((book) => [book.id, book]));
         const ordered = recommendations
           .map((item) => item.book)
@@ -126,6 +138,7 @@ function App() {
                 ? await authClient.imageUrl(book.thumbnailUrl)
                 : undefined,
               recommendationRequestId: recommendation?.recommendationRequestId,
+              recommendationItemId: recommendation?.recommendationItemId,
               impressionId: recommendation?.impressionId,
               modelVersion: recommendation?.modelVersion,
               rank: recommendation?.rank,
@@ -250,7 +263,10 @@ function App() {
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(
               apiRoutes.reader.libraryBook(id),
-              { method: enabled ? "PUT" : "DELETE" },
+              {
+                method: enabled ? "PUT" : "DELETE",
+                headers: correlationHeaders(id),
+              },
             );
             if (!response.ok)
               throw new Error("Não foi possível atualizar sua biblioteca.");
@@ -260,6 +276,7 @@ function App() {
           like: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(apiRoutes.social.like(id), {
               method: enabled ? "PUT" : "DELETE",
+              headers: correlationHeaders(id),
             });
             if (!response.ok)
               throw new Error("Não foi possível atualizar a curtida.");
@@ -269,7 +286,10 @@ function App() {
               apiRoutes.social.share(id),
               {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  ...correlationHeaders(id),
+                },
                 body: JSON.stringify({ channel: "copy-link" }),
               },
             );
@@ -537,21 +557,7 @@ function App() {
           open: async (id: string) => {
             await authClient.fetch(apiRoutes.reader.opened(id), {
               method: "POST",
-            });
-            await authClient.fetch(apiRoutes.behavior(), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                events: [
-                  {
-                    eventKey: `BOOK_OPEN:${id}:${Date.now()}`,
-                    eventType: "BOOK_OPEN",
-                    bookId: id,
-                    occurredAt: new Date().toISOString(),
-                    payload: {},
-                  },
-                ],
-              }),
+              headers: correlationHeaders(id),
             });
           },
           chapters: async (id: string) => {
@@ -561,9 +567,7 @@ function App() {
             return response.ok ? response.json() : [];
           },
           viewable: async (id: string) => {
-            const item = recommendations.find(
-              (candidate) => candidate.book?.id === id,
-            );
+            const item = recommendationFor(id);
             if (item?.impressionId) {
               const response = await authClient.fetch(
                 apiRoutes.reader.impressionViewable(item.impressionId),
@@ -581,6 +585,9 @@ function App() {
           ) => {
             telemetry.track(eventType, bookId, {
               ...payload,
+              recommendationItemId:
+                recommendationFor(bookId)?.recommendationItemId,
+              impressionId: recommendationFor(bookId)?.impressionId,
               excerptId: excerpt?.id,
               sourceAssetVersionId: excerpt?.sourceAssetVersionId,
             });

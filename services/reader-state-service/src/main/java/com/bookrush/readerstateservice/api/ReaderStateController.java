@@ -8,6 +8,7 @@ import java.security.Principal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
@@ -46,6 +47,22 @@ public class ReaderStateController {
     return request == null ? null : request.getHeader("Authorization");
   }
 
+  private Map<String, Object> correlation(HttpServletRequest request) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    for (Map.Entry<String, String> entry : Map.of(
+        "recommendationItemId", "X-BookRush-Recommendation-Item",
+        "impressionId", "X-BookRush-Impression").entrySet()) {
+      String value = request == null ? null : request.getHeader(entry.getValue());
+      if (value == null || value.isBlank()) continue;
+      try {
+        payload.put(entry.getKey(), UUID.fromString(value));
+      } catch (IllegalArgumentException ignored) {
+        // Correlation is optional; malformed client metadata must not affect reading.
+      }
+    }
+    return payload;
+  }
+
   private int integerValue(Map<String, Object> body, String key) {
     Object value = body.get(key);
     return value instanceof Number number ? Math.max(0, number.intValue()) : 0;
@@ -59,7 +76,7 @@ public class ReaderStateController {
     jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?) "
         + "on conflict(subject_key,book_id) do update set last_opened_at=now()",
         subject, bookId);
-    behavior.publish("BOOK_OPEN", bookId, Map.of(), authorization(request));
+    behavior.publish("BOOK_OPEN", bookId, correlation(request), authorization(request));
     return Map.of("bookId", bookId, "recorded", true);
   }
 
@@ -90,7 +107,9 @@ public class ReaderStateController {
     jdbc.update("INSERT INTO reader_state.reading_day(subject_key, day, minutes) VALUES (?, CURRENT_DATE, ?) "
         + "ON CONFLICT (subject_key, day) DO UPDATE SET minutes = "
         + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, seconds / 60);
-    behavior.publish("READ_SESSION", null, Map.of("activeSeconds", seconds), authorization(request));
+    Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
+    payload.put("activeSeconds", seconds);
+    behavior.publish("READ_SESSION", null, payload, authorization(request));
     return Map.of("id", id, "activeSeconds", seconds, "plant", refreshPlant(subject));
   }
 
@@ -147,16 +166,18 @@ public class ReaderStateController {
   }
 
   @PutMapping("/library/{bookId}")
-  public Map<String, Object> save(@PathVariable UUID bookId, Principal principal) {
+  public Map<String, Object> save(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     jdbc.update("INSERT INTO reader_state.library(subject_key, book_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
         subject(principal), bookId);
+    behavior.publish("BOOK_SAVE", bookId, correlation(request), authorization(request));
     return Map.of("bookId", bookId, "saved", true);
   }
 
   @DeleteMapping("/library/{bookId}")
-  public void remove(@PathVariable UUID bookId, Principal principal) {
+  public void remove(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     jdbc.update("DELETE FROM reader_state.library WHERE subject_key = ? AND book_id = ?",
         subject(principal), bookId);
+    behavior.publish("BOOK_UNSAVE", bookId, correlation(request), authorization(request));
   }
 
   @PutMapping("/books/{bookId}/progress")
@@ -166,7 +187,9 @@ public class ReaderStateController {
         + "VALUES (?, ?, ?, ?) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
         + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, updated_at = now()",
         subject(principal), bookId, value.positionCodepoint(), value.percent());
-    behavior.publish("READ_PROGRESS", bookId, Map.of("percent", value.percent()), authorization(request));
+    Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
+    payload.put("percent", value.percent());
+    behavior.publish("READ_PROGRESS", bookId, payload, authorization(request));
     return Map.of("bookId", bookId, "percent", value.percent());
   }
 

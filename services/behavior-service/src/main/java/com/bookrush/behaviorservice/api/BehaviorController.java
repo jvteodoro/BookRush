@@ -28,6 +28,17 @@ public class BehaviorController {
   public record Event(@NotBlank String eventKey, @NotBlank String eventType, String issuer,
       String subject, UUID bookId, @NotNull Instant occurredAt, JsonNode payload) {}
   public record Batch(@Valid List<Event> events) {}
+
+  private UUID correlationUuid(JsonNode payload, String field) {
+    if (payload == null || !payload.has(field) || payload.get(field).isNull()) return null;
+    JsonNode value = payload.get(field);
+    if (!value.isTextual()) throw new IllegalArgumentException(field + " must be a UUID string");
+    try {
+      return UUID.fromString(value.asText());
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalArgumentException(field + " must be a UUID string", exception);
+    }
+  }
   @PostMapping("/events")
   @Transactional
   public ResponseEntity<Map<String,Object>> ingest(@Valid @RequestBody Batch batch, Principal principal) {
@@ -37,6 +48,14 @@ public class BehaviorController {
     if (subject == null || subject.isBlank()) return ResponseEntity.status(401).body(Map.of("error","authentication required"));
     for (Event e: batch.events()) {
       String payload = e.payload()==null?"{}":e.payload().toString();
+      try {
+        correlationUuid(e.payload(), "recommendationItemId");
+        correlationUuid(e.payload(), "impressionId");
+      } catch (IllegalArgumentException exception) {
+        jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_CORRELATION",payload);
+        duplicate++;
+        continue;
+      }
       if (e.eventType().length()>80 || e.eventKey().length()>200 || payload.length()>16_384 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",payload); duplicate++; continue; }
       UUID eventId = UUID.randomUUID();
       int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
@@ -51,45 +70,10 @@ public class BehaviorController {
   }
   @PostMapping("/aggregates/rebuild")
   public Map<String, Object> rebuild() {
-    jdbc.update("""
-        INSERT INTO behavior.daily_book(day, book_id, impressions, opens, likes, reads, shares, comments)
-        SELECT occurred_at::date, book_id,
-          count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
-          count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
-          count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
-          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE')),
-          count(*) FILTER (WHERE event_type = 'BOOK_SHARE'),
-          count(*) FILTER (WHERE event_type = 'BOOK_COMMENT')
-        FROM behavior.events
-        WHERE book_id IS NOT NULL
-        GROUP BY occurred_at::date, book_id
-        ON CONFLICT (day, book_id) DO UPDATE SET
-          impressions = excluded.impressions, opens = excluded.opens,
-          likes = excluded.likes, reads = excluded.reads,
-          shares = excluded.shares, comments = excluded.comments
-        """);
-    jdbc.update("""
-        INSERT INTO behavior.daily_user_book
-          (day, identity_subject, book_id, impressions, opens, likes, reads, active_seconds)
-        SELECT occurred_at::date, identity_subject, book_id,
-          count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
-          count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
-          count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
-          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE')),
-          coalesce(sum(CASE
-            WHEN event_type = 'READ_SESSION'
-              AND payload->>'activeSeconds' ~ '^[0-9]+$'
-            THEN (payload->>'activeSeconds')::bigint ELSE 0 END), 0)
-        FROM behavior.events
-        WHERE book_id IS NOT NULL AND identity_subject IS NOT NULL
-        GROUP BY occurred_at::date, identity_subject, book_id
-        ON CONFLICT (day, identity_subject, book_id) DO UPDATE SET
-          impressions = excluded.impressions, opens = excluded.opens,
-          likes = excluded.likes, reads = excluded.reads,
-          active_seconds = excluded.active_seconds
-        """);
+    maintenance.rebuildNow();
     return Map.of("rebuilt", true);
   }
+
 
   @GetMapping("/aggregates")
   public Object aggregates() {

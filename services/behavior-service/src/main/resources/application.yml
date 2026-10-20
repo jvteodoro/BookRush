@@ -20,6 +20,13 @@ management:
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
+    issuer: ${BOOKRUSH_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+    jwk-set-uri: ${BOOKRUSH_SECURITY_JWK_SET_URI:http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+    audience: ${BOOKRUSH_SECURITY_AUDIENCE:account}
+    s2s-issuer: ${BOOKRUSH_S2S_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+    s2s-jwk-set-uri: ${BOOKRUSH_S2S_SECURITY_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
+    s2s-audience: ${BOOKRUSH_S2S_SECURITY_AUDIENCE:bookrush-behavior}
+    s2s-scope: ${BOOKRUSH_S2S_SECURITY_SCOPE:bookrush.behavior.read}
   cors:
     allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
   behavior:

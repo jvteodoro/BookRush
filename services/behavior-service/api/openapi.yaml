@@ -1,0 +1,107 @@
+openapi: 3.0.3
+info:
+  title: BookRush Behavior Service
+  version: 0.1.0
+  description: >-
+    Behavioral event ingestion and internal recommendation-serving signals.
+    Recommendation-originated event payloads may include the optional UUID
+    strings recommendationItemId and impressionId; attribution is scoped to the
+    authenticated subject.
+servers:
+  - url: /
+paths:
+  /api/internal/v1/recommendation/signals:
+    post:
+      summary: Read bounded user-book serving signals
+      description: >-
+        Internal S2S endpoint for recommendation serving. The subject is an opaque
+        identity key supplied in the request body and is never placed in the URL.
+        The caller must use the platform realm audience bookrush-behavior and the
+        scope bookrush.behavior.read.
+      operationId: readRecommendationSignals
+      security:
+        - behaviorSignalsS2S: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignalsRequest'
+      responses:
+        '200':
+          description: Bounded signal snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignalsResponse'
+        '400':
+          description: Invalid subject, filter or pagination
+        '401':
+          description: Missing or invalid S2S token
+        '403':
+          description: Valid token without the required S2S scope or audience
+components:
+  securitySchemes:
+    behaviorSignalsS2S:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    SignalsRequest:
+      type: object
+      required: [subject]
+      additionalProperties: false
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+        bookIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+        offset:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          default: 0
+    SignalsResponse:
+      type: object
+      required: [limit, offset, total, hasMore, items]
+      properties:
+        limit: { type: integer }
+        offset: { type: integer }
+        total: { type: integer, format: int64 }
+        hasMore: { type: boolean }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserBookSignal'
+    UserBookSignal:
+      type: object
+      required: [bookId, impressionCount, viewableImpressionCount, openCount,
+        progressEventCount, completionCount, activeSeconds, maxProgress, liked,
+        saved, firstEventAt, lastEventAt]
+      properties:
+        bookId: { type: string, format: uuid }
+        impressionCount: { type: integer, format: int64 }
+        viewableImpressionCount: { type: integer, format: int64 }
+        openCount: { type: integer, format: int64 }
+        progressEventCount: { type: integer, format: int64 }
+        completionCount: { type: integer, format: int64 }
+        activeSeconds: { type: integer, format: int64 }
+        maxProgress: { type: number, format: double, minimum: 0, maximum: 100 }
+        liked: { type: boolean }
+        saved: { type: boolean }
+        firstEventAt: { type: string, format: date-time }
+        lastEventAt: { type: string, format: date-time }
+        lastOpenedAt: { type: string, format: date-time, nullable: true }
+        lastProgressAt: { type: string, format: date-time, nullable: true }
+        lastImpressionAt: { type: string, format: date-time, nullable: true }

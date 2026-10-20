@@ -38,6 +38,7 @@ components:
         requestId: {type: string, format: uuid}
         modelVersion: {type: string}
         rankingVersion: {type: string}
+        candidateSetHash: {type: string, pattern: '^[0-9a-f]{64}$'}
         strategy:
           type: string
           enum: [COLD_START, DIVERSE, LUCKY]
@@ -49,9 +50,11 @@ components:
             properties:
               book: {type: object}
               recommendationRequestId: {type: string, format: uuid}
+              recommendationItemId: {type: string, format: uuid}
               impressionId: {type: string, format: uuid}
               modelVersion: {type: string}
               rank: {type: integer}
+              score: {type: number, nullable: true}
               reason:
                 type: string
                 enum: [popular-cold-start, diversity-heuristic, lucky-exploration, analytics-score]
