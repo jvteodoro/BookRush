@@ -53,6 +53,13 @@ seed. Its weights are bootstrap/unvalidated and must not be interpreted as
 probabilities. The class is covered independently until the live profile and
 source providers are wired into the HTTP feed.
 
+`ExplorationPolicy` replaces implicit hash-only lucky ordering with an explicit
+epsilon/slot policy. It is configurable, bounded by a quota, deterministic for
+the same request seed and policy version, excludes already selected IDs, and
+returns an auditable reason/draw. It is not a contextual bandit and does not
+claim engagement probabilities; the simulation test checks approximate quota
+behavior without production traffic.
+
 `BookDiversityMmr` provides the post-score, book-level diversity step. It uses
 `lambda * score - (1-lambda) * maxCosineToSelected`, has deterministic ID
 tie-breaking, and records the selected candidate's redundancy/rationale. A
