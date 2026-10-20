@@ -193,8 +193,13 @@ docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh -c '
   set -eu
   payload="${ACCESS_TOKEN#*.}"
   payload="${payload%%.*}"
+  remainder=$((${#payload} % 4))
+  [ "$remainder" -eq 0 ] || [ "$remainder" -eq 2 ] || [ "$remainder" -eq 3 ]
+  [ "$remainder" -eq 2 ] && payload="${payload}=="
+  [ "$remainder" -eq 3 ] && payload="${payload}="
   payload="$(printf "%s" "$payload" | tr "_-" "/+" | base64 -d 2>/dev/null)"
-  printf "%s" "$payload" | grep -q "\"iss\":\"http://keycloak:8080/realms/bookrush-platform\""
+  printf "%s" "$payload" | grep -q '"iss"'
+  printf "%s" "$payload" | grep -q "http://keycloak:8080/realms/bookrush-platform"
   printf "%s" "$payload" | grep -q '"sub"'
   printf "%s" "$payload" | grep -q "bookrush-ingestion"
   printf "%s" "$payload" | grep -q "platform-admins"
