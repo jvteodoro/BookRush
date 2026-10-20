@@ -32,6 +32,7 @@ COPY services/reader-state-service/catalog-info.yaml services/reader-state-servi
 COPY services/reader-state-service/docs /repo/services/reader-state-service/docs
 COPY services/reader-profile-service/catalog-info.yaml services/reader-profile-service/mkdocs.yml /repo/services/reader-profile-service/
 COPY services/reader-profile-service/docs /repo/services/reader-profile-service/docs
+COPY services/reader-profile-service/api /repo/services/reader-profile-service/api
 COPY services/social-service/catalog-info.yaml services/social-service/mkdocs.yml /repo/services/social-service/
 COPY services/social-service/docs /repo/services/social-service/docs
 COPY services/behavior-service/catalog-info.yaml services/behavior-service/mkdocs.yml /repo/services/behavior-service/
@@ -68,7 +69,7 @@ FROM build AS runtime
 # The deployed image always runs with the production frontend/auth profile.
 # Local development uses `yarn dev` outside this runtime image.
 ENV NODE_ENV=production
-RUN chmod 0755 entrypoint.sh && mkdir -p /app/techdocs && chown -R node:node /app /repo/backstage
+RUN chmod 0755 entrypoint.sh && install -d -o node -g node /app/techdocs
 USER node
 WORKDIR /repo/backstage/packages/backend
 EXPOSE 7007

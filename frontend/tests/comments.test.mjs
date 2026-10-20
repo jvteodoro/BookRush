@@ -12,7 +12,7 @@ const bundled = await build({
     builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const authClient = { fetch() { throw new Error("Unexpected live request"); } };' }));
   } }],
 });
-const { loadComments, postComment } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+const { loadComments, postComment, reportComment } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 const response = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
 
 test('comment loading preserves author identity and text returned by the server', async () => {
@@ -49,4 +49,19 @@ test('failed publication is an error rather than a fabricated successful comment
 
 test('an expired session is distinguished from an empty conversation', async () => {
   await assert.rejects(loadComments('book-id', undefined, async () => response(null, 401)), /sessão expirou/);
+});
+
+test('reporting a comment sends both the book and comment identifiers', async () => {
+  await reportComment('book/id', 'comment-1', '  Conteúdo ofensivo  ', async (url, init) => {
+    assert.equal(url, '/api/v1/social/reports');
+    assert.equal(init.method, 'POST');
+    assert.deepEqual(JSON.parse(init.body), { bookId: 'book/id', commentId: 'comment-1', reason: 'Conteúdo ofensivo' });
+    return response({ id: 'report-1', status: 'OPEN' });
+  });
+});
+
+test('an empty report reason is rejected without a request', async () => {
+  let requests = 0;
+  await assert.rejects(reportComment('book-id', 'comment-1', ' ', async () => { requests++; return response({}); }), /motivo/);
+  assert.equal(requests, 0);
 });

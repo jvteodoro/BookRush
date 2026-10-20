@@ -22,6 +22,11 @@ O serviço escuta somente em `127.0.0.1:18084`. O gateway publica a console em
 raiz; não exponha o container diretamente na Internet. O job Jenkins `bookrush-admin-web` executa
 build, lint e imagem, e só faz deploy quando o parâmetro `DEPLOY` é marcado.
 
+O Nginx da imagem encaminha `/api/v1/admin/` para o `admin-service` pela rede
+interna do Compose. Assim, tanto o caminho `/admin/` no gateway quanto o host
+administrativo dedicado mantêm a API na mesma origem do navegador, preservam o
+bearer recebido e não dependem de CORS entre domínios.
+
 O build publicado usa `VITE_BASE_PATH=/admin/` por padrão e a pipeline também o
 passa explicitamente. Sem esse valor, o
 Vite gera referências como `/assets/index.js`; o gateway encaminha essa URL ao

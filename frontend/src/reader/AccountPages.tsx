@@ -1,8 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
-import { Switch } from "../components/ui/Switch";
 import type { ReaderTab } from "../components/layout/AppShell";
+import { PrivacyPage } from "./PrivacyPage";
 
 type AccountRuntime = {
   __BOOKRUSH_PROFILE__?: {
@@ -13,21 +13,6 @@ type AccountRuntime = {
   __BOOKRUSH_ADMIN_USERS__?: unknown[];
   __BOOKRUSH_ADMIN_REPORTS__?: unknown[];
   __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[];
-  __BOOKRUSH_API__?: {
-    privacy?: () => Promise<PrivacyPreferences>;
-    updatePrivacy?: (
-      preferences: PrivacyPreferences,
-    ) => Promise<PrivacyPreferences>;
-  };
-};
-
-type Visibility = "PUBLIC" | "FOLLOWERS" | "PRIVATE";
-type PrivacyPreferences = {
-  profileVisibility: Visibility;
-  activityVisibility: Visibility;
-  libraryVisibility: Visibility;
-  recentVisibility: Visibility;
-  socialGraphVisibility: Visibility;
 };
 type PlantState = {
   formulaVersion?: string;
@@ -83,20 +68,6 @@ export function AccountPage({
 }: Props) {
   const profile = accountRuntime().__BOOKRUSH_PROFILE__;
   const displayName = profile?.displayName?.trim() || userName;
-  const [privacy, setPrivacy] = useState<PrivacyPreferences>();
-  const [privacyStatus, setPrivacyStatus] = useState("");
-
-  useEffect(() => {
-    if (tab !== "privacy") return;
-    const load = accountRuntime().__BOOKRUSH_API__?.privacy;
-    if (!load) return;
-    void load()
-      .then(setPrivacy)
-      .catch(() =>
-        setPrivacyStatus("Não foi possível carregar a privacidade."),
-      );
-  }, [tab]);
-
   if (tab === "plant") {
     return (
       <section className="br-account-page">
@@ -180,79 +151,7 @@ export function AccountPage({
   }
 
   if (tab === "privacy") {
-    const current =
-      privacy ??
-      ({
-        profileVisibility: profile?.isPublic === false ? "PRIVATE" : "PUBLIC",
-        activityVisibility: "PUBLIC",
-        libraryVisibility: "PRIVATE",
-        recentVisibility: "PRIVATE",
-        socialGraphVisibility: "PUBLIC",
-      } satisfies PrivacyPreferences);
-    const update = (key: keyof PrivacyPreferences) => {
-      const next: PrivacyPreferences = {
-        ...current,
-        [key]: current[key] === "PUBLIC" ? "PRIVATE" : "PUBLIC",
-      };
-      setPrivacy(next);
-      setPrivacyStatus("Salvando…");
-      const save = accountRuntime().__BOOKRUSH_API__?.updatePrivacy;
-      if (!save) return;
-      void save(next)
-        .then((saved) => {
-          setPrivacy(saved);
-          setPrivacyStatus("Preferências salvas");
-        })
-        .catch(() => setPrivacyStatus("Não foi possível salvar."));
-    };
-    return (
-      <section className="br-account-page">
-        <PageHeading
-          eyebrow="CONTROLE DE VISIBILIDADE"
-          title="Privacidade"
-          description="Você escolhe o que compartilhar com outros leitores."
-        />
-        <Card className="br-account-panel">
-          <h2>Visibilidade do perfil</h2>
-          <p className="br-muted">
-            Estas preferências controlam a exposição das suas atividades no
-            produto.
-          </p>
-          <Switch
-            className="br-privacy-option"
-            label="Perfil público"
-            checked={current.profileVisibility === "PUBLIC"}
-            onChange={() => update("profileVisibility")}
-          />
-          <Switch
-            className="br-privacy-option"
-            label="Atividade de leitura"
-            checked={current.activityVisibility === "PUBLIC"}
-            onChange={() => update("activityVisibility")}
-          />
-          <Switch
-            className="br-privacy-option"
-            label="Biblioteca"
-            checked={current.libraryVisibility === "PUBLIC"}
-            onChange={() => update("libraryVisibility")}
-          />
-          <Switch
-            className="br-privacy-option"
-            label="Sequência de leitura"
-            checked={current.recentVisibility === "PUBLIC"}
-            onChange={() => update("recentVisibility")}
-          />
-          <ActionRow>
-            <Button onClick={() => onNavigate("profile")}>
-              Voltar ao perfil
-            </Button>
-            <span className="br-muted" role="status">
-              {privacyStatus}
-            </span>
-          </ActionRow>
-        </Card>
-      </section>
-    );
+    return <PrivacyPage onBack={() => onNavigate("profile")} />;
   }
 
   if (tab === "admin") {

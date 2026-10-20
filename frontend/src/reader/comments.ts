@@ -43,4 +43,25 @@ export async function postComment(
     );
   return response.json();
 }
+export async function reportComment(
+  bookId: string,
+  commentId: string,
+  reason: string,
+  fetcher: Fetcher = authClient.fetch.bind(authClient),
+): Promise<void> {
+  const detail = reason.trim();
+  if (!detail || detail.length > 120)
+    throw new Error("Informe um motivo com até 120 caracteres.");
+  const response = await fetcher(apiRoutes.social.reports(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bookId, commentId, reason: detail }),
+  });
+  if (!response.ok)
+    throw new Error(
+      response.status === 401
+        ? "Sua sessão expirou. Entre novamente."
+        : "Não foi possível denunciar o comentário.",
+    );
+}
 import { apiRoutes } from "../app/apiRoutes";
