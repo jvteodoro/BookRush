@@ -110,6 +110,8 @@ public class BookrushSecurityAutoConfiguration {
             .forEach(value -> authorities.add(new SimpleGrantedAuthority("ROLE_" + value)));
       }
       var identity = new TechnicalIdentity(jwt.getIssuer().toString(), jwt.getSubject());
+      AgeCategory age = AgeCategory.fromBirthdate(jwt.getClaimAsString("birthdate"), Clock.systemUTC());
+      authorities.add(new SimpleGrantedAuthority("AGE_" + age.name()));
       return new JwtAuthenticationToken(jwt, authorities, identity.toString());
     }
   }
