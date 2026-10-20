@@ -27,6 +27,11 @@ feed:
     page-size: ${FEED_RETRIEVAL_PAGE_SIZE:100}
     max-pages: ${FEED_RETRIEVAL_MAX_PAGES:5}
     version: ${FEED_RETRIEVAL_VERSION:catalog-page-v1}
+    union-version: ${FEED_RETRIEVAL_UNION_VERSION:union-v1}
+    semantic-quota: ${FEED_RETRIEVAL_SEMANTIC_QUOTA:200}
+    global-quota: ${FEED_RETRIEVAL_GLOBAL_QUOTA:150}
+    trending-quota: ${FEED_RETRIEVAL_TRENDING_QUOTA:100}
+    exploration-quota: ${FEED_RETRIEVAL_EXPLORATION_QUOTA:50}
   ranking:
     enabled: ${FEED_ANALYTICS_RANKING_ENABLED:${FEED_EXCERPTS_ENABLED:false}}
     model-version: ${FEED_ANALYTICS_RANKING_MODEL_VERSION:analytics-aware-v1}

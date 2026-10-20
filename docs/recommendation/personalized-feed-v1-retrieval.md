@@ -20,6 +20,14 @@ The implementation is intentionally catalog-backed and bounded. Future PFV1
 retrievers can combine semantic, global, trending, and exploration sources
 behind `CandidateRetriever` without coupling those changes to the ranker.
 
+`CandidateUnionBuilder` now provides that source-union contract: each provider
+supplies named candidates, semantic candidates are ordered by cosine similarity
+when a `UserTasteProfile` is available, quotas prevent one source from
+monopolizing the pool, and duplicate books retain all contributing source names.
+The union is deterministic and bounded. The current catalog API has no trending
+or embedding-vector serving endpoint, so the live adapter remains catalog-backed
+until those providers are connected; no fake trending signal is generated.
+
 Validation is covered by `CatalogCandidateRetrieverTest`, including a book
 returned beyond the former first-page boundary, duplicate IDs, missing
 embeddings, and bounded pagination.
