@@ -3,6 +3,10 @@ import jenkins.model.JenkinsLocationConfiguration
 import hudson.model.*
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
+import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
+import hudson.plugins.git.GitSCM
+import hudson.plugins.git.UserRemoteConfig
+import hudson.plugins.git.BranchSpec
 import com.cloudbees.plugins.credentials.CredentialsScope
 import com.cloudbees.plugins.credentials.domains.Domain
 import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl
@@ -137,9 +141,23 @@ if (!(backstageJob.getDefinition() instanceof CpsFlowDefinition) || backstageJob
     backstageJob.setDefinition(new CpsFlowDefinition(backstageScript, true))
     backstageJob.save()
 }
-def pipelineScript = pipelineFile.text
-if (!(job.getDefinition() instanceof CpsFlowDefinition) || job.getDefinition().getScript() != pipelineScript) {
-    job.setDefinition(new CpsFlowDefinition(pipelineScript, true))
+// Keep the deploy job's pipeline definition in Git. The BRANCH parameter is
+// expanded by the Git plugin before Jenkins loads Jenkinsfile, so a build of a
+// feature branch executes the pipeline from that same branch. This prevents a
+// stale CpsFlowDefinition in jenkins_home from silently masking pushed changes.
+def deployScm = new GitSCM(
+    [new UserRemoteConfig('https://github.com/jvteodoro/BookRush.git', null, null, null)],
+    [new BranchSpec('*/${BRANCH}')],
+    false,
+    [],
+    null,
+    null,
+    []
+)
+def deployDefinition = new CpsScmFlowDefinition(deployScm, 'Jenkinsfile')
+deployDefinition.setLightweight(false)
+if (!(job.getDefinition() instanceof CpsScmFlowDefinition)) {
+    job.setDefinition(deployDefinition)
     job.save()
 }
 job.removeProperty(ParametersDefinitionProperty.class)
@@ -147,6 +165,7 @@ job.addProperty(new ParametersDefinitionProperty([
     new StringParameterDefinition('BRANCH', 'main', 'Branch a compilar e implantar.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação após o build.'),
     new BooleanParameterDefinition('ANALYTICS_GPU', false, 'Construir e implantar o runtime analytics com PyTorch CUDA e override NVIDIA.'),
+    new ChoiceParameterDefinition('FEED_PERSONALIZED_MODE', ['OFF', 'ON'] as String[], 'Ativar o fluxo novo de feed personalizado no Compose.'),
     new ChoiceParameterDefinition('DEPLOY_TARGET', ['compose', 'kubernetes'] as String[], 'Destino.'),
     new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git HTTPS opcional.'),
     new StringParameterDefinition('REGISTRY', '', 'Registry opcional para Compose.'),
