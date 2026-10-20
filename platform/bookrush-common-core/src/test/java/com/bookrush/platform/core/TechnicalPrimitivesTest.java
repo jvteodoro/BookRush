@@ -30,4 +30,15 @@ class TechnicalPrimitivesTest {
         java.io.IOException.class,
         () -> Sha256.digest(new ByteArrayInputStream(new byte[] {1, 2, 3}), 2));
   }
+  @Test
+void ageCategoryFailsClosed() {
+  var clock = java.time.Clock.fixed(java.time.Instant.parse("2026-10-20T00:00:00Z"), java.time.ZoneOffset.UTC);
+  assertEquals(AgeCategory.ADULT, AgeCategory.fromBirthdate("2008-10-20", clock));
+  assertEquals(AgeCategory.MINOR, AgeCategory.fromBirthdate("2008-10-21", clock));
+  assertEquals(AgeCategory.UNKNOWN, AgeCategory.fromBirthdate(null, clock));
+  assertEquals(AgeCategory.UNKNOWN, AgeCategory.fromBirthdate("2999-01-01", clock));
+  assertEquals(AgeCategory.UNKNOWN, AgeCategory.fromBirthdate("nope", clock));
+  assertFalse(AgeCategory.UNKNOWN.canAccess(18));
+  assertTrue(AgeCategory.MINOR.canAccess(0));
+}
 }
