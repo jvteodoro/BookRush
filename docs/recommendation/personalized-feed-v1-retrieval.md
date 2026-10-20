@@ -52,3 +52,9 @@ full `Breakdown` alongside the score. Missing features use an explicit policy
 seed. Its weights are bootstrap/unvalidated and must not be interpreted as
 probabilities. The class is covered independently until the live profile and
 source providers are wired into the HTTP feed.
+
+`BookDiversityMmr` provides the post-score, book-level diversity step. It uses
+`lambda * score - (1-lambda) * maxCosineToSelected`, has deterministic ID
+tie-breaking, and records the selected candidate's redundancy/rationale. A
+missing embedding has a documented zero-similarity fallback and never produces
+NaN. This is intentionally separate from excerpt-level analytics MMR.
