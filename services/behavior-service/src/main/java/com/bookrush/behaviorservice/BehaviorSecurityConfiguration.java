@@ -22,6 +22,7 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -52,13 +53,18 @@ public class BehaviorSecurityConfiguration {
       @Value("${bookrush.security.s2s-audience}") String s2sAudience) {
     JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
     AuthenticationManager product = manager(productDecoder, converter);
-    JwtDecoder s2sDecoder = NimbusJwtDecoder.withJwkSetUri(s2sJwkSetUri).build();
+    // Keycloak signs service tokens with RS256.  Make the accepted algorithm
+    // explicit so Nimbus cannot select an encryption key (the same JWKS also
+    // contains RSA-OAEP keys) when the platform realm rotates its keys.
+    NimbusJwtDecoder s2sDecoder = NimbusJwtDecoder.withJwkSetUri(s2sJwkSetUri)
+        .jwsAlgorithm(SignatureAlgorithm.RS256)
+        .build();
     OAuth2TokenValidator<Jwt> audience = token ->
         token.getAudience() != null && token.getAudience().contains(s2sAudience)
             ? OAuth2TokenValidatorResult.success()
             : OAuth2TokenValidatorResult.failure(
                 new OAuth2Error("invalid_token", "required audience is missing", null));
-    ((NimbusJwtDecoder) s2sDecoder).setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+    s2sDecoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
         JwtValidators.createDefaultWithIssuer(s2sIssuer), audience));
     AuthenticationManager s2s = manager(s2sDecoder, converter);
     return request -> request.getRequestURI().startsWith("/api/internal/v1/recommendation/")

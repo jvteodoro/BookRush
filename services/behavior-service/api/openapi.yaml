@@ -17,7 +17,8 @@ paths:
         Internal S2S endpoint for recommendation serving. The subject is an opaque
         identity key supplied in the request body and is never placed in the URL.
         The caller must use the platform realm audience bookrush-behavior and the
-        scope bookrush.behavior.read.
+        scope bookrush.behavior.read. Tokens are RS256 JWTs issued by the
+        bookrush-platform realm.
       operationId: readRecommendationSignals
       security:
         - behaviorSignalsS2S: []

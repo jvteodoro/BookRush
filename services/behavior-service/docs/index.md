@@ -55,6 +55,12 @@ e agregados. O cliente declarativo é
 `bookrush-recommendation-behavior-s2s`; seu segredo deve existir somente no
 ambiente protegido e não é necessário para o serviço responder.
 
+Os tokens S2S são JWTs `RS256` assinados pelo realm `bookrush-platform`. O
+decoder do serviço aceita explicitamente esse algoritmo para não confundir a
+chave de assinatura com chaves RSA de criptografia publicadas no mesmo JWKS.
+Após uma rotação de chaves do Keycloak, o serviço deve ser recriado ou
+reiniciado para recarregar o JWKS antes de validar o smoke S2S.
+
 The ingestion endpoint derives `identity_subject` from the authenticated
 principal and ignores identity fields supplied in the event body. Batches are
 limited to 100 events and payloads to 16 KiB; retries remain idempotent through
