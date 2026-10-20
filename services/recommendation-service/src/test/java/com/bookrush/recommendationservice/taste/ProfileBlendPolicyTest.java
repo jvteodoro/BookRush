@@ -36,6 +36,7 @@ class ProfileBlendPolicyTest {
     cache.invalidate("user-a");
     assertTrue(cache.get("user-a", "bge-v1", "hash", NOW.plusSeconds(1)).isEmpty());
     assertTrue(cache.get("user-b", "bge-v1", "hash", NOW.plusSeconds(1)).isPresent());
+    assertTrue(cache.get("user-b", "bge-v2", "hash", NOW.plusSeconds(1)).isEmpty());
     assertTrue(cache.get("user-b", "bge-v1", "hash", NOW.plusSeconds(61)).isEmpty());
   }
 }

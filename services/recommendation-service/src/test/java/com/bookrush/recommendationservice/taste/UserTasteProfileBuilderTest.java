@@ -61,6 +61,26 @@ class UserTasteProfileBuilderTest {
     assertEquals(1d, profile.vector().getFirst(), 0.000001);
   }
 
+  @Test
+  void replayIsDeterministicAndDifferentSignalsPointToDifferentBooks() {
+    UUID first = UUID.randomUUID();
+    UUID second = UUID.randomUUID();
+    var embeddings = Map.of(first, embedding(first, List.of(1d, 0d)),
+        second, embedding(second, List.of(0d, 1d)));
+    var builder = new UserTasteProfileBuilder(CONFIG);
+    var firstSignals = List.of(new UserTasteProfileBuilder.Signal(first, 0, 1, 1, 0, 100, true, false, NOW));
+    var secondSignals = List.of(new UserTasteProfileBuilder.Signal(second, 0, 1, 1, 0, 100, false, true, NOW));
+
+    var firstRun = builder.build(firstSignals, embeddings, NOW);
+    var replay = builder.build(firstSignals, embeddings, NOW);
+    var secondRun = builder.build(secondSignals, embeddings, NOW);
+
+    assertEquals(firstRun, replay);
+    assertEquals(1d, firstRun.vector().getFirst(), 0.000001);
+    assertEquals(1d, secondRun.vector().get(1), 0.000001);
+    assertEquals(0d, firstRun.vector().get(1), 0.000001);
+  }
+
   private static UserTasteProfileBuilder.BookEmbedding embedding(UUID book, List<Double> vector) {
     return new UserTasteProfileBuilder.BookEmbedding(book, "bge-m3", "2026-01",
         UUID.randomUUID(), "a".repeat(64), vector);

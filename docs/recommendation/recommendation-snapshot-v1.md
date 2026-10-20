@@ -66,6 +66,12 @@ criam afinidade. A ligação remota que materializa vetores ainda deve ser feita
 em uma etapa posterior, pois o snapshot S2S atual expõe metadados e mantém os
 vetores no storage.
 
+As fixtures de `UserTasteProfileBuilderTest` usam vetores ortogonais e horários
+fixos: o replay do mesmo snapshot/configuração é determinístico, sinais
+LIKE/SAVE distintos apontam para direções distintas, `EMPTY` não cria vetor e
+modelo incompatível reduz a cobertura sem virar score zero. O cache também
+recusa leitura com outra versão de modelo.
+
 ## Confidence, cold start e lifecycle
 
 `ProfileBlendPolicy` mantém o cold start compatível com o ranking global:
