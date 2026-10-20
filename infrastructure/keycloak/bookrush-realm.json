@@ -7,28 +7,6 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
 
-  "userProfile": {
-    "attributes": [
-      {
-        "name": "birthdate",
-        "displayName": "Data de nascimento (AAAA-MM-DD)",
-        "validations": {
-          "pattern": {
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "error-message": "Use o formato AAAA-MM-DD"
-          }
-        },
-        "required": {
-          "roles": ["user"]
-        },
-        "permissions": {
-          "view": ["admin", "user"],
-          "edit": ["admin"]
-        }
-      }
-    ]
-  },
-
   "roles": {
     "realm": [
       {
