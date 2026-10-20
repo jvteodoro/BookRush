@@ -142,20 +142,26 @@ public class RecommendationController {
         : analyticsRequired ? rankingProperties.modelVersion() : MODEL_VERSION;
     String candidateSetHash = RecommendationProvenance.candidateSetHash(candidateSet, scoreById, modelVersion);
     if (personalizationDecision.path() == PersonalizedFeedGate.Path.SHADOW) {
-      var shadowRanking = personalizedRank(rankedBooks, scoreById, fatigueById,
-          profileResult, subject, limit);
+      final var shadowInput = rankedBooks;
+      var shadowRanking = feedMetrics.time("personalized_shadow", () -> personalizedRank(shadowInput,
+          scoreById, fatigueById, profileResult, subject, limit));
       var baselineIds = rankedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull)
           .map(UUID::toString).limit(limit).toList();
       var shadowIds = shadowRanking.books().stream().map(this::bookId).filter(java.util.Objects::nonNull)
           .map(UUID::toString).limit(limit).toList();
       int overlap = (int) shadowIds.stream().filter(baselineIds::contains).count();
+      int rankMovement = 0;
+      for (int index = 0; index < shadowIds.size(); index++) {
+        int baselineIndex = baselineIds.indexOf(shadowIds.get(index));
+        if (baselineIndex >= 0) rankMovement += Math.abs(index - baselineIndex);
+      }
       decisionReplay.replayIds(shadowIds,
           profileResult.profile() == null ? "" : profileResult.profile().profileVersion(),
           RecommendationProvenance.candidateSetHash(candidateSet, scoreById,
               PersonalizedRankerV1.MODEL_VERSION), personalizedRanker.configurationHash());
       feedMetrics.observePersonalization(personalizationDecision.path().name(),
           personalizationDecision.reason(), profileResult.profile() == null ? 0 : profileResult.profile().confidence(),
-          profileResult.signals().size(), overlap, 1);
+          profileResult.signals().size(), overlap, 1, rankMovement);
     } else {
       feedMetrics.observePersonalization(personalizationDecision.path().name(),
           personalizationDecision.reason(), profileResult.profile() == null ? 0 : profileResult.profile().confidence(),

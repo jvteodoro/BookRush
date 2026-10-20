@@ -50,4 +50,6 @@ coverage and confidence gates pass. `FEED_PERSONALIZED_ROLLOUT_PERCENTAGE`
 provides deterministic staged activation and setting the mode back to `OFF` is
 the immediate rollback. See
 `docs/recommendation/personalized-feed-v1-operations.md` for replay, metrics
-and the read-only dataset handoff.
+and the read-only dataset handoff. In `SHADOW`, the service records a bounded
+timer plus overlap and aggregate rank movement; these measurements never use
+subject or book IDs as metric labels.

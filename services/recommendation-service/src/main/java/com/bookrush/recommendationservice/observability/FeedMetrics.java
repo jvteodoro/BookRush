@@ -52,11 +52,17 @@ public final class FeedMetrics {
 
   public void observePersonalization(String path, String reason, double confidence,
       int profileSignals, int shadowOverlap, int shadowCompared) {
+    observePersonalization(path, reason, confidence, profileSignals, shadowOverlap, shadowCompared, 0);
+  }
+
+  public void observePersonalization(String path, String reason, double confidence,
+      int profileSignals, int shadowOverlap, int shadowCompared, int rankMovement) {
     count("bookrush.feed.personalized.path", safe(path), 1);
     count("bookrush.feed.personalized.reason", safe(reason), 1);
     count("bookrush.feed.personalized.profile.signals", "count", profileSignals);
     count("bookrush.feed.personalized.shadow.compared", "count", shadowCompared);
     count("bookrush.feed.personalized.shadow.overlap", "count", shadowOverlap);
+    count("bookrush.feed.personalized.shadow.rank_movement", "count", rankMovement);
     count("bookrush.feed.personalized.profile.confidence", confidenceBucket(confidence), 1);
   }
 
