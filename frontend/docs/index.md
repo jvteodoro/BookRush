@@ -290,9 +290,11 @@ com debounce e paginação; não baixa mais os primeiros 50 livros para filtrar
 localmente.
 As respostas do catálogo incluem `thumbnailUrl` quando a edição possui uma
 thumbnail Gutenberg aprovada. A rota exige o bearer do usuário do realm de
-produto; o frontend busca cada imagem com `authClient.fetch`, cria uma URL de
-`Blob` apenas em memória; os componentes revogam suas URLs ao desmontar. Isso evita
-enviar uma URL protegida diretamente em `<img src>` sem credenciais. O shell
+produto; o frontend troca a URL assinada por um `Blob` apenas em memória, mas
+não envia o bearer nessa segunda chamada: a assinatura da URL já autoriza o
+download e evita um preflight `OPTIONS` incompatível com a rota S3. Os
+componentes revogam suas URLs ao desmontar. Isso evita enviar uma URL protegida
+diretamente em `<img src>` sem credenciais. O shell
 aplica as imagens autenticadas nas capas do feed, recomendações, busca,
 biblioteca e sorteio; se a rota retornar `404`, o gradiente gerado permanece
 como fallback.
