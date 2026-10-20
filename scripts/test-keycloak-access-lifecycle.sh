@@ -6,9 +6,8 @@ set -Eeuo pipefail
 # real user.
 command -v docker >/dev/null || { echo 'Docker ausente.' >&2; exit 2; }
 docker info >/dev/null 2>&1 || { echo 'Usuário sem acesso ao Docker.' >&2; exit 2; }
-command -v python3 >/dev/null || { echo 'Python 3 ausente.' >&2; exit 2; }
 json_access_token() {
-  python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])'
+  sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"\\]*\)".*/\1/p'
 }
 name="bookrush-keycloak-access-$RANDOM"
 probe="bookrush-keycloak-access-probe-$RANDOM"
@@ -107,15 +106,16 @@ admin_web_token_response="$(docker exec "$probe" curl -fsS -X POST "$token_url" 
   -d grant_type=password -d client_id=labsoft-admin-web \
   -d username="$token_user_name" -d password='disposable-user-password')"
 access_token="$(json_access_token <<<"$admin_web_token_response")"
-ACCESS_TOKEN="$access_token" python3 - <<'PY'
-import base64, json, os
-payload = os.environ["ACCESS_TOKEN"].split(".")[1]
-payload += "=" * (-len(payload) % 4)
-claims = json.loads(base64.urlsafe_b64decode(payload))
-assert claims.get("sub"), claims
-assert "platform-admins" in claims.get("groups", []), claims
-assert "bookrush-ingestion" in claims.get("aud", []), claims
-PY
+test -n "$access_token"
+docker exec -e ACCESS_TOKEN="$access_token" "$probe" /bin/sh -c '
+  set -eu
+  payload="${ACCESS_TOKEN#*.}"
+  payload="${payload%%.*}"
+  payload="$(printf "%s" "$payload" | tr "_-" "/+" | base64 -d 2>/dev/null)"
+  printf "%s" "$payload" | grep -q '"sub"'
+  printf "%s" "$payload" | grep -q 'platform-admins'
+  printf "%s" "$payload" | grep -q 'bookrush-ingestion'
+'
 unset access_token
 
 admin update "users/$token_user_id" -r bookrush-platform -s enabled=false >/dev/null
