@@ -40,7 +40,7 @@ atual, diagramas E/R, linhagem, anotações humanas e consumidores. O
 as limitações atuais.
 O [relatório de integração de excerpts no feed](analytics/excerpt-feed-integration.md)
 descreve o que já está persistido, o contrato interno disponível e as etapas
-necessárias para apresentar trechos com fallback seguro.
+necessárias para mostrar trechos com fallback seguro.
 O [registro de execução da integração V1](analytics/excerpt-feed-integration-v1-beads.md)
 mantém o mapa dos beads importados, suas evidências e o gate final.
 
