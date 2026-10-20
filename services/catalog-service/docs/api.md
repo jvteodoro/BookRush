@@ -19,6 +19,12 @@ realm de produto `bookrush`. Ele redireciona para uma URL temporária assinada
 de um thumbnail aprovado. O frontend deve buscar a imagem com `Authorization`
 e usar uma URL de `Blob`; uma tag `<img src="...">` não envia bearer
 automaticamente.
+Quando não há asset aprovado, a API preserva o `404` original; ele não é
+convertido em `403` pelo dispatch de erro do Spring Security.
+O bearer precisa conter o scope `bookrush.catalog.read`; a cadeia de segurança
+da rota converte explicitamente esse claim em `SCOPE_bookrush.catalog.read`
+antes de avaliar a autorização. Tokens emitidos antes da concessão do scope
+devem ser renovados com novo login.
 
 O contrato machine-readable está em api/openapi.yaml, exportado de Springdoc. API Catalog o exibe; endpoints não são duplicados nesta página. Atualize o arquivo a partir da mesma revisão do serviço usando backstage/scripts/export-openapi.py. Breaking changes requerem revisão de consumidores; erros HTTP diferenciam autenticação, validação e indisponibilidade.
 
@@ -34,6 +40,11 @@ textual não encontra todos os resultados.
 resultados são ordenados por relevância textual e depois por título. `size` é
 limitado a 100. A aba Buscar usa esta API diretamente e solicita somente a
 página atual.
+
+O endpoint reader de capítulos seleciona somente a projeção da versão TXT
+`AVAILABLE` mais recente, mesmo quando o asset lógico anterior já foi marcado
+`INACTIVE` durante um reprocessamento. Projeções antigas continuam no banco
+para rastreabilidade, mas não aparecem na navegação do leitor.
 
 Consumidores como ingestão e analytics consultam o catálogo pelas rotas internas,
 sem credenciais ou conexão direta ao PostgreSQL:
@@ -57,8 +68,47 @@ continuam sujeitos às rotas de distribuição e às políticas de direitos.
 `COVER` em estado `ACTIVE` e responde com um redirecionamento para uma URL S3
 temporária. O serviço valida issuer e audience do token do realm de produto;
 ausência ou rejeição do bearer retorna `401`, e ausência de capa retorna `404`.
+Uma capa com distribuição aprovada pode ser exibida enquanto o livro estiver
+`REVIEW_REQUIRED`; isso não libera o conteúdo textual nem os downloads do livro.
 A listagem de livros retorna `thumbnailUrl` apontando para essa rota.
+
+## Fila administrativa de revisão
+
+`GET /api/admin/books/review?page=0&size=25` lista livros em
+`REVIEW_REQUIRED`, incluindo o estado do asset e da versão física atual. A
+consulta exige `bookrush.catalog.read` (ou autoridade administrativa
+equivalente); `size` é limitado a 100.
+
+`POST /api/admin/books/{bookId}/approve` muda um livro de `REVIEW_REQUIRED`
+para `ACTIVE` e exige `bookrush.catalog.write` ou `bookrush.assets.write`.
+`POST /api/admin/books/{bookId}/assets/{assetId}/approve` aprova o asset e
+continua exigindo `bookrush.assets.write`. A aprovação do livro e a aprovação
+do thumbnail são deliberadamente separadas: reprocessar um livro apenas cria
+ou atualiza o asset, não libera a obra automaticamente.
+
+`GET /api/admin/books/{bookId}/assets/{assetId}/download-url` gera uma URL
+pré-assinada curta para inspeção administrativa do arquivo. O painel abre essa
+URL apenas durante a revisão: imagens são renderizadas diretamente, TXT/JSON
+como texto e EPUB em leitor embutido. O objeto continua privado e a URL não
+deve ser persistida.
+
+`GET /api/admin/books/approval-history?page=0&size=25` lista as decisões de
+aprovação e revogação com livro, ator, horários, transição de status e estado
+atual. `POST /api/admin/books/{bookId}/revoke-approval` retorna um livro cuja
+aprovação editorial foi registrada para `REVIEW_REQUIRED`. A operação é
+idempotente para livros já nessa fila e não revoga livros `ACTIVE` que nunca
+foram aprovados pelo fluxo editorial.
+
+Os timestamps PostgreSQL `timestamptz` são convertidos de
+`OffsetDateTime` para `Instant` na resposta JSON; consumidores não devem
+inferir o fuso a partir do texto formatado.
+
 ## Reader chapters
+
+`GET /api/v1/books/{bookId}/reader-assets/{assetId}/content` é uma fronteira
+interna autenticada por `X-Content-Service-Token` usada pelo
+`book-content-service` para ler o EPUB SOURCE. Não deve ser chamada pelo
+navegador e não retorna URL permanente de storage.
 
 `GET /api/v1/books/{bookId}/reader-assets/chapters` returns the persisted
 chapter projection for the book, including the exact text asset version,

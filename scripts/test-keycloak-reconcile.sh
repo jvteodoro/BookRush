@@ -81,4 +81,13 @@ docker cp "$work_dir/rendered/bookrush-platform-realm.json" "$cli:/tmp/bookrush-
 docker start -a "$cli"
 
 docker exec "$probe" curl -fsS 'http://127.0.0.1:8080/realms/bookrush-platform/.well-known/openid-configuration' >/dev/null
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh config credentials \
+  --server http://127.0.0.1:8080 --realm master --user admin --password "$admin_password" >/dev/null
+service_account_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get users \
+  -r bookrush-platform -q username=service-account-bookrush-ingestion-admin \
+  --fields id --format csv --noquotes | awk 'NR == 1 { first = $0 } END { print first }')"
+test -n "$service_account_id"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
+  "users/$service_account_id/role-mappings/realm" -r bookrush-platform \
+  --fields name --format csv --noquotes | grep -qx 'platform-operator'
 echo 'Keycloak IaC render + import + reconcile: OK (ambiente descartável)'

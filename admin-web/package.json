@@ -7,11 +7,17 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "node --test tests/annotation-studio.e2e.mjs",
+    "test:coverage": "node --test --experimental-test-coverage tests/*.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.16",
     "axios": "^1.7.7",
+    "epubjs": "^0.3.93",
     "keycloak-js": "^26.0.5",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
@@ -28,6 +34,7 @@
     "eslint": "^9.15.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.14",
+    "prettier": "^3.6.2",
     "globals": "^15.12.0",
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.15.0",

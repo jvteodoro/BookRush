@@ -75,11 +75,24 @@ remota participam do build. Alterações locais deste diretório não são impla
 O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
+O estágio `Validação Mobile` executa `npm ci`, `npm run typecheck` e
+`EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export` em `mobile/` usando
+`node:20-bookworm`. O bundle Android em `mobile/dist/` é arquivado como
+artefato; a dependência `expo-asset` fica fixada no lockfile para o export do
+Expo SDK 52. Isso valida o aplicativo, mas não publica APK nem substitui um
+job de distribuição mobile.
 
 Antes dos builds, as pipelines executam `scripts/validate-change.sh --ci`.
 Esse gate exige documentação ou contrato para mudanças de código, infraestrutura
 e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
 executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
+
+No job principal, `scripts/test-portal.sh --validation-only` executa contratos,
+TechDocs, TypeScript, lint e testes sem exportar ou desempacotar uma imagem
+Backstage que não será implantada por esse job. A imagem runtime fica a cargo
+da pipeline dedicada do Backstage. Nela, o runtime mantém dependências como
+somente leitura e concede escrita apenas a `/app/techdocs`, evitando um
+`chown -R` demorado sobre toda a árvore de dependências.
 
 O gate roda em um container Python efêmero. Como o agente Jenkins usa o socket
 Docker e o workspace está no volume nomeado `jenkins_home`, a etapa usa
@@ -121,15 +134,54 @@ deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+### Pipeline dedicada do SeaweedFS
+
+O bootstrap cria o job `bookrush-seaweedfs` a partir de
+`seaweedfs.Jenkinsfile`. A execução normal apenas valida a infraestrutura,
+executa `scripts/test-storage.sh` e constrói a imagem customizada. Use
+`PUBLISH=true` com `REGISTRY` para publicar a imagem; use `DEPLOY=true` para
+recriar somente SeaweedFS, o proxy OIDC e o reverse-proxy no Compose de
+produção. O deploy exige que o container atual esteja saudável e possui
+rollback automático para a imagem anterior. O volume persistente não é
+removido.
+
+O Compose aceita `SEAWEEDFS_IMAGE` para que a pipeline injete a imagem
+construída sem alterar o `.env` protegido. O valor padrão continua sendo
+`bookrush/seaweedfs:4.46`. O procedimento, parâmetros e limites estão em
+[`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
+
+Se o container existente estiver parado (`exited`), a pipeline dedicada pode
+recuperá-lo preservando o volume persistente; essa exceção é limitada ao job
+`bookrush-seaweedfs` e não permite substituir um container `unhealthy`.
+
 ### Importação Gutenberg (opt-in)
 
 O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para
 executá-lo, marque `RUN_GUTENBERG_IMPORT`, informe apenas IDs numéricos em
 `GUTENBERG_EXTERNAL_IDS` e mantenha `GUTENBERG_DRY_RUN` marcado na primeira
 execução. O job usa a credential Jenkins Secret text indicada por
-`INGESTION_CREDENTIAL_ID` como Bearer token; o token nunca é gravado no
-relatório. A chave de idempotência é derivada do commit, IDs, modo e URL, então
-repetir o build não cria uma segunda execução lógica.
+`INGESTION_CREDENTIAL_ID` como segredo do client OIDC
+`bookrush-ingestion-admin`, solicita um access token de curta duração a cada
+execução e nunca grava o segredo ou o token no relatório. A chave de
+idempotência inclui também o identificador da build Jenkins: uma mesma build
+continua idempotente, mas uma nova tentativa deliberada pode reprocessar o
+mesmo livro sem receber o resultado de uma tentativa anterior que falhou.
+
+O estágio declara Bash como o primeiro byte do script do agente, pois usa
+arrays, `[[ ]]` e here-strings para validar os IDs e o JSON.
+O agente Jenkins também inclui `jq` na imagem base; ele é usado para validar a
+resposta OIDC, montar o payload e acompanhar o job Gutenberg.
+
+Na instalação Compose, essa Secret Text é provisionada idempotentemente pelo
+`init.groovy.d/bookrush.groovy`, convertendo o valor para o tipo Secret do
+Jenkins e usando o mesmo segredo protegido do client
+OIDC do Jenkins. O provisionamento ocorre somente no startup do Jenkins e não
+grava o segredo no repositório.
+
+Para reprocessar um livro já importado e atualizar o EPUB, capítulos, TXT e
+thumbnail, desmarque `GUTENBERG_DRY_RUN` e mantenha
+`GUTENBERG_PROCESS_ASSETS` marcado. Esse modo envia `processAssets=true` e
+`reprocess=true`; ele é deliberado e não é executado em deploys normais.
 
 O estágio consulta o job até o limite escolhido em
 `GUTENBERG_TIMEOUT_MINUTES`, arquiva `gutenberg-import-report.json` e falha a
@@ -143,9 +195,31 @@ ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
 deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
-frontend, perfis de leitores e social; isso garante que contratos usados pelo
-frontend sejam implantados na mesma revisão. PostgreSQL, Redis, pgAdmin e
-Jenkins são preservados.
+frontend, perfis de leitores, social, `admin-service` e `admin-web`; isso garante
+que contratos usados pelas interfaces sejam implantados na mesma revisão.
+PostgreSQL, Redis, pgAdmin e Jenkins são preservados.
+
+Antes de aceitar a revisão, o deploy também obtém um token técnico do realm
+administrativo e consulta `/api/v1/admin/users` pelo `admin-service`. Esse smoke
+autenticado valida, em uma única chamada, os papéis do operador técnico, o
+segredo do cliente de gerenciamento e o acesso ao realm de usuários; qualquer
+falha aciona diagnóstico e rollback.
+
+Os smokes aguardam por até um minuto a convergência de DNS, proxy e aplicações
+depois dos healthchecks. A verificação de usuários atravessa o proxy de mesma
+origem empacotado na própria imagem `admin-web` da revisão. Ela não depende do
+`dynamic.yaml` montado no Traefik a partir do checkout estável do host, que pode
+estar temporariamente atrás da branch. O console registra somente o status HTTP
+de tentativas malsucedidas; bearer, secrets e respostas com usuários não são
+expostos. Respostas `401` e `403` encerram as tentativas imediatamente porque
+representam contrato de identidade, não atraso de inicialização.
+
+Um job parametrizado pode carregar o Jenkinsfile da `main` antes de fazer o
+checkout de uma feature. Enquanto a `main` ainda não conhecer as imagens
+administrativas, `deploy-compose.sh` deriva suas tags das imagens de catálogo e
+frontend e constrói localmente somente as que estiverem ausentes. Depois que o
+Jenkinsfile novo estiver na `main`, as imagens são normalmente construídas e
+publicadas no estágio **Imagens**, e esse fallback não executa builds adicionais.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
 perfil e social para as imagens criadas pela construção atual.
@@ -219,3 +293,81 @@ O deploy Compose exige as imagens `BACKEND_IMAGE`, `INGESTION_IMAGE`,
 constrói/publica todas elas antes de executar o script de deploy. Essa matriz
 também é refletida em `infrastructure/compose.yaml`, evitando que uma imagem
 obrigatória fique apenas com o fallback `:local`.
+
+Os jobs de social, publisher, behavior e admin devem executar `mvn verify` e
+construir as imagens correspondentes depois de uma alteração. O admin-web usa
+`VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for
+ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
+quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
+cliente possui `query-users`/`view-users`/`manage-users` no `realm-management` do realm de
+produto `bookrush`. A autenticação humana do painel continua no realm separado
+`bookrush-platform`.
+
+Na primeira ativação do `admin-service`, provisionar e validar o cliente sem
+exibir ou versionar o segredo:
+
+```bash
+infrastructure/keycloak/provision-admin-service-client.sh --env-file .env
+infrastructure/keycloak/reconcile.sh --env-file .env
+bash scripts/test-keycloak-admin-service-client.sh .env
+```
+
+O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
+e concede apenas `query-users`, `view-users` e `manage-users` à conta de serviço. O teste
+valida token, roles e acesso à API de usuários sem imprimir credenciais.
+Quando uma instalação anterior ainda não possui
+`KEYCLOAK_ADMIN_CLIENT_SECRET` no arquivo protegido, a reconciliação cria o
+cliente e o deploy consulta seu segredo pela API administrativa do Keycloak.
+O valor é capturado com `xtrace` desativado, permanece apenas no processo de
+deploy e é injetado no container do `admin-service`; ele não é gravado no
+workspace nem exibido no log do Jenkins.
+
+Essa consulta também é feita quando já existe uma cópia do segredo no arquivo
+protegido. O valor vigente no Keycloak persistente tem precedência, evitando
+falhas após criação ou rotação da credencial; a cópia configurada permanece
+como fallback se a API administrativa não puder ser consultada.
+
+Como o `keycloak-config-cli` pode preservar mappings antigos de uma conta de
+serviço já existente, o deploy reaplica idempotentemente as roles mínimas
+`query-users`, `view-users` e `manage-users` antes de iniciar o `admin-service`.
+Essa etapa não rotaciona credenciais e não altera usuários ou sessões.
+As mesmas três roles são incluídas explicitamente nos scope mappings do cliente,
+portanto a integração também funciona quando `Full Scope Allowed` está
+desabilitado sem liberar todas as demais roles atribuídas à conta de serviço.
+O deploy fixa token URI, Admin API e client ID no realm de produto `bookrush`
+antes de renderizar o Compose. Valores antigos no arquivo protegido não podem,
+portanto, validar um realm no preflight e direcionar o serviço para outro.
+
+`ADMIN_WEB_ADMIN_USERNAME` identifica o usuário humano do realm
+`bookrush-platform` que deve administrar a aplicação. O reconcile o mantém no
+grupo `platform-admins`; após uma primeira concessão, o usuário deve sair e
+entrar novamente para receber a role no access token.
+O mesmo reconcile mantém no cliente `labsoft-admin-web` um mapper explícito de
+`sub`, usado pelo `admin-service` como identidade canônica de auditoria.
+
+O Nginx do `admin-web` resolve `admin-service` pelo DNS interno do Docker no
+momento de cada chamada. Assim, o painel pode iniciar enquanto o serviço está
+sendo recriado sem encerrar por uma corrida de DNS durante o deploy Compose.
+
+O usuário permanente `codex-jenkins-agent` também permanece nos grupos
+`operators` e `platform-operators`; a associação é reconciliada no realm e é
+necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.
+O cliente `bookrush-jenkins` também publica a audience `bookrush-ingestion`,
+mantendo os tokens emitidos para smoke tests compatíveis com os serviços
+de plataforma. O mapper `jenkins-subject` e o client scope `profile` também
+emitem a claim OIDC `sub`, necessária para associar o actor autenticado às
+ações administrativas; após alterar o realm, gere token novo e valide `iss`,
+`aud`, `sub` e `groups` antes do smoke.
+protegidos.
+
+O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
+Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh
+.env`; o script mantém a URL e um token aleatório no `.env` protegido e nunca
+imprime o token.
+
+O deploy Compose preserva um Keycloak já ativo quando o container persistente
+foi criado por uma instalação anterior e não possui os labels atuais do
+Compose. Isso evita o conflito de nome `bookrush-keycloak-1` durante a
+reconciliação ou rollback; o container continua na rede `bookrush_bookrush` e
+os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
+estiver parado, o deploy volta a incluí-lo na operação.

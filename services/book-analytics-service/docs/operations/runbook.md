@@ -1,5 +1,8 @@
 # Runbook
 
+O desenho e as decisões de capacidade do job estão consolidados em
+[Arquitetura de processamento em lote](../../../../docs/analytics/batch-processing-architecture.md).
+
 Health: `/actuator/health`. OpenAPI: `/v3/api-docs` e `/swagger-ui/index.html`.
 Falhas de migration devem ser tratadas no banco do serviço; não use
 `ddl-auto=update` nem edite migrations aplicadas. Uma análise falha sem apagar
@@ -36,16 +39,76 @@ Prometheus quando habilitado. Os nomes principais são:
 - `bookrush.analytics.excerpts{operation=generated}`;
 - `bookrush.analytics.failures{stage=analysis}`;
 - `bookrush.analytics.analyzer.duration`.
+- `bookrush.analytics.phase.duration{phase=...}` com percentis P50/P90/P95/P99;
+- `bookrush.analytics.phase.completions{phase=...}` e
+  `bookrush.analytics.phase.failures{phase=...}`.
+
+As durações históricas também são persistidas em
+`analytics.analysis_phase_timing`, nas fases `ITEM_TOTAL`, `LOAD_METADATA`,
+`READ_ASSET`, `CHAPTER_DISCOVERY`, `LANGUAGE_VALIDATION`,
+`EXCERPT_SELECTION`, `EXCERPT_PERSISTENCE`, `EXCERPT_EMBEDDINGS`, `FEATURES`
+e `SCOPE_EMBEDDINGS`. O endpoint administrativo
+`GET /api/admin/v1/content-analytics/phase-timings?jobId=<uuid>` retorna média,
+mínimo, P50, P90, P95, P99 e máximo por fase/estado. Use Prometheus para
+alertas e séries temporais; use o endpoint para comparar batches históricos.
 
 O worker determinístico é ativado no Compose por `ANALYTICS_WORKER_ENABLED=true`.
 Ele requer `STORAGE_ENDPOINT`, `STORAGE_ACCESS_KEY` e `STORAGE_SECRET_KEY`, além
 de bucket/key/hash/size registrados no catálogo. Para uma execução local sem
 object storage, mantenha a variável em `false`; jobs permanecerão `PENDING`.
 
+O polling e a recuperação de leases executam na thread de agendamento, separada
+do executor que processa os itens. `ANALYTICS_WORKER_CONCURRENCY` controla o
+número de itens processados simultaneamente e vale `1` por padrão; mesmo com
+um único item ativo, análises longas não bloqueiam heartbeat, recuperação de
+órfãos ou consultas administrativas.
+
+O worker usa uma lease lógica para evitar que uma interrupção deixe itens
+permanentemente em `RUNNING`. Itens de jobs ativos, não cancelados, sem
+atualização por `ANALYTICS_WORKER_STALE_AFTER_SECONDS` (900 segundos por
+padrão) são recuperados antes do próximo claim. Se ainda houver tentativas
+disponíveis, voltam a `PENDING`; se o item já atingiu
+`ANALYTICS_WORKER_MAX_ATTEMPTS`, ele fica `FAILED` com
+`WORKER_RESTART_RECOVERY`, em vez de entrar numa fila que não poderia mais ser
+reclamada. O limite deve ser maior que o pior tempo esperado de uma análise;
+a recuperação não remove itens, jobs, execuções ou objetos do storage. Depois
+de um restart, acompanhe o endpoint de itens do job e confirme que os itens
+recuperados voltaram a `COMPLETED` ou `FAILED` de forma explícita.
+Essa recuperação é parametrizada pelo limite configurado e tem teste que
+confere a quantidade de parâmetros da SQL, evitando que uma alteração no
+histórico de estados desative silenciosamente o scheduler.
+Itens `PENDING` legados que já atingiram o limite também são convertidos para
+`FAILED` com o mesmo código de recuperação; isso elimina estados impossíveis de
+reclamar deixados por versões anteriores do worker.
+
+Falhas transitórias também retornam automaticamente a `PENDING`: o worker usa
+até `ANALYTICS_WORKER_MAX_ATTEMPTS` (3 por padrão) e backoff progressivo baseado
+em `ANALYTICS_WORKER_RETRY_DELAY_SECONDS` (30 segundos por padrão). Erros de
+integridade, asset inexistente e argumentos inválidos continuam terminais e
+viram `FAILED`; não são repetidos indefinidamente. O `attempt_count` persistido
+impede que um item seja processado além do limite, enquanto o job continua
+`RUNNING` quando ainda existem itens pendentes.
+
+A persistência de features e embeddings é idempotente por conflito/chave de
+entrada; os lotes de embeddings são confirmados progressivamente no storage e
+no banco. Uma interrupção pode repetir o lote em andamento, mas não perde os
+lotes anteriores nem exige recomeçar o job inteiro. Isso reduz a pressão sobre
+`WALSync`; `WALSync` prolongado deve ser investigado
+com `pg_stat_activity`, `pg_stat_wal` e saúde do volume, não resolvido
+desativando `fsync` ou `synchronous_commit` globalmente.
+
 IDs de livro, hashes, operation keys e texto nunca são tags. Para investigar um
 job, consulte primeiro `GET /api/admin/v1/analytics/jobs/{id}` e depois
 `/items`; use `resume` somente após corrigir o erro persistido. O cache/provider
 LLM desabilitado não gera chamadas externas.
+
+Uma falha de item não encerra o lote enquanto existirem itens `PENDING` ou
+`RUNNING`: o worker reconcilia os contadores e mantém o job `RUNNING`, mesmo
+após reinício do container. O lote só termina como `COMPLETED` ou
+`COMPLETED_WITH_ERRORS` quando não restam itens transitórios. Se um job terminal
+ainda tiver itens pendentes, trate-o como estado legado e use `resume` após
+verificar os erros dos itens; não crie um segundo job para a mesma
+`operationKey`.
 
 ## Benchmark offline
 
@@ -82,8 +145,11 @@ versão física de entrada. Os vetores são objetos privados em `books-ml`, com
 metadados e hashes nas tabelas `chapter_embedding` e `document_embedding`.
 
 `ANALYTICS_NLI_ENABLED=false` mantém NLI desligado por padrão. Ao habilitar,
-até `ANALYTICS_NLI_MAX_EXCERPTS` candidatos por execução recebem as hipóteses
-versionadas de narrativa e emoção. Cada observação grava entailment, neutral,
+até `ANALYTICS_NLI_MAX_EXCERPTS` candidatos por execução (limitado a 50) recebem
+as hipóteses versionadas de narrativa e emoção. A seleção é determinística e
+combina qualidade estrutural/lexical com embeddings BGE, aplicando MMR para
+evitar que um único capítulo ou grupo de trechos semelhantes domine o lote.
+Cada observação grava entailment, neutral,
 contradiction, support e confidence como scores de modelo; nenhum deles é uma
 probabilidade comportamental. A migration V11 cria as definições tipadas.
 
@@ -99,3 +165,80 @@ calcula SHA-256, publica no bucket privado `books-ml` e imprime os metadados par
 registro em `analytics.corpus_frequency_model`. A normalização de estilo é
 registrada com ordem de features, médias, desvios padrão e checksum; os valores
 ausentes continuam sendo `UNSUPPORTED`, nunca zero.
+
+Para materializar o conjunto semântico real, prepare o cache BGE-M3 validado e
+execute `python3 scripts/materialize-semantic-prototypes.py --endpoint
+http://book-analytics-runtime:8092 --output
+services/book-analytics-service/config/semantic-prototypes-v1.artifact.json`.
+O comando exige o modelo `bge-m3-dense-v1`, dimensão 1024, verifica os hashes de
+entrada, normaliza cada embedding, calcula centroides EN/PT/multilíngues e grava
+um checksum SHA-256 canônico. O validador de contratos rejeita artefatos ausentes,
+alterados ou não normalizados; o serviço nunca baixa modelos durante o boot.
+
+## Validação dos artefatos reais
+
+O E2E determinístico não prova que o cache de modelos está utilizável. Execute
+`bash scripts/test-analytics-models.sh` com o volume de modelos montado em
+somente leitura. O harness constrói a imagem pinned do runtime e verifica
+respostas `VALID` reais de fastText EN/PT, spaCy EN/PT, BGE-M3 (1024 dimensões
+normalizadas) e mDeBERTa NLI (scores que somam 1). Ele não baixa modelos, não
+altera o volume, não inicia jobs de analytics e não imprime credenciais.
+
+```bash
+ANALYTICS_MODEL_VOLUME=bookrush_analytics_models bash scripts/test-analytics-models.sh
+```
+
+Falha nessa validação é NO-GO para os gates do V1. `MODEL_UNAVAILABLE` não pode
+ser convertido em valores zero nem usado como evidência para fechar os beads de
+bulk-readiness.
+
+## Piloto isolado de capacidade
+
+Para medir o caminho de runtime sem tocar no catálogo, execute:
+
+```bash
+ANALYTICS_MODEL_VOLUME=bookrush_analytics_models \
+ANALYTICS_PILOT_OUTPUT=/tmp/bookrush-analytics-pilot.json \
+bash scripts/run-analytics-pilot.sh
+```
+
+O piloto gera pelo menos 500 fixtures determinísticas (seed `1337`), divide-as
+igualmente entre EN/PT, executa embeddings em lotes de 32 e verifica amostras
+de idioma, spaCy e NLI. O container monta o cache em somente leitura e o
+relatório declara explicitamente `writes_to_production=false` e
+`quality_gate=NOT_ASSESSED`.
+
+Execução de 2026-10-17: `GO_RUNTIME_CAPACITY`, 500/500 embeddings válidos,
+40/40 amostras válidas em fastText, spaCy e NLI, 6.000 candidatos estruturais,
+334,358 s e 1,495 livros/s. Esse resultado prova capacidade e integridade dos
+adaptadores, mas não é GO de qualidade editorial: ainda são necessários corpus
+real, revisão humana, comparação PT/EN e calibração do ranker/classificador.
+
+### Piloto com livros reais do catálogo
+
+`scripts/run-analytics-production-pilot.sh` executa uma amostra somente leitura
+dos livros Gutenberg já cadastrados. Consulta apenas IDs, idioma e proveniência
+no PostgreSQL, baixa temporariamente a fonte pública correspondente e envia o
+texto somente ao runtime offline. O relatório contém contagens e hash do
+corpus; texto completo, JSONL e credenciais não entram no repositório.
+
+```bash
+ANALYTICS_PILOT_OUTPUT=/tmp/bookrush-analytics-production-pilot.json \
+bash scripts/run-analytics-production-pilot.sh
+```
+
+O comando não chama ingestão, não cria job e não grava em catálogo ou storage.
+Quando o gateway/SeaweedFS estiverem indisponíveis, o resultado deve declarar
+que usou o snapshot local de proveniência e a fonte pública Gutenberg; isso
+valida o runtime com obras reais, mas não substitui o gate de produção nem a
+aprovação editorial.
+
+Execução controlada em 2026-10-17: 8 obras reais (todas EN) do snapshot foram
+processadas com janela de 2.000 caracteres e lotes de 4; embeddings 8/8,
+language 8/8, linguistic 8/8 e NLI 8/8 válidos em 20,367 s (24,55 obras/s),
+`GO_RUNTIME_CAPACITY`, hash
+`5a26cfe8c922932997f80783e154abb7f48547cb27bf95b0245a967ad5b98529`.
+O gateway público estava em HTTP 502 e o SeaweedFS local parado, portanto a
+fonte textual foi Gutenberg público a partir da proveniência do snapshot; o
+resultado não é um gate de produção nem cobre qualidade humana, PT ou escrita
+de analytics.

@@ -1,15 +1,30 @@
+const envOr = (value: string | undefined, fallback: string) =>
+  value?.trim() || fallback;
+
+const useMocks = envOr(import.meta.env.VITE_USE_MOCKS, "false") === "true";
+if (import.meta.env.PROD && useMocks) {
+  throw new Error("VITE_USE_MOCKS=true is forbidden in production builds");
+}
+
 export const config = {
-  basePath: import.meta.env.BASE_URL ?? '/',
-  useMocks: (import.meta.env.VITE_USE_MOCKS ?? 'false') === 'true',
+  basePath: import.meta.env.BASE_URL ?? "/",
+  useMocks,
   keycloak: {
-    url: import.meta.env.VITE_KEYCLOAK_URL ?? 'https://keycloak-bookrush.jteodoro.tec.br',
-    realm: import.meta.env.VITE_KEYCLOAK_REALM ?? 'bookrush-platform',
-    clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? 'labsoft-admin-web',
+    url: envOr(
+      import.meta.env.VITE_KEYCLOAK_URL,
+      "https://keycloak-bookrush.jteodoro.tec.br",
+    ),
+    realm: envOr(import.meta.env.VITE_KEYCLOAK_REALM, "bookrush-platform"),
+    clientId: envOr(
+      import.meta.env.VITE_KEYCLOAK_CLIENT_ID,
+      "labsoft-admin-web",
+    ),
   },
   apis: {
-    catalog: import.meta.env.VITE_CATALOG_API_URL ?? '/api',
-    ingestion: import.meta.env.VITE_INGESTION_API_URL ?? '/ingestion',
-    analytics: import.meta.env.VITE_ANALYTICS_API_URL ?? '/analytics',
-    feed: import.meta.env.VITE_FEED_API_URL ?? '/feed',
+    catalog: envOr(import.meta.env.VITE_CATALOG_API_URL, "/api"),
+    ingestion: envOr(import.meta.env.VITE_INGESTION_API_URL, "/ingestion"),
+    analytics: envOr(import.meta.env.VITE_ANALYTICS_API_URL, "/analytics"),
+    feed: envOr(import.meta.env.VITE_FEED_API_URL, "/feed"),
+    admin: envOr(import.meta.env.VITE_ADMIN_API_URL, "/"),
   },
 };

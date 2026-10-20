@@ -1,16 +1,67 @@
-import { authClient } from '../auth';
+import { authClient } from "../auth";
 
-export type BookComment = { id: string; body: string; subject_key?: string; authorName?: string; created_at?: string };
+export type BookComment = {
+  id: string;
+  body: string;
+  subject_key?: string;
+  authorName?: string;
+  created_at?: string;
+};
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
-export async function loadComments(bookId: string, signal?: AbortSignal, fetcher: Fetcher = authClient.fetch.bind(authClient)): Promise<BookComment[]> {
-  const response = await fetcher(`/api/v1/social/books/${encodeURIComponent(bookId)}/comments`, { signal });
-  if (!response.ok) throw new Error(response.status === 401 ? 'Sua sessão expirou. Entre novamente.' : 'Não foi possível carregar os comentários.');
+export async function loadComments(
+  bookId: string,
+  signal?: AbortSignal,
+  fetcher: Fetcher = authClient.fetch.bind(authClient),
+): Promise<BookComment[]> {
+  const response = await fetcher(apiRoutes.social.comments(bookId), { signal });
+  if (!response.ok)
+    throw new Error(
+      response.status === 401
+        ? "Sua sessão expirou. Entre novamente."
+        : "Não foi possível carregar os comentários.",
+    );
   return response.json();
 }
-export async function postComment(bookId: string, body: string, fetcher: Fetcher = authClient.fetch.bind(authClient)): Promise<BookComment> {
+export async function postComment(
+  bookId: string,
+  body: string,
+  fetcher: Fetcher = authClient.fetch.bind(authClient),
+): Promise<BookComment> {
   const text = body.trim();
-  if (!text || text.length > 2000) throw new Error('Escreva um comentário com até 2000 caracteres.');
-  const response = await fetcher(`/api/v1/social/books/${encodeURIComponent(bookId)}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text }) });
-  if (!response.ok) throw new Error(response.status === 401 ? 'Sua sessão expirou. Entre novamente.' : 'Não foi possível publicar o comentário. Seu texto foi preservado.');
+  if (!text || text.length > 2000)
+    throw new Error("Escreva um comentário com até 2000 caracteres.");
+  const response = await fetcher(apiRoutes.social.comments(bookId), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body: text }),
+  });
+  if (!response.ok)
+    throw new Error(
+      response.status === 401
+        ? "Sua sessão expirou. Entre novamente."
+        : "Não foi possível publicar o comentário. Seu texto foi preservado.",
+    );
   return response.json();
 }
+export async function reportComment(
+  bookId: string,
+  commentId: string,
+  reason: string,
+  fetcher: Fetcher = authClient.fetch.bind(authClient),
+): Promise<void> {
+  const detail = reason.trim();
+  if (!detail || detail.length > 120)
+    throw new Error("Informe um motivo com até 120 caracteres.");
+  const response = await fetcher(apiRoutes.social.reports(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bookId, commentId, reason: detail }),
+  });
+  if (!response.ok)
+    throw new Error(
+      response.status === 401
+        ? "Sua sessão expirou. Entre novamente."
+        : "Não foi possível denunciar o comentário.",
+    );
+}
+import { apiRoutes } from "../app/apiRoutes";

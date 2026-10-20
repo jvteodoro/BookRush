@@ -1,5 +1,11 @@
 # behavior-service
 
+Accepted events are written transactionally with a durable outbox. The
+maintenance job rebuilds derived aggregates and retention only. Set
+`BEHAVIOR_OUTBOX_SINK_URL` to an internal authenticated event sink to enable
+delivery; failed deliveries remain pending and increment `attempts` with an
+error, rather than being marked as published.
+
 Append-only behavioral events and aggregates. Este serviço é um bounded context independente; contratos e ownership estão no ADR 0034.
 
 Migrations V2/V3 store idempotent append-only events and rebuildable daily book aggregates.
@@ -27,3 +33,10 @@ principal and ignores identity fields supplied in the event body. Batches are
 limited to 100 events and payloads to 16 KiB; retries remain idempotent through
 the unique `event_key` constraint. This prevents a browser from attributing an
 event to another user.
+## Outbox downstream
+
+Eventos aceitos entram na outbox e são enviados pelo dispatcher para
+`BEHAVIOR_OUTBOX_SINK_URL`. O ambiente Compose usa o consumidor interno do
+`book-analytics-service` em `/api/internal/v1/behavior/events`; a autenticação
+entre os serviços usa `BEHAVIOR_OUTBOX_SINK_TOKEN`, mantido somente no `.env`
+protegido. A linha só recebe `published_at` depois de uma resposta 2xx.

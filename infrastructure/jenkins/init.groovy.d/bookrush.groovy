@@ -3,6 +3,28 @@ import jenkins.model.JenkinsLocationConfiguration
 import hudson.model.*
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
 import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
+import com.cloudbees.plugins.credentials.CredentialsScope
+import com.cloudbees.plugins.credentials.domains.Domain
+import org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl
+import com.cloudbees.plugins.credentials.SystemCredentialsProvider
+import hudson.util.Secret
+
+def ingestionSecret = System.getenv('JENKINS_OIDC_CLIENT_SECRET')
+if (ingestionSecret != null && !ingestionSecret.isBlank()) {
+    def credentialStore = SystemCredentialsProvider.getInstance().getStore()
+    def globalDomain = Domain.global()
+    def credentialId = 'bookrush-ingestion-token'
+    def exists = credentialStore.getCredentials(globalDomain).any { it.id == credentialId }
+    if (!exists) {
+        credentialStore.addCredentials(globalDomain, new StringCredentialsImpl(
+            CredentialsScope.GLOBAL,
+            credentialId,
+            'Segredo do client OIDC bookrush-ingestion-admin',
+            Secret.fromString(ingestionSecret)
+        ))
+        credentialStore.save()
+    }
+}
 
 def instance = Jenkins.get()
 JenkinsLocationConfiguration.get().setUrl('https://jenkins-bookrush.jteodoro.tec.br/')
@@ -26,8 +48,36 @@ if (adminWebJob == null) {
 def adminWebScript = adminWebPipelineFile.text
 if (!(adminWebJob.getDefinition() instanceof CpsFlowDefinition) || adminWebJob.getDefinition().getScript() != adminWebScript) {
     adminWebJob.setDefinition(new CpsFlowDefinition(adminWebScript, true))
-    adminWebJob.save()
 }
+adminWebJob.removeProperty(ParametersDefinitionProperty.class)
+adminWebJob.addProperty(new ParametersDefinitionProperty([
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a validar e publicar.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git opcional para repositório privado.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
+    new BooleanParameterDefinition('PUBLISH', false, 'Publicar a imagem validada no registry.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Atualizar admin-web no Compose do host.')
+]))
+adminWebJob.save()
+def seaweedfsPipelineFile = new File('/opt/bookrush/seaweedfs.Jenkinsfile')
+def seaweedfsJob = instance.getItem('bookrush-seaweedfs')
+if (seaweedfsJob == null) {
+    seaweedfsJob = instance.createProject(WorkflowJob, 'bookrush-seaweedfs')
+}
+def seaweedfsScript = seaweedfsPipelineFile.text
+if (!(seaweedfsJob.getDefinition() instanceof CpsFlowDefinition) || seaweedfsJob.getDefinition().getScript() != seaweedfsScript) {
+    seaweedfsJob.setDefinition(new CpsFlowDefinition(seaweedfsScript, true))
+}
+seaweedfsJob.removeProperty(ParametersDefinitionProperty.class)
+seaweedfsJob.addProperty(new ParametersDefinitionProperty([
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a validar.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git opcional para repositório privado.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
+    new BooleanParameterDefinition('PUBLISH', false, 'Publicar a imagem validada.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Implantar SeaweedFS e seu proxy OIDC no Compose.')
+]))
+seaweedfsJob.save()
 def microservicePipelineFile = new File('/opt/bookrush/microservice.Jenkinsfile')
 def verticalPipelineFile = new File('/opt/bookrush/vertical.Jenkinsfile')
 def replaceParameters = { WorkflowJob pipelineJob, List definitions ->
@@ -44,6 +94,10 @@ def microserviceParameters = [
     new BooleanParameterDefinition('PUBLISH', false, 'Publicar a imagem validada.'),
     new ChoiceParameterDefinition('DEPLOY_TARGET', ['none', 'compose', 'kubernetes'] as String[], 'Destino do deploy; none apenas valida.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Implantar a imagem validada no destino escolhido.'),
+    new BooleanParameterDefinition('RUN_PUBLIC_E2E', false, 'Executar smoke autenticado do reader-bff pelo gateway público.'),
+    new StringParameterDefinition('E2E_CREDENTIAL_ID', 'bookrush-product-e2e', 'Credential username/password do usuário de teste do realm bookrush.'),
+    new StringParameterDefinition('E2E_BASE_URL', 'https://bookrush.jteodoro.tec.br', 'Gateway público usado pelo smoke autenticado.'),
+    new StringParameterDefinition('E2E_BOOK_ID', '', 'UUID de livro com publication.json aprovado.'),
     new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Credential Jenkins do tipo Secret file para Kubernetes.')
 ]
 def verticalParameters = [

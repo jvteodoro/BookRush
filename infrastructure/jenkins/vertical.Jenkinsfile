@@ -53,11 +53,12 @@ pipeline {
             registry="${REGISTRY%/}"
             tag="${BUILD_NUMBER}-$(printf '%s' "$GIT_COMMIT" | cut -c1-7)"
             echo "$REGISTRY_PASSWORD" | docker login "$registry" -u "$REGISTRY_USER" --password-stdin
-            while read -r service; do
+            services=$(bash scripts/vertical-services.sh "$SELECTED_VERTICAL")
+            printf '%s\n' "$services" | while read -r service; do
               image="$registry/bookrush/$service:$tag"
               docker tag "bookrush/$service:$BUILD_NUMBER" "$image"
               docker push "$image"
-            done < <(bash scripts/vertical-services.sh "$SELECTED_VERTICAL")
+            done
           '''
         }
       }
@@ -67,9 +68,10 @@ pipeline {
       steps {
         sh '''
           set -euo pipefail
-          while read -r service; do
+          services=$(bash scripts/vertical-services.sh "$SELECTED_VERTICAL")
+          printf '%s\n' "$services" | while read -r service; do
             bash scripts/deploy-compose-service.sh "$service" "bookrush/$service:$BUILD_NUMBER"
-          done < <(bash scripts/vertical-services.sh "$SELECTED_VERTICAL")
+          done
         '''
       }
     }
@@ -81,9 +83,10 @@ pipeline {
             set -euo pipefail
             registry="${REGISTRY%/}"
             tag="${BUILD_NUMBER}-$(printf '%s' "$GIT_COMMIT" | cut -c1-7)"
-            while read -r service; do
+            services=$(bash scripts/vertical-services.sh "$SELECTED_VERTICAL")
+            printf '%s\n' "$services" | while read -r service; do
               bash scripts/deploy-kubernetes-service.sh "$service" "$registry/bookrush/$service:$tag"
-            done < <(bash scripts/vertical-services.sh "$SELECTED_VERTICAL")
+            done
           '''
         }
       }

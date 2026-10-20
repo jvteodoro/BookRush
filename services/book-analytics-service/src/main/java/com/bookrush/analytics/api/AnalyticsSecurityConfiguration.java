@@ -39,6 +39,7 @@ public class AnalyticsSecurityConfiguration {
                       "/swagger-ui/**",
                       "/swagger-ui.html")
                   .permitAll();
+              auth.requestMatchers("/api/internal/v1/behavior/events").permitAll();
               if (enabled) {
                 auth.requestMatchers("/api/admin/v1/annotation/campaigns/**")
                     .hasAnyRole("ANALYTICS_OPERATOR", "EXCERPT_REVIEWER");
@@ -82,15 +83,9 @@ public class AnalyticsSecurityConfiguration {
           if (!value.isBlank()) authorities.add(new SimpleGrantedAuthority("SCOPE_" + value));
       Object groups = jwt.getClaims().get("groups");
       if (groups instanceof List<?> values)
-        for (Object group : values) {
-          String g = String.valueOf(group);
-          if ("operators".equals(g) || "platform-admins".equals(g))
-            authorities.add(new SimpleGrantedAuthority("ROLE_ANALYTICS_OPERATOR"));
-          if ("excerpt-annotators".equals(g) || "developers".equals(g))
-            authorities.add(new SimpleGrantedAuthority("ROLE_EXCERPT_ANNOTATOR"));
-          if ("excerpt-reviewers".equals(g) || "platform-admins".equals(g))
-            authorities.add(new SimpleGrantedAuthority("ROLE_EXCERPT_REVIEWER"));
-        }
+        AnalyticsRolePolicy.rolesFor(values).stream()
+            .map(SimpleGrantedAuthority::new)
+            .forEach(authorities::add);
       String principal = jwt.getSubject();
       if (principal == null || principal.isBlank()) {
         principal = "session:" + String.valueOf(jwt.getClaims().getOrDefault("sid", "unknown"));

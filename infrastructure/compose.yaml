@@ -9,6 +9,7 @@ services:
     # Routing is loaded from a file so the proxy does not depend on the Docker
     # API version exposed by the production daemon.
     image: traefik:v3.5.3
+    restart: unless-stopped
     command:
       - --providers.docker=false
       - --providers.file.filename=/etc/traefik/dynamic.yaml
@@ -40,10 +41,11 @@ services:
   seaweedfs:
     build:
       context: ./seaweedfs
-    image: bookrush/seaweedfs:4.46
+    image: ${SEAWEEDFS_IMAGE:-bookrush/seaweedfs:4.46}
     environment:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?Set STORAGE_ACCESS_KEY in .env}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?Set STORAGE_SECRET_KEY in .env}
+      STORAGE_ALLOWED_ORIGINS: ${STORAGE_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br}
     volumes:
       - seaweedfs_data:/data
     ulimits:
@@ -70,7 +72,10 @@ services:
       - --oidc-issuer-url=${SEAWEEDFS_OIDC_ISSUER_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       - --oidc-jwks-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs
       - --skip-oidc-discovery
-      - --login-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/auth
+      # The authorization endpoint is followed by the user's browser, so it
+      # must be reachable outside the Docker network. Token, profile and JWKS
+      # calls below remain on the private Compose network.
+      - --login-url=${SEAWEEDFS_OIDC_LOGIN_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/auth}
       - --redeem-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token
       - --profile-url=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/userinfo
       - --client-id=${SEAWEEDFS_OIDC_CLIENT_ID:-bookrush-seaweedfs}
@@ -99,6 +104,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     command: ["postgres", "-c", "max_connections=150", "-c", "superuser_reserved_connections=5"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bookrush}
@@ -132,6 +138,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
     profiles: [auth]
+    restart: unless-stopped
     command: ["start-dev", "--http-port=8080", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
@@ -145,10 +152,10 @@ services:
       KC_HTTP_ENABLED: "true"
     volumes:
       - keycloak_data:/opt/keycloak/data
-      # This path is resolved by the Docker daemon, not by the Jenkins
-      # container that invokes Compose through the Docker socket.
-      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-realm.json:/opt/keycloak/data/import/bookrush-realm.json:ro
-      - ${BOOKRUSH_REPO_ROOT:-..}/infrastructure/keycloak/bookrush-platform-realm.json:/opt/keycloak/data/import/bookrush-platform-realm.json:ro
+      # Realm JSON is applied by the idempotent keycloak-config-cli reconcile
+      # step. Do not bind-mount files from the Jenkins workspace here: Compose
+      # may be invoked inside a Jenkins container through the host Docker
+      # socket, in which case the daemon cannot see that workspace path.
     ports:
       - "127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}:8080"
     healthcheck:
@@ -218,7 +225,9 @@ services:
       STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-300}
       STORAGE_MAX_UPLOAD_BYTES: ${STORAGE_MAX_UPLOAD_BYTES:-104857600}
       STORAGE_TIMEOUT: ${STORAGE_TIMEOUT:-30s}
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      # This endpoint is embedded in presigned URLs consumed by browsers. It
+      # must be an externally reachable HTTPS S3 endpoint, never localhost.
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-https://seaweedfs-s3-bookrush.jteodoro.tec.br}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       ASSET_ADMIN_TOKEN: ${ASSET_ADMIN_TOKEN:?Set ASSET_ADMIN_TOKEN in .env}
@@ -230,7 +239,7 @@ services:
       CATALOG_PRODUCT_OIDC_ISSUER: ${CATALOG_PRODUCT_OIDC_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       CATALOG_PRODUCT_OIDC_JWK_SET_URI: ${CATALOG_PRODUCT_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       CATALOG_PRODUCT_OIDC_AUDIENCE: ${CATALOG_PRODUCT_OIDC_AUDIENCE:-account}
-      CATALOG_CORS_ALLOWED_ORIGINS: ${CATALOG_CORS_ALLOWED_ORIGINS:-https://docs-bookrush.jteodoro.tec.br,https://doc-bookrush.jteodoro.tec.br}
+      CATALOG_CORS_ALLOWED_ORIGINS: ${CATALOG_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,https://docs-bookrush.jteodoro.tec.br,https://doc-bookrush.jteodoro.tec.br}
       CATALOG_SECURITY_LEGACY_STATIC_ENABLED: ${CATALOG_SECURITY_LEGACY_STATIC_ENABLED:-false}
       CATALOG_READER_INTERNAL_TOKEN: ${CATALOG_READER_INTERNAL_TOKEN:-${CANONICAL_SERVICE_TOKEN:-}}
       CANONICAL_SERVICE_TOKEN: ${CANONICAL_SERVICE_TOKEN:-}
@@ -279,10 +288,13 @@ services:
       INGESTION_OIDC_TOKEN_URI: ${INGESTION_OIDC_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
       INGESTION_CANONICAL_CLIENT_ID: ${INGESTION_CANONICAL_CLIENT_ID:-}
       INGESTION_CANONICAL_CLIENT_SECRET: ${INGESTION_CANONICAL_CLIENT_SECRET:-}
-      INGESTION_CANONICAL_SCOPE: ${INGESTION_CANONICAL_SCOPE:-bookrush.catalog.write}
+      # The canonical client receives this scope as a Keycloak default client
+      # scope. Keep the override available, but do not request a scope that may
+      # be absent during a rolling Keycloak reconcile.
+      INGESTION_CANONICAL_SCOPE: ${INGESTION_CANONICAL_SCOPE:-}
       INGESTION_ASSET_CLIENT_ID: ${INGESTION_ASSET_CLIENT_ID:-}
       INGESTION_ASSET_CLIENT_SECRET: ${INGESTION_ASSET_CLIENT_SECRET:-}
-      INGESTION_ASSET_SCOPE: ${INGESTION_ASSET_SCOPE:-bookrush.assets.write}
+      INGESTION_ASSET_SCOPE: ${INGESTION_ASSET_SCOPE:-}
       INGESTION_PUBLISHER_CALLBACK_URL: ${INGESTION_PUBLISHER_CALLBACK_URL:-http://publisher-service:8099}
       PUBLISHER_INGESTION_CALLBACK_TOKEN: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:-}
       PUBLISHER_INGESTION_URL: ${PUBLISHER_INGESTION_URL:-http://book-ingestion-service:8090}
@@ -326,14 +338,20 @@ services:
       ANALYTICS_OIDC_ISSUER: ${ANALYTICS_OIDC_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       ANALYTICS_OIDC_JWK_SET_URI: ${ANALYTICS_OIDC_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       ANALYTICS_OIDC_AUDIENCE: ${ANALYTICS_OIDC_AUDIENCE:-bookrush-analytics}
+      BEHAVIOR_OUTBOX_SINK_TOKEN: ${BEHAVIOR_OUTBOX_SINK_TOKEN:-}
       ANALYTICS_SCOPE_EMBEDDINGS_ENABLED: ${ANALYTICS_SCOPE_EMBEDDINGS_ENABLED:-true}
       ANALYTICS_NLI_ENABLED: ${ANALYTICS_NLI_ENABLED:-false}
       ANALYTICS_NLI_MAX_EXCERPTS: ${ANALYTICS_NLI_MAX_EXCERPTS:-50}
       ANALYTICS_WORKER_ENABLED: ${ANALYTICS_WORKER_ENABLED:-true}
+      ANALYTICS_WORKER_CONCURRENCY: ${ANALYTICS_WORKER_CONCURRENCY:-1}
+      ANALYTICS_WORKER_STALE_AFTER_SECONDS: ${ANALYTICS_WORKER_STALE_AFTER_SECONDS:-900}
       ANALYTICS_OFFLINE: ${ANALYTICS_OFFLINE:-true}
       ANALYTICS_MODEL_CACHE_DIR: ${ANALYTICS_MODEL_CACHE_DIR:-/var/lib/bookrush/models}
       ANALYTICS_RUNTIME_TIMEOUT_SECONDS: ${ANALYTICS_RUNTIME_TIMEOUT_SECONDS:-60}
-      ANALYTICS_MAX_EXCERPTS_PER_ITEM: ${ANALYTICS_MAX_EXCERPTS_PER_ITEM:-0}
+      ANALYTICS_RUNTIME_LANGUAGE_SAMPLE_CHARS: ${ANALYTICS_RUNTIME_LANGUAGE_SAMPLE_CHARS:-90000}
+      ANALYTICS_MAX_EXCERPTS_PER_ITEM: ${ANALYTICS_MAX_EXCERPTS_PER_ITEM:-500}
+      ANALYTICS_WORKER_MAX_ATTEMPTS: ${ANALYTICS_WORKER_MAX_ATTEMPTS:-3}
+      ANALYTICS_WORKER_RETRY_DELAY_SECONDS: ${ANALYTICS_WORKER_RETRY_DELAY_SECONDS:-30}
       ANALYTICS_V2_GENERATOR_VERSION: ${ANALYTICS_V2_GENERATOR_VERSION:-sentence-window-v2}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
       STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
@@ -476,6 +494,7 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
     depends_on:
       postgres:
         condition: service_healthy
@@ -502,6 +521,10 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
+      BEHAVIOR_OUTBOX_SINK_URL: ${BEHAVIOR_OUTBOX_SINK_URL:-}
+      BEHAVIOR_OUTBOX_SINK_TOKEN: ${BEHAVIOR_OUTBOX_SINK_TOKEN:-}
+      BEHAVIOR_OUTBOX_DELAY_MS: ${BEHAVIOR_OUTBOX_DELAY_MS:-5000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -565,9 +588,10 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_ADMIN_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_ADMIN_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_ADMIN_SECURITY_AUDIENCE:-bookrush-ingestion}
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
       PUBLISHER_STORAGE_ENABLED: ${PUBLISHER_STORAGE_ENABLED:-false}
       STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://seaweedfs:8333}
-      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-http://localhost:18333}
+      STORAGE_PUBLIC_ENDPOINT: ${STORAGE_PUBLIC_ENDPOINT:-https://seaweedfs-s3-bookrush.jteodoro.tec.br}
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}
@@ -599,6 +623,11 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_ADMIN_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_ADMIN_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_ADMIN_SECURITY_AUDIENCE:-bookrush-ingestion}
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
+      KEYCLOAK_ADMIN_TOKEN_URI: ${KEYCLOAK_ADMIN_TOKEN_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/token}
+      KEYCLOAK_ADMIN_BASE: ${KEYCLOAK_ADMIN_BASE:-http://keycloak:8080/admin/realms/bookrush}
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-bookrush-admin-service}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -621,11 +650,15 @@ services:
       DB_NAME: ${POSTGRES_DB:-bookrush}
       DB_USERNAME: ${POSTGRES_USER:-bookrush}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-bookrush}
+      RECOMMENDATION_URL: http://recommendation-service:8098
+      READER_STATE_URL: http://reader-state-service:8094
       CATALOG_URL: http://catalog-service:8080
+      BOOK_CONTENT_URL: http://book-content-service:8093
       BOOKRUSH_SECURITY_ENABLED: ${BOOKRUSH_SECURITY_ENABLED:-true}
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
     depends_on:
       postgres:
         condition: service_healthy
@@ -663,6 +696,9 @@ services:
         VITE_BASE_PATH: ${ADMIN_WEB_BASE_PATH:-/admin/}
     ports:
       - "127.0.0.1:${BOOKRUSH_ADMIN_WEB_PORT:-18084}:80"
+    depends_on:
+      admin-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1/healthz"]
       interval: 10s

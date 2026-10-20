@@ -19,12 +19,37 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 curl_args=(--fail-with-body --silent --show-error --connect-timeout 5 --max-time 20)
 
+curl "${curl_args[@]}" "${headers[@]}" \
+  "$base_url/api/admin/v1/annotation/items/$ANNOTATION_ITEM_ID" >"$tmp_dir/item.json"
+jq -e 'has("candidate_score") | not and has("ranker_version") | not and has("modelFeatures") | not' \
+  "$tmp_dir/item.json" >/dev/null
+
+set +e
+pre_context_status="$(curl "${headers[@]}" -o "$tmp_dir/pre-context.json" -w '%{http_code}' \
+  "$base_url/api/admin/v1/annotation/items/$ANNOTATION_ITEM_ID/context")"
+set -e
+[[ "$pre_context_status" == 403 ]] || {
+  echo "expected pre-lock context status 403, got $pre_context_status" >&2
+  exit 1
+}
+jq -e '.code == "CONTEXT_LOCK_REQUIRED"' "$tmp_dir/pre-context.json" >/dev/null
+
 curl "${curl_args[@]}" "${headers[@]}" -X POST "$base_url/api/admin/v1/annotation/items/$ANNOTATION_ITEM_ID/first-screen" \
   --data '{"hook":3}' >"$tmp_dir/first.json"
 curl "${curl_args[@]}" "${headers[@]}" -X POST "$base_url/api/admin/v1/annotation/items/$ANNOTATION_ITEM_ID/lock" \
   --data '{"dimensions":{"HOOK":3,"CLARITY":3,"AUTHENTICITY":3,"IMPACT":3,"PACING":3,"SELF_CONTAINMENT":3},"confidence":3,"failureTags":[]}' >"$tmp_dir/lock.json"
 
 jq -e '.locked == true and .contextAvailable == true' "$tmp_dir/lock.json" >/dev/null
+
+curl "${curl_args[@]}" "${headers[@]}" \
+  "$base_url/api/admin/v1/annotation/items/$ANNOTATION_ITEM_ID/context" >"$tmp_dir/context.json"
+jq -e '.primaryReadOnly == true and has("previousContext") and has("nextContext")' \
+  "$tmp_dir/context.json" >/dev/null
+
+campaign_id="$(jq -r '.campaign_id // .campaignId' "$tmp_dir/item.json")"
+curl "${curl_args[@]}" "${headers[@]}" \
+  "$base_url/api/admin/v1/annotation/campaigns/$campaign_id/progress" >"$tmp_dir/progress.json"
+jq -e '.total >= .completed and .completed >= 0 and .remaining >= 0' "$tmp_dir/progress.json" >/dev/null
 
 count="$(docker exec "$db_container" psql -U "$db_user" -d "$db_name" -Atc "SELECT count(*) FROM analytics.annotation_dimension_value d JOIN analytics.annotation a ON a.id=d.annotation_id WHERE a.campaign_item_id='$ANNOTATION_ITEM_ID' AND a.annotator_subject='$ANNOTATION_TEST_SUBJECT' AND a.primary_locked_at IS NOT NULL AND d.stage='FULL_EXCERPT';")"
 [[ "$count" == 6 ]] || { echo "expected 6 persisted dimensions, got $count" >&2; exit 1; }
@@ -35,4 +60,9 @@ status="$(curl "${headers[@]}" -X POST -o "$tmp_dir/retry.json" -w '%{http_code}
 set -e
 [[ "$status" == 409 ]] || { echo "expected retry status 409, got $status" >&2; cat "$tmp_dir/retry.json" >&2; exit 1; }
 jq -e '.code == "PRIMARY_ALREADY_LOCKED"' "$tmp_dir/retry.json" >/dev/null
+
+curl "${curl_args[@]}" "${headers[@]}" -X POST \
+  "$base_url/api/admin/v1/annotation/items/$ANNOTATION_ITEM_ID/submit" \
+  --data '{"contextRequired":true,"severity":3}' >"$tmp_dir/submit.json"
+jq -e '.status == "SUBMITTED"' "$tmp_dir/submit.json" >/dev/null
 echo "annotation lock integration: PASS (HTTP -> Spring -> PostgreSQL; retry conflict verified)"

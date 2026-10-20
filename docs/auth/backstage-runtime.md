@@ -40,6 +40,7 @@ deixar `api` indefinida durante a inicialização.
 As chamadas **Try it out** que usam `Authorization` fazem preflight para a API.
 O catálogo permite somente as origens configuradas em
 `CATALOG_CORS_ALLOWED_ORIGINS` (por padrão,
+`https://bookrush.jteodoro.tec.br`,
 `https://docs-bookrush.jteodoro.tec.br` e
 `https://doc-bookrush.jteodoro.tec.br`) e aplica essa política às rotas de
 consulta interna e administrativas de assets. As rotas administrativas também

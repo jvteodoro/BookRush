@@ -42,10 +42,11 @@ O protótipo PageLoop foi usado apenas para hierarquia visual e fluxos de descob
 
 A experiência autenticada usa os mesmos blocos do modelo fornecido: shell, busca, catálogo, biblioteca e leitor. O runtime React consulta o catálogo e o estado do leitor pelas APIs autenticadas; não carrega mais `public/pageloop.js` nem datasets mockados/localStorage como fonte de verdade. O aplicativo mobile mantém o feed vertical escuro e consulta catálogo/biblioteca/eventos por HTTP autenticado.
 
-O SDK `frontend/src/telemetry.ts` mantém uma fila em memória, envia lotes ao
-behavior-service com retry limitado e suporta impressão por
-`IntersectionObserver` e dwell. Payloads são reduzidos por allowlist
-estrutural, sem texto livre, tokens ou identificadores pessoais.
+Os SDKs `frontend/src/telemetry.ts` e `mobile/src/telemetry.ts` mantêm uma fila
+em memória, enviam lotes ao behavior-service com retry limitado e suportam
+impressão por `IntersectionObserver` no web e por chamada explícita no mobile,
+além de dwell. Payloads são reduzidos por allowlist estrutural, sem texto
+livre, tokens ou identificadores pessoais.
 
 O portal PageLoop também consulta o `publisher-service` quando o usuário
 autenticado abre a área de publicador. Rascunhos e submissões são criados e
@@ -105,14 +106,17 @@ Obras sem
 projeção textual disponível permanecem indisponíveis até a ingestão concluir o
 artifact autorizado.
 
-O perfil autenticado é carregado de `GET /api/v1/profile`; nome, bio e estado
-público deixam de depender da lista de usuários do protótipo. A edição e a
-privacidade persistem por `PUT /api/v1/profile`. A administração exibe somente
+O perfil autenticado é carregado de `GET /api/v1/profile`; nome e bio deixam de
+depender da lista de usuários do protótipo. As cinco preferências de privacidade
+são lidas e persistidas em `GET/PUT /api/v1/profile/privacy`: perfil, atividade,
+biblioteca, leituras recentes e grafo social aceitam `PUBLIC`, `FOLLOWERS` ou
+`PRIVATE`. O campo legado `isPublic` continua compatível e corresponde à
+visibilidade do perfil. A administração exibe somente
 usuários e denúncias retornados pela facade, e decisões são registradas por
 `POST /api/v1/admin/moderation`; não há bloqueios ou métricas simuladas no
 cliente.
 
-A tela do leitor mantém somente o `WebPubNavigator` do Readium: não há texto de exemplo, slider de paginação, controle manual de fonte/tema ou barra móvel paralela. O shell fornece apenas metadados do livro, progresso persistido e marcador; navegação, paginação e renderização pertencem à publicação Readium.
+A tela do leitor mantém o `WebPubNavigator` do Readium como fonte de renderização e navegação. O shell fornece sumário por capítulos, anterior/próximo, progresso persistido, marcador e controles de leitura: família da fonte, tamanho, espaçamento, cor do texto e cor de fundo. As preferências visuais são limitadas a valores seguros e persistidas no navegador; o frontend as injeta novamente no iframe sempre que o navigator troca o recurso HTML.
 
 O layout atual do leitor usa uma única coluna responsiva: um cabeçalho compacto para retorno e marcador, o `readium-host` centralizado para o WebPubNavigator e o progresso fixado na base. Os painéis laterais do protótipo antigo não participam da rota de leitura.
 
@@ -128,6 +132,8 @@ Ao sair da rota de leitura, o frontend destrói explicitamente o `WebPubNavigato
 
 O fetcher autenticado usa `cache: no-store` para manifesto e recursos da publicação, evitando que uma segunda montagem reutilize um blob/iframe inválido. A saída aguarda `unmount()` terminar antes de renderizar a rota anterior.
 
+O contrato do texto reader-ready declara explicitamente `text/plain;charset=UTF-8` no catálogo e `text/html;charset=UTF-8` no content-service. O HTML dos capítulos também declara `<meta charset="utf-8">`. Essa declaração precisa existir na resposta HTTP, pois o content-service converte o artifact em `String` antes de gerar a publicação; somente a meta tag não corrige uma decodificação anterior feita com charset incorreto.
+
 
 O host do Readium começa vazio; o frontend não deixa um texto de carregamento sobreposto ao iframe, e só renderiza uma mensagem quando a montagem falha.
 
@@ -141,9 +147,11 @@ Respostas `401` de endpoints opcionais (administração/publicador) não removem
 Comentários preservam `subject_key` como identidade técnica, mas resolvem o nome de exibição público no `reader-profile-service`. O valor é salvo como snapshot no comentário e também atualizado na leitura quando o perfil público estiver disponível; email nunca é usado como chave.
 
 O contrato `GET /api/v1/profile/public?subject=...` retorna `displayName` e
-`bio` somente quando `is_public=true`; o `social-service` encaminha o bearer do
-usuário ao consultar esse contrato e expõe o nome como `authorName` nos
-comentários.
+`bio` somente quando `profileVisibility=PUBLIC` (com fallback para o legado
+`is_public` quando ainda não existe política); o `social-service` encaminha o
+bearer do usuário ao consultar esse contrato e expõe o nome como `authorName`
+nos comentários. `FOLLOWERS` é mantido fechado nesse contrato público; a
+aplicação da audiência exige um consumidor que conheça a relação social.
 
 No cliente web, o nome e o avatar do autor no painel de comentários abrem
 `/usuarios/{subject_key}`. A rota consulta o mesmo perfil público usando o

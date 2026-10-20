@@ -7,6 +7,10 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "lint": "eslint .",
+    "test": "node --test tests/*.test.mjs",
+    "test:coverage": "node --test --experimental-test-coverage tests/*.test.mjs",
+    "format": "prettier --write src/main.tsx src/app/*.ts src/reader/AccountPages.tsx src/reader/comments.ts src/reader/library.ts src/reader/readiumBridge.ts src/reader/search.ts src/reader/LiveReader.tsx src/reader/PrivacyPage.tsx src/reader/privacy.ts tests/privacy.test.mjs public/pageloop.js public/pageloop.css",
+    "format:check": "prettier --check src/main.tsx src/app/*.ts src/reader/AccountPages.tsx src/reader/comments.ts src/reader/library.ts src/reader/readiumBridge.ts src/reader/search.ts src/reader/LiveReader.tsx src/reader/PrivacyPage.tsx src/reader/privacy.ts tests/privacy.test.mjs public/pageloop.js public/pageloop.css",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -24,6 +28,7 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "eslint": "9.13.0",
+    "prettier": "3.6.2",
     "typescript-eslint": "8.14.0"
   }
 }

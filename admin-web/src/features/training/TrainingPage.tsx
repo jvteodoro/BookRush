@@ -1,36 +1,754 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Database, FlaskConical, LockKeyhole, Plus, ShieldCheck } from 'lucide-react';
-import { services } from '../../lib/services';
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Database,
+  FlaskConical,
+  LockKeyhole,
+  Plus,
+  ShieldCheck,
+} from "lucide-react";
+import { services } from "../../lib/services";
 
 export function TrainingPage() {
-  const qc=useQueryClient(); const campaigns=useQuery({queryKey:['annotation-campaigns'],queryFn:services.listAnnotationCampaigns});
-  const [selected,setSelected]=useState<string>(); const [tab,setTab]=useState('campaigns');
-  const create=useMutation({mutationFn:()=>services.createAnnotationCampaign({code:`pilot-v1-${Date.now()}`,name:'Excerpt Quality Pilot V1',languagePolicy:{languages:['en','pt'],targetPerLanguage:50},samplingConfig:{seed:1337,strata:['language','dialogue','position','subject'],items:100}}),onSuccess:()=>qc.invalidateQueries({queryKey:['annotation-campaigns']})});
-  const action=useMutation({mutationFn:({id,a}:{id:string;a:string})=>services.transitionAnnotationCampaign(id,a),onSuccess:()=>qc.invalidateQueries({queryKey:['annotation-campaigns']})});
-  const sample=useMutation({mutationFn:services.sampleAnnotationCampaign});
-  const dataset=useMutation({mutationFn:services.publishAnnotationDataset});
-  const metrics=useQuery({queryKey:['annotation-metrics',selected],queryFn:()=>services.annotationMetrics(selected!),enabled:Boolean(selected)});
-  const failure=[create,action,sample,dataset].find(m=>m.isError)?.error;
-  return <section><header className="pagehead"><div><span className="eyebrow">TRAINING & GROUND TRUTH</span><h1>Excerpt quality</h1><p>Coleta humana cega para avaliar excerpts. Scores de modelo só aparecem depois do lock primário.</p></div><button className="button-action" onClick={()=>create.mutate()} disabled={create.isPending}><Plus size={16}/>Criar piloto 50 EN + 50 PT</button></header>{failure&&<div className="panel import-error"><strong>Ação não concluída</strong><p>{failure instanceof Error?failure.message:'O serviço recusou a operação. Consulte os logs do analytics.'}</p></div>}
-    <div className="training-tabs">{[['campaigns','Campaigns'],['studio','Annotation Studio'],['review','Review & Adjudication'],['datasets','Datasets'],['evaluation','Model Evaluation']].map(([id,label])=><button className={tab===id?'active':''} onClick={()=>setTab(id)} key={id}>{label}</button>)}</div>
-    {tab==='campaigns'&&<div className="panel"><div className="panelhead"><div><h2>Annotation campaigns</h2><span>Sampling versionado, três ratings por item e eventos auditáveis.</span></div><ShieldCheck size={20}/></div>{campaigns.isLoading&&<p>Carregando campanhas…</p>}{campaigns.data?.length===0&&!campaigns.isLoading&&<p>Nenhuma campanha criada. O piloto não é iniciado automaticamente.</p>}{campaigns.data?.map(c=><article className="campaign-card" key={c.id} onClick={()=>setSelected(c.id)}><div><strong>{c.name}</strong><small>{c.code} · {c.status} · {c.target_annotations_per_item} ratings/item</small><code>{c.id}</code></div><div className="runrow"><button onClick={e=>{e.stopPropagation();sample.mutate(c.id)}}>Sample 100</button><button onClick={e=>{e.stopPropagation();action.mutate({id:c.id,a:c.status==='DRAFT'?'start':'pause'})}}>{c.status==='DRAFT'?'Iniciar':'Pausar'}</button><button onClick={e=>{e.stopPropagation();dataset.mutate(c.id)}}>Publicar dataset</button></div></article>)}</div>}
-    {tab==='studio'&&<BlindStudio/>}{tab==='review'&&<ReviewPanel campaignId={selected}/>} {tab==='datasets'&&<DatasetPanel campaignId={selected}/>} {tab==='evaluation'&&<div className="panel"><h2>Model Evaluation</h2><p>Comparações human × model serão exibidas com versão, idioma, MAE e Spearman. Correlação não implica validade de constructo.</p><FlaskConical size={28}/></div>}
-    {selected&&<div className="panel"><h2>QA da campanha selecionada</h2>{metrics.isLoading?<p>Calculando…</p>:<pre>{JSON.stringify(metrics.data,null,2)}</pre>}</div>}</section>;
+  const qc = useQueryClient();
+  const campaigns = useQuery({
+    queryKey: ["annotation-campaigns"],
+    queryFn: services.listAnnotationCampaigns,
+  });
+  const [selected, setSelected] = useState<string>();
+  const [tab, setTab] = useState("campaigns");
+  const create = useMutation({
+    mutationFn: () =>
+      services.createAnnotationCampaign({
+        code: `pilot-v1-${Date.now()}`,
+        name: "Excerpt Quality Pilot V1",
+        languagePolicy: { languages: ["en", "pt"], targetPerLanguage: 50 },
+        samplingConfig: {
+          seed: 1337,
+          strata: ["language", "dialogue", "position", "subject"],
+          items: 100,
+        },
+      }),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["annotation-campaigns"] }),
+  });
+  const action = useMutation({
+    mutationFn: ({ id, a }: { id: string; a: string }) =>
+      services.transitionAnnotationCampaign(id, a),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["annotation-campaigns"] }),
+  });
+  const sample = useMutation({ mutationFn: services.sampleAnnotationCampaign });
+  const dataset = useMutation({
+    mutationFn: services.publishAnnotationDataset,
+  });
+  const metrics = useQuery({
+    queryKey: ["annotation-metrics", selected],
+    queryFn: () => services.annotationMetrics(selected!),
+    enabled: Boolean(selected),
+  });
+  const failure = [create, action, sample, dataset].find(
+    (m) => m.isError,
+  )?.error;
+  return (
+    <section>
+      <header className="pagehead">
+        <div>
+          <span className="eyebrow">TRAINING & GROUND TRUTH</span>
+          <h1>Excerpt quality</h1>
+          <p>
+            Coleta humana cega para avaliar excerpts. Scores de modelo só
+            aparecem depois do lock primário.
+          </p>
+        </div>
+        <button
+          className="button-action"
+          onClick={() => create.mutate()}
+          disabled={create.isPending}
+        >
+          <Plus size={16} />
+          Criar piloto 50 EN + 50 PT
+        </button>
+      </header>
+      {failure && (
+        <div className="panel import-error">
+          <strong>Ação não concluída</strong>
+          <p>
+            {failure instanceof Error
+              ? failure.message
+              : "O serviço recusou a operação. Consulte os logs do analytics."}
+          </p>
+        </div>
+      )}
+      <div className="training-tabs">
+        {[
+          ["campaigns", "Campaigns"],
+          ["studio", "Annotation Studio"],
+          ["review", "Review & Adjudication"],
+          ["datasets", "Datasets"],
+          ["evaluation", "Model Evaluation"],
+        ].map(([id, label]) => (
+          <button
+            className={tab === id ? "active" : ""}
+            onClick={() => setTab(id)}
+            key={id}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {tab === "campaigns" && (
+        <div className="panel">
+          <div className="panelhead">
+            <div>
+              <h2>Annotation campaigns</h2>
+              <span>
+                Sampling versionado, três ratings por item e eventos auditáveis.
+              </span>
+            </div>
+            <ShieldCheck size={20} />
+          </div>
+          {campaigns.isLoading && <p>Carregando campanhas…</p>}
+          {campaigns.data?.length === 0 && !campaigns.isLoading && (
+            <p>
+              Nenhuma campanha criada. O piloto não é iniciado automaticamente.
+            </p>
+          )}
+          {campaigns.data?.map((c) => (
+            <article
+              className="campaign-card"
+              key={c.id}
+              onClick={() => setSelected(c.id)}
+            >
+              <div>
+                <strong>{c.name}</strong>
+                <small>
+                  {c.code} · {c.status} · {c.target_annotations_per_item}{" "}
+                  ratings/item
+                </small>
+                <code>{c.id}</code>
+              </div>
+              <div className="runrow">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sample.mutate(c.id);
+                  }}
+                >
+                  Sample 100
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    action.mutate({
+                      id: c.id,
+                      a: c.status === "DRAFT" ? "start" : "pause",
+                    });
+                  }}
+                >
+                  {c.status === "DRAFT" ? "Iniciar" : "Pausar"}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dataset.mutate(c.id);
+                  }}
+                >
+                  Publicar dataset
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      {tab === "studio" && <BlindStudio />}
+      {tab === "review" && <ReviewPanel campaignId={selected} />}{" "}
+      {tab === "datasets" && <DatasetPanel campaignId={selected} />}{" "}
+      {tab === "evaluation" && (
+        <div className="panel">
+          <h2>Model Evaluation</h2>
+          <p>
+            Comparações human × model serão exibidas com versão, idioma, MAE e
+            Spearman. Correlação não implica validade de constructo.
+          </p>
+          <FlaskConical size={28} />
+        </div>
+      )}
+      {selected && (
+        <div className="panel">
+          <h2>QA da campanha selecionada</h2>
+          {metrics.isLoading ? (
+            <p>Calculando…</p>
+          ) : (
+            <pre>{JSON.stringify(metrics.data, null, 2)}</pre>
+          )}
+        </div>
+      )}
+    </section>
+  );
 }
 const dimensionHelp: Record<string, string> = {
-  FIRST_SCREEN_HOOK: 'A primeira reação: o trecho desperta vontade imediata de continuar?',
-  HOOK: 'Força do início e capacidade de criar interesse sem depender do contexto.',
-  CLARITY: 'O trecho pode ser entendido sem esforço ou conhecimento externo?',
-  AUTHENTICITY: 'A voz, situação ou emoção parece específica e convincente?',
-  IMPACT: 'O trecho produz uma impressão marcante depois da leitura?',
-  PACING: 'O ritmo e a progressão das frases funcionam para este trecho?',
-  SELF_CONTAINMENT: 'O trecho mantém sentido suficiente quando lido isoladamente?',
+  FIRST_SCREEN_HOOK:
+    "A primeira reação: o trecho desperta vontade imediata de continuar?",
+  HOOK: "Força do início e capacidade de criar interesse sem depender do contexto.",
+  CLARITY: "O trecho pode ser entendido sem esforço ou conhecimento externo?",
+  AUTHENTICITY: "A voz, situação ou emoção parece específica e convincente?",
+  IMPACT: "O trecho produz uma impressão marcante depois da leitura?",
+  PACING: "O ritmo e a progressão das frases funcionam para este trecho?",
+  SELF_CONTAINMENT:
+    "O trecho mantém sentido suficiente quando lido isoladamente?",
+  CONFIDENCE: "Quão segura é sua avaliação deste trecho?",
 };
-const dimensionLabels: Record<string, string> = { HOOK: 'Gancho', CLARITY: 'Clareza', AUTHENTICITY: 'Autenticidade', IMPACT: 'Impacto', PACING: 'Ritmo', SELF_CONTAINMENT: 'Autossuficiência' };
-function RatingControl({ code, value, disabled, onChange }: { code: string; value: number; disabled?: boolean; onChange: (value: number) => void }) {
-  return <div className="rating-control"><div className="rating-title"><strong>{dimensionLabels[code] ?? code}</strong><span>{value ? `${value}/5` : 'Selecione'}</span></div><p>{dimensionHelp[code]}</p><div className="rating-options" role="radiogroup" aria-label={dimensionLabels[code] ?? code}>{[1,2,3,4,5].map(n=><button type="button" key={n} role="radio" aria-checked={value===n} aria-label={`${n} de 5`} disabled={disabled} className={value===n?'selected':''} onClick={()=>onChange(n)}>{n}</button>)}</div><div className="rating-scale"><span>Baixo</span><span>Alto</span></div></div>;
+const dimensionLabels: Record<string, string> = {
+  HOOK: "Gancho",
+  CLARITY: "Clareza",
+  AUTHENTICITY: "Autenticidade",
+  IMPACT: "Impacto",
+  PACING: "Ritmo",
+  SELF_CONTAINMENT: "Autossuficiência",
+  CONFIDENCE: "Confiança",
+};
+function RatingControl({
+  code,
+  value,
+  disabled,
+  onChange,
+}: {
+  code: string;
+  value: number;
+  disabled?: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="rating-control">
+      <div className="rating-title">
+        <strong>{dimensionLabels[code] ?? code}</strong>
+        <span>{value ? `${value}/5` : "Selecione"}</span>
+      </div>
+      <p>{dimensionHelp[code]}</p>
+      <div
+        className="rating-options"
+        role="radiogroup"
+        aria-label={dimensionLabels[code] ?? code}
+      >
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            type="button"
+            key={n}
+            role="radio"
+            aria-checked={value === n}
+            aria-label={`${n} de 5`}
+            disabled={disabled}
+            className={value === n ? "selected" : ""}
+            data-rating-code={code}
+            onKeyDown={(event) => {
+              if (!disabled && /^[1-5]$/.test(event.key)) {
+                event.preventDefault();
+                onChange(Number(event.key));
+              }
+            }}
+            onClick={() => onChange(n)}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <div className="rating-scale">
+        <span>Baixo</span>
+        <span>Alto</span>
+      </div>
+    </div>
+  );
 }
-function BlindStudio(){const campaigns=useQuery({queryKey:['annotation-campaigns-studio'],queryFn:services.listAnnotationCampaigns});const [campaign,setCampaign]=useState('');const [item,setItem]=useState<any>();const [hook,setHook]=useState(0);const [ratings,setRatings]=useState<Record<string,number>>({});const [locked,setLocked]=useState(false);const [busy,setBusy]=useState(false);const [studioError,setStudioError]=useState('');const [context,setContext]=useState(false);const [contextData,setContextData]=useState<any>();const dims=['HOOK','CLARITY','AUTHENTICITY','IMPACT','PACING','SELF_CONTAINMENT'];const claim=async()=>{if(!campaign)return;setStudioError('');setBusy(true);try{const next=await services.claimAnnotationItem(campaign);if(next)setItem(next);else setStudioError('Não há itens disponíveis nesta campanha. Materialize uma amostra ou aguarde outro item.');}catch(e:any){setStudioError(e?.response?.data?.code||'Não foi possível reivindicar o próximo item.')}finally{setBusy(false);}};const nextExcerpt=async()=>{setItem(undefined);setHook(0);setRatings({});setLocked(false);setContext(false);setContextData(undefined);await claim();};const lock=async()=>{if(!item||hook<1||Object.keys(ratings).length<6)return;setStudioError('');setBusy(true);try{await services.rateFirstScreen(item.campaignItemId,hook);await services.lockAnnotation(item.campaignItemId,ratings,3);setLocked(true);}catch(e:any){setStudioError(e?.response?.data?.code||e?.response?.data?.message||'Não foi possível bloquear a anotação. Verifique a sessão e tente novamente.')}finally{setBusy(false);}};const reveal=async()=>{try{const data=await services.revealAnnotationContext(item.campaignItemId);setContextData(data);setContext(true);}catch(e:any){setStudioError(e?.response?.data?.code||'Não foi possível revelar o contexto.')}};return <div className="panel blind-studio"><h2>Annotation Studio</h2><p className="studio-intro">Leia o trecho sem influência de modelos. Dê sua primeira impressão, avalie as dimensões e bloqueie a anotação antes de consultar o contexto.</p><div className="blind-banner"><LockKeyhole size={18}/> Modo cego ativo — previsões e scores permanecem ocultos até o lock</div>{studioError&&<div className="error-box" role="alert">{studioError}</div>}{!item?<><p>Escolha uma campanha com amostra materializada para reivindicar um item.</p><select className="theme-select" aria-label="Annotation campaign" value={campaign} onChange={e=>setCampaign(e.target.value)}><option value="">Selecione uma campanha</option>{campaigns.data?.map(c=><option key={c.id} value={c.id}>{c.name} · {c.status}</option>)}</select><button className="primary-action" disabled={!campaign||busy} onClick={()=>void claim()}>{busy?'Reivindicando…':'Claim next item'}</button></>:<><p>Item <code>{item.campaignItemId}</code> · avaliação cega</p><blockquote>{item.excerpt_text||'Texto indisponível para este item.'}</blockquote><RatingControl code="FIRST_SCREEN_HOOK" value={hook} disabled={locked||busy} onChange={setHook}/><div className="dimension-grid">{dims.map(d=><RatingControl key={d} code={d} value={ratings[d]??0} disabled={locked||busy} onChange={value=>setRatings({...ratings,[d]:value})}/>)}</div><button className="primary-action" disabled={locked||busy||Object.keys(ratings).length<6||!hook} onClick={()=>void lock()}>{locked?'Primary locked':busy?'Salvando…':'Lock primary annotation'}</button>{locked&&<button className="secondary-action" disabled={busy} onClick={()=>void nextExcerpt()}>Próximo excerpt</button>}{locked&&!context&&<button className="secondary-action" onClick={()=>void reveal()}>Reveal context</button>}{context&&<div className="context-box"><strong>Contexto liberado</strong><p>Agora compare o trecho com o contexto. Os labels primários continuam somente leitura.</p>{contextData?.rankers?.length>0&&<><h3>Rankers</h3><div className="context-rankers">{contextData.rankers.map((r:any)=><div key={`${r.ranker_code}-${r.ranker_version}`}><strong>{r.ranker_code}</strong><span>{Number(r.final_score).toFixed(3)}</span><small>{r.ranker_version}</small></div>)}</div></>}{contextData?.modelFeatures?.length>0&&<><h3>Features e scores dos modelos</h3><div className="context-features">{contextData.modelFeatures.map((f:any)=><div key={`${f.code}-${f.version}`}><span>{f.name||f.code}</span><strong>{f.numeric_value==null?'—':Number(f.numeric_value).toFixed(3)}</strong><small>{f.semantic_category} · {f.value_status}</small></div>)}</div></>}<button className="primary-action" onClick={()=>void services.submitAnnotation(item.campaignItemId,true,3)}>Submit diagnostic</button></div>}</>}</div>}
-function ReviewPanel({campaignId}:{campaignId?:string}){const q=useQuery({queryKey:['annotation-queue',campaignId],queryFn:()=>services.annotationQueue(campaignId!),enabled:Boolean(campaignId)});const [rationale,setRationale]=useState('');const [value,setValue]=useState(3);const adjudicate=useMutation({mutationFn:({item,dimension}:{item:string;dimension:string})=>services.adjudicateAnnotation(item,dimension,value,rationale),onSuccess:()=>q.refetch()});return <div className="panel"><h2>Review & Adjudication</h2><p>Discordâncias com amplitude igual ou maior que 2. Labels brutos permanecem preservados.</p>{!campaignId?<p>Selecione uma campanha na aba Campaigns.</p>:q.data?.items?.length===0?<p>Nenhum item na fila.</p>:q.data?.items?.map((item:any)=><article className="campaign-card" key={`${item.campaign_item_id}-${item.dimension_code}`}><div><strong>{item.dimension_code}</strong><small>item {item.campaign_item_id} · {item.min_value}–{item.max_value} ({item.ratings} ratings)</small></div><div><input aria-label="Rationale" placeholder="Rationale" value={rationale} onChange={e=>setRationale(e.target.value)}/><select value={value} onChange={e=>setValue(Number(e.target.value))}>{[1,2,3,4,5].map(n=><option key={n}>{n}</option>)}</select><button onClick={()=>adjudicate.mutate({item:item.campaign_item_id,dimension:item.dimension_code})}>Adjudicate</button></div></article>)}</div>}
-function DatasetPanel({campaignId}:{campaignId?:string}){const [version,setVersion]=useState(1);const [result,setResult]=useState<unknown>();return <div className="panel"><h2>Datasets imutáveis</h2><p>Snapshots guardam manifesto, labels brutos e adjudicações separadamente.</p>{!campaignId?<p>Selecione uma campanha na aba Campaigns.</p>:<><label>Version <input type="number" min={1} value={version} onChange={e=>setVersion(Number(e.target.value))}/></label><button onClick={async()=>setResult(await services.exportAnnotationDataset(campaignId,version))}>Export dataset</button>{result&&<pre>{JSON.stringify(result,null,2)}</pre>}</>}<Database size={28}/></div>}
+function BlindStudio() {
+  const campaigns = useQuery({
+    queryKey: ["annotation-campaigns-studio"],
+    queryFn: services.listAnnotationCampaigns,
+  });
+  const [campaign, setCampaign] = useState("");
+  const [item, setItem] = useState<any>();
+  const [hook, setHook] = useState(0);
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [confidence, setConfidence] = useState(0);
+  const [failureTags, setFailureTags] = useState<string[]>([]);
+  const [locked, setLocked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [studioError, setStudioError] = useState("");
+  const [context, setContext] = useState(false);
+  const [contextData, setContextData] = useState<any>();
+  const [restored, setRestored] = useState(false);
+  const dims = [
+    "HOOK",
+    "CLARITY",
+    "AUTHENTICITY",
+    "IMPACT",
+    "PACING",
+    "SELF_CONTAINMENT",
+  ];
+  const progress = useQuery({
+    queryKey: ["annotation-progress", campaign],
+    queryFn: () => services.annotationProgress(campaign),
+    enabled: Boolean(campaign),
+  });
+  useEffect(() => {
+    const raw = sessionStorage.getItem("bookrush.annotation-studio.pending");
+    if (!raw) {
+      setRestored(true);
+      return;
+    }
+    try {
+      const saved = JSON.parse(raw);
+      setCampaign(saved.campaign ?? "");
+      setHook(saved.hook ?? 0);
+      setRatings(saved.ratings ?? {});
+      setConfidence(saved.confidence ?? 0);
+      setFailureTags(saved.failureTags ?? []);
+      setLocked(Boolean(saved.locked));
+      setContext(Boolean(saved.context));
+      setContextData(saved.contextData);
+      if (saved.item?.campaignItemId) {
+        void services
+          .annotationItem(saved.item.campaignItemId)
+          .then(setItem)
+          .catch(() =>
+            sessionStorage.removeItem("bookrush.annotation-studio.pending"),
+          );
+      }
+    } catch {
+      sessionStorage.removeItem("bookrush.annotation-studio.pending");
+    } finally {
+      setRestored(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (!restored) return;
+    if (!item) {
+      sessionStorage.removeItem("bookrush.annotation-studio.pending");
+      return;
+    }
+    sessionStorage.setItem(
+      "bookrush.annotation-studio.pending",
+      JSON.stringify({
+        campaign,
+        item,
+        hook,
+        ratings,
+        confidence,
+        failureTags,
+        locked,
+        context,
+        contextData,
+      }),
+    );
+  }, [
+    campaign,
+    confidence,
+    context,
+    contextData,
+    failureTags,
+    hook,
+    item,
+    locked,
+    ratings,
+    restored,
+  ]);
+  const claim = async () => {
+    if (!campaign) return;
+    setStudioError("");
+    setBusy(true);
+    try {
+      const next = await services.claimAnnotationItem(campaign);
+      if (next) setItem(next);
+      else
+        setStudioError(
+          "Não há itens disponíveis nesta campanha. Materialize uma amostra ou aguarde outro item.",
+        );
+    } catch (e: any) {
+      setStudioError(
+        e?.response?.data?.code ||
+          "Não foi possível reivindicar o próximo item.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const nextExcerpt = async () => {
+    setItem(undefined);
+    setHook(0);
+    setRatings({});
+    setConfidence(0);
+    setFailureTags([]);
+    setLocked(false);
+    setContext(false);
+    setContextData(undefined);
+    await claim();
+  };
+  const lock = async () => {
+    if (!item || hook < 1 || Object.keys(ratings).length < 6 || !confidence)
+      return;
+    setStudioError("");
+    setBusy(true);
+    try {
+      await services.rateFirstScreen(item.campaignItemId, hook);
+      await services.lockAnnotation(
+        item.campaignItemId,
+        ratings,
+        confidence,
+        failureTags,
+      );
+      setLocked(true);
+      await progress.refetch();
+    } catch (e: any) {
+      setStudioError(
+        e?.response?.data?.code ||
+          e?.response?.data?.message ||
+          "Não foi possível bloquear a anotação. Verifique a sessão e tente novamente.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const reveal = async () => {
+    try {
+      const data = await services.revealAnnotationContext(item.campaignItemId);
+      setContextData(data);
+      setContext(true);
+    } catch (e: any) {
+      setStudioError(
+        e?.response?.data?.code || "Não foi possível revelar o contexto.",
+      );
+    }
+  };
+  const submitDiagnostic = async () => {
+    if (!item) return;
+    setBusy(true);
+    setStudioError("");
+    try {
+      await services.submitAnnotation(item.campaignItemId, true, 3);
+      await nextExcerpt();
+    } catch (e: any) {
+      setStudioError(
+        e?.response?.data?.code || "Não foi possível submeter o diagnóstico.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="panel blind-studio">
+      <h2>Annotation Studio</h2>
+      <p className="studio-intro">
+        Leia o trecho sem influência de modelos. Dê sua primeira impressão,
+        avalie as dimensões e bloqueie a anotação antes de consultar o contexto.
+      </p>
+      <div className="blind-banner">
+        <LockKeyhole size={18} /> Modo cego ativo — previsões e scores
+        permanecem ocultos até o lock
+      </div>
+      {campaign && (
+        <div className="studio-progress" aria-live="polite">
+          <strong>Progresso</strong>
+          <span>
+            {progress.data?.completed ?? 0} de {progress.data?.total ?? "—"}{" "}
+            itens concluídos
+          </span>
+          <small>{progress.data?.remaining ?? "—"} restantes</small>
+        </div>
+      )}
+      {studioError && (
+        <div className="error-box" role="alert">
+          {studioError}
+        </div>
+      )}
+      {!item ? (
+        <>
+          <p>
+            Escolha uma campanha com amostra materializada para reivindicar um
+            item.
+          </p>
+          <select
+            className="theme-select"
+            aria-label="Annotation campaign"
+            value={campaign}
+            onChange={(e) => setCampaign(e.target.value)}
+          >
+            <option value="">Selecione uma campanha</option>
+            {campaigns.data?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} · {c.status}
+              </option>
+            ))}
+          </select>
+          <button
+            className="primary-action"
+            disabled={!campaign || busy}
+            onClick={() => void claim()}
+          >
+            {busy ? "Reivindicando…" : "Claim next item"}
+          </button>
+        </>
+      ) : (
+        <>
+          <p>
+            Item <code>{item.campaignItemId}</code> · avaliação cega
+          </p>
+          <p className="keyboard-hint">
+            Dica: use Tab para navegar e as teclas 1–5 para avaliar o campo
+            focado.
+          </p>
+          <blockquote>
+            {item.excerpt_text || "Texto indisponível para este item."}
+          </blockquote>
+          <RatingControl
+            code="FIRST_SCREEN_HOOK"
+            value={hook}
+            disabled={locked || busy}
+            onChange={setHook}
+          />
+          <div className="dimension-grid">
+            {dims.map((d) => (
+              <RatingControl
+                key={d}
+                code={d}
+                value={ratings[d] ?? 0}
+                disabled={locked || busy}
+                onChange={(value) => setRatings({ ...ratings, [d]: value })}
+              />
+            ))}
+          </div>
+          <RatingControl
+            code="CONFIDENCE"
+            value={confidence}
+            disabled={locked || busy}
+            onChange={setConfidence}
+          />
+          <fieldset className="failure-tags" disabled={locked || busy}>
+            <legend>Failure tags (opcional)</legend>
+            {["NOT_ENOUGH_CONTEXT", "UNCLEAR", "LOW_IMPACT", "OTHER"].map(
+              (tag) => (
+                <label key={tag}>
+                  <input
+                    type="checkbox"
+                    checked={failureTags.includes(tag)}
+                    onChange={(event) =>
+                      setFailureTags((current) =>
+                        event.target.checked
+                          ? [...current, tag]
+                          : current.filter((value) => value !== tag),
+                      )
+                    }
+                  />
+                  {tag.replace(/_/g, " ")}
+                </label>
+              ),
+            )}
+          </fieldset>
+          <button
+            className="primary-action"
+            disabled={
+              locked ||
+              busy ||
+              Object.keys(ratings).length < 6 ||
+              !hook ||
+              !confidence
+            }
+            onClick={() => void lock()}
+          >
+            {locked
+              ? "Primary locked"
+              : busy
+                ? "Salvando…"
+                : "Lock primary annotation"}
+          </button>
+          {locked && (
+            <button
+              className="secondary-action"
+              disabled={busy}
+              onClick={() => void nextExcerpt()}
+            >
+              Próximo excerpt
+            </button>
+          )}
+          {locked && !context && (
+            <button className="secondary-action" onClick={() => void reveal()}>
+              Reveal context
+            </button>
+          )}
+          {context && (
+            <div className="context-box">
+              <strong>Contexto liberado</strong>
+              <p>
+                Agora compare o trecho com o contexto. Os labels primários
+                continuam somente leitura.
+              </p>
+              <div className="context-neighbors">
+                <div>
+                  <small>Trecho anterior</small>
+                  <p>
+                    {contextData?.previousContext?.text ||
+                      "Não há trecho anterior."}
+                  </p>
+                </div>
+                <div>
+                  <small>Trecho seguinte</small>
+                  <p>
+                    {contextData?.nextContext?.text ||
+                      "Não há trecho seguinte."}
+                  </p>
+                </div>
+              </div>
+              {contextData?.rankers?.length > 0 && (
+                <>
+                  <h3>Rankers</h3>
+                  <div className="context-rankers">
+                    {contextData.rankers.map((r: any) => (
+                      <div key={`${r.ranker_code}-${r.ranker_version}`}>
+                        <strong>{r.ranker_code}</strong>
+                        <span>{Number(r.final_score).toFixed(3)}</span>
+                        <small>{r.ranker_version}</small>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {contextData?.modelFeatures?.length > 0 && (
+                <>
+                  <h3>Features e scores dos modelos</h3>
+                  <div className="context-features">
+                    {contextData.modelFeatures.map((f: any) => (
+                      <div key={`${f.code}-${f.version}`}>
+                        <span>{f.name || f.code}</span>
+                        <strong>
+                          {f.numeric_value == null
+                            ? "—"
+                            : Number(f.numeric_value).toFixed(3)}
+                        </strong>
+                        <small>
+                          {f.semantic_category} · {f.value_status}
+                        </small>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button
+                className="primary-action"
+                disabled={busy}
+                onClick={() => void submitDiagnostic()}
+              >
+                {busy ? "Salvando…" : "Submit diagnostic e próximo excerpt"}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+function ReviewPanel({ campaignId }: { campaignId?: string }) {
+  const q = useQuery({
+    queryKey: ["annotation-queue", campaignId],
+    queryFn: () => services.annotationQueue(campaignId!),
+    enabled: Boolean(campaignId),
+  });
+  const [rationale, setRationale] = useState("");
+  const [value, setValue] = useState(3);
+  const adjudicate = useMutation({
+    mutationFn: ({ item, dimension }: { item: string; dimension: string }) =>
+      services.adjudicateAnnotation(item, dimension, value, rationale),
+    onSuccess: () => q.refetch(),
+  });
+  return (
+    <div className="panel">
+      <h2>Review & Adjudication</h2>
+      <p>
+        Discordâncias com amplitude igual ou maior que 2. Labels brutos
+        permanecem preservados.
+      </p>
+      {!campaignId ? (
+        <p>Selecione uma campanha na aba Campaigns.</p>
+      ) : q.data?.items?.length === 0 ? (
+        <p>Nenhum item na fila.</p>
+      ) : (
+        q.data?.items?.map((item: any) => (
+          <article
+            className="campaign-card"
+            key={`${item.campaign_item_id}-${item.dimension_code}`}
+          >
+            <div>
+              <strong>{item.dimension_code}</strong>
+              <small>
+                item {item.campaign_item_id} · {item.min_value}–{item.max_value}{" "}
+                ({item.ratings} ratings)
+              </small>
+            </div>
+            <div>
+              <input
+                aria-label="Rationale"
+                placeholder="Rationale"
+                value={rationale}
+                onChange={(e) => setRationale(e.target.value)}
+              />
+              <select
+                value={value}
+                onChange={(e) => setValue(Number(e.target.value))}
+              >
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+              <button
+                onClick={() =>
+                  adjudicate.mutate({
+                    item: item.campaign_item_id,
+                    dimension: item.dimension_code,
+                  })
+                }
+              >
+                Adjudicate
+              </button>
+            </div>
+          </article>
+        ))
+      )}
+    </div>
+  );
+}
+function DatasetPanel({ campaignId }: { campaignId?: string }) {
+  const [version, setVersion] = useState(1);
+  const [result, setResult] = useState<unknown>();
+  return (
+    <div className="panel">
+      <h2>Datasets imutáveis</h2>
+      <p>
+        Snapshots guardam manifesto, labels brutos e adjudicações separadamente.
+      </p>
+      {!campaignId ? (
+        <p>Selecione uma campanha na aba Campaigns.</p>
+      ) : (
+        <>
+          <label>
+            Version{" "}
+            <input
+              type="number"
+              min={1}
+              value={version}
+              onChange={(e) => setVersion(Number(e.target.value))}
+            />
+          </label>
+          <button
+            onClick={async () =>
+              setResult(
+                await services.exportAnnotationDataset(campaignId, version),
+              )
+            }
+          >
+            Export dataset
+          </button>
+          {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
+        </>
+      )}
+      <Database size={28} />
+    </div>
+  );
+}

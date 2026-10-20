@@ -11,7 +11,7 @@ paths:
         - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
       responses:
         '200':
-          description: Feed with request, impression and optional analytics excerpt lineage
+          description: Feed with request, impression, heuristic strategy and optional analytics excerpt lineage
           content:
             application/json:
               schema:
@@ -37,6 +37,9 @@ components:
       properties:
         requestId: {type: string, format: uuid}
         modelVersion: {type: string}
+        strategy:
+          type: string
+          enum: [COLD_START, DIVERSE, LUCKY]
         items:
           type: array
           items:
@@ -48,6 +51,9 @@ components:
               impressionId: {type: string, format: uuid}
               modelVersion: {type: string}
               rank: {type: integer}
+              reason:
+                type: string
+                enum: [popular-cold-start, diversity-heuristic, lucky-exploration]
               excerpt:
                 $ref: '#/components/schemas/FeedExcerpt'
     FeedExcerpt:

@@ -59,6 +59,10 @@ exibem erro. A regressão está em `tests/search-save.test.mjs`.
 
 A Biblioteca (`reader/LibraryPage.tsx`) consulta a estante e os recentes reais,
 resolve os metadados pelo ID de cada livro e busca progresso no reader-state.
+
+A tela Minha planta consulta `GET /api/v1/reader/plant` no reader-state-service.
+Ela exibe o estágio e os minutos acumulados da projeção versionada
+`reading-minutes-v1`; não usa métricas demonstrativas locais.
 Metadados do catálogo usam GET público sem Bearer, pois o catálogo valida o
 realm de plataforma; biblioteca, recentes e progresso usam o token do leitor.
 Ela não limita a estante aos livros do feed.
@@ -108,6 +112,22 @@ o fluxo autenticado requer validação no navegador com a conta do usuário.
 - abertura idempotente de livro e eventos de comportamento autenticados;
 - layout responsivo para desktop e telas pequenas;
 - estados explícitos de carregamento, catálogo vazio, sessão expirada e erro da API.
+
+## Telemetria web e mobile
+
+`src/telemetry.ts` e `mobile/src/telemetry.ts` implementam o mesmo contrato
+de eventos em memória. O cliente agrupa no máximo 20 eventos por envio,
+mantém no máximo 100 eventos pendentes e repete falhas com backoff exponencial
+limitado a 60 segundos. A fila é perdida ao encerrar a sessão ou o processo;
+nenhum token, e-mail ou texto do livro entra nela.
+
+O web registra impressões somente quando o elemento atinge o limiar de
+visibilidade (`IntersectionObserver`) e mede `DWELL` com duração não negativa.
+O mobile expõe os mesmos eventos por `impression` e `dwell`, pois não possui
+um DOM; `BOOK_OPEN`, `BOOK_SAVED` e `BOOK_UNSAVED` são enfileirados pelo app.
+O envio chama `POST /api/v1/behavior/events` com o bearer apenas no cabeçalho.
+Os testes estão em `tests/telemetry.test.mjs` e cobrem sanitização, batching,
+retry, viewability e dwell.
 
 A API continua sendo a fronteira de autorização. O navegador não persiste access tokens; a implementação usa memória e estado transitório de protocolo.
 
@@ -223,6 +243,11 @@ npm run build
 ```
 
 A configuração OIDC pode ser sobrescrita com `VITE_OIDC_AUTHORITY` e `VITE_OIDC_CLIENT_ID`. O cliente padrão é `bookrush-web`, provisionado em `infrastructure/keycloak/bookrush-realm.json`.
+Além dos scopes básicos (`openid profile email`), o frontend solicita
+`bookrush.catalog.read` para que o bearer emitido pelo Keycloak possa consultar
+o catálogo e as thumbnails protegidas. Tokens emitidos antes dessa alteração
+precisam ser renovados após novo login; um token já emitido não recebe scopes
+retroativamente.
 
 O Vite usa a porta fixa `18080`: abra `http://localhost:18080`, origem permitida
 no client Keycloak versionado. Se a porta estiver ocupada, o Vite informa erro
