@@ -66,6 +66,19 @@ criam afinidade. A ligação remota que materializa vetores ainda deve ser feita
 em uma etapa posterior, pois o snapshot S2S atual expõe metadados e mantém os
 vetores no storage.
 
+## Confidence, cold start e lifecycle
+
+`ProfileBlendPolicy` mantém o cold start compatível com o ranking global:
+perfil `EMPTY` tem peso personalizado zero e, conforme a confiança cresce, o
+score personalizado entra continuamente no blend. Os níveis `EMPTY`, `LOW` e
+`ESTABLISHED` e seus limiares pertencem a uma configuração versionada; o
+valor de produto não é codificado como um número fixo de eventos.
+
+`UserTasteProfileCache` é reconstruível, possui TTL e chaveia por subject,
+versão do modelo e hash da configuração. Eventos novos podem invalidar apenas
+o subject afetado; ausência de behavior não consulta nem reutiliza o perfil de
+outro usuário.
+
 ## Validação
 
 `RecommendationSnapshotQueryRepositoryIT` usa PostgreSQL/Testcontainers e
