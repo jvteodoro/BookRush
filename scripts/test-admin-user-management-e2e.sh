@@ -4,7 +4,6 @@ set -Eeuo pipefail
 # End-to-end proof of platform token -> admin-service -> product-realm users.
 # All containers, credentials and data are disposable.
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-admin-e2e.XXXXXX")"
 suffix="$RANDOM-$$"
 network="bookrush-admin-e2e-$suffix"
 keycloak="bookrush-admin-e2e-keycloak-$suffix"
@@ -30,12 +29,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run --rm --user "$(id -u):$(id -g)" \
-  -e KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
-  -e INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
-  -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
-  python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
-  /repo/infrastructure/keycloak /out/rendered
+if docker inspect "$HOSTNAME" >/dev/null 2>&1; then
+  work_dir="$(mktemp -d "$repo_dir/.bookrush-admin-e2e.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" --volumes-from "$HOSTNAME" \
+    -w "$repo_dir" \
+    -e KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
+    -e INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
+    python:3.12-slim python3 infrastructure/keycloak/render-config.py \
+    infrastructure/keycloak "$work_dir/rendered"
+else
+  work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-admin-e2e.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" \
+    -e KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
+    -e INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
+    -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
+    python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
+    /repo/infrastructure/keycloak /out/rendered
+fi
 
 docker network create "$network" >/dev/null
 docker run -d --name "$postgres" --network "$network" --network-alias postgres \

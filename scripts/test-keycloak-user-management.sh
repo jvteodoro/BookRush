@@ -6,7 +6,6 @@ set -Eeuo pipefail
 command -v docker >/dev/null || { echo 'Docker ausente.' >&2; exit 2; }
 docker info >/dev/null 2>&1 || { echo 'Usuário sem acesso ao Docker.' >&2; exit 2; }
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-user-management.XXXXXX")"
 name="bookrush-user-management-$RANDOM"
 probe="bookrush-user-management-probe-$RANDOM"
 admin_password='disposable-admin-password'
@@ -20,11 +19,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run --rm --user "$(id -u):$(id -g)" \
-  -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
-  -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
-  python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
-  /repo/infrastructure/keycloak /out/rendered
+if docker inspect "$HOSTNAME" >/dev/null 2>&1; then
+  work_dir="$(mktemp -d "$repo_dir/.bookrush-user-management.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" --volumes-from "$HOSTNAME" \
+    -w "$repo_dir" -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
+    python:3.12-slim python3 infrastructure/keycloak/render-config.py \
+    infrastructure/keycloak "$work_dir/rendered"
+else
+  work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-user-management.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" \
+    -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
+    -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
+    python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
+    /repo/infrastructure/keycloak /out/rendered
+fi
 docker create --name "$name" \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
   -e KC_BOOTSTRAP_ADMIN_PASSWORD="$admin_password" \
