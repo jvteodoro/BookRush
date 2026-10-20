@@ -1,3 +1,4 @@
+
 {
   "realm": "bookrush",
   "enabled": true,
@@ -5,6 +6,29 @@
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
+
+  "userProfile": {
+    "attributes": [
+      {
+        "name": "birthdate",
+        "displayName": "Data de nascimento (AAAA-MM-DD)",
+        "validations": {
+          "pattern": {
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "error-message": "Use o formato AAAA-MM-DD"
+          }
+        },
+        "required": {
+          "roles": ["user"]
+        },
+        "permissions": {
+          "view": ["admin", "user"],
+          "edit": ["admin"]
+        }
+      }
+    ]
+  },
+
   "roles": {
     "realm": [
       {
@@ -30,6 +54,7 @@
       }
     ]
   },
+
   "clientScopes": [
     {
       "name": "bookrush.catalog.read",
@@ -40,6 +65,7 @@
       }
     }
   ],
+
   "clients": [
     {
       "clientId": "bookrush-web",
@@ -57,7 +83,22 @@
       ],
       "attributes": {
         "post.logout.redirect.uris": "https://bookrush.jteodoro.tec.br/*##http://localhost:18080/*"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "birthdate",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "birthdate",
+            "claim.name": "birthdate",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "bookrush-ingestion",
