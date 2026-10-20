@@ -28,11 +28,14 @@ public class AnalyticsController {
   private final JdbcTemplate jdbc;
   private final ObjectMapper mapper;
   private final AnalyticsMetrics metrics;
+  private final BookScoresQueryRepository bookScoresQuery;
 
-  public AnalyticsController(JdbcTemplate jdbc, ObjectMapper mapper, AnalyticsMetrics metrics) {
+  public AnalyticsController(JdbcTemplate jdbc, ObjectMapper mapper, AnalyticsMetrics metrics,
+      BookScoresQueryRepository bookScoresQuery) {
     this.jdbc = jdbc;
     this.mapper = mapper;
     this.metrics = metrics;
+    this.bookScoresQuery = bookScoresQuery;
   }
 
   public record JobRequest(
@@ -608,44 +611,19 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
           "code", "INVALID_BOOK_IDS",
           "message", "bookIds must contain between 1 and 100 distinct UUIDs"));
     }
-    String placeholders = String.join(",", java.util.Collections.nCopies(bookIds.size(), "?"));
-    String sql = """
-WITH latest_asset AS (
-  SELECT DISTINCT ON (a.book_id) a.book_id, v.id AS version_id
-    FROM catalog.book_asset a
-    JOIN catalog.book_asset_version v ON v.id = a.current_version_id
-   WHERE a.book_id IN (%s)
-     AND a.asset_role IN ('NORMALIZED', 'PROCESSING', 'ANALYTICS')
-     AND a.asset_type IN ('TXT', 'HTML')
-     AND a.status <> 'DELETED'
-     AND v.status = 'AVAILABLE'
-   ORDER BY a.book_id, a.updated_at DESC, a.id DESC
-), ranked AS (
-  SELECT la.book_id, er.final_score, er.ranker_version, er.created_at
-    FROM latest_asset la
-    JOIN analytics.excerpt e ON e.source_asset_version_id = la.version_id
-    JOIN LATERAL (
-      SELECT final_score, ranker_version, created_at
-        FROM analytics.excerpt_rank
-       WHERE excerpt_id = e.id
-         AND final_score IS NOT NULL
-       ORDER BY created_at DESC
-       LIMIT 1
-    ) er ON TRUE
-   WHERE e.body_eligible = TRUE AND e.exclusion_reason IS NULL
-)
-SELECT book_id, MAX(final_score) AS score,
-       (ARRAY_AGG(ranker_version ORDER BY final_score DESC, created_at DESC))[1] AS ranker_version
-  FROM ranked
-    GROUP BY book_id
-""".formatted(placeholders);
-    var rows = jdbc.queryForList(sql, bookIds.toArray());
-    metrics.bookScoresBatch();
-    var items = rows.stream().map(row -> Map.of(
-        "bookId", row.get("book_id"),
-        "score", row.get("score"),
-        "rankerVersion", row.get("ranker_version"))).toList();
-    return ResponseEntity.ok(Map.of("items", items, "requested", bookIds.size(), "returned", items.size()));
+    var endpointSample = metrics.startBookScoresEndpoint();
+    try {
+      var query = bookScoresQuery.find(bookIds);
+      var rows = query.rows();
+      metrics.bookScoresBatch(bookIds.size(), rows.size(), query.strategy(), query.jit());
+      var items = rows.stream().map(row -> Map.of(
+          "bookId", row.get("book_id"),
+          "score", row.get("score"),
+          "rankerVersion", row.get("ranker_version"))).toList();
+      return ResponseEntity.ok(Map.of("items", items, "requested", bookIds.size(), "returned", items.size()));
+    } finally {
+      metrics.stopBookScoresEndpoint(endpointSample);
+    }
   }
 
   @GetMapping("/internal/v1/content-analytics/asset-versions/{assetVersionId}")

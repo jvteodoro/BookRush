@@ -49,10 +49,13 @@ public final class AnalyticsScoreClient {
       if (entry != null && entry.expiresAt().isAfter(now)) result.put(id, entry.score());
       else missing.add(id);
     }
+    metrics.counter("bookrush.feed.analytics_scores.cache", "outcome", "hit").increment(bounded.size() - missing.size());
+    metrics.counter("bookrush.feed.analytics_scores.cache", "outcome", "miss").increment(missing.size());
     if (missing.isEmpty()) {
       metrics.counter("bookrush.feed.ranking", "result", "cache_hit").increment();
       return result;
     }
+    long started = System.nanoTime();
     try {
       String bearer = accessToken();
       Map<String, Object> body = analytics.post()
@@ -83,10 +86,15 @@ public final class AnalyticsScoreClient {
         }
       }
       metrics.counter("bookrush.feed.ranking", "result", "analytics").increment();
+      metrics.counter("bookrush.feed.analytics_scores", "outcome", "returned").increment(result.size());
       return result;
     } catch (RestClientException | IllegalStateException ex) {
+      metrics.counter("bookrush.feed.analytics_scores", "outcome", ex instanceof org.springframework.web.client.ResourceAccessException ? "timeout" : "error").increment();
       metrics.counter("bookrush.feed.ranking", "result", "fallback").increment();
       return result;
+    } finally {
+      metrics.timer("bookrush.feed.analytics_scores.duration")
+          .record(System.nanoTime() - started, java.util.concurrent.TimeUnit.NANOSECONDS);
     }
   }
 

@@ -2,6 +2,7 @@ package com.bookrush.analytics;
 
 import com.bookrush.analytics.config.AnalyticsRuntimeProperties;
 import com.bookrush.analytics.config.AnalyticsV2GeneratorProperties;
+import com.bookrush.analytics.api.BookScoresQueryProperties;
 import com.bookrush.analytics.storage.AnalyticsStorageProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -14,6 +15,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   AnalyticsStorageProperties.class,
   AnalyticsV2GeneratorProperties.class,
   AnalyticsRuntimeProperties.class
+  ,BookScoresQueryProperties.class
 })
 public class BookAnalyticsApplication {
   public static void main(String[] args) {

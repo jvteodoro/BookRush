@@ -28,7 +28,7 @@ operacional, enquanto a análise SQL abaixo mede o caminho de scores diretamente
 
 ## Metodologia
 
-Harness reproduzível: [`scripts/benchmark-feed-performance.sh`](../../../scripts/benchmark-feed-performance.sh).
+Harness reproduzível: `scripts/benchmark-feed-performance.sh`.
 
 Configuração desta execução:
 

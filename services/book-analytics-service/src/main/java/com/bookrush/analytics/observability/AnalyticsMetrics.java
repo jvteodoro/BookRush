@@ -59,6 +59,21 @@ public final class AnalyticsMetrics {
     bookScoresBatches.increment();
   }
 
+  public void bookScoresBatch(int requested, int returned, String strategy, String jit) {
+    bookScoresBatches.increment();
+    registry.counter("bookrush.analytics.book_scores.requested", "strategy", strategy).increment(requested);
+    registry.counter("bookrush.analytics.book_scores.returned", "strategy", strategy).increment(returned);
+    registry.counter("bookrush.analytics.book_scores.jit", "mode", jit).increment();
+  }
+
+  public Timer.Sample startBookScoresEndpoint() {
+    return Timer.start(registry);
+  }
+
+  public void stopBookScoresEndpoint(Timer.Sample sample) {
+    sample.stop(registry.timer("bookrush.analytics.book_scores.endpoint"));
+  }
+
   public void jobItemFailed(String code) {
     analysisFailures.increment();
   }

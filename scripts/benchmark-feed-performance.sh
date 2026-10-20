@@ -14,7 +14,13 @@ out="${BENCHMARK_OUTPUT_DIR:-docs/operations/incidents/evidence/raw/feed-benchma
 mkdir -p "$out"
 requests="$out/requests.tsv"
 stats="$out/container-stats.tsv"
-printf 'timestamp\tscenario\tpath\tsize\tworker\titeration\tstatus\telapsed_ms\titems\tmodel\tstrategy\twith_excerpt\n' >"$requests"
+summary="$out/summary.tsv"
+metadata="$out/metadata.json"
+printf 'timestamp\tscenario\tpath\tsize\tworker\titeration\tstatus\tstarted_ms\tfinished_ms\telapsed_ms\titems\tmodel\tstrategy\twith_excerpt\n' >"$requests"
+git_sha="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+cat >"$metadata" <<EOF
+{"commit":"$git_sha","base_url":"$base","sizes":[10,25,50],"sequential_reps":${SEQUENTIAL_REPS:-15},"parallelism":${CONCURRENCY:-4},"parallel_reps":${PARALLEL_REPS:-5},"paused_reps":${PAUSED_REPS:-15},"strategy":"${ANALYTICS_BOOK_SCORES_STRATEGY:-DEFAULT}","jit":"${ANALYTICS_BOOK_SCORES_JIT:-DEFAULT}","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+EOF
 tmp="$(mktemp -d)"
 worker="${ANALYTICS_WORKER_CONTAINER:-bookrush-book-analytics-runtime-1}"
 initial_paused="$(docker inspect -f '{{.State.Paused}}' "$worker" 2>/dev/null || echo false)"
@@ -60,10 +66,11 @@ access="$(token_login)"
 auth_header="Authorization: Bearer $access"
 
 record_body() {
-  local body="$1" status="$2" elapsed="$3" scenario="$4" path="$5" size="$6" worker_state="$7" iteration="$8"
-  python3 - "$body" "$status" "$elapsed" "$scenario" "$path" "$size" "$worker_state" "$iteration" "$requests" <<'PY'
+  local body="$1" status="$2" started_ms="$3" finished_ms="$4" scenario="$5" path="$6" size="$7" worker_state="$8" iteration="$9"
+  local elapsed="$((finished_ms-started_ms))"
+  python3 - "$body" "$status" "$started_ms" "$finished_ms" "$elapsed" "$scenario" "$path" "$size" "$worker_state" "$iteration" "$requests" <<'PY'
 import json,sys,datetime
-body,status,elapsed,scenario,path,size,worker,iteration,out=sys.argv[1:]
+body,status,started_ms,finished_ms,elapsed,scenario,path,size,worker,iteration,out=sys.argv[1:]
 try:
     data=json.load(open(body,encoding='utf-8'))
     items=data.get('items',[]) if isinstance(data,dict) else []
@@ -74,7 +81,7 @@ except Exception:
     items=[]; model=''; strategy=''; with_excerpt=0
 ts=datetime.datetime.now(datetime.timezone.utc).isoformat()
 with open(out,'a',encoding='utf-8') as f:
-    f.write('\t'.join([ts,scenario,path,size,worker,iteration,status,elapsed,str(len(items)),model,strategy,str(with_excerpt)])+'\n')
+    f.write('\t'.join([ts,scenario,path,size,worker,iteration,status,started_ms,finished_ms,elapsed,str(len(items)),model,strategy,str(with_excerpt)])+'\n')
 PY
 }
 
@@ -82,9 +89,9 @@ record_request() {
   local scenario="$1" size="$2" worker_state="$3" iteration="$4"
   local body="$tmp/body-${scenario}-${size}-${iteration}" start end status
   start="$(date +%s%3N)"
-  status="$(curl -ksS --max-time 20 -o "$body" -w '%{http_code}' "$base/api/v1/reader/feed?size=$size" -H "$auth_header" || true)"
+  status="$(curl --fail-with-body --max-time 20 -o "$body" -w '%{http_code}' "$base/api/v1/reader/feed?size=$size" -H "$auth_header" || true)"
   end="$(date +%s%3N)"
-  record_body "$body" "$status" "$((end-start))" "$scenario" public "$size" "$worker_state" "$iteration"
+  record_body "$body" "$status" "$start" "$end" "$scenario" public "$size" "$worker_state" "$iteration"
 }
 
 snapshot_stats() {
@@ -105,9 +112,9 @@ for worker_id in $(seq 1 "${CONCURRENCY:-4}"); do
     for i in $(seq 1 "${PARALLEL_REPS:-5}"); do
       body="$parallel_dir/body-${worker_id}-${i}"
       start="$(date +%s%3N)"
-      status="$(curl -ksS --max-time 20 -o "$body" -w '%{http_code}' "$base/api/v1/reader/feed?size=50" -H "$auth_header" || true)"
+      status="$(curl --fail-with-body --max-time 20 -o "$body" -w '%{http_code}' "$base/api/v1/reader/feed?size=50" -H "$auth_header" || true)"
       end="$(date +%s%3N)"
-      record_body "$body" "$status" "$((end-start))" parallel public 50 active "${worker_id}.${i}"
+      record_body "$body" "$status" "$start" "$end" parallel public 50 active "${worker_id}.${i}"
     done
   ) &
 done
@@ -125,3 +132,31 @@ fi
 
 printf 'output=%s\nrequests=%s\nworker_status=%s\n' "$out" "$requests" "$(docker inspect -f '{{.State.Status}} paused={{.State.Paused}}' "$worker")"
 
+python3 - "$requests" "$summary" <<'PY'
+import csv, math, statistics, sys
+from collections import defaultdict
+rows = list(csv.DictReader(open(sys.argv[1], encoding="utf-8"), delimiter="\t"))
+groups = defaultdict(list)
+for row in rows:
+    try:
+        elapsed = float(row["elapsed_ms"])
+    except ValueError:
+        continue
+    groups[(row["scenario"], row["size"])].append(
+        (elapsed, row["status"], int(row["items"]), int(row["started_ms"]), int(row["finished_ms"])))
+with open(sys.argv[2], "w", encoding="utf-8", newline="") as out:
+    out.write("scenario\tsize\tn\tmean_ms\tstdev_ms\tp50_ms\tp95_ms\tp99_ms\tthroughput_per_s\thttp_error_rate\tfunctional_error_rate\terror_rate\tmean_items\n")
+    for (scenario, size), values in sorted(groups.items()):
+        values.sort()
+        times = [x[0] for x in values]
+        quantile = lambda p: times[min(len(times) - 1, max(0, math.ceil(p * len(times)) - 1))]
+        http_errors = sum(x[1] not in {"200", "201", "204"} for x in values)
+        functional_errors = sum(x[1] in {"200", "201", "204"} and x[2] < int(__import__('os').environ.get("EXPECTED_MIN_ITEMS", "1")) for x in values)
+        errors = http_errors + functional_errors
+        mean = statistics.mean(times)
+        stdev = statistics.stdev(times) if len(times) > 1 else 0
+        started = min(row[3] for row in values)
+        finished = max(row[4] for row in values)
+        wall_seconds = max((finished - started) / 1000, 0.001)
+        out.write(f"{scenario}\t{size}\t{len(times)}\t{mean:.3f}\t{stdev:.3f}\t{statistics.median(times):.3f}\t{quantile(.95):.3f}\t{quantile(.99):.3f}\t{len(times)/wall_seconds:.6f}\t{http_errors/len(times):.6f}\t{functional_errors/len(times):.6f}\t{errors/len(times):.6f}\t{statistics.mean(x[2] for x in values):.3f}\n")
+PY
