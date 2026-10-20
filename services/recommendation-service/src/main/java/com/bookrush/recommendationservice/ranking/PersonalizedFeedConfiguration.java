@@ -43,17 +43,39 @@ public class PersonalizedFeedConfiguration {
   }
 
   @ConfigurationProperties(prefix = "feed.personalized")
-  public record Properties(PersonalizedFeedGate.Mode mode, double minCoverage, double minConfidence,
-      double rolloutPercentage) {
+  public static class Properties {
+    private PersonalizedFeedGate.Mode mode = PersonalizedFeedGate.Mode.OFF;
+    private double minCoverage = .5;
+    private double minConfidence = .5;
+    private double rolloutPercentage = 100;
+
+    public Properties() {}
+
     public Properties(PersonalizedFeedGate.Mode mode, double minCoverage, double minConfidence) {
-      this(mode, minCoverage, minConfidence, 100);
+      this.mode = mode;
+      this.minCoverage = minCoverage;
+      this.minConfidence = minConfidence;
     }
 
-    public Properties {
-      mode = mode == null ? PersonalizedFeedGate.Mode.OFF : mode;
-      minCoverage = minCoverage < 0 ? .5 : minCoverage;
-      minConfidence = minConfidence < 0 ? .5 : minConfidence;
-      rolloutPercentage = rolloutPercentage < 0 ? 100 : rolloutPercentage;
+    public PersonalizedFeedGate.Mode mode() { return mode; }
+    public double minCoverage() { return minCoverage; }
+    public double minConfidence() { return minConfidence; }
+    public double rolloutPercentage() { return rolloutPercentage; }
+
+    public void setMode(PersonalizedFeedGate.Mode mode) {
+      this.mode = mode == null ? PersonalizedFeedGate.Mode.OFF : mode;
+    }
+
+    public void setMinCoverage(double value) {
+      this.minCoverage = value < 0 ? .5 : value;
+    }
+
+    public void setMinConfidence(double value) {
+      this.minConfidence = value < 0 ? .5 : value;
+    }
+
+    public void setRolloutPercentage(double value) {
+      this.rolloutPercentage = value < 0 ? 100 : value;
     }
   }
 }

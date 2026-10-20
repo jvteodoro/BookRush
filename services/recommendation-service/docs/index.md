@@ -53,3 +53,8 @@ the immediate rollback. See
 and the read-only dataset handoff. In `SHADOW`, the service records a bounded
 timer plus overlap and aggregate rank movement; these measurements never use
 subject or book IDs as metric labels.
+
+The `feed.personalized` properties use Spring's mutable configuration binding
+so the service starts correctly in Docker and in the production profile. The
+binding is covered by a context-property test; invalid rollout values are
+handled by the gate's validation rather than changing the default `OFF` mode.
