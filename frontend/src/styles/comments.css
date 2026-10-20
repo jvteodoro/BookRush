@@ -9,9 +9,13 @@
 .br-drawer__body { overflow-y: auto; padding: 1.5rem; overscroll-behavior-y: contain; }
 .br-drawer__footer { padding: 1.25rem 1.5rem calc(1.25rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--br-outline-soft); }
 .br-comments-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.5rem; }
+.br-comment-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .br-comment-author { display: inline-flex; align-items: center; gap: .6rem; color: var(--br-content); text-decoration: none; font-size: .85rem; }
 .br-comment-author:hover strong { text-decoration: underline; }
 .br-comment-author:focus-visible { outline: 2px solid var(--br-teal); outline-offset: 4px; }
+.br-comment-report { border: 0; background: transparent; color: var(--br-content-dim); cursor: pointer; font: inherit; font-size: .72rem; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.br-comment-report:hover, .br-comment-report:focus-visible { color: var(--br-red); }
+.br-comment-report:disabled { cursor: wait; opacity: .6; }
 .br-comment-avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--br-gold); color: var(--br-ink); font-size: .7rem; font-weight: 800; flex-shrink: 0; }
 .br-comment > p { white-space: pre-wrap; overflow-wrap: anywhere; margin: .75rem 0 0 2.75rem; font-size: .85rem; line-height: 1.6; }
 .br-comment-compose { display: grid; gap: .75rem; }

@@ -23,10 +23,11 @@ set +a
 admin_user="${KEYCLOAK_CONFIG_CLI_ADMIN_USER:-${KEYCLOAK_ADMIN:-}}"
 : "${admin_user:?KEYCLOAK_CONFIG_CLI_ADMIN_USER ou KEYCLOAK_ADMIN ausente}"
 port="${BOOKRUSH_KEYCLOAK_PORT:-18088}"
-base="${KEYCLOAK_ADMIN_BASE:-http://127.0.0.1:${port}/admin/realms/bookrush-platform}"
+base="${KEYCLOAK_ADMIN_BASE:-http://127.0.0.1:${port}/admin/realms/bookrush}"
 base="${base%/}"
-server="${base%/admin/realms/bookrush-platform}"
-token_uri="${KEYCLOAK_ADMIN_TOKEN_URI:-$server/realms/bookrush-platform/protocol/openid-connect/token}"
+realm_name="${base##*/}"
+server="${base%/admin/realms/$realm_name}"
+token_uri="${KEYCLOAK_ADMIN_TOKEN_URI:-$server/realms/$realm_name/protocol/openid-connect/token}"
 token="$(curl -fsS -X POST "${server}/realms/master/protocol/openid-connect/token" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode "username=${admin_user}" \

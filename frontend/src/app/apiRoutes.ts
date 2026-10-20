@@ -41,6 +41,7 @@ export const apiRoutes = {
     like: (bookId: string) => `/api/v1/social/books/${id(bookId)}/like`,
     share: (bookId: string) => `/api/v1/social/books/${id(bookId)}/share`,
     follow: (subject: string) => `/api/v1/social/follow?user=${id(subject)}`,
+    reports: () => "/api/v1/social/reports",
   },
   behavior: () => "/api/v1/behavior/events",
   profile: {
