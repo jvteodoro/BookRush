@@ -53,6 +53,20 @@ seed. Its weights are bootstrap/unvalidated and must not be interpreted as
 probabilities. The class is covered independently until the live profile and
 source providers are wired into the HTTP feed.
 
+The behavior service now runs `DataQualityReconciliation` periodically. It
+records bounded gauges for event count, projected subjects, attributed
+outcomes, orphaned correlations, and projection age, plus a healthy/issues
+counter. An orphaned correlation is retained and reported as an issue; it is
+never silently treated as a positive signal. The report is deliberately scoped
+to behavior-owned data and does not query recommendation tables cross-schema.
+
+Operational interpretation: `healthy` with zero attributed rows means there is
+no observed correlated outcome yet, not a successful recommendation; a
+positive `orphaned` gauge means collection/rebuild needs investigation. A
+non-zero `projection_age_seconds` measures lag between the newest event and
+the serving projection. These low-cardinality metrics can be charted directly
+from the behavior-service Prometheus endpoint.
+
 `ExplorationPolicy` replaces implicit hash-only lucky ordering with an explicit
 epsilon/slot policy. It is configurable, bounded by a quota, deterministic for
 the same request seed and policy version, excludes already selected IDs, and
