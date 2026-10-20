@@ -94,6 +94,44 @@ paths:
         '400': {description: Lista inválida ou maior que 100 livros}
         '401': {description: Bearer ausente ou inválido}
         '403': {description: Token sem scope bookrush.analytics}
+  /api/internal/v1/content-analytics/recommendation-snapshot:
+    post:
+      summary: Retornar snapshot analítico versionado para recomendações
+      description: Endpoint interno S2S limitado a 100 livros. Fixa a versão textual atual e retorna score/ranker e metadados do embedding documental válido; artefatos ausentes são nulos.
+      security:
+        - analyticsServiceBearer: [bookrush.analytics]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookIds]
+              properties:
+                bookIds:
+                  type: array
+                  maxItems: 100
+                  items: {type: string, format: uuid}
+                offset: {type: integer, minimum: 0, default: 0}
+                limit: {type: integer, minimum: 1, maximum: 100, default: 100}
+      responses:
+        '200':
+          description: Snapshot versionado, preservando ausência explícita de analytics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, requested, returned, offset, limit]
+                properties:
+                  items: {type: array, items: {type: object}}
+                  requested: {type: integer, minimum: 1, maximum: 100}
+                  returned: {type: integer, minimum: 0, maximum: 100}
+                  offset: {type: integer, minimum: 0}
+                  limit: {type: integer, minimum: 1, maximum: 100}
+                  embeddingModel: {type: string}
+        '400': {description: Lista inválida ou maior que 100 livros}
+        '401': {description: Bearer ausente ou inválido}
+        '403': {description: Token sem scope bookrush.analytics}
   /api/admin/v1/content-analytics/phase-timings:
     get:
       summary: Distribution of persisted analytics phase durations

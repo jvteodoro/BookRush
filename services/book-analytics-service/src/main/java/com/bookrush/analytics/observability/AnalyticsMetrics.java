@@ -74,6 +74,19 @@ public final class AnalyticsMetrics {
     sample.stop(registry.timer("bookrush.analytics.book_scores.endpoint"));
   }
 
+  public Timer.Sample startRecommendationSnapshot() {
+    return Timer.start(registry);
+  }
+
+  public void stopRecommendationSnapshot(Timer.Sample sample) {
+    sample.stop(registry.timer("bookrush.analytics.recommendation_snapshot.endpoint"));
+  }
+
+  public void recommendationSnapshotBatch(int requested, int returned) {
+    registry.counter("bookrush.analytics.recommendation_snapshot.requested").increment(requested);
+    registry.counter("bookrush.analytics.recommendation_snapshot.returned").increment(returned);
+  }
+
   public void jobItemFailed(String code) {
     analysisFailures.increment();
   }

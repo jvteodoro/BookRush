@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
@@ -29,13 +30,16 @@ public class AnalyticsController {
   private final ObjectMapper mapper;
   private final AnalyticsMetrics metrics;
   private final BookScoresQueryRepository bookScoresQuery;
+  private final RecommendationSnapshotQueryRepository recommendationSnapshotQuery;
 
   public AnalyticsController(JdbcTemplate jdbc, ObjectMapper mapper, AnalyticsMetrics metrics,
-      BookScoresQueryRepository bookScoresQuery) {
+      BookScoresQueryRepository bookScoresQuery,
+      RecommendationSnapshotQueryRepository recommendationSnapshotQuery) {
     this.jdbc = jdbc;
     this.mapper = mapper;
     this.metrics = metrics;
     this.bookScoresQuery = bookScoresQuery;
+    this.recommendationSnapshotQuery = recommendationSnapshotQuery;
   }
 
   public record JobRequest(
@@ -44,6 +48,11 @@ public class AnalyticsController {
       Map<String, Object> configuration) {}
 
   public record BookScoresRequest(@NotEmpty List<UUID> bookIds) {}
+
+  public record RecommendationSnapshotRequest(
+      @NotEmpty @Size(max = 100) List<UUID> bookIds,
+      Integer offset,
+      Integer limit) {}
 
   @PostMapping("/internal/v1/behavior/events")
   @Transactional
@@ -623,6 +632,60 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
       return ResponseEntity.ok(Map.of("items", items, "requested", bookIds.size(), "returned", items.size()));
     } finally {
       metrics.stopBookScoresEndpoint(endpointSample);
+    }
+  }
+
+  @PostMapping("/internal/v1/content-analytics/recommendation-snapshot")
+  @Operation(
+      summary = "Retornar snapshot analítico versionado",
+      description = "Contrato interno S2S, limitado a 100 livros, que fixa a versão textual atual e associa score e metadados do embedding documental disponível.")
+  public ResponseEntity<Map<String, Object>> recommendationSnapshot(
+      @Valid @RequestBody RecommendationSnapshotRequest request) {
+    var bookIds = request.bookIds() == null ? List.<UUID>of() : request.bookIds().stream().distinct().toList();
+    if (bookIds.isEmpty() || bookIds.size() > 100) {
+      return ResponseEntity.badRequest().body(Map.of(
+          "code", "INVALID_BOOK_IDS",
+          "message", "bookIds must contain between 1 and 100 distinct UUIDs"));
+    }
+    int offset = Math.max(0, request.offset() == null ? 0 : request.offset());
+    int limit = Math.max(1, Math.min(100, request.limit() == null ? 100 : request.limit()));
+    var sample = metrics.startRecommendationSnapshot();
+    try {
+      var query = recommendationSnapshotQuery.find(bookIds, offset, limit);
+      var items = query.rows().stream().map(row -> {
+        var item = new LinkedHashMap<String, Object>();
+        item.put("bookId", row.get("book_id"));
+        item.put("sourceAssetVersionId", row.get("source_asset_version_id"));
+        item.put("score", row.get("score"));
+        item.put("rankerCode", row.get("ranker_code"));
+        item.put("rankerVersion", row.get("ranker_version"));
+        item.put("rankConfigurationHash", row.get("rank_configuration_hash"));
+        if (row.get("embedding_model") == null) {
+          item.put("embedding", null);
+        } else {
+          var embedding = new LinkedHashMap<String, Object>();
+          embedding.put("model", row.get("embedding_model"));
+          embedding.put("modelVersion", row.get("embedding_model_version"));
+          embedding.put("dimension", row.get("embedding_dimension"));
+          embedding.put("inputSha256", row.get("embedding_input_sha256"));
+          embedding.put("sourceAssetVersionId", row.get("source_asset_version_id"));
+          embedding.put("storageProvider", row.get("embedding_storage_provider"));
+          embedding.put("bucket", row.get("embedding_bucket"));
+          embedding.put("objectKey", row.get("embedding_object_key"));
+          item.put("embedding", embedding);
+        }
+        return item;
+      }).toList();
+      metrics.recommendationSnapshotBatch(query.requested(), items.size());
+      return ResponseEntity.ok(Map.of(
+          "items", items,
+          "requested", query.requested(),
+          "returned", items.size(),
+          "offset", offset,
+          "limit", limit,
+          "embeddingModel", query.embeddingModel()));
+    } finally {
+      metrics.stopRecommendationSnapshot(sample);
     }
   }
 
