@@ -127,10 +127,11 @@ export const authClient = {
   async imageUrl(input: string): Promise<string | undefined> {
     const url = new URL(input, origin);
     if (url.origin !== origin) throw new Error('Imagem deve ser same-origin.');
-    // Thumbnails are presigned storage URLs. The signature already authorizes
-    // the request; attaching the OIDC bearer would trigger a CORS preflight on
-    // the storage route, which intentionally does not implement OPTIONS.
-    const response = await fetch(url, { cache: 'no-store' });
+    // The catalog thumbnail endpoint is protected and redirects to a
+    // presigned storage URL. Authenticate the same-origin hop through the API
+    // client; the browser then follows the redirect without leaking the bearer
+    // to the storage host.
+    const response = await authClient.fetch(url.toString(), { cache: 'no-store' });
     if (!response.ok) return undefined;
     return URL.createObjectURL(await response.blob());
   },

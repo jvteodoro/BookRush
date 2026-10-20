@@ -279,6 +279,11 @@ por `GET /api/v1/books` sem Bearer (leitura pública), carrega a biblioteca em
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
 fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
+As áreas administrativas e de publicação não são consultadas durante o
+bootstrap do leitor: elas pertencem ao realm `bookrush-platform` e devem ser
+abertas pela console `admin-web`, que obtém o token administrativo correto.
+Isso evita enviar um bearer do realm de produto para APIs administrativas e
+transformar uma sessão válida do leitor em uma sequência de `401`.
 O feed usa `GET /api/v1/reader/feed` e registra viewability em
 `POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
 livro. Com o ranking analytics ativado, o backend só envia livros que já têm

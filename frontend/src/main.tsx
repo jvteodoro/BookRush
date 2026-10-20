@@ -167,16 +167,10 @@ function App() {
         );
         const saved = new Set(await loadLibrary());
         const recent = await loadRecent();
-        let submissions: unknown[] = [];
-        try {
-          const response = await authClient.fetch(
-            apiRoutes.publisher.submissions(),
-          );
-          if (response.ok) submissions = (await response.json()) as unknown[];
-        } catch {
-          // Publisher access is optional for reader accounts; the portal shows
-          // an empty state instead of preventing the reader feed from loading.
-        }
+        // Publisher and administration APIs belong to the platform realm and
+        // are intentionally not called by the product-realm reader session.
+        // The dedicated admin console obtains the correct platform token.
+        const submissions: unknown[] = [];
         (
           window as Window & {
             __BOOKRUSH_BOOKS__?: PageLoopBook[];
@@ -206,29 +200,12 @@ function App() {
             window as Window & { __BOOKRUSH_PROFILE__?: unknown }
           ).__BOOKRUSH_PROFILE__ = null;
         }
-        try {
-          const [usersResponse, reportsResponse] = await Promise.all([
-            authClient.fetch(apiRoutes.admin.users()),
-            authClient.fetch(apiRoutes.admin.reports()),
-          ]);
-          (
-            window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_USERS__ = usersResponse.ok
-            ? ((await usersResponse.json()) as unknown[])
-            : [];
-          (
-            window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_REPORTS__ = reportsResponse.ok
-            ? ((await reportsResponse.json()) as unknown[])
-            : [];
-        } catch {
-          (
-            window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_USERS__ = [];
-          (
-            window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_REPORTS__ = [];
-        }
+        (
+          window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }
+        ).__BOOKRUSH_ADMIN_USERS__ = [];
+        (
+          window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }
+        ).__BOOKRUSH_ADMIN_REPORTS__ = [];
         try {
           const streakResponse = await authClient.fetch(
             apiRoutes.reader.streak(),
