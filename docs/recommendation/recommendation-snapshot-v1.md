@@ -54,6 +54,18 @@ inventado é criado. As métricas `bookrush.feed.book_features.cache` e
 quantidade de embeddings. O TTL usa a configuração já existente
 `FEED_ANALYTICS_RANKING_CACHE_TTL`.
 
+## UserTasteProfile bootstrap
+
+O recommendation-service contém o builder determinístico
+`UserTasteProfileBuilder`. Ele recebe o read model de sinais do behavior e um
+mapa de embeddings já materializados, aplica pesos bounded por livro e decay de
+meia-vida, normaliza a direção e calcula `coverage`/`confidence`. A configuração
+é versionada e recebe `configurationHash`; o perfil sem sinais positivos ou sem
+embedding válido é `EMPTY` com vetor nulo. Impressões isoladas e reversões não
+criam afinidade. A ligação remota que materializa vetores ainda deve ser feita
+em uma etapa posterior, pois o snapshot S2S atual expõe metadados e mantém os
+vetores no storage.
+
 ## Validação
 
 `RecommendationSnapshotQueryRepositoryIT` usa PostgreSQL/Testcontainers e
