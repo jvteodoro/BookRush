@@ -1,3 +1,6 @@
+import { mountAppearance } from "./reader/appearancePanel";
+import { mountReaderPanels } from "./reader/readerPanels";
+import "./styles/reader-appearance.css";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { authClient, type AuthState } from "./auth";
@@ -615,9 +618,15 @@ function App() {
         thumbnailStyle.rel = "stylesheet";
         thumbnailStyle.href = "/thumbnails.css?v=20261006-gutenberg";
         document.head.appendChild(thumbnailStyle);
+        Object.assign(window, {
+          __BOOKRUSH_APPEARANCE__: {
+            mount: mountAppearance,
+            panels: mountReaderPanels,
+          },
+        });
         const script = document.createElement("script");
         script.dataset.bookrushPageloop = "true";
-        script.src = "/pageloop.js?v=20261012-design-system-bridge";
+        script.src = "/pageloop.js?v=20261019-reader-appearance";
         script.async = true;
         script.onload = () => {
           if (active) setFeedReady(true);

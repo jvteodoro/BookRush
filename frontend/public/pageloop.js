@@ -15,53 +15,6 @@
 
   const BOOKS = window.__BOOKRUSH_BOOKS__ || [];
 
-  const readerPreferencesKey = "bookrush-reader-preferences";
-  const defaultReaderPreferences = {
-    fontFamily: "serif",
-    fontSize: 100,
-    lineHeight: 1.8,
-    foreground: "#29261f",
-    background: "#f7f4ee",
-  };
-  const allowedReaderColors = ["#29261f", "#f7f4ee", "#1b1b1b", "#f1e7c8"];
-
-  function normalizeReaderPreferences(value = {}) {
-    const fontFamily = ["serif", "sans", "dyslexic"].includes(value.fontFamily)
-      ? value.fontFamily
-      : defaultReaderPreferences.fontFamily;
-    const fontSize = Math.min(170, Math.max(85, Number(value.fontSize) || 100));
-    const lineHeight = Math.min(
-      2.4,
-      Math.max(1.4, Number(value.lineHeight) || 1.8),
-    );
-    const foreground = allowedReaderColors.includes(value.foreground)
-      ? value.foreground
-      : defaultReaderPreferences.foreground;
-    const background = allowedReaderColors.includes(value.background)
-      ? value.background
-      : defaultReaderPreferences.background;
-
-    return { fontFamily, fontSize, lineHeight, foreground, background };
-  }
-
-  function readReaderPreferences() {
-    try {
-      return normalizeReaderPreferences(
-        JSON.parse(localStorage.getItem(readerPreferencesKey) || "{}"),
-      );
-    } catch {
-      return { ...defaultReaderPreferences };
-    }
-  }
-
-  function writeReaderPreferences(preferences) {
-    try {
-      localStorage.setItem(readerPreferencesKey, JSON.stringify(preferences));
-    } catch {
-      // A preferência inválida de storage não impede a leitura nesta sessão.
-    }
-  }
-
   const defaultState = {
     route: initialRoute,
     likes: { ...(window.__BOOKRUSH_LIKES__ || {}) },
@@ -73,7 +26,6 @@
     removedReports: {},
     readerBook: BOOKS[0]?.id || "",
     readerPage: 0,
-    readerPreferences: readReaderPreferences(),
     libraryTab: "saved",
     search: "",
     searchFilter: "Todos",
@@ -855,57 +807,23 @@
     const content = `<div class="reader-shell" id="readerShell">
       <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${getMode() === "app" ? "feed" : "library"}" aria-label="Voltar">${icon("chevron", "icon-sm")}<span>Voltar</span></button></div>
       <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
-      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir configurações">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
+      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir aparência" aria-controls="settingsPanel" aria-expanded="false">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
       <aside class="reader-panel reader-toc" id="tocPanel" hidden><div class="reader-panel-heading"><strong>Sumário</strong><button class="reader-panel-close" data-reader-close="tocPanel" aria-label="Fechar">×</button></div><nav>${chapterItems(chapters) || emptyChapterItems}</nav></aside>
-      <aside class="reader-panel reader-settings" id="settingsPanel" hidden><div class="reader-panel-heading"><strong>Aparência</strong><button class="reader-panel-close" data-reader-close="settingsPanel" aria-label="Fechar">×</button></div>
-        <label>Fonte<select data-reader-pref="fontFamily"><option value="serif">Serifada</option><option value="sans">Sem serifa</option><option value="dyslexic">Acessível</option></select></label>
-        <label>Tamanho<input data-reader-pref="fontSize" type="range" min="85" max="170" step="5"><output data-reader-output="fontSize"></output></label>
-        <label>Espaçamento<input data-reader-pref="lineHeight" type="range" min="1.4" max="2.4" step=".1"><output data-reader-output="lineHeight"></output></label>
-        <div class="reader-swatches"><span>Texto</span><button data-reader-color="foreground:#29261f" aria-label="Texto escuro">A</button><button data-reader-color="foreground:#f7f4ee" aria-label="Texto claro">A</button><span>Fundo</span><button data-reader-color="background:#f7f4ee" aria-label="Fundo claro">□</button><button data-reader-color="background:#1b1b1b" aria-label="Fundo escuro">■</button><button data-reader-color="background:#f1e7c8" aria-label="Fundo sépia">▧</button></div>
+      <aside class="reader-panel reader-settings" id="settingsPanel" role="region" aria-label="Aparência da leitura" hidden><div class="reader-panel-heading"><strong>Aparência</strong><button class="reader-panel-close" data-reader-close="settingsPanel" aria-label="Fechar">×</button></div>
+        <div id="readerAppearance"></div>
       </aside>
       <div class="reader-page-controls"><button id="readerPrevious" aria-label="Página anterior">‹</button><button id="readerNext" aria-label="Próxima página">›</button></div>
       <main class="reader-main"><div class="readium-host" id="readium-reader" aria-label="Leitor Readium"></div></main>
     </div>`;
     shell(content, b.title);
-    const updatePreferences = () => {
-      state.readerPreferences = normalizeReaderPreferences(
-        state.readerPreferences,
-      );
-      writeReaderPreferences(state.readerPreferences);
-      window.__BOOKRUSH_READIUM__?.applyPreferences?.(state.readerPreferences);
-      document
-        .querySelectorAll('[data-reader-output="fontSize"]')
-        .forEach((output) => {
-          output.textContent = `${state.readerPreferences.fontSize}%`;
-        });
-      document
-        .querySelectorAll('[data-reader-output="lineHeight"]')
-        .forEach((output) => {
-          output.textContent = Number(
-            state.readerPreferences.lineHeight,
-          ).toFixed(1);
-        });
-    };
-    document.querySelector('[data-reader-pref="fontFamily"]').value =
-      state.readerPreferences.fontFamily;
-    document.querySelector('[data-reader-pref="fontSize"]').value =
-      state.readerPreferences.fontSize;
-    document.querySelector('[data-reader-pref="lineHeight"]').value =
-      state.readerPreferences.lineHeight;
-    updatePreferences();
-    document.getElementById("tocBtn")?.addEventListener("click", () => {
-      document.getElementById("tocPanel").hidden = false;
-      document.getElementById("settingsPanel").hidden = true;
-    });
-    document.getElementById("settingsBtn")?.addEventListener("click", () => {
-      document.getElementById("settingsPanel").hidden = false;
-      document.getElementById("tocPanel").hidden = true;
-    });
-    document.querySelectorAll("[data-reader-close]").forEach((button) => {
-      button.addEventListener("click", () => {
-        document.getElementById(button.dataset.readerClose).hidden = true;
-      });
-    });
+    window.__BOOKRUSH_APPEARANCE__?.mount(
+      document.getElementById("readerAppearance"),
+      (preferences) =>
+        window.__BOOKRUSH_READIUM__?.applyPreferences?.(preferences),
+    );
+    const readerPanels = window.__BOOKRUSH_APPEARANCE__?.panels(
+      document.getElementById("readerShell"),
+    );
     const bindChapterButtons = () => {
       document.querySelectorAll("[data-reader-chapter]").forEach((button) => {
         if (button.dataset.readerBound) return;
@@ -915,28 +833,11 @@
             button.dataset.readerChapter,
           );
           if (!ok) toast("Não foi possível abrir este capítulo.");
-          else document.getElementById("tocPanel").hidden = true;
+          else readerPanels?.close();
         });
       });
     };
     bindChapterButtons();
-    document.querySelectorAll("[data-reader-pref]").forEach((input) => {
-      input.addEventListener("input", () => {
-        state.readerPreferences = {
-          ...state.readerPreferences,
-          [input.dataset.readerPref]:
-            input.type === "range" ? Number(input.value) : input.value,
-        };
-        updatePreferences();
-      });
-    });
-    document.querySelectorAll("[data-reader-color]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const [key, value] = button.dataset.readerColor.split(":");
-        state.readerPreferences = { ...state.readerPreferences, [key]: value };
-        updatePreferences();
-      });
-    });
     document
       .getElementById("readerPrevious")
       ?.addEventListener(

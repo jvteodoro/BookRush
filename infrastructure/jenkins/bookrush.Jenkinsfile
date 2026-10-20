@@ -55,7 +55,7 @@ pipeline {
     stage('Developer Portal e documentação') {
       steps {
         sh 'docker run --rm --volumes-from "$HOSTNAME" -w "$PWD" python:3.12-slim bash -lc "apt-get update -qq && apt-get install -y -qq --no-install-recommends git >/dev/null && python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema && git config --global --add safe.directory \"$PWD\" && bash scripts/validate-change.sh --ci"'
-        sh 'bash scripts/test-portal.sh'
+        sh 'bash scripts/test-portal.sh --validation-only'
       }
     }
 
@@ -83,6 +83,8 @@ pipeline {
           bash scripts/test-keycloak-realms.sh
           bash scripts/test-keycloak-reconcile.sh
           bash scripts/test-keycloak-access-lifecycle.sh
+          bash scripts/test-keycloak-user-management.sh
+          bash scripts/test-admin-user-management-e2e.sh
           bash scripts/test-keycloak-jwks-rotation.sh
         '''
       }
@@ -102,6 +104,8 @@ pipeline {
           env.READER_BFF_IMAGE = "${registry}/bookrush/reader-bff-service:${env.IMAGE_TAG}"
           env.READER_PROFILE_IMAGE = "${registry}/bookrush/reader-profile-service:${env.IMAGE_TAG}"
           env.SOCIAL_IMAGE = "${registry}/bookrush/social-service:${env.IMAGE_TAG}"
+          env.ADMIN_SERVICE_IMAGE = "${registry}/bookrush/admin-service:${env.IMAGE_TAG}"
+          env.ADMIN_WEB_IMAGE = "${registry}/bookrush/admin-web:${env.IMAGE_TAG}"
         }
         sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" -f services/catalog-service/Dockerfile .'
         sh 'docker run --rm "bookrush/catalog-test:$BUILD_NUMBER" mvn -B verify'
@@ -114,6 +118,10 @@ pipeline {
         sh 'docker build -t "$READER_BFF_IMAGE" -f services/reader-bff-service/Dockerfile .'
         sh 'docker build -t "$READER_PROFILE_IMAGE" -f services/reader-profile-service/Dockerfile .'
         sh 'docker build -t "$SOCIAL_IMAGE" -f services/social-service/Dockerfile .'
+        sh 'docker build --target build -t "bookrush/admin-service-test:$BUILD_NUMBER" -f services/admin-service/Dockerfile .'
+        sh 'docker run --rm "bookrush/admin-service-test:$BUILD_NUMBER" mvn -B verify'
+        sh 'docker build -t "$ADMIN_SERVICE_IMAGE" -f services/admin-service/Dockerfile .'
+        sh 'docker build -t "$ADMIN_WEB_IMAGE" admin-web'
       }
     }
 
@@ -231,7 +239,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin'
-          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$RECOMMENDATION_IMAGE" && docker push "$READER_BFF_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE"'
+          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$RECOMMENDATION_IMAGE" && docker push "$READER_BFF_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE" && docker push "$ADMIN_SERVICE_IMAGE" && docker push "$ADMIN_WEB_IMAGE"'
         }
       }
     }

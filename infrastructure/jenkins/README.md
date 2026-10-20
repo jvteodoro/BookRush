@@ -210,10 +210,32 @@ mesma revisão. Alterações no filtro/ranking do feed exigem as imagens de
 recommendation e BFF; deixar esses serviços fora do conjunto mantém um digest
 antigo e pode produzir 502 ou itens sem analytics. PostgreSQL, Redis, pgAdmin e
 Jenkins são preservados.
+
+Antes de aceitar a revisão, o deploy também obtém um token técnico do realm
+administrativo e consulta `/api/v1/admin/users` pelo `admin-service`. Esse smoke
+autenticado valida, em uma única chamada, os papéis do operador técnico, o
+segredo do cliente de gerenciamento e o acesso ao realm de usuários; qualquer
+falha aciona diagnóstico e rollback.
+
+Os smokes aguardam por até um minuto a convergência de DNS, proxy e aplicações
+depois dos healthchecks. A verificação de usuários atravessa o proxy de mesma
+origem empacotado na própria imagem `admin-web` da revisão. Ela não depende do
+`dynamic.yaml` montado no Traefik a partir do checkout estável do host, que pode
+estar temporariamente atrás da branch. O console registra somente o status HTTP
+de tentativas malsucedidas; bearer, secrets e respostas com usuários não são
+expostos. Respostas `401` e `403` encerram as tentativas imediatamente porque
+representam contrato de identidade, não atraso de inicialização.
+
+Um job parametrizado pode carregar o Jenkinsfile da `main` antes de fazer o
+checkout de uma feature. Enquanto a `main` ainda não conhecer as imagens
+administrativas, `deploy-compose.sh` deriva suas tags das imagens de catálogo e
+frontend e constrói localmente somente as que estiverem ausentes. Depois que o
+Jenkinsfile novo estiver na `main`, as imagens são normalmente construídas e
+publicadas no estágio **Imagens**, e esse fallback não executa builds adicionais.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
-recommendation, BFF, perfil e social para as imagens criadas pela construção
-atual.
+recommendation, BFF, perfil, social, `admin-service` e `admin-web` para as
+imagens criadas pela construção atual.
 Quando a thumbnail é protegida, a imagem do catálogo precisa ser atualizada
 junto com o frontend. O Compose configura `CATALOG_PRODUCT_OIDC_ISSUER`,
 `CATALOG_PRODUCT_OIDC_JWK_SET_URI` e `CATALOG_PRODUCT_OIDC_AUDIENCE` para que

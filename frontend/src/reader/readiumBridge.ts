@@ -8,13 +8,12 @@ import type {
   ReaderPreferences,
 } from "../app/types";
 
-const defaultPreferences: ReaderPreferences = {
-  fontFamily: "serif",
-  fontSize: 100,
-  lineHeight: 1.8,
-  foreground: "#29261f",
-  background: "#f7f4ee",
-};
+import {
+  defaults,
+  fonts,
+  normalizePreferences,
+  textWidths,
+} from "./appearance";
 
 let navigator: any;
 let manifest: any;
@@ -22,13 +21,7 @@ let publication: Publication | undefined;
 let container: HTMLElement | undefined;
 let frame: HTMLIFrameElement | undefined;
 let frameWindow: Window | undefined;
-let preferences = defaultPreferences;
-
-const fontFamilies = {
-  serif: 'Georgia, "Times New Roman", serif',
-  sans: "Arial, Helvetica, sans-serif",
-  dyslexic: "OpenDyslexic, Arial, sans-serif",
-};
+let preferences = { ...defaults };
 
 function toChapters(links: any[] = [], depth = 0): ReaderChapter[] {
   return links.flatMap((link, index) => {
@@ -47,13 +40,14 @@ function toChapters(links: any[] = [], depth = 0): ReaderChapter[] {
 }
 
 function applyPreferences(next: ReaderPreferences) {
+  next = normalizePreferences(next);
   preferences = next;
   container?.style.setProperty("background", next.background);
   if (navigator?.submitPreferences) {
     void navigator
       .submitPreferences(
         new WebPubPreferences({
-          fontFamily: fontFamilies[next.fontFamily],
+          fontFamily: fonts[next.fontFamily].family,
           lineHeight: next.lineHeight,
         }),
       )
@@ -68,10 +62,27 @@ function applyPreferences(next: ReaderPreferences) {
   style.id = "bookrush-reader-preferences";
   style.textContent = `
     html, body { background: ${next.background} !important; color: ${next.foreground} !important; }
-    body, body * { font-family: ${fontFamilies[next.fontFamily]} !important; }
+    body, body * { font-family: ${fonts[next.fontFamily].family} !important; }
     body { font-size: ${next.fontSize}% !important; line-height: ${next.lineHeight} !important; }
-    p, li, blockquote, h1, h2, h3, h4, h5, h6 { color: ${next.foreground} !important; }
-    p, li, blockquote { line-height: ${next.lineHeight} !important; }
+    body {
+      box-sizing: border-box !important;
+      width: 100% !important;
+      max-width: ${textWidths[next.textWidth].maxWidth} !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      padding-left: clamp(1.2rem, 4vw, 3rem) !important;
+      padding-right: clamp(1.2rem, 4vw, 3rem) !important;
+      overflow-wrap: break-word;
+    }
+    body * { color: ${next.foreground} !important; }
+    h1 { font-size: 1.75em !important; }
+    h2 { font-size: 1.5em !important; }
+    h3 { font-size: 1.25em !important; }
+    h4 { font-size: 1.15em !important; }
+    h5 { font-size: 1.05em !important; }
+    h6 { font-size: 1em !important; }
+    h1 *, h2 *, h3 *, h4 *, h5 *, h6 * { font-size: inherit !important; }
+    p, li, blockquote { font-size: inherit !important; line-height: ${next.lineHeight} !important; }
   `;
   document.head.appendChild(style);
 }

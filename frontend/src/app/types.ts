@@ -1,7 +1,8 @@
 export type ReaderPreferences = {
-  fontFamily: "serif" | "sans" | "dyslexic";
+  fontFamily: "serif" | "sans" | "literary" | "verdana" | "times";
   fontSize: number;
   lineHeight: number;
+  textWidth: "narrow" | "comfortable" | "wide";
   foreground: string;
   background: string;
 };

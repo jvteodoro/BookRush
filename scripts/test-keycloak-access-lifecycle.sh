@@ -76,6 +76,14 @@ grep -qi 'not fully set up\|required action' <<<"$mfa_response"
 admin create users -r bookrush-platform -s username="$token_user_name" -s firstName=Codex -s lastName=Lifecycle -s enabled=true -s email='codex-token@bookrush.test' -s emailVerified=true >/dev/null
 token_user_id="$(admin get users -r bookrush-platform -q username="$token_user_name" --fields id --format csv --noquotes | awk 'NR == 1 { first = $0 } END { print first }')"
 test -n "$token_user_id"
+for _ in 1 2; do
+  docker run --rm -i --network "container:$name" \
+    -e KEYCLOAK_URL=http://127.0.0.1:8080 -e KEYCLOAK_USER=admin \
+    -e KEYCLOAK_PASSWORD="$admin_password" -e ADMIN_WEB_ADMIN_USERNAME="$token_user_name" \
+    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/grant-admin-console-access.py"
+done
+admin get "users/$token_user_id/groups" -r bookrush-platform --format csv --noquotes \
+  | grep -q 'platform-admins'
 admin update "users/$token_user_id" -r bookrush-platform -s firstName=Codex -s lastName=Lifecycle -s enabled=true -s email='codex-token@bookrush.test' -s emailVerified=true -s 'requiredActions=[]' >/dev/null
 token_user_state="$(admin get "users/$token_user_id" -r bookrush-platform --fields enabled,emailVerified,requiredActions --format csv --noquotes)"
 grep -q 'true' <<<"$token_user_state"
@@ -85,6 +93,26 @@ token_response="$(docker exec "$probe" curl -sS -w '\n%{http_code}' -X POST "$to
   -d grant_type=password -d client_id="$client_id" -d username="$token_user_name" -d password='disposable-user-password')"
 grep -q '^200$' <<<"$token_response"
 grep -q 'access_token' <<<"$token_response"
+access_token="$(sed -n '1p' <<<"$token_response" | jq -er '.access_token')"
+unset access_token
+
+admin_web_client_id="$(admin get clients -r bookrush-platform -q clientId=labsoft-admin-web --fields id --format csv --noquotes)"
+test -n "$admin_web_client_id"
+admin update "clients/$admin_web_client_id" -r bookrush-platform -s directAccessGrantsEnabled=true >/dev/null
+admin_web_token_response="$(docker exec "$probe" curl -fsS -X POST "$token_url" \
+  -d grant_type=password -d client_id=labsoft-admin-web \
+  -d username="$token_user_name" -d password='disposable-user-password')"
+access_token="$(jq -er '.access_token' <<<"$admin_web_token_response")"
+ACCESS_TOKEN="$access_token" python3 - <<'PY'
+import base64, json, os
+payload = os.environ["ACCESS_TOKEN"].split(".")[1]
+payload += "=" * (-len(payload) % 4)
+claims = json.loads(base64.urlsafe_b64decode(payload))
+assert claims.get("sub"), claims
+assert "platform-admins" in claims.get("groups", []), claims
+assert "bookrush-ingestion" in claims.get("aud", []), claims
+PY
+unset access_token
 
 admin update "users/$token_user_id" -r bookrush-platform -s enabled=false >/dev/null
 set +e

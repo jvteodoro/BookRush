@@ -97,25 +97,39 @@ export type ApprovalHistoryPage = {
 };
 export type AdminUser = {
   subjectKey: string;
-  displayName?: string;
-  bio?: string;
-  isPublic?: boolean;
-  enabled?: boolean;
-  updatedAt?: string;
+  username: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  enabled: boolean;
+  createdTimestamp?: number;
+};
+export type AdminUserPage = {
+  items: AdminUser[];
+  page: number;
+  size: number;
+  totalItems: number;
+  last: boolean;
 };
 export type AdminReport = {
   id: string;
   reporter: string;
+  reporterName: string;
   bookId?: string;
   commentId?: string;
+  commentAuthorName?: string;
+  commentBody?: string;
   reason: string;
   status: string;
+  resolutionNote?: string;
+  reviewedAt?: string;
   createdAt?: string;
 };
 export type AdminComment = {
   id: string;
   bookId: string;
   subjectKey: string;
+  authorName: string;
   body: string;
   visibility: string;
   reasonCode?: string;
@@ -138,8 +152,19 @@ function idempotencyKey(prefix: string, id: string) {
 function problem(error: unknown, fallback: string) {
   if (error && typeof error === "object" && "response" in error) {
     const response = (
-      error as { response?: { data?: { message?: string; detail?: string } } }
+      error as {
+        response?: {
+          status?: number;
+          data?: { message?: string; detail?: string };
+        };
+      }
     ).response;
+    if (response?.status === 401)
+      return new Error("Sua sessão expirou. Entre novamente no Admin Console.");
+    if (response?.status === 403)
+      return new Error(
+        "Sua conta não possui a role platform-admin ou platform-operator. Saia e entre novamente após a concessão do acesso.",
+      );
     return new Error(
       response?.data?.message ?? response?.data?.detail ?? fallback,
     );
@@ -172,20 +197,38 @@ function mapBook(raw: Record<string, unknown>): BookCandidate {
 }
 
 export const services = {
-  async listAdminUsers(): Promise<AdminUser[]> {
-    const { data } = await adminHttp.get("/api/v1/admin/users");
-    return (data.items ?? data).map((item: Record<string, unknown>) => ({
-      subjectKey: String(item.subjectKey ?? item.subject_key),
-      displayName: item.displayName ?? item.display_name,
-      bio: item.bio,
-      isPublic: item.isPublic ?? item.is_public,
-      enabled: item.enabled !== false,
-      updatedAt: item.updatedAt ?? item.updated_at,
-    }));
+  async listAdminUsers(
+    search = "",
+    page = 0,
+    size = 25,
+  ): Promise<AdminUserPage> {
+    try {
+      const { data } = await adminHttp.get("/api/v1/admin/users", {
+        params: { search: search.trim(), page, size },
+      });
+      return {
+        items: data.items.map((item: Record<string, unknown>) => ({
+          subjectKey: String(item.subjectKey),
+          username: String(item.username),
+          email: item.email ? String(item.email) : undefined,
+          firstName: item.firstName ? String(item.firstName) : undefined,
+          lastName: item.lastName ? String(item.lastName) : undefined,
+          enabled: item.enabled !== false,
+          createdTimestamp: Number(item.createdTimestamp ?? 0),
+        })),
+        page: Number(data.page),
+        size: Number(data.size),
+        totalItems: Number(data.totalItems),
+        last: Boolean(data.last),
+      };
+    } catch (error) {
+      throw problem(error, "A integração de usuários com o Keycloak falhou.");
+    }
   },
-  async setUserEnabled(subjectKey: string, enabled: boolean) {
+  async setUserEnabled(subjectKey: string, enabled: boolean, reason: string) {
     const { data } = await adminHttp.post(
       `/api/v1/admin/users/${encodeURIComponent(subjectKey)}/${enabled ? "enable" : "disable"}`,
+      { reason },
     );
     return data;
   },
@@ -194,12 +237,30 @@ export const services = {
     return (data.items ?? data).map((item: Record<string, unknown>) => ({
       id: String(item.id),
       reporter: String(item.reporter),
+      reporterName: String(
+        item.reporterName ?? item.reporter_name ?? item.reporter,
+      ),
       bookId: item.bookId ?? item.book_id,
       commentId: item.commentId ?? item.comment_id,
+      commentAuthorName: item.commentAuthorName ?? item.comment_author_name,
+      commentBody: item.commentBody ?? item.comment_body,
       reason: String(item.reason),
       status: String(item.status),
+      resolutionNote: item.resolutionNote ?? item.resolution_note,
+      reviewedAt: item.reviewedAt ?? item.reviewed_at,
       createdAt: item.createdAt ?? item.created_at,
     }));
+  },
+  async updateAdminReportStatus(
+    reportId: string,
+    status: string,
+    note: string,
+  ) {
+    const { data } = await adminHttp.post(
+      `/api/v1/admin/reports/${encodeURIComponent(reportId)}/status`,
+      { status, note },
+    );
+    return data;
   },
   async listAdminComments(): Promise<AdminComment[]> {
     const { data } = await adminHttp.get("/api/v1/admin/moderation/comments");
@@ -207,6 +268,12 @@ export const services = {
       id: String(item.id),
       bookId: String(item.bookId ?? item.book_id),
       subjectKey: String(item.subjectKey ?? item.subject_key),
+      authorName: String(
+        item.authorName ??
+          item.author_name ??
+          item.subjectKey ??
+          item.subject_key,
+      ),
       body: String(item.body),
       visibility: String(item.visibility ?? "VISIBLE"),
       reasonCode: item.reasonCode ?? item.reason_code,

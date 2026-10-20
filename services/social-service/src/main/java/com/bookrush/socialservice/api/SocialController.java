@@ -156,11 +156,22 @@ public class SocialController {
 
   @PostMapping("/reports")
   public Object report(@Valid @RequestBody Report report, Principal principal, HttpServletRequest request) {
+    if (report.bookId() == null && report.commentId() == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bookId or commentId is required");
+    }
+    if (report.commentId() != null) {
+      Boolean exists = jdbc.queryForObject(
+          "SELECT EXISTS (SELECT 1 FROM social.comments WHERE id = ?)", Boolean.class, report.commentId());
+      if (!Boolean.TRUE.equals(exists)) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "comment not found");
+      }
+    }
     UUID id = UUID.randomUUID();
     jdbc.update("INSERT INTO social.reports(id, reporter, book_id, comment_id, reason) "
         + "VALUES (?, ?, ?, ?, ?)", id, subject(principal), report.bookId(), report.commentId(),
         report.reason());
-    behavior.publish("BOOK_REPORT", report.bookId(), Map.of("reason", report.reason()), request.getHeader(HttpHeaders.AUTHORIZATION));
+    behavior.publish(report.commentId() == null ? "BOOK_REPORT" : "COMMENT_REPORT", report.bookId(),
+        Map.of("reason", report.reason()), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("id", id, "status", "OPEN");
   }
 
@@ -228,8 +239,16 @@ public class SocialController {
   public Object moderationReports(Principal principal, Authentication authentication) {
     requireOperator(authentication);
     subject(principal);
-    return jdbc.queryForList("SELECT id, reporter, book_id, comment_id, reason, status, created_at "
-        + "FROM social.reports ORDER BY created_at DESC LIMIT 250");
+    return jdbc.queryForList("SELECT r.id, r.reporter, "
+        + "COALESCE(NULLIF(reporter_profile.display_name, ''), r.reporter) AS reporter_name, "
+        + "r.book_id, r.comment_id, r.reason, r.status, r.created_at, "
+        + "c.body AS comment_body, "
+        + "COALESCE(NULLIF(c.author_display_name, ''), NULLIF(author_profile.display_name, ''), c.subject_key) "
+        + "AS comment_author_name FROM social.reports r "
+        + "LEFT JOIN social.comments c ON c.id=r.comment_id "
+        + "LEFT JOIN reader_profile.profile reporter_profile ON reporter_profile.subject_key=r.reporter "
+        + "LEFT JOIN reader_profile.profile author_profile ON author_profile.subject_key=c.subject_key "
+        + "ORDER BY r.created_at DESC LIMIT 250");
   }
 
   @PutMapping("/moderation/comments/{commentId}")
