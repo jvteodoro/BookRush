@@ -20,7 +20,7 @@ public final class PersonalizedFeedGate {
     if (!behaviorAvailable) return new Decision(Path.FALLBACK, "behavior-unavailable");
     if (!snapshotAvailable) return new Decision(Path.FALLBACK, "snapshot-unavailable");
     if (profile == null || profile.status() != UserTasteProfile.Status.READY) {
-      return new Decision(Path.FALLBACK, "profile-missing");
+      return new Decision(Path.FALLBACK, "cold-start");
     }
     if (profile.coverage() < properties.minCoverage()) return new Decision(Path.FALLBACK, "coverage-low");
     if (profile.confidence() < properties.minConfidence()) return new Decision(Path.FALLBACK, "confidence-low");

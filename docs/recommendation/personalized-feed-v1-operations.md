@@ -31,9 +31,11 @@ uma fixture sem reprocessar PII.
 1. Verifique `bookrush.feed.requests{outcome}` e os timers por `stage`.
 2. Em `SHADOW`, compare `bookrush.feed.personalized.shadow.overlap` com a
    população `compared`; divergência alta não é, sozinha, motivo para ativar.
-3. Investigue razões `behavior-unavailable`, `snapshot-unavailable`,
+3. `behavior-unavailable` indica erro/timeout/configuração no serving S2S;
+   `cold-start` indica que o serving respondeu com sucesso, mas o subject ainda
+   não possui sinais comportamentais. Investigue também `snapshot-unavailable`,
    `coverage-low`, `confidence-low` e `rollout-excluded` antes de alterar o
-   percentual.
+   percentual. Um cold-start não deve ser tratado como indisponibilidade.
 4. Se houver erro/latência, volte para `OFF`; o feed deve continuar servindo o
    caminho seguro.
 

@@ -10,9 +10,12 @@ import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Bounded S2S client for behavior-owned serving signals. */
 public final class BehaviorSignalsClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BehaviorSignalsClient.class);
   private final RestClient behavior;
   private final RestClient tokenClient;
   private final BehaviorSignalsProperties properties;
@@ -38,11 +41,17 @@ public final class BehaviorSignalsClient {
   }
 
   public List<Signal> find(String subject) {
-    if (!properties.configured() || subject == null || subject.isBlank()) return List.of();
+    return lookup(subject).signals();
+  }
+
+  public Lookup lookup(String subject) {
+    if (!properties.configured() || subject == null || subject.isBlank()) {
+      return new Lookup(List.of(), false);
+    }
     var cached = cache.get(subject);
     if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
       metrics.counter("bookrush.feed.personalized.behavior", "outcome", "cache_hit").increment();
-      return cached.signals();
+      return new Lookup(cached.signals(), cached.available());
     }
     long started = System.nanoTime();
     try {
@@ -54,13 +63,15 @@ public final class BehaviorSignalsClient {
           .body(Map.of("subject", subject, "limit", properties.maxSignals(), "offset", 0))
           .retrieve().body(Map.class);
       var result = parse(body);
-      cache.put(subject, new Entry(subject, result, Instant.now().plus(properties.cacheTtl())));
+      cache.put(subject, new Entry(subject, result, true, Instant.now().plus(properties.cacheTtl())));
       metrics.counter("bookrush.feed.personalized.behavior", "outcome", "success").increment();
-      return result;
+      return new Lookup(result, true);
     } catch (RestClientException | IllegalStateException exception) {
       metrics.counter("bookrush.feed.personalized.behavior", "outcome",
           exception instanceof org.springframework.web.client.ResourceAccessException ? "timeout" : "error").increment();
-      return List.of();
+      LOGGER.warn("Behavior serving signals unavailable: outcome={}",
+          exception instanceof org.springframework.web.client.ResourceAccessException ? "timeout" : "error");
+      return new Lookup(List.of(), false);
     } finally {
       metrics.timer("bookrush.feed.personalized.behavior.duration")
           .record(System.nanoTime() - started, java.util.concurrent.TimeUnit.NANOSECONDS);
@@ -127,6 +138,12 @@ public final class BehaviorSignalsClient {
     }
   }
 
-  private record Entry(String subject, List<Signal> signals, Instant expiresAt) { }
+  public record Lookup(List<Signal> signals, boolean available) {
+    public Lookup {
+      signals = signals == null ? List.of() : List.copyOf(signals);
+    }
+  }
+
+  private record Entry(String subject, List<Signal> signals, boolean available, Instant expiresAt) { }
   private record Token(String value, Instant expiresAt) { }
 }

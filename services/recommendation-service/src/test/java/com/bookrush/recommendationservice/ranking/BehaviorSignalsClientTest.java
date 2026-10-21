@@ -35,4 +35,24 @@ class BehaviorSignalsClientTest {
     assertEquals(1, client.find("subject-a").getFirst().liked() ? 1 : 0);
     server.verify();
   }
+
+  @Test
+  void distinguishesSuccessfulColdStartFromUnavailableBehaviorService() {
+    RestClient.Builder builder = RestClient.builder();
+    MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+    server.expect(requestTo("http://keycloak/token"))
+        .andRespond(withSuccess("{\"access_token\":\"behavior-token\",\"expires_in\":300}",
+            MediaType.APPLICATION_JSON));
+    server.expect(requestTo("http://behavior/api/internal/v1/recommendation/signals"))
+        .andRespond(withSuccess("{\"items\":[]}", MediaType.APPLICATION_JSON));
+    var props = new BehaviorSignalsProperties("http://behavior", "http://keycloak/token", "client", "secret",
+        "bookrush-behavior", "bookrush.behavior.read", Duration.ofMinutes(1), Duration.ofSeconds(1),
+        Duration.ofSeconds(1), 50);
+    var result = new BehaviorSignalsClient(builder, props, new SimpleMeterRegistry(), false)
+        .lookup("cold-subject");
+
+    assertEquals(true, result.available());
+    assertEquals(0, result.signals().size());
+    server.verify();
+  }
 }

@@ -28,9 +28,10 @@ public final class PersonalizedProfileService {
     Instant now = Instant.now();
     var existing = cache.get(subject);
     if (existing != null && existing.expiresAt().isAfter(now)) return existing.result();
-    var signals = behavior.find(subject);
+    var lookup = behavior.lookup(subject);
+    var signals = lookup.signals();
     if (signals.isEmpty()) {
-      var result = new Result(null, false, false, List.of(), Map.of());
+      var result = new Result(null, lookup.available(), false, List.of(), Map.of());
       cache.put(subject, new Entry(result, now.plus(Duration.ofMinutes(2))));
       return result;
     }
