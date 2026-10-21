@@ -196,8 +196,6 @@ export function AccountPage({
   }
 
   if (tab === "publisher") {
-    const submissions =
-      accountRuntime().__BOOKRUSH_PUBLISHER_SUBMISSIONS__ ?? [];
     return (
       <section className="br-account-page">
         <PageHeading
@@ -207,12 +205,16 @@ export function AccountPage({
         />
         <Card className="br-account-panel">
           <h2>Suas publicações</h2>
-          <strong className="br-account-number">{submissions.length}</strong>
+          <strong className="br-account-number">—</strong>
           <p className="br-muted">
-            rascunhos e publicações retornados pelo serviço.
+            O portal de publicações usa a console protegida do realm de
+            plataforma. Abra a console administrativa para continuar.
           </p>
           <ActionRow>
-            <Button onClick={() => onNavigate("feed")}>
+            <Button onClick={() => window.location.assign("/admin/")}>
+              Abrir console
+            </Button>
+            <Button variant="ghost" onClick={() => onNavigate("feed")}>
               Voltar para o feed
             </Button>
           </ActionRow>

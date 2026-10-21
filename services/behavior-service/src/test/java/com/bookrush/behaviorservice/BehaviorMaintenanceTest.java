@@ -26,6 +26,8 @@ class BehaviorMaintenanceTest {
 
     verify(jdbc).update(org.mockito.ArgumentMatchers.contains("INSERT INTO behavior.daily_book"));
     verify(jdbc).update(org.mockito.ArgumentMatchers.contains("INSERT INTO behavior.outcome_attribution"));
+    verify(jdbc).update(org.mockito.ArgumentMatchers.contains("DELETE FROM behavior.user_book_signal"));
+    verify(jdbc).update(org.mockito.ArgumentMatchers.contains("INSERT INTO behavior.user_book_signal"));
     verify(jdbc).update(org.mockito.ArgumentMatchers.contains("DELETE FROM behavior.rejects"),
         (Object[]) org.mockito.ArgumentMatchers.any());
     verify(jdbc).update(org.mockito.ArgumentMatchers.contains("DELETE FROM behavior.outbox"),

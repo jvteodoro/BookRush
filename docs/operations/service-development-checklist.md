@@ -184,10 +184,11 @@ bash scripts/validate-pipelines.sh
 bash scripts/validate-change.sh --ci
 ```
 
-4. Jobs inline criados por `init.groovy.d` não são Multibranch: precisam de
-   checkout explícito de branch e podem continuar com Jenkinsfile antigo até o
-   bootstrap sincronizar a definição. Não apague o job ou o volume para
-   “corrigir” sincronização.
+4. O job integrado `bookrush-deploy` usa Pipeline from SCM e carrega o
+   `Jenkinsfile` da branch informada no parâmetro `BRANCH`. Jobs de serviço e
+   verticais ainda podem ser inline; se um deles for alterado, a definição
+   persistida precisa ser sincronizada pelo bootstrap. Não apague o job ou o
+   volume para “corrigir” sincronização.
 5. Faça login OIDC com usuário permanente do agente, valide `whoAmI`, obtenha
    crumb da mesma sessão e só então chame `buildWithParameters`. Não reutilize
    callback, cookie ou crumb antigo.

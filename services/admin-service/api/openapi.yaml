@@ -4,6 +4,20 @@ info:
   version: 0.2.0
   description: Administrative user lifecycle and audit operations.
 paths:
+  /api/v1/admin/feed:
+    get:
+      summary: Read the versioned recommendation ledger for Feed Lab
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200':
+          description: Read-only recommendation items with privacy-safe provenance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FeedLabResponse' }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
   /api/v1/admin/users:
     get:
       summary: Search product-realm users
@@ -149,3 +163,14 @@ components:
         size: { type: integer }
         totalItems: { type: integer, format: int64 }
         last: { type: boolean }
+    FeedLabResponse:
+      type: object
+      required: [items, source, readOnly]
+      properties:
+        source: { type: string, example: recommendation-ledger-v1 }
+        readOnly: { type: boolean, example: true }
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true

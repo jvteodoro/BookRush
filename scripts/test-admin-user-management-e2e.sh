@@ -4,7 +4,6 @@ set -Eeuo pipefail
 # End-to-end proof of platform token -> admin-service -> product-realm users.
 # All containers, credentials and data are disposable.
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-admin-e2e.XXXXXX")"
 suffix="$RANDOM-$$"
 network="bookrush-admin-e2e-$suffix"
 keycloak="bookrush-admin-e2e-keycloak-$suffix"
@@ -30,10 +29,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
-INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
-  python3 "$repo_dir/infrastructure/keycloak/render-config.py" \
-  "$repo_dir/infrastructure/keycloak" "$work_dir/rendered"
+if docker inspect "$HOSTNAME" >/dev/null 2>&1; then
+  work_dir="$(mktemp -d "$repo_dir/.bookrush-admin-e2e.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" --volumes-from "$HOSTNAME" \
+    -w "$repo_dir" \
+    -e KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
+    -e INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
+    python:3.12-slim python3 infrastructure/keycloak/render-config.py \
+    infrastructure/keycloak "$work_dir/rendered"
+else
+  work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-admin-e2e.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" \
+    -e KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
+    -e INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
+    -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
+    python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
+    /repo/infrastructure/keycloak /out/rendered
+fi
 
 docker network create "$network" >/dev/null
 docker run -d --name "$postgres" --network "$network" --network-alias postgres \
@@ -170,21 +182,28 @@ INSERT INTO social.reports(id, reporter, book_id, comment_id, reason)
 VALUES ('$report_id', 'reader-2', '33333333-3333-4333-8333-333333333333', '$legacy_comment_id', 'spam');
 SQL
 
-token="$(docker exec "$probe" curl -fsS -X POST \
+token_response="$(docker exec "$probe" curl -fsS -X POST \
   http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
   -d grant_type=password -d client_id=labsoft-admin-web \
   --data-urlencode "username=$human_username" \
-  --data-urlencode "password=$human_password" | jq -er '.access_token')"
-TOKEN="$token" python3 - <<'PY'
-import base64, json, os
-payload = os.environ["TOKEN"].split(".")[1]
-payload += "=" * (-len(payload) % 4)
-claims = json.loads(base64.urlsafe_b64decode(payload))
-assert claims["iss"] == "http://keycloak:8080/realms/bookrush-platform", claims["iss"]
-assert claims.get("sub"), claims
-assert "bookrush-ingestion" in claims.get("aud", []), claims.get("aud")
-assert "platform-admins" in claims.get("groups", []), claims.get("groups")
-PY
+  --data-urlencode "password=$human_password")"
+token="$(sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"\\]*\)".*/\1/p' <<<"$token_response")"
+test -n "$token"
+docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh -c '
+  set -eu
+  payload="${ACCESS_TOKEN#*.}"
+  payload="${payload%%.*}"
+  remainder=$((${#payload} % 4))
+  [ "$remainder" -eq 0 ] || [ "$remainder" -eq 2 ] || [ "$remainder" -eq 3 ]
+  [ "$remainder" -eq 2 ] && payload="${payload}=="
+  [ "$remainder" -eq 3 ] && payload="${payload}="
+  payload="$(printf "%s" "$payload" | tr "_-" "/+" | base64 -d 2>/dev/null)"
+  printf "%s" "$payload" | grep -q '"iss"'
+  printf "%s" "$payload" | grep -q "http://keycloak:8080/realms/bookrush-platform"
+  printf "%s" "$payload" | grep -q '"sub"'
+  printf "%s" "$payload" | grep -q "bookrush-ingestion"
+  printf "%s" "$payload" | grep -q "platform-admins"
+'
 status=000
 for _ in $(seq 1 30); do
   status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \

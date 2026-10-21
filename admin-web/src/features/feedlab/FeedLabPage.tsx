@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../auth/useAuth";
+import { config } from "../../lib/config";
 import { defaultWeights } from "../../mocks/data";
 import { services } from "../../lib/services";
 import { FeedWeights, TrainingSession } from "../../types/domain";
@@ -32,7 +33,9 @@ export function FeedLabPage() {
   const initialWeights = useRef(weights).current;
   const [index, setIndex] = useState(0);
   useEffect(() => {
-    void services.createSession(auth.userId, initialWeights).then(setSession);
+    if (config.useMocks) {
+      void services.createSession(auth.userId, initialWeights).then(setSession);
+    }
   }, [auth.userId, initialWeights]);
   const item = feed.data?.[index % Math.max(feed.data?.length ?? 1, 1)];
   useEffect(() => {
@@ -129,8 +132,8 @@ export function FeedLabPage() {
           <span className="eyebrow">RECOMMENDATION LAB</span>
           <h1>Feed Lab</h1>
           <p>
-            Use usuários administrativos como população inicial para gerar
-            eventos de interação e calibrar o ranking.
+            Inspecione decisões reais do ledger de recomendações, com
+            proveniência e componentes agregados. Esta tela é somente leitura.
           </p>
         </div>
         <div className="sessionbadge">
@@ -202,6 +205,45 @@ export function FeedLabPage() {
           <div className="version">
             <span>Parameter version</span>
             <code>{session?.parameterVersion ?? "creating..."}</code>
+          </div>
+          <div className="featurebox">
+            <span>Decision provenance</span>
+            <div>
+              <span>Model</span>
+              <strong>{item.modelVersion || item.rankingVersion || "—"}</strong>
+            </div>
+            <div>
+              <span>Reason</span>
+              <strong>{item.reason || "—"}</strong>
+            </div>
+            <div>
+              <span>Personalization</span>
+              <strong>
+                {item.personalizationPath || "—"} ·{" "}
+                {item.personalizationReason || "—"}
+              </strong>
+            </div>
+            <div>
+              <span>Profile</span>
+              <strong>
+                {item.profileVersion || "—"} · confidence{" "}
+                {(item.profileConfidence ?? 0).toFixed(2)}
+              </strong>
+            </div>
+            <div>
+              <span>Candidate set</span>
+              <code>{item.candidateSetHash || "—"}</code>
+            </div>
+            <div>
+              <span>Request</span>
+              <code>{item.recommendationRequestId || "—"}</code>
+            </div>
+            <div>
+              <span>Item / impression</span>
+              <code>
+                {item.recommendationItemId || "—"} / {item.impressionId || "—"}
+              </code>
+            </div>
           </div>
           <div className="featurebox">
             <span>Score decomposition</span>

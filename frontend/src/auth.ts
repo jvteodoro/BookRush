@@ -125,7 +125,13 @@ export const authClient = {
     return response;
   },
   async imageUrl(input: string): Promise<string | undefined> {
-    const response = await this.fetch(input, { cache: 'no-store' });
+    const url = new URL(input, origin);
+    if (url.origin !== origin) throw new Error('Imagem deve ser same-origin.');
+    // The catalog thumbnail endpoint is protected and redirects to a
+    // presigned storage URL. Authenticate the same-origin hop through the API
+    // client; the browser then follows the redirect without leaking the bearer
+    // to the storage host.
+    const response = await authClient.fetch(url.toString(), { cache: 'no-store' });
     if (!response.ok) return undefined;
     return URL.createObjectURL(await response.blob());
   },

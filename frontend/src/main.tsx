@@ -87,6 +87,18 @@ function App() {
         const catalog = await loadCatalog();
         const recommendations = await loadRecommendationFeed();
         if (!active) return;
+        const recommendationFor = (bookId: string) =>
+          recommendations.find((item) => item.book?.id === bookId);
+        const correlationHeaders = (bookId: string): Record<string, string> => {
+          const recommendation = recommendationFor(bookId);
+          const headers: Record<string, string> = {};
+          if (recommendation?.recommendationItemId)
+            headers["X-BookRush-Recommendation-Item"] =
+              recommendation.recommendationItemId;
+          if (recommendation?.impressionId)
+            headers["X-BookRush-Impression"] = recommendation.impressionId;
+          return headers;
+        };
         const byId = new Map(catalog.map((book) => [book.id, book]));
         const ordered = recommendations
           .map((item) => item.book)
@@ -129,6 +141,7 @@ function App() {
                 ? await authClient.imageUrl(book.thumbnailUrl)
                 : undefined,
               recommendationRequestId: recommendation?.recommendationRequestId,
+              recommendationItemId: recommendation?.recommendationItemId,
               impressionId: recommendation?.impressionId,
               modelVersion: recommendation?.modelVersion,
               rank: recommendation?.rank,
@@ -154,16 +167,10 @@ function App() {
         );
         const saved = new Set(await loadLibrary());
         const recent = await loadRecent();
-        let submissions: unknown[] = [];
-        try {
-          const response = await authClient.fetch(
-            apiRoutes.publisher.submissions(),
-          );
-          if (response.ok) submissions = (await response.json()) as unknown[];
-        } catch {
-          // Publisher access is optional for reader accounts; the portal shows
-          // an empty state instead of preventing the reader feed from loading.
-        }
+        // Publisher and administration APIs belong to the platform realm and
+        // are intentionally not called by the product-realm reader session.
+        // The dedicated admin console obtains the correct platform token.
+        const submissions: unknown[] = [];
         (
           window as Window & {
             __BOOKRUSH_BOOKS__?: PageLoopBook[];
@@ -193,29 +200,12 @@ function App() {
             window as Window & { __BOOKRUSH_PROFILE__?: unknown }
           ).__BOOKRUSH_PROFILE__ = null;
         }
-        try {
-          const [usersResponse, reportsResponse] = await Promise.all([
-            authClient.fetch(apiRoutes.admin.users()),
-            authClient.fetch(apiRoutes.admin.reports()),
-          ]);
-          (
-            window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_USERS__ = usersResponse.ok
-            ? ((await usersResponse.json()) as unknown[])
-            : [];
-          (
-            window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_REPORTS__ = reportsResponse.ok
-            ? ((await reportsResponse.json()) as unknown[])
-            : [];
-        } catch {
-          (
-            window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_USERS__ = [];
-          (
-            window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }
-          ).__BOOKRUSH_ADMIN_REPORTS__ = [];
-        }
+        (
+          window as Window & { __BOOKRUSH_ADMIN_USERS__?: unknown[] }
+        ).__BOOKRUSH_ADMIN_USERS__ = [];
+        (
+          window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }
+        ).__BOOKRUSH_ADMIN_REPORTS__ = [];
         try {
           const streakResponse = await authClient.fetch(
             apiRoutes.reader.streak(),
@@ -253,7 +243,10 @@ function App() {
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(
               apiRoutes.reader.libraryBook(id),
-              { method: enabled ? "PUT" : "DELETE" },
+              {
+                method: enabled ? "PUT" : "DELETE",
+                headers: correlationHeaders(id),
+              },
             );
             if (!response.ok)
               throw new Error("Não foi possível atualizar sua biblioteca.");
@@ -263,6 +256,7 @@ function App() {
           like: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(apiRoutes.social.like(id), {
               method: enabled ? "PUT" : "DELETE",
+              headers: correlationHeaders(id),
             });
             if (!response.ok)
               throw new Error("Não foi possível atualizar a curtida.");
@@ -272,7 +266,10 @@ function App() {
               apiRoutes.social.share(id),
               {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  ...correlationHeaders(id),
+                },
                 body: JSON.stringify({ channel: "copy-link" }),
               },
             );
@@ -540,21 +537,7 @@ function App() {
           open: async (id: string) => {
             await authClient.fetch(apiRoutes.reader.opened(id), {
               method: "POST",
-            });
-            await authClient.fetch(apiRoutes.behavior(), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                events: [
-                  {
-                    eventKey: `BOOK_OPEN:${id}:${Date.now()}`,
-                    eventType: "BOOK_OPEN",
-                    bookId: id,
-                    occurredAt: new Date().toISOString(),
-                    payload: {},
-                  },
-                ],
-              }),
+              headers: correlationHeaders(id),
             });
           },
           chapters: async (id: string) => {
@@ -564,9 +547,7 @@ function App() {
             return response.ok ? response.json() : [];
           },
           viewable: async (id: string) => {
-            const item = recommendations.find(
-              (candidate) => candidate.book?.id === id,
-            );
+            const item = recommendationFor(id);
             if (item?.impressionId) {
               const response = await authClient.fetch(
                 apiRoutes.reader.impressionViewable(item.impressionId),
@@ -584,6 +565,9 @@ function App() {
           ) => {
             telemetry.track(eventType, bookId, {
               ...payload,
+              recommendationItemId:
+                recommendationFor(bookId)?.recommendationItemId,
+              impressionId: recommendationFor(bookId)?.impressionId,
               excerptId: excerpt?.id,
               sourceAssetVersionId: excerpt?.sourceAssetVersionId,
             });

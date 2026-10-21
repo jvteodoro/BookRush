@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import java.security.Principal;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -90,13 +91,29 @@ public class SocialController {
         + "VALUES (?, ?, ?, ?, ?, ?, now())", UUID.randomUUID(), actor, type, bookId, commentId, target);
   }
 
+  private Map<String, Object> correlation(HttpServletRequest request) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    for (Map.Entry<String, String> entry : Map.of(
+        "recommendationItemId", "X-BookRush-Recommendation-Item",
+        "impressionId", "X-BookRush-Impression").entrySet()) {
+      String value = request == null ? null : request.getHeader(entry.getValue());
+      if (value == null || value.isBlank()) continue;
+      try {
+        payload.put(entry.getKey(), UUID.fromString(value));
+      } catch (IllegalArgumentException ignored) {
+        // Correlation is optional and must not block a social action.
+      }
+    }
+    return payload;
+  }
+
   @PutMapping("/books/{bookId}/like")
   public Map<String, Object> like(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     jdbc.update("INSERT INTO social.likes(subject_key, book_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
         subject(principal), bookId);
     String actor = subject(principal);
     activity(actor, "LIKE", bookId, null, null);
-    behavior.publish("BOOK_LIKE", bookId, Map.of(), request.getHeader(HttpHeaders.AUTHORIZATION));
+    behavior.publish("BOOK_LIKE", bookId, correlation(request), request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("bookId", bookId, "liked", true);
   }
 
@@ -104,7 +121,7 @@ public class SocialController {
   public void unlike(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     jdbc.update("DELETE FROM social.likes WHERE subject_key = ? AND book_id = ?",
         subject(principal), bookId);
-    behavior.publish("BOOK_UNLIKE", bookId, Map.of(), request.getHeader(HttpHeaders.AUTHORIZATION));
+    behavior.publish("BOOK_UNLIKE", bookId, correlation(request), request.getHeader(HttpHeaders.AUTHORIZATION));
   }
 
   @PutMapping("/follow")
@@ -166,7 +183,9 @@ public class SocialController {
     jdbc.update("INSERT INTO social.shares(id, subject_key, book_id, channel) VALUES (?, ?, ?, ?)",
         id, subject(principal), bookId, share.channel());
     activity(subject(principal), "SHARE", bookId, null, null);
-    behavior.publish("BOOK_SHARE", bookId, Map.of("channel", share.channel()), request.getHeader(HttpHeaders.AUTHORIZATION));
+    Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
+    payload.put("channel", share.channel());
+    behavior.publish("BOOK_SHARE", bookId, payload, request.getHeader(HttpHeaders.AUTHORIZATION));
     return Map.of("id", id, "bookId", bookId, "channel", share.channel(), "recorded", true);
   }
 

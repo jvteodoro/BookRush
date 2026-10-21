@@ -125,6 +125,18 @@ export interface FeedItem {
   text: string;
   rankScore: number;
   features: Record<string, number>;
+  modelVersion?: string;
+  rankingVersion?: string;
+  candidateSetHash?: string;
+  recommendationRequestId?: string;
+  recommendationItemId?: string;
+  impressionId?: string;
+  reason?: string;
+  personalizationPath?: string;
+  personalizationReason?: string;
+  profileVersion?: string;
+  profileCoverage?: number;
+  profileConfidence?: number;
 }
 
 export type FeedEventType =

@@ -63,6 +63,21 @@ class AdminControllerTest {
   }
 
   @Test
+  void feedLabReadsRecommendationLedgerOnlyForOperators() {
+    var rows = List.of(Map.<String, Object>of(
+        "book_id", "book-1", "book_title", "Book One", "model_version", "personalized-v1"));
+    when(jdbc.queryForList(contains("FROM recommendation.item"), eq(50))).thenReturn(rows);
+
+    var response = controller.feed(50, principal, operator);
+
+    assertEquals(rows, response.get("items"));
+    assertEquals(true, response.get("readOnly"));
+    assertEquals("recommendation-ledger-v1", response.get("source"));
+    var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
+    assertThrows(ResponseStatusException.class, () -> controller.feed(50, principal, reader));
+  }
+
+  @Test
   void validatesPaginationAndLifecycleReasonBeforeCallingKeycloak() {
     assertThrows(ResponseStatusException.class, () -> controller.users("", -1, 25, principal, operator));
     assertThrows(ResponseStatusException.class, () -> controller.disable(

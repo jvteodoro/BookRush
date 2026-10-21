@@ -30,6 +30,9 @@ bookrush:
   security.jwk-set-uri: ${ANALYTICS_OIDC_JWK_SET_URI:}
   security.audience: ${ANALYTICS_OIDC_AUDIENCE:bookrush-analytics}
 analytics:
+  recommendation-snapshot:
+    embedding-model: ${ANALYTICS_RECOMMENDATION_EMBEDDING_MODEL:bge-m3-dense-v1}
+    embedding-model-version: ${ANALYTICS_RECOMMENDATION_EMBEDDING_MODEL_VERSION:}
   book-scores:
     strategy: ${ANALYTICS_BOOK_SCORES_STRATEGY:CURRENT}
     jit: ${ANALYTICS_BOOK_SCORES_JIT:DEFAULT}

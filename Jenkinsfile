@@ -9,6 +9,7 @@ pipeline {
     string(name: 'REGISTRY_CREDENTIAL_ID', defaultValue: 'docker-registry', description: 'Credential Jenkins de usuário/senha do registry.')
     booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Atualizar a aplicação no destino escolhido após o build.')
     booleanParam(name: 'ANALYTICS_GPU', defaultValue: false, description: 'Construir e implantar o runtime analytics com PyTorch CUDA e override NVIDIA. Requer host com NVIDIA Container Toolkit.')
+    choice(name: 'FEED_PERSONALIZED_MODE', choices: ['OFF', 'ON'], description: 'Ativar o fluxo novo de feed personalizado no Compose. OFF preserva o comportamento anterior.')
     string(name: 'KUBECONFIG_CREDENTIAL_ID', defaultValue: 'bookrush-kubeconfig', description: 'Credential Jenkins do tipo Secret file.')
     booleanParam(name: 'RUN_GUTENBERG_IMPORT', defaultValue: false, description: 'Executar explicitamente a importação Gutenberg depois dos testes. Desmarcado: nenhuma importação.')
     booleanParam(name: 'GUTENBERG_DRY_RUN', defaultValue: true, description: 'Executar a importação Gutenberg em modo dry-run (recomendado).')
@@ -246,7 +247,7 @@ pipeline {
     stage('Deploy Compose') {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
       steps {
-          withEnv(["ANALYTICS_GPU=${params.ANALYTICS_GPU}"]) {
+          withEnv(["ANALYTICS_GPU=${params.ANALYTICS_GPU}", "FEED_PERSONALIZED_MODE=${params.FEED_PERSONALIZED_MODE}"]) {
             sh 'bash infrastructure/jenkins/deploy-compose.sh'
           }
       }

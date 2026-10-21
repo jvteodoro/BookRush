@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
@@ -14,12 +15,16 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.time.OffsetDateTime;
+import java.util.Optional;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 @RestController
 @RequestMapping("/api")
@@ -29,13 +34,19 @@ public class AnalyticsController {
   private final ObjectMapper mapper;
   private final AnalyticsMetrics metrics;
   private final BookScoresQueryRepository bookScoresQuery;
+  private final RecommendationSnapshotQueryRepository recommendationSnapshotQuery;
+  private final ObjectProvider<S3Client> analyticsStorage;
 
   public AnalyticsController(JdbcTemplate jdbc, ObjectMapper mapper, AnalyticsMetrics metrics,
-      BookScoresQueryRepository bookScoresQuery) {
+      BookScoresQueryRepository bookScoresQuery,
+      RecommendationSnapshotQueryRepository recommendationSnapshotQuery,
+      ObjectProvider<S3Client> analyticsStorage) {
     this.jdbc = jdbc;
     this.mapper = mapper;
     this.metrics = metrics;
     this.bookScoresQuery = bookScoresQuery;
+    this.recommendationSnapshotQuery = recommendationSnapshotQuery;
+    this.analyticsStorage = analyticsStorage;
   }
 
   public record JobRequest(
@@ -44,6 +55,12 @@ public class AnalyticsController {
       Map<String, Object> configuration) {}
 
   public record BookScoresRequest(@NotEmpty List<UUID> bookIds) {}
+
+  public record RecommendationSnapshotRequest(
+      @NotEmpty @Size(max = 100) List<UUID> bookIds,
+      Integer offset,
+      Integer limit,
+      boolean includeEmbedding) {}
 
   @PostMapping("/internal/v1/behavior/events")
   @Transactional
@@ -623,6 +640,87 @@ SELECT e.id, e.source_asset_version_id, e.chapter_id, e.start_codepoint,
       return ResponseEntity.ok(Map.of("items", items, "requested", bookIds.size(), "returned", items.size()));
     } finally {
       metrics.stopBookScoresEndpoint(endpointSample);
+    }
+  }
+
+  @PostMapping("/internal/v1/content-analytics/recommendation-snapshot")
+  @Operation(
+      summary = "Retornar snapshot analítico versionado",
+      description = "Contrato interno S2S, limitado a 100 livros, que fixa a versão textual atual e associa score e metadados do embedding documental disponível.")
+  public ResponseEntity<Map<String, Object>> recommendationSnapshot(
+      @Valid @RequestBody RecommendationSnapshotRequest request) {
+    var bookIds = request.bookIds() == null ? List.<UUID>of() : request.bookIds().stream().distinct().toList();
+    if (bookIds.isEmpty() || bookIds.size() > 100) {
+      return ResponseEntity.badRequest().body(Map.of(
+          "code", "INVALID_BOOK_IDS",
+          "message", "bookIds must contain between 1 and 100 distinct UUIDs"));
+    }
+    int offset = Math.max(0, request.offset() == null ? 0 : request.offset());
+    int limit = Math.max(1, Math.min(100, request.limit() == null ? 100 : request.limit()));
+    var sample = metrics.startRecommendationSnapshot();
+    try {
+      var query = recommendationSnapshotQuery.find(bookIds, offset, limit);
+      var items = query.rows().stream().map(row -> {
+        var item = new LinkedHashMap<String, Object>();
+        item.put("bookId", row.get("book_id"));
+        item.put("sourceAssetVersionId", row.get("source_asset_version_id"));
+        item.put("score", row.get("score"));
+        item.put("rankerCode", row.get("ranker_code"));
+        item.put("rankerVersion", row.get("ranker_version"));
+        item.put("rankConfigurationHash", row.get("rank_configuration_hash"));
+        if (row.get("embedding_model") == null) {
+          item.put("embedding", null);
+        } else {
+          var embedding = new LinkedHashMap<String, Object>();
+          embedding.put("model", row.get("embedding_model"));
+          embedding.put("modelVersion", row.get("embedding_model_version"));
+          embedding.put("dimension", row.get("embedding_dimension"));
+          embedding.put("inputSha256", row.get("embedding_input_sha256"));
+          embedding.put("sourceAssetVersionId", row.get("source_asset_version_id"));
+          embedding.put("storageProvider", row.get("embedding_storage_provider"));
+          embedding.put("bucket", row.get("embedding_bucket"));
+          embedding.put("objectKey", row.get("embedding_object_key"));
+          if (request.includeEmbedding()) {
+            readEmbedding(row).ifPresent(vector -> embedding.put("vector", vector));
+          }
+          item.put("embedding", embedding);
+        }
+        return item;
+      }).toList();
+      metrics.recommendationSnapshotBatch(query.requested(), items.size());
+      return ResponseEntity.ok(Map.of(
+          "items", items,
+          "requested", query.requested(),
+          "returned", items.size(),
+          "offset", offset,
+          "limit", limit,
+          "embeddingModel", query.embeddingModel()));
+    } finally {
+      metrics.stopRecommendationSnapshot(sample);
+    }
+  }
+
+  private Optional<List<Double>> readEmbedding(Map<String, Object> row) {
+    S3Client client = analyticsStorage.getIfAvailable();
+    if (client == null || row.get("embedding_bucket") == null || row.get("embedding_object_key") == null) {
+      return Optional.empty();
+    }
+    try {
+      var bytes = client.getObjectAsBytes(GetObjectRequest.builder()
+          .bucket(String.valueOf(row.get("embedding_bucket")))
+          .key(String.valueOf(row.get("embedding_object_key"))).build()).asByteArray();
+      var document = mapper.readTree(bytes);
+      var node = document.isArray() ? document : document.path("vector");
+      if (!node.isArray()) return Optional.empty();
+      var vector = new java.util.ArrayList<Double>(node.size());
+      for (var value : node) {
+        if (!value.isNumber() || !Double.isFinite(value.doubleValue())) return Optional.empty();
+        vector.add(value.doubleValue());
+      }
+      return vector.isEmpty() ? Optional.empty() : Optional.of(List.copyOf(vector));
+    } catch (RuntimeException | java.io.IOException exception) {
+      metrics.embeddingUnavailable();
+      return Optional.empty();
     }
   }
 

@@ -312,6 +312,12 @@ constrói/publica todas elas antes de executar o script de deploy. Essa matriz
 também é refletida em `infrastructure/compose.yaml`, evitando que uma imagem
 obrigatória fique apenas com o fallback `:local`.
 
+Quando `FEED_PERSONALIZED_MODE=ON`, `deploy-compose.sh` resolve o segredo
+vigente de `bookrush-recommendation-behavior-s2s` no realm
+`bookrush-platform` e o injeta somente na interpolação protegida do Compose.
+Se o segredo não puder ser resolvido, o deploy falha antes de subir uma
+revisão que cairia silenciosamente no fallback global.
+
 Os jobs de social, publisher, behavior e admin devem executar `mvn verify` e
 construir as imagens correspondentes depois de uma alteração. O admin-web usa
 `VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for

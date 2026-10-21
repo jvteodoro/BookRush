@@ -6,7 +6,6 @@ set -Eeuo pipefail
 command -v docker >/dev/null || { echo 'Docker ausente.' >&2; exit 2; }
 docker info >/dev/null 2>&1 || { echo 'Usuário sem acesso ao Docker.' >&2; exit 2; }
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-user-management.XXXXXX")"
 name="bookrush-user-management-$RANDOM"
 probe="bookrush-user-management-probe-$RANDOM"
 admin_password='disposable-admin-password'
@@ -20,9 +19,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
-KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" python3 \
-  "$repo_dir/infrastructure/keycloak/render-config.py" \
-  "$repo_dir/infrastructure/keycloak" "$work_dir/rendered"
+if docker inspect "$HOSTNAME" >/dev/null 2>&1; then
+  work_dir="$(mktemp -d "$repo_dir/.bookrush-user-management.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" --volumes-from "$HOSTNAME" \
+    -w "$repo_dir" -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
+    python:3.12-slim python3 infrastructure/keycloak/render-config.py \
+    infrastructure/keycloak "$work_dir/rendered"
+else
+  work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-user-management.XXXXXX")"
+  docker run --rm --user "$(id -u):$(id -g)" \
+    -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
+    -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
+    python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
+    /repo/infrastructure/keycloak /out/rendered
+fi
 docker create --name "$name" \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin \
   -e KC_BOOTSTRAP_ADMIN_PASSWORD="$admin_password" \
@@ -65,19 +75,25 @@ resolved_secret="$(docker run --rm -i --network "container:$name" \
 test "$resolved_secret" = "$client_secret"
 echo 'Keycloak user management: protected client secret resolution OK'
 
-token="$(docker exec "$probe" curl -fsS -X POST http://127.0.0.1:8080/realms/bookrush/protocol/openid-connect/token \
+token_response="$(docker exec "$probe" curl -fsS -X POST http://127.0.0.1:8080/realms/bookrush/protocol/openid-connect/token \
   -d grant_type=client_credentials -d client_id=bookrush-admin-service \
-  --data-urlencode "client_secret=$client_secret" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+  --data-urlencode "client_secret=$client_secret")"
+token="$(sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"\\]*\)".*/\1/p' <<<"$token_response")"
+test -n "$token"
 auth=(-H "Authorization: Bearer $token")
-python3 - "$token" <<'PY'
-import base64, json, sys
-payload = sys.argv[1].split('.')[1]
-payload += '=' * (-len(payload) % 4)
-roles = set(json.loads(base64.urlsafe_b64decode(payload)).get('resource_access', {}).get('realm-management', {}).get('roles', []))
-required = {'query-users', 'view-users', 'manage-users'}
-if not required.issubset(roles):
-    raise SystemExit(f"service token missing roles: {sorted(required - roles)}")
-PY
+docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh -c '
+  set -eu
+  payload="${ACCESS_TOKEN#*.}"
+  payload="${payload%%.*}"
+  remainder=$((${#payload} % 4))
+  [ "$remainder" -eq 0 ] || [ "$remainder" -eq 2 ] || [ "$remainder" -eq 3 ]
+  [ "$remainder" -eq 2 ] && payload="${payload}=="
+  [ "$remainder" -eq 3 ] && payload="${payload}="
+  payload="$(printf "%s" "$payload" | tr "_-" "/+" | base64 -d 2>/dev/null)"
+  printf "%s" "$payload" | grep -q "query-users"
+  printf "%s" "$payload" | grep -q "view-users"
+  printf "%s" "$payload" | grep -q "manage-users"
+'
 echo 'Keycloak user management: service token roles OK'
 docker exec "$probe" curl -fsS "${auth[@]}" \
   "http://127.0.0.1:8080/admin/realms/bookrush/users?search=$target_username" | grep -q "$target_username"

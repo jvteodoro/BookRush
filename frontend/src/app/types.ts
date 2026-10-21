@@ -66,6 +66,7 @@ export type PageLoopBook = {
   progress: number;
   thumbnailUrl?: string | null;
   recommendationRequestId?: string;
+  recommendationItemId?: string;
   impressionId?: string;
   modelVersion?: string;
   rank?: number;
@@ -75,6 +76,7 @@ export type RecommendationItem = {
   book?: CatalogBook;
   impressionId?: string;
   recommendationRequestId?: string;
+  recommendationItemId?: string;
   modelVersion?: string;
   rank?: number;
   excerpt?: FeedExcerpt | null;

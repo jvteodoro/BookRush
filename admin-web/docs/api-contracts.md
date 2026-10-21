@@ -36,11 +36,16 @@ Os adapters não expõem URLs permanentes de object storage.
 
 ## Feed Lab
 
-As rotas `/feed/admin/training-sessions`, `/feed/admin/feed`,
-`/feed/admin/events` e `/feed/admin/training-sessions/{id}/parameters` são
-contratos administrativos do serviço de feed. O usuário é obtido do JWT; o
-browser nunca envia um `userId` confiável. Eventos carregam `eventId` para
-deduplicação e parâmetros são imutáveis por versão.
+O Feed Lab de produção consulta `GET /api/v1/admin/feed?limit=50` no
+`admin-service`. A rota exige o realm `bookrush-platform` e um grupo de
+operadores, lê o ledger `recommendation.*` e retorna somente metadados
+privacy-safe da decisão: modelo/ranking, candidate-set hash, item/impression,
+score e excerpt associado. A rota é explicitamente somente leitura; navegar ou
+alterar pesos no painel não grava eventos comportamentais nem labels humanos.
+
+O endpoint usa o mesmo gateway `/api/v1/admin` das demais operações do admin.
+Não existe mais uma dependência implícita de `/feed`, que anteriormente caía
+no `index.html` do frontend e mascarava a ausência do serviço.
 
 Quando um serviço ainda não estiver implantado, o portal pode operar em
 `VITE_USE_MOCKS=true`; o modo de produção falha com uma mensagem sanitizada e

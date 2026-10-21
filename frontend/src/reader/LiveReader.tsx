@@ -24,6 +24,7 @@ type SourceBook = {
   thumbnailUrl?: string | null;
   excerpt?: FeedExcerpt | null;
   impressionId?: string;
+  recommendationItemId?: string;
 };
 type SocialCounts = { likes: number; comments: number; liked: boolean };
 type Runtime = {
@@ -44,7 +45,12 @@ type Runtime = {
     like: (id: string, enabled: boolean) => Promise<void>;
     refreshCounts: (id: string) => Promise<SocialCounts>;
     viewable: (id: string) => Promise<void>;
-    trackExcerpt: (type: string, id: string, excerpt: unknown) => void;
+    trackExcerpt: (
+      type: string,
+      id: string,
+      excerpt: unknown,
+      payload?: Record<string, unknown>,
+    ) => void;
   };
   __BOOKRUSH_LEGACY__: {
     navigate: (route: string, query?: string) => void;

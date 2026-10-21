@@ -33,11 +33,25 @@ components:
   schemas:
     FeedResponse:
       type: object
-      required: [requestId, modelVersion, items]
+      required: [requestId, modelVersion, items, personalization]
       properties:
         requestId: {type: string, format: uuid}
         modelVersion: {type: string}
         rankingVersion: {type: string}
+        candidateSetHash: {type: string, pattern: '^[0-9a-f]{64}$'}
+        personalization:
+          type: object
+          description: Privacy-safe decision provenance; no subject, text or embedding is returned.
+          required: [path, reason, profileVersion, profileCoverage, profileConfidence]
+          properties:
+            path: {type: string, enum: [FALLBACK, SHADOW, PERSONALIZED]}
+            reason: {type: string}
+            profileVersion: {type: string}
+            profileCoverage: {type: number, minimum: 0, maximum: 1}
+            profileConfidence: {type: number, minimum: 0, maximum: 1}
+            rankerConfigHash: {type: string}
+            mmrConfigHash: {type: string}
+            explorationPolicy: {type: string}
         strategy:
           type: string
           enum: [COLD_START, DIVERSE, LUCKY]
@@ -49,12 +63,14 @@ components:
             properties:
               book: {type: object}
               recommendationRequestId: {type: string, format: uuid}
+              recommendationItemId: {type: string, format: uuid}
               impressionId: {type: string, format: uuid}
               modelVersion: {type: string}
               rank: {type: integer}
+              score: {type: number, nullable: true}
               reason:
                 type: string
-                enum: [popular-cold-start, diversity-heuristic, lucky-exploration, analytics-score]
+                enum: [popular-cold-start, diversity-heuristic, lucky-exploration, analytics-score, personalized-score, personalized-exploration]
               excerpt:
                 $ref: '#/components/schemas/FeedExcerpt'
     FeedExcerpt:

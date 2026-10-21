@@ -2,6 +2,7 @@ package com.bookrush.adminservice.api;
 
 import java.security.Principal;
 import java.util.Map;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import com.bookrush.adminservice.KeycloakAdminClient;
@@ -237,6 +238,38 @@ public class AdminController {
         "comments", count("SELECT count(*) FROM social.comments"),
         "moderationActions", count("SELECT count(*) FROM admin.moderation"),
         "auditEntries", count("SELECT count(*) FROM admin.audit_log"));
+  }
+
+  /**
+   * Read-only recommendation ledger view for the administrative Feed Lab.
+   * The admin service owns the platform-realm authorization; recommendation
+   * decisions remain owned by the recommendation schema and are never mutated
+   * by this endpoint.
+   */
+  @GetMapping("/feed")
+  public Map<String, Object> feed(@RequestParam(defaultValue = "50") int limit,
+      Principal principal, Authentication authentication) {
+    requireOperator(authentication);
+    actor(principal);
+    int boundedLimit = Math.max(1, Math.min(limit, 100));
+    List<Map<String, Object>> items = jdbc.queryForList(
+        "SELECT i.excerpt_id, i.book_id, b.canonical_title AS book_title, "
+            + "COALESCE((SELECT string_agg(a.name, ', ' ORDER BY ba.position) "
+            + "FROM catalog.book_author ba JOIN catalog.author a ON a.id=ba.author_id "
+            + "WHERE ba.book_id=i.book_id AND ba.role='AUTHOR'), '') AS author, "
+            + "COALESCE(e.text, '') AS text, i.score AS rank_score, "
+            + "r.model_version, r.model_version AS ranking_version, r.candidate_set_hash, "
+            + "i.id AS recommendation_item_id, imp.id AS impression_id, "
+            + "i.reason AS features, r.context->>'personalizationPath' AS personalization_path, "
+            + "r.context->>'personalizationReason' AS personalization_reason, "
+            + "r.context->>'personalizationProfileConfigHash' AS profile_version "
+            + "FROM recommendation.item i "
+            + "JOIN recommendation.request r ON r.id=i.request_id "
+            + "JOIN catalog.book b ON b.id=i.book_id "
+            + "LEFT JOIN analytics.excerpt e ON e.id=i.excerpt_id "
+            + "LEFT JOIN recommendation.impression imp ON imp.item_id=i.id "
+            + "ORDER BY r.created_at DESC, i.rank ASC LIMIT ?", boundedLimit);
+    return Map.of("items", items, "source", "recommendation-ledger-v1", "readOnly", true);
   }
 
   private long count(String sql) {

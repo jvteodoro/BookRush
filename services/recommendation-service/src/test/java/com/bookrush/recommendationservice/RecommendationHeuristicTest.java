@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
+import java.time.Duration;
+import com.bookrush.recommendationservice.fatigue.ExposureFatigue;
 import com.bookrush.recommendationservice.ranking.AnalyticsScoreClient.BookScore;
 import org.junit.jupiter.api.Test;
 
@@ -57,5 +60,17 @@ class RecommendationHeuristicTest {
             "b", new BookScore(0.9, "EXCERPT_HEURISTIC_RANKER_V1")));
     assertEquals("b", ((Map<?, ?>) ranked.get(0)).get("id"));
     assertEquals("a", ((Map<?, ?>) ranked.get(1)).get("id"));
+  }
+
+  @Test
+  void recentViewableExposureLowersEffectiveAnalyticsScore() {
+    var books = List.of(book("a", "en"), book("b", "pt"));
+    var now = Instant.parse("2026-10-20T00:00:00Z");
+    var ranked = RecommendationHeuristic.rank(books, "reader-1", 2,
+        RecommendationHeuristic.Strategy.DIVERSE,
+        Map.of("a", new BookScore(.9, "v1"), "b", new BookScore(.8, "v1")),
+        Map.of("a", new ExposureFatigue.Signal(2, now)), now,
+        new ExposureFatigue(new ExposureFatigue.Config("v1", Duration.ofDays(1), .2, .8)));
+    assertEquals("b", ((Map<?, ?>) ranked.get(0)).get("id"));
   }
 }
