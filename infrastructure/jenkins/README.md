@@ -304,6 +304,15 @@ O override `deploy-images.compose.yaml` fixa as onze imagens da revisão, inclus
 catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
 Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
 
+O override também repassa as quatro variáveis `KEYCLOAK_ADMIN_*` ao
+`admin-service`. Exportá-las no agente não basta quando `/opt/bookrush/compose.yaml`
+ainda não declara essas variáveis. O segredo vigente continua sendo resolvido
+pelo script de deploy após o reconcile e conferido no container, sem exposição
+nos logs. Não substitua essa verificação apenas pelo healthcheck.
+`bash scripts/test-deploy-compose-config.sh` testa o merge real do Compose atual
+e de um host antigo, usando somente credenciais fictícias; faz parte da etapa
+de contratos do Jenkinsfile atualizado e não inicia a aplicação.
+
 ## Proxy e visualização de estágios
 
 A imagem inclui `pipeline-stage-view` (tabela de estágios no job) e
