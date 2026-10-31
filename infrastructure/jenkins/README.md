@@ -274,6 +274,52 @@ from SCM**, repositório `https://github.com/jvteodoro/BookRush.git`, branch
 `*/main`, Script Path `Jenkinsfile`. Essa branch fornece a definição da pipeline;
 **BRANCH** seleciona o código que será compilado e implantado.
 
+Se a definição carregada pela `main` (ou um script inline antigo) ainda não
+exportar `RECOMMENDATION_IMAGE`, `READER_BFF_IMAGE`, `READER_PROFILE_IMAGE` ou
+`SOCIAL_IMAGE`, o deploy deriva as imagens ausentes do registry, namespace e tag
+de `BACKEND_IMAGE`. As imagens derivadas que não existirem no daemon são
+construídas com os Dockerfiles do checkout selecionado antes de alterar os
+containers. Imagens explicitamente fornecidas pela pipeline são preservadas.
+Esse mecanismo exige o formato `<prefixo>/bookrush/catalog-service:<tag>`;
+nomes personalizados exigem informar as imagens explicitamente. A solução
+preferencial continua sendo carregar a definição atual da pipeline da branch
+desejada no SCM. Não é necessário apagar jobs ou volumes.
+
+Valide essa compatibilidade sem Docker ou credenciais com
+`python3 scripts/test-deploy-compose-images.py` (também executado por
+`bash scripts/validate-pipelines.sh`). O teste cobre variáveis ausentes,
+registry com porta, imagens explícitas, cache, formato inválido e falha de build.
+Quando o agente não possui Python 3, `validate-pipelines.sh` executa esse mesmo
+teste em `python:3.12-slim` pelo Docker. Somente os dois arquivos necessários
+são enviados por stdin, sem montar o workspace ou acessar credenciais. O
+container usa `--rm` e rede desativada; não é preciso instalar Python no Jenkins.
+
+O mesmo preparo cobre `ANALYTICS_RUNTIME_IMAGE` ausente: deriva o nome de
+`ANALYTICS_IMAGE` e constrói o runtime do checkout quando necessário, usando
+`requirements.cuda.txt` se `ANALYTICS_GPU=true`. Apenas derivar o nome não
+garante que a imagem exista. Antes de iniciar ou alterar containers, o deploy
+confere as onze imagens no daemon e valida o Compose; imagem explícita ausente
+interrompe o processo com o nome da variável, sem iniciar recriação ou rollback.
+O override `deploy-images.compose.yaml` fixa as onze imagens da revisão, inclusive
+catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
+Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
+
+O override também repassa as quatro variáveis `KEYCLOAK_ADMIN_*` ao
+`admin-service`. Exportá-las no agente não basta quando `/opt/bookrush/compose.yaml`
+ainda não declara essas variáveis. O segredo vigente continua sendo resolvido
+pelo script de deploy após o reconcile e conferido no container, sem exposição
+nos logs. Não substitua essa verificação apenas pelo healthcheck.
+`bash scripts/test-deploy-compose-config.sh` testa o merge real do Compose atual
+e de um host antigo, usando somente credenciais fictícias; faz parte da etapa
+de contratos do Jenkinsfile atualizado e não inicia a aplicação.
+
+O smoke de usuários solicita o token `client_credentials` do cliente
+`bookrush-ingestion-admin` no realm `bookrush-platform` dentro de
+`python:3.12-slim`, sem exigir `jq` ou Python no agente. Erros mostram somente
+o status HTTP ou a categoria de falha; segredo, token e corpo da resposta não
+são registrados. Um HTTP 400/401 deve ser investigado no cliente/segredo/service
+account; uma falha de conexão indica rede/DNS/disponibilidade do Keycloak.
+
 ## Proxy e visualização de estágios
 
 A imagem inclui `pipeline-stage-view` (tabela de estágios no job) e

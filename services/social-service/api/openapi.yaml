@@ -1,0 +1,83 @@
+openapi: 3.0.3
+info:
+  title: BookRush Social API
+  version: 0.2.0
+  description: Reader comments, author removal and privacy-aware follower counts.
+security: [{ bearerAuth: [] }]
+paths:
+  /api/v1/social/followers:
+    get:
+      summary: Read incoming follower count subject to profile and social graph privacy
+      parameters:
+        - { name: user, in: query, description: Omit to read the authenticated reader's own count, schema: { type: string, maxLength: 200 } }
+      responses:
+        '200':
+          description: Authoritative count or visible false with no count for a private social graph
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, following, visible]
+                properties:
+                  user: { type: string }
+                  following: { type: boolean }
+                  visible: { type: boolean }
+                  followerCount: { type: integer, format: int64, minimum: 0, nullable: true }
+        '400': { description: Invalid subject }
+        '401': { description: Authentication required }
+        '404': { description: Other reader profile not found }
+  /api/v1/social/books/{bookId}/comments:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: List visible comments that have not been removed by their author
+      responses:
+        '200':
+          description: Comments with server-derived ownership capability
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Comment' }
+        '401': { description: 'Invalid, expired or absent product-realm token' }
+    post:
+      summary: Publish a comment as the authenticated reader
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '200': { description: Published comment ID and canDelete true }
+        '400': { description: Invalid comment body }
+        '401': { description: Authentication required }
+  /api/v1/social/comments/{commentId}:
+    delete:
+      summary: Remove a comment owned by the authenticated reader
+      description: Idempotent logical deletion. The token subject must match the stored author; clients cannot supply an owner. Preserves moderation and reports and cannot be undone by admin restore.
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Removed or already removed by this author; no response body }
+        '400': { description: Invalid comment UUID }
+        '401': { description: Authentication required }
+        '403': { description: Comment belongs to another reader }
+        '404': { description: Comment does not exist }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    Comment:
+      type: object
+      required: [id, subject_key, body, authorName, canDelete, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        subject_key: { type: string }
+        body: { type: string }
+        authorName: { type: string }
+        canDelete: { type: boolean, description: True only when the token subject is the comment author }
+        created_at: { type: string, format: date-time }
