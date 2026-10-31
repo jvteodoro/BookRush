@@ -245,10 +245,12 @@ probe_user_management() {
     return 1
   fi
   for attempt in {1..6}; do
-    probe_token="$(docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 -fsS -X POST \
-      http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
-      -d grant_type=client_credentials -d client_id=bookrush-ingestion-admin \
-      --data-urlencode "client_secret=$probe_secret" 2>/dev/null | jq -er '.access_token' 2>/dev/null)" && break
+    probe_token="$(docker run --rm -i --network bookrush_bookrush \
+      -e KEYCLOAK_URL=http://keycloak:8080 \
+      -e KEYCLOAK_REALM=bookrush-platform \
+      -e KEYCLOAK_CLIENT_ID=bookrush-ingestion-admin \
+      -e KEYCLOAK_CLIENT_SECRET="$probe_secret" \
+      python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/request-client-token.py")" && break
     echo "Smoke de usuários: token técnico ainda indisponível (tentativa $attempt/6)." >&2
     sleep 5
   done

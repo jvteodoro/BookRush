@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Exercise deploy image preparation without Docker, credentials or a deployment."""
 import os
+import contextlib
+import io
+import runpy
+import urllib.error
+import urllib.parse
+from unittest.mock import patch
 from pathlib import Path
 import subprocess
 import tempfile
@@ -128,6 +134,58 @@ exit 99
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(calls.count('build -t'), 1)
 
+
+
+class ClientTokenTest(unittest.TestCase):
+    def request(self, response=None, error=None):
+        output, errors = io.StringIO(), io.StringIO()
+        env = {'KEYCLOAK_URL': 'http://keycloak:8080',
+               'KEYCLOAK_REALM': 'bookrush-platform',
+               'KEYCLOAK_CLIENT_ID': 'bookrush-ingestion-admin',
+               'KEYCLOAK_CLIENT_SECRET': 'fixture+secret&=value'}
+        with patch.dict(os.environ, env), patch('urllib.request.urlopen') as urlopen:
+            if error:
+                urlopen.side_effect = error
+            else:
+                urlopen.return_value.__enter__.return_value = io.BytesIO(response)
+            with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+                with self.assertRaises(SystemExit) as stopped:
+                    runpy.run_path(str(ROOT / 'infrastructure/keycloak/request-client-token.py'), run_name='__main__')
+            request = urlopen.call_args.args[0]
+        self.assertNotIn(env['KEYCLOAK_CLIENT_SECRET'], errors.getvalue())
+        self.assertNotIn('fixture-token', errors.getvalue())
+        return stopped.exception.code, output.getvalue(), errors.getvalue(), request
+
+    def test_token_request_and_form_encoding(self):
+        code, output, errors, request = self.request(b'{"access_token":"fixture-token"}')
+        self.assertEqual(code, 0)
+        self.assertEqual(output, 'fixture-token\n')
+        self.assertEqual(errors, '')
+        self.assertEqual(request.full_url, 'http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token')
+        self.assertEqual(urllib.parse.parse_qs(request.data.decode()), {
+            'grant_type': ['client_credentials'], 'client_id': ['bookrush-ingestion-admin'],
+            'client_secret': ['fixture+secret&=value']})
+
+    def test_http_rejection_is_reported_without_body(self):
+        error = urllib.error.HTTPError('http://keycloak/token', 401, 'fixture-token', {}, io.BytesIO(b'fixture+secret&=value'))
+        code, output, errors, _ = self.request(error=error)
+        self.assertEqual(code, 1)
+        self.assertEqual(output, '')
+        self.assertIn('HTTP 401', errors)
+
+    def test_connection_failure_is_reported(self):
+        code, output, errors, _ = self.request(error=urllib.error.URLError('fixture-token'))
+        self.assertEqual(code, 1)
+        self.assertEqual(output, '')
+        self.assertIn('falha de conexão', errors)
+
+    def test_invalid_payloads_fail_without_token(self):
+        for payload in (b'not-json', b'{}', b'[]', b'{"access_token":123}', b'{"access_token":""}'):
+            with self.subTest(payload=payload):
+                code, output, errors, _ = self.request(payload)
+                self.assertEqual(code, 1)
+                self.assertEqual(output, '')
+                self.assertTrue(errors)
 
 if __name__ == '__main__':
     unittest.main()

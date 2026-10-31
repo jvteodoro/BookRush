@@ -14,7 +14,7 @@ elif command -v docker >/dev/null 2>&1; then
   # O agente Jenkins tem Docker, mas não necessariamente Python. Envie apenas
   # os arquivos do teste por stdin: funciona também com daemon fora do agente,
   # sem depender de bind mounts ou instalar pacotes no host.
-  tar -cf - scripts/test-deploy-compose-images.py infrastructure/jenkins/deploy-compose.sh |
+  tar -cf - scripts/test-deploy-compose-images.py infrastructure/jenkins/deploy-compose.sh infrastructure/keycloak/request-client-token.py |
     docker run --rm -i --network none python:3.12-slim bash -lc '
       set -euo pipefail
       workspace=$(mktemp -d)

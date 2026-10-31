@@ -313,6 +313,13 @@ nos logs. Não substitua essa verificação apenas pelo healthcheck.
 e de um host antigo, usando somente credenciais fictícias; faz parte da etapa
 de contratos do Jenkinsfile atualizado e não inicia a aplicação.
 
+O smoke de usuários solicita o token `client_credentials` do cliente
+`bookrush-ingestion-admin` no realm `bookrush-platform` dentro de
+`python:3.12-slim`, sem exigir `jq` ou Python no agente. Erros mostram somente
+o status HTTP ou a categoria de falha; segredo, token e corpo da resposta não
+são registrados. Um HTTP 400/401 deve ser investigado no cliente/segredo/service
+account; uma falha de conexão indica rede/DNS/disponibilidade do Keycloak.
+
 ## Proxy e visualização de estágios
 
 A imagem inclui `pipeline-stage-view` (tabela de estágios no job) e
