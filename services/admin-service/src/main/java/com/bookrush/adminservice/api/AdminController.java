@@ -127,12 +127,14 @@ public class AdminController {
     return Map.of("reportId", reportId, "status", change.status(), "updated", true);
   }
 
+  private static final String COMMENT_VISIBILITY = "CASE WHEN c.author_deleted_at IS NOT NULL "
+      + "THEN 'REMOVED' ELSE COALESCE(m.visibility, 'VISIBLE') END";
   private static final String COMMENT_FROM = " FROM social.comments c "
       + "LEFT JOIN social.comment_moderation_state m ON m.comment_id=c.id "
       + "LEFT JOIN reader_profile.profile p ON p.subject_key=c.subject_key ";
   private static final String COMMENT_SELECT = "SELECT c.id, c.book_id, c.subject_key, c.body, c.created_at, "
       + "COALESCE(NULLIF(c.author_display_name, ''), NULLIF(p.display_name, ''), c.subject_key) AS author_name, "
-      + "COALESCE(m.visibility, 'VISIBLE') AS visibility, m.reason_code, m.updated_by_subject, m.updated_at ";
+      + COMMENT_VISIBILITY + " AS visibility, c.author_deleted_at, m.reason_code, m.updated_by_subject, m.updated_at ";
 
   @GetMapping("/moderation/comments")
   public Object comments(Principal principal, Authentication authentication) {
@@ -156,7 +158,7 @@ public class AdminController {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid comment filters or pagination");
     }
     // Literal substring matching: user-supplied % and _ are not SQL wildcards.
-    String filter = "WHERE (? = '' OR COALESCE(m.visibility, 'VISIBLE') = ?) "
+    String filter = "WHERE (? = '' OR " + COMMENT_VISIBILITY + " = ?) "
         + "AND (? = '' OR strpos(lower(c.body || ' ' || c.id::text || ' ' || c.subject_key || ' ' || c.book_id::text || ' ' || "
         + "COALESCE(c.author_display_name, '') || ' ' || COALESCE(p.display_name, '')), lower(?)) > 0) ";
     String query = search.trim();
@@ -204,8 +206,11 @@ public class AdminController {
     UUID id = change.commentId();
     String operator = actor(principal);
     // Serialize decisions even for legacy comments without a moderation row.
-    var rows = jdbc.queryForList("SELECT id FROM social.comments WHERE id=? FOR UPDATE", id);
+    var rows = jdbc.queryForList("SELECT id, author_deleted_at FROM social.comments WHERE id=? FOR UPDATE", id);
     if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "comment not found");
+    if (rows.get(0).get("author_deleted_at") != null && "VISIBLE".equals(change.visibility())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "comment was removed by its author");
+    }
     String previous = jdbc.queryForObject("SELECT COALESCE((SELECT visibility FROM "
         + "social.comment_moderation_state WHERE comment_id=?), 'VISIBLE')", String.class, id);
     if (previous.equals(change.visibility())) {

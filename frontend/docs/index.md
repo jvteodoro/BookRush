@@ -320,3 +320,13 @@ run:android` ou EAS. Os tokens também ficam somente na memória.
 ## Limitações intencionais
 
 Feed social, comentários, progresso de leitura e recomendações dependem de APIs de produto que ainda não existem. A interface mostra o catálogo canônico sem inventar métricas editoriais ou dados sociais.
+
+## Remover comentários próprios
+
+Na conversa do livro, o autor vê Remover nos próprios comentários. Após a
+confirmação, a interface usa o cliente autenticado para enviar DELETE ao
+social-service e atualiza a conversa e a contagem. Cancelar não envia nada;
+falhas preservam o comentário e exibem a mensagem correspondente. A propriedade
+`canDelete` vem do servidor; a autorização real compara o subject do token com o
+autor persistido. A remoção é definitiva para a leitura pública; moderação e
+referências de denúncias ficam preservadas.

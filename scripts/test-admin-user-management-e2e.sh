@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+trap 'printf "E2E failure at line %s\n" "$LINENO" >&2' ERR
 
 # End-to-end proof of platform token -> admin-service -> product-realm users.
 # All containers, credentials and data are disposable.
@@ -10,6 +11,7 @@ keycloak="bookrush-admin-e2e-keycloak-$suffix"
 postgres="bookrush-admin-e2e-postgres-$suffix"
 service="bookrush-admin-e2e-service-$suffix"
 social_service="bookrush-admin-e2e-social-$suffix"
+product_social="bookrush-comment-author-e2e-$suffix"
 web="bookrush-admin-e2e-web-$suffix"
 probe="bookrush-admin-e2e-probe-$suffix"
 admin_password='disposable-admin-password'
@@ -22,7 +24,7 @@ social_image="bookrush/social-service-e2e:$suffix"
 web_image="bookrush/admin-web-e2e:$suffix"
 cleanup() {
   local rc=$?
-  docker rm -f "$probe" "$web" "$service" "$social_service" "$keycloak" "$postgres" >/dev/null 2>&1 || true
+  docker rm -fv "$probe" "$web" "$service" "$social_service" "$product_social" "$keycloak" "$postgres" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
   # Remove only this invocation's unique image tags; retain shared build cache.
   docker image rm "$image" "$social_image" "$web_image" >/dev/null 2>&1 || true
@@ -122,6 +124,21 @@ for _ in $(seq 1 60); do
   docker exec "$postgres" pg_isready -U bookrush -d bookrush >/dev/null 2>&1 && break
   sleep 1
 done
+# Real PostgreSQL upgrade from V7, with retained comment and moderation evidence.
+docker exec "$postgres" createdb -U bookrush comments_upgrade
+for migration in "$repo_dir"/services/social-service/src/main/resources/db/migration/V[1-7]__*.sql; do
+  docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d comments_upgrade < "$migration" >/dev/null
+done
+docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d comments_upgrade >/dev/null <<'SQL'
+INSERT INTO social.comments(id, subject_key, book_id, body)
+VALUES ('88888888-8888-4888-8888-888888888888', 'upgrade-reader', '33333333-3333-4333-8333-333333333333', 'migration fixture');
+INSERT INTO social.comment_moderation_state(comment_id, visibility, reason_code)
+VALUES ('88888888-8888-4888-8888-888888888888', 'HIDDEN', 'upgrade evidence');
+SQL
+docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d comments_upgrade \
+  < "$repo_dir/services/social-service/src/main/resources/db/migration/V8__comment_author_deletion.sql" >/dev/null
+docker exec "$postgres" psql -At -U bookrush -d comments_upgrade \
+  -c "SELECT c.author_deleted_at IS NULL AND c.body='migration fixture' AND m.visibility='HIDDEN' FROM social.comments c JOIN social.comment_moderation_state m ON m.comment_id=c.id" | grep -qx t
 docker run -d --name "$social_service" --network "$network" \
   -e DB_HOST=postgres -e DB_NAME=bookrush -e DB_USERNAME=bookrush -e DB_PASSWORD=bookrush \
   -e BOOKRUSH_SECURITY_ENABLED=true \
@@ -343,5 +360,106 @@ done
 docker exec "$postgres" psql -At -U bookrush -d bookrush \
   -c "SELECT count(*) FROM admin.audit_log WHERE action='REPORT_STATUS_CHANGED' AND target='$report_id'" \
   | grep -qx '4'
+
+# Product-realm owner removal uses the same issuer/audience contract as Compose.
+docker run -d --name "$product_social" --network "$network" \
+  -e DB_HOST=postgres -e DB_NAME=bookrush -e DB_USERNAME=bookrush -e DB_PASSWORD=bookrush \
+  -e BOOKRUSH_SECURITY_ENABLED=true \
+  -e BOOKRUSH_SECURITY_ISSUER=http://keycloak:8080/realms/bookrush \
+  -e BOOKRUSH_SECURITY_JWK_SET_URI=http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs \
+  -e BOOKRUSH_SECURITY_AUDIENCE=account "$social_image" >/dev/null
+for _ in $(seq 1 90); do
+  docker exec "$probe" curl -fsS "http://$product_social:8096/actuator/health" >/dev/null 2>&1 && break
+  sleep 1
+done
+docker exec "$probe" curl -fsS "http://$product_social:8096/actuator/health" >/dev/null
+product_client_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients \
+  -r bookrush -q clientId=bookrush-web --fields id --format csv --noquotes)"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh update "clients/$product_client_id" \
+  -r bookrush -s directAccessGrantsEnabled=true >/dev/null
+for reader_name in comment-owner comment-other; do
+  docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh create users -r bookrush \
+    -s username="$reader_name" -s firstName=Comment -s lastName=Reader \
+    -s email="$reader_name@bookrush.test" -s enabled=true -s emailVerified=true -s 'requiredActions=[]' >/dev/null
+  reader_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get users -r bookrush \
+    -q username="$reader_name" --fields id --format csv --noquotes)"
+  docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh set-password -r bookrush \
+    --userid "$reader_id" --new-password "$human_password" >/dev/null
+  reader_token="$(docker exec "$probe" curl -fsS -X POST \
+    http://keycloak:8080/realms/bookrush/protocol/openid-connect/token \
+    -d grant_type=password -d client_id=bookrush-web --data-urlencode "username=$reader_name" \
+    --data-urlencode "password=$human_password" | jq -er '.access_token')"
+  token_payload="${reader_token#*.}"
+  token_payload="${token_payload%%.*}"
+  case $((${#token_payload} % 4)) in 2) token_payload="${token_payload}==" ;; 3) token_payload="${token_payload}=" ;; esac
+  printf '%s' "$token_payload" | tr '_-' '/+' | base64 -d \
+    | jq -e '(.aud | if type == "array" then index("account") != null else . == "account" end) and .azp == "bookrush-web" and (.sub | type == "string" and length > 0)' >/dev/null
+  if [[ "$reader_name" == comment-owner ]]; then owner_token="$reader_token"; else other_token="$reader_token"; fi
+done
+product_base="http://$product_social:8096/api/v1/social"
+comments_url="$product_base/books/33333333-3333-4333-8333-333333333333/comments"
+echo 'Comment removal E2E: publishing with product token'
+owner_comment_id="$(docker exec "$probe" curl -fsS -X POST -H "Authorization: Bearer $owner_token" \
+  -H 'Content-Type: application/json' --data '{"body":"owner removal fixture"}' "$comments_url" | jq -er '.id')"
+for reader_kind in owner other; do
+  expected=false
+  read_token="$other_token"
+  if [[ "$reader_kind" == owner ]]; then expected=true; read_token="$owner_token"; fi
+  docker exec "$probe" curl -fsS -H "Authorization: Bearer $read_token" "$comments_url" \
+    | jq -e --arg id "$owner_comment_id" --argjson expected "$expected" \
+      '.[] | select(.id == $id) | .canDelete == $expected' >/dev/null
+done
+echo 'Comment removal E2E: product publication and ownership flags OK'
+delete_url="$product_base/comments/$owner_comment_id"
+for identity in absent invalid other; do
+  case "$identity" in
+    absent) status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X DELETE "$delete_url")"; expected=401 ;;
+    invalid) status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H 'Authorization: Bearer invalid-token' "$delete_url")"; expected=401 ;;
+    other) status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $other_token" "$delete_url")"; expected=403 ;;
+  esac
+  [[ "$status" == "$expected" ]]
+done
+echo 'Comment removal E2E: invalid and foreign author requests rejected'
+# A reported and hidden comment can still be removed by its owner, preserving both records.
+docker exec "$probe" curl -fsS -X POST -H "Authorization: Bearer $other_token" \
+  -H 'Content-Type: application/json' --data "{\"commentId\":\"$owner_comment_id\",\"reason\":\"review fixture\"}" \
+  "$product_base/reports" >/dev/null
+echo 'Comment removal E2E: product report recorded'
+docker exec "$probe" curl -fsS -X POST -H "Authorization: Bearer $token" \
+  -H 'Content-Type: application/json' --data "{\"commentId\":\"$owner_comment_id\",\"visibility\":\"HIDDEN\",\"reasonCode\":\"preserve evidence\"}" \
+  http://admin-web/api/v1/admin/moderation/comments >/dev/null
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
+  -H "Authorization: Bearer $owner_token" "$delete_url")"
+[[ "$status" == 204 ]]
+removed_at="$(docker exec "$postgres" psql -At -U bookrush -d bookrush \
+  -c "SELECT author_deleted_at::text FROM social.comments WHERE id='$owner_comment_id'")"
+test -n "$removed_at"
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
+  -H "Authorization: Bearer $owner_token" "$delete_url")"
+[[ "$status" == 204 ]]
+[[ "$removed_at" == "$(docker exec "$postgres" psql -At -U bookrush -d bookrush \
+  -c "SELECT author_deleted_at::text FROM social.comments WHERE id='$owner_comment_id'")" ]]
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $owner_token" "$comments_url" \
+  | jq -e --arg id "$owner_comment_id" 'all(.[]; .id != $id)' >/dev/null
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X POST \
+  -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+  --data "{\"commentId\":\"$owner_comment_id\",\"visibility\":\"VISIBLE\",\"reasonCode\":\"restore blocked\"}" \
+  http://admin-web/api/v1/admin/moderation/comments)"
+[[ "$status" == 409 ]]
+docker exec "$probe" curl -fsS -G -H "Authorization: Bearer $token" \
+  --data-urlencode "search=$owner_comment_id" --data-urlencode 'visibility=REMOVED' \
+  http://admin-web/api/v1/admin/moderation/comments/page \
+  | jq -e '.totalItems == 1 and .items[0].author_deleted_at != null' >/dev/null
+docker exec "$postgres" psql -At -U bookrush -d bookrush \
+  -c "SELECT count(*) FROM social.comments c JOIN social.comment_moderation_state m ON m.comment_id=c.id JOIN social.reports r ON r.comment_id=c.id WHERE c.id='$owner_comment_id' AND c.body='owner removal fixture' AND m.visibility='HIDDEN'" | grep -qx 1
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X DELETE \
+  -H "Authorization: Bearer $owner_token" "$product_base/comments/99999999-9999-4999-8999-999999999999")"
+[[ "$status" == 404 ]]
+headers="$(docker exec "$probe" curl -sS -D - -o /dev/null -X OPTIONS \
+  -H 'Origin: https://bookrush.jteodoro.tec.br' -H 'Access-Control-Request-Method: DELETE' \
+  -H 'Access-Control-Request-Headers: authorization' "$delete_url")"
+printf '%s' "$headers" | grep -iq 'Access-Control-Allow-Origin: https://bookrush.jteodoro.tec.br'
+printf '%s' "$headers" | grep -iq 'Access-Control-Allow-Methods:.*DELETE'
+echo 'Comment author removal E2E: product ownership, 401/403/404/204, idempotency, evidence, restore409, CORS and V8 upgrade OK'
 
 echo 'Admin moderation E2E: users, comment visibility/history/rollback, authorization, CORS and report lifecycle OK'

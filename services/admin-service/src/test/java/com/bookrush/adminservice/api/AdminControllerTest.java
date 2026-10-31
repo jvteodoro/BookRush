@@ -202,4 +202,14 @@ class AdminControllerTest {
     verify(jdbc).queryForList(contains("strpos"), eq("HIDDEN"), eq("HIDDEN"), eq("100%"), eq("100%"), eq(25), eq(25L));
   }
 
+  @Test
+  void administrativeRestoreCannotUndoRemovalByTheAuthor() {
+    var id = java.util.UUID.randomUUID();
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id))).thenReturn(List.of(Map.of(
+        "id", id, "author_deleted_at", java.time.Instant.now())));
+    assertEquals(409, assertThrows(ResponseStatusException.class,
+        () -> controller.moderateComment(new AdminController.CommentModerationChange(id, "VISIBLE", "reviewed"),
+            principal, operator)).getStatusCode().value());
+  }
+
 }

@@ -61,3 +61,7 @@ Histórico exibe as últimas 100 decisões com operador, data, motivo e transiç
 de visibilidade. Remover preserva o texto para auditoria e permite restaurar;
 comentários ocultos/removidos deixam de aparecer aos leitores. O fluxo de
 resolução de denúncias é independente da visibilidade do comentário.
+
+A remoção pelo próprio autor aparece com data e indicador específico. As ações
+de visibilidade ficam bloqueadas nesse caso; a API também impede restauração
+com 409. O texto preservado continua disponível para análise de denúncias.

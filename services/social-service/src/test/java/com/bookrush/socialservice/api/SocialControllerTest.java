@@ -66,4 +66,43 @@ class SocialControllerTest {
         org.mockito.ArgumentMatchers.any(), eq("subject-1"), eq(bookId), eq(commentId),
         eq("conteúdo ofensivo"));
   }
+  @Test
+  void deletionRequiresAuthenticationAndOwnershipEvenForOperators() {
+    UUID id = UUID.randomUUID();
+    assertEquals(401, assertThrows(ResponseStatusException.class,
+        () -> controller.deleteOwnComment(id, null)).getStatusCode().value());
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id)))
+        .thenReturn(java.util.List.of(Map.of("subject_key", "another-reader")));
+    assertEquals(403, assertThrows(ResponseStatusException.class,
+        () -> controller.deleteOwnComment(id, principal)).getStatusCode().value());
+    org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never()).update(
+        contains("author_deleted_at"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void deletionOfMissingCommentReturnsNotFound() {
+    assertEquals(404, assertThrows(ResponseStatusException.class,
+        () -> controller.deleteOwnComment(UUID.randomUUID(), principal)).getStatusCode().value());
+  }
+
+  @Test
+  void deletionRetainsTheRowAndOnlySetsTheFirstRemovalTime() {
+    UUID id = UUID.randomUUID();
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id)))
+        .thenReturn(java.util.List.of(Map.of("subject_key", "subject-1")));
+    controller.deleteOwnComment(id, principal);
+    verify(jdbc).update(contains("author_deleted_at IS NULL"), eq(id), eq("subject-1"));
+  }
+
+  @Test
+  void legacyModerationCannotRestoreAnAuthorRemovedComment() {
+    UUID id = UUID.randomUUID();
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id)))
+        .thenReturn(java.util.List.of(Map.of("author_deleted_at", java.time.Instant.now())));
+    var operator = new TestingAuthenticationToken(principal, "credentials", "ROLE_operators");
+    assertEquals(409, assertThrows(ResponseStatusException.class,
+        () -> controller.moderateComment(id, new SocialController.ModerationDecision("VISIBLE", "restore"),
+            principal, operator)).getStatusCode().value());
+  }
+
 }

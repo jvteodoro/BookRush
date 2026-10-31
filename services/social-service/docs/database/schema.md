@@ -10,3 +10,8 @@ estados `VISIBLE`, `HIDDEN` e `REMOVED`. `social.reports` referencia livros ou
 comentários e registra o ciclo de análise descrito em
 [migrations.md](migrations.md). Os identificadores técnicos continuam sendo a
 fonte de autorização e auditoria; nomes são apenas dados de apresentação.
+
+`social.comments.author_deleted_at` guarda o instante da remoção pelo próprio
+autor; o ator é a identidade imutável `subject_key` da mesma linha. A marca é
+independente de `comment_moderation_state` e exclui a linha da leitura pública
+mesmo que um estado legado de moderação ainda seja `VISIBLE`.

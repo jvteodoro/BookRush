@@ -32,3 +32,22 @@ com issuer e audience. Comentários ocultos/removidos pela fachada administrativ
 continuam excluídos da listagem de leitores; restaurar devolve a visibilidade.
 O teste integrado `scripts/test-admin-user-management-e2e.sh` verifica esse
 comportamento contra os serviços reais e PostgreSQL descartável.
+
+## Remover o próprio comentário
+
+`DELETE /api/v1/social/comments/{commentId}` retorna 204 sem corpo, inclusive
+quando repetido pelo mesmo autor. Exige token do realm de produto `bookrush`,
+issuer e audience configurados do serviço. O subject vem do token e deve ser
+igual a `social.comments.subject_key`: token ausente/inválido/expirado recebe
+401, outro autor recebe 403 e UUID inexistente recebe 404. O método DELETE e os
+cabeçalhos Authorization/Content-Type já fazem parte do CORS explícito; o
+reverse proxy mantém o prefixo `/api/v1/social/` ao encaminhar ao social-service.
+
+A listagem devolve `canDelete` calculado no servidor; nomes de apresentação não
+concedem autorização. A interface solicita confirmação e atualiza lista e
+contagem somente após o sucesso. Conteúdo, autoria e denúncias permanecem
+preservados para moderação. [Contrato OpenAPI](../api/openapi.yaml).
+
+Em rollout parcial, implante primeiro o social-service para aplicar V8 e depois
+o admin-service/admin-web, que exibem a remoção pelo autor e bloqueiam restauração.
+A pipeline integrada já constrói e implanta esses serviços.

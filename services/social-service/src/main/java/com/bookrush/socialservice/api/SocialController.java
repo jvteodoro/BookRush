@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.client.RestClient;
 import org.springframework.http.HttpHeaders;
@@ -213,16 +215,19 @@ public class SocialController {
     jdbc.update("INSERT INTO social.comment_moderation_state(comment_id) VALUES (?) ON CONFLICT DO NOTHING", id);
     activity(identity, "COMMENT", bookId, id, null);
     behavior.publish("BOOK_COMMENT", bookId, Map.of(), request.getHeader(HttpHeaders.AUTHORIZATION));
-    return Map.of("id", id, "bookId", bookId, "body", comment.body());
+    return Map.of("id", id, "bookId", bookId, "body", comment.body(),
+        "subject_key", identity, "canDelete", true);
   }
 
   @GetMapping("/books/{bookId}/comments")
-  public Object comments(@PathVariable UUID bookId, HttpServletRequest request) {
+  public Object comments(@PathVariable UUID bookId, HttpServletRequest request, Principal principal) {
     var rows = jdbc.queryForList("SELECT c.id, c.subject_key, c.author_display_name, c.body, c.created_at "
         + "FROM social.comments c LEFT JOIN social.comment_moderation_state m ON m.comment_id=c.id "
-        + "WHERE c.book_id = ? AND COALESCE(m.visibility, 'VISIBLE') = 'VISIBLE' ORDER BY c.created_at", bookId);
+        + "WHERE c.book_id = ? AND c.author_deleted_at IS NULL "
+        + "AND COALESCE(m.visibility, 'VISIBLE') = 'VISIBLE' ORDER BY c.created_at, c.id", bookId);
     rows.forEach(row -> {
       String identity = String.valueOf(row.get("subject_key"));
+      row.put("canDelete", principal != null && identity.equals(principal.getName()));
       String profileName = profileDisplayName(identity, request);
       Object stored = row.get("author_display_name");
       row.put("authorName", profileName != null ? profileName
@@ -230,6 +235,21 @@ public class SocialController {
       row.remove("author_display_name");
     });
     return rows;
+  }
+
+  @DeleteMapping("/comments/{commentId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Transactional
+  public void deleteOwnComment(@PathVariable UUID commentId, Principal principal) {
+    String owner = subject(principal);
+    var rows = jdbc.queryForList("SELECT subject_key FROM social.comments WHERE id=? FOR UPDATE", commentId);
+    if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "comment not found");
+    if (!owner.equals(rows.get(0).get("subject_key"))) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only the author can remove this comment");
+    }
+    // Idempotent: never overwrite the original deletion timestamp or moderation.
+    jdbc.update("UPDATE social.comments SET author_deleted_at=clock_timestamp() "
+        + "WHERE id=? AND subject_key=? AND author_deleted_at IS NULL", commentId, owner);
   }
 
   public record ModerationDecision(@NotBlank @Size(max = 16) String visibility,
@@ -252,12 +272,18 @@ public class SocialController {
   }
 
   @PutMapping("/moderation/comments/{commentId}")
+  @Transactional
   public Object moderateComment(@PathVariable UUID commentId, @Valid @RequestBody ModerationDecision decision,
       Principal principal, Authentication authentication) {
     requireOperator(authentication);
     String actor = subject(principal);
     if (!Set.of("VISIBLE", "HIDDEN", "REMOVED").contains(decision.visibility())) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unsupported visibility");
+    }
+    var rows = jdbc.queryForList("SELECT author_deleted_at FROM social.comments WHERE id=? FOR UPDATE", commentId);
+    if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "comment not found");
+    if (rows.get(0).get("author_deleted_at") != null && "VISIBLE".equals(decision.visibility())) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "comment was removed by its author");
     }
     int updated = jdbc.update("UPDATE social.comment_moderation_state SET visibility=?, reason_code=?, updated_by_subject=?, updated_at=now() WHERE comment_id=?",
         decision.visibility(), decision.reasonCode(), actor, commentId);

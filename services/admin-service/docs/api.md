@@ -61,3 +61,8 @@ O teste de integração também exige 403 para um token recém-emitido sem papel
 operador, 401 para token inválido/ausente e preflight da origem autorizada. Suas
 imagens com tags aleatórias são removidas ao final, preservando o cache de build
 compartilhado e todos os volumes persistentes do projeto.
+
+Comentários com `author_deleted_at` são exibidos como `REMOVED`, com o instante
+da remoção pelo autor. Uma tentativa de restaurar recebe 409, mantendo denúncias
+e decisões anteriores. A marca é propriedade do social-service (migration V8),
+que deve ser implantado antes da nova revisão administrativa em deploy parcial.

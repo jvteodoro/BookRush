@@ -24,3 +24,17 @@ fila ordenada de moderação.
 Durante o upgrade, estados históricos desconhecidos são normalizados para
 `OPEN`, preservando a denúncia para nova avaliação. Nenhuma denúncia,
 comentário ou identidade existente é removida.
+
+## V8 — remoção pelo autor
+
+`V8__comment_author_deletion.sql` adiciona `author_deleted_at` nullable em
+`social.comments`, preservando conteúdo, autoria, estado de moderação e
+referências de denúncias. Registros legados continuam ativos (`NULL`). Um índice
+parcial por livro/data/ID cobre a leitura de comentários disponíveis. A API
+preenche o instante no servidor somente após confirmar o subject autenticado;
+repetir DELETE não altera o instante original. A marca não pode ser revertida
+por restauração administrativa.
+
+O teste `scripts/test-admin-user-management-e2e.sh` aplica V1–V7 em um banco
+PostgreSQL 16 descartável com comentário legado, valida upgrade V8 e também o
+boot normal do social-service em banco vazio com todas as migrations Flyway.

@@ -27,3 +27,6 @@
 .br-comment-compose .br-comment-error { color: var(--br-content); }
 @keyframes br-drawer-enter { from { transform: translateX(24px); opacity: .5; } to { transform: translateX(0); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .br-drawer[open] { animation: none; } }
+.br-comment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.br-comment-delete-confirm { margin: .75rem 0 0 2.75rem; padding: 1rem; border: 1px solid var(--br-outline-soft); border-radius: 12px; }
+.br-comment-delete-confirm p { margin: 0 0 .75rem; font-size: .85rem; }

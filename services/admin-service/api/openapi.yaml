@@ -134,6 +134,7 @@ paths:
         '401': { description: Authentication required }
         '403': { description: Platform operator role required }
         '404': { description: Comment not found }
+        '409': { description: A comment removed by its author cannot be restored }
   /api/v1/admin/moderation/comments/page:
     get:
       summary: Search comments by text, author, comment ID or book ID with visibility filter and stable pagination
@@ -183,6 +184,7 @@ components:
         author_name: { type: string }
         body: { type: string }
         visibility: { type: string, enum: [VISIBLE, HIDDEN, REMOVED] }
+        author_deleted_at: { type: string, format: date-time, nullable: true }
         reason_code: { type: string, nullable: true }
         updated_by_subject: { type: string, nullable: true }
         updated_at: { type: string, format: date-time, nullable: true }

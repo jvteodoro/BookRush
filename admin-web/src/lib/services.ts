@@ -136,6 +136,7 @@ export type AdminComment = {
   createdAt?: string;
   updatedAt?: string;
   updatedBy?: string;
+  authorDeletedAt?: string;
 };
 export type AdminCommentPage = {
   items: AdminComment[];
@@ -306,6 +307,7 @@ export const services = {
       createdAt: item.createdAt ?? item.created_at,
       updatedAt: item.updatedAt ?? item.updated_at,
       updatedBy: item.updatedBy ?? item.updated_by_subject,
+      authorDeletedAt: item.authorDeletedAt ?? item.author_deleted_at,
     }));
     return {
       items,

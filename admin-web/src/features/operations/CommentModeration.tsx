@@ -67,6 +67,12 @@ function CommentCard({
           <span className={`state-badge ${state.className}`}>
             {state.label}
           </span>
+          {comment.authorDeletedAt && (
+            <small>
+              Removido pelo autor em {date(comment.authorDeletedAt)}. A
+              restauração está bloqueada.
+            </small>
+          )}
           {comment.reasonCode && (
             <small>Último motivo: {comment.reasonCode}</small>
           )}
@@ -89,7 +95,11 @@ function CommentCard({
                 type="button"
                 key={visibility}
                 className={`secondary-action ${visibility === "REMOVED" ? "danger-action" : ""}`}
-                disabled={busy || comment.visibility === visibility}
+                disabled={
+                  busy ||
+                  Boolean(comment.authorDeletedAt) ||
+                  comment.visibility === visibility
+                }
                 onClick={() => {
                   setDecision(visibility);
                   setReason("");
