@@ -131,9 +131,15 @@ export const authClient = {
     // presigned storage URL. Authenticate the same-origin hop through the API
     // client; the browser then follows the redirect without leaking the bearer
     // to the storage host.
-    const response = await authClient.fetch(url.toString(), { cache: 'no-store' });
-    if (!response.ok) return undefined;
-    return URL.createObjectURL(await response.blob());
+    try {
+      const response = await authClient.fetch(url.toString(), { cache: 'no-store' });
+      if (!response.ok) return undefined;
+      return URL.createObjectURL(await response.blob());
+    } catch {
+      // A failed storage redirect/CORS request must leave the book's existing
+      // cover fallback available instead of rejecting the entire feed.
+      return undefined;
+    }
   },
 };
 

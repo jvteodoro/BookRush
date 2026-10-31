@@ -338,3 +338,13 @@ com singular/plural e formatação pt-BR. Seguir ou deixar de seguir atualiza a
 contagem consultando novamente o social-service. Preferências privadas exibem
 "Seguidores privados"; erros exibem indisponibilidade, sem simular zero. O perfil
 próprio oferece nova tentativa quando a consulta falha.
+
+## Feed e capas após login
+
+A indisponibilidade de uma capa (rede, CORS ou leitura da resposta) usa o
+fallback existente e não impede a abertura do feed. A requisição inicial da
+thumbnail continua usando o cliente autenticado e a restrição same-origin.
+O gateway S3 precisa atender o domínio público do storage com CORS adequado;
+uma resposta HTML da aplicação nesse domínio indica roteamento incorreto.
+Consulte `docs/operations/feed-after-login.md` no repositório para o diagnóstico
+e a correção do arquivo Traefik efetivamente montado no servidor.

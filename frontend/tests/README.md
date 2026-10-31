@@ -2,7 +2,8 @@
 
 Os testes usam o test runner nativo do Node e ficam agrupados por comportamento:
 
-- `auth-callback.test.mjs`: callback OIDC e replay do StrictMode.
+- `auth-callback.test.mjs`: callback OIDC, replay do StrictMode e falhas de
+  thumbnails sem impedir a abertura do feed (rede/CORS, HTTP e leitura do blob).
 - `catalog-search.test.mjs` e `search.test.mjs`: contrato de busca server-side,
   paginação, erros e transformação dos resultados.
 - `library.test.mjs` e `search-save.test.mjs`: biblioteca, concorrência e
@@ -23,3 +24,7 @@ Por isso, o percentual exibido pelo Node não deve ser interpretado como
 cobertura real de linhas do código TypeScript. A próxima evolução deve migrar
 esses testes para um runner com source maps (por exemplo, Vitest) antes de
 adotar um limite de cobertura no CI.
+
+Falhas de rede/CORS ou leitura de capas usam o fallback visual e não devem
+interromper o feed. Para diagnosticar o endpoint público e o proxy S3, consulte
+[Feed após login](../../docs/operations/feed-after-login.md).
