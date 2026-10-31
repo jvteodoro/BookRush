@@ -298,9 +298,9 @@ O mesmo preparo cobre `ANALYTICS_RUNTIME_IMAGE` ausente: deriva o nome de
 `ANALYTICS_IMAGE` e constrói o runtime do checkout quando necessário, usando
 `requirements.cuda.txt` se `ANALYTICS_GPU=true`. Apenas derivar o nome não
 garante que a imagem exista. Antes de iniciar ou alterar containers, o deploy
-confere as onze imagens no daemon e valida o Compose; imagem explícita ausente
+confere as doze imagens no daemon e valida o Compose; imagem explícita ausente
 interrompe o processo com o nome da variável, sem iniciar recriação ou rollback.
-O override `deploy-images.compose.yaml` fixa as onze imagens da revisão, inclusive
+O override `deploy-images.compose.yaml` fixa as doze imagens da revisão, inclusive
 catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
 Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
 
@@ -408,3 +408,16 @@ os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
 estiver parado, o deploy volta a incluí-lo na operação.
 
 A planta diária exige a imagem `READER_STATE_IMAGE` da mesma revisão do frontend; o deploy integrado atualiza o reader-state-service e preserva seu schema existente.
+
+## Contrato da busca de pessoas
+
+A etapa de contratos executa `scripts/test-profile-search-e2e.sh`, incluindo
+`mvn verify` e imagem do reader-profile-service, migrations em PostgreSQL16 e
+requisições autenticadas pelo Traefik/Keycloak25 descartáveis. O teste não
+altera `.env`, realms ou volumes de produção e remove recursos da execução.
+O build integrado continua entregando `READER_PROFILE_IMAGE` e `FRONTEND_IMAGE`;
+nenhuma configuração extra do job ou do host é necessária para essa rota.
+
+A integração com a planta diária inclui `READER_STATE_IMAGE` no teste de merge
+Compose: as doze imagens da revisão são verificadas tanto com o Compose atual
+quanto com um host antigo simulado, junto com a configuração administrativa.

@@ -49,6 +49,7 @@ export const apiRoutes = {
   },
   behavior: () => "/api/v1/behavior/events",
   profile: {
+    search: (query: string) => `/api/v1/profile/search?${query}`,
     self: () => "/api/v1/profile",
     privacy: () => "/api/v1/profile/privacy",
     public: (subject: string) =>

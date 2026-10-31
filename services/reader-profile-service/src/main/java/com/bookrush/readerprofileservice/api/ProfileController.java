@@ -3,6 +3,7 @@ package com.bookrush.readerprofileservice.api;
 import java.security.Principal;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -26,10 +27,26 @@ public class ProfileController {
   @GetMapping
   public Object get(Principal principal) {
     String subject = subject(principal);
+    syncIdentity(principal, subject);
     var rows = jdbc.queryForList(
         "select subject_key,display_name,bio,is_public,updated_at from reader_profile.profile where subject_key=?",
         subject);
     return rows.isEmpty() ? Map.of("subject", subject, "displayName", "") : rows.getFirst();
+  }
+
+  private void syncIdentity(Principal principal, String subject) {
+    if (!(principal instanceof JwtAuthenticationToken authentication)) return;
+    String username = authentication.getToken().getClaimAsString("preferred_username");
+    String name = authentication.getToken().getClaimAsString("name");
+    if (name == null || name.isBlank()) name = username;
+    jdbc.update(
+        """
+        insert into reader_profile.profile(subject_key,display_name,username) values(?,?,?)
+        on conflict(subject_key) do update set username=coalesce(nullif(excluded.username,''),reader_profile.profile.username),
+          display_name=case when nullif(btrim(reader_profile.profile.display_name),'') is null
+            then excluded.display_name else reader_profile.profile.display_name end
+        """,
+        subject, name, username);
   }
 
   @GetMapping("/public")

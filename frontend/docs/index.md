@@ -348,3 +348,12 @@ O gateway S3 precisa atender o domínio público do storage com CORS adequado;
 uma resposta HTML da aplicação nesse domínio indica roteamento incorreto.
 Consulte `docs/operations/feed-after-login.md` no repositório para o diagnóstico
 e a correção do arquivo Traefik efetivamente montado no servidor.
+
+## Pesquisa de pessoas
+
+A barra de busca mantém os resultados de livros e oferece a opção **Pessoas**.
+O mesmo texto pesquisa nome ou `@usuário` em perfis públicos, com debounce,
+paginação, cancelamento de consultas antigas, estados vazios e retry de erros.
+**Ver perfil** usa a navegação existente para perfis de leitores. A pesquisa de
+pessoas usa o cliente autenticado e `/api/v1/profile/search`; contas que ainda
+não acessaram seu perfil não são importadas da administração do Keycloak.

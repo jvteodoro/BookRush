@@ -5,7 +5,7 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
 workspace="$(mktemp -d)"
 trap 'rm -rf "$workspace"' EXIT
-for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
   export "$variable=contract/bookrush/${variable,,}:revision"
 done
 export KEYCLOAK_ADMIN_TOKEN_URI=http://keycloak:8080/realms/bookrush/protocol/openid-connect/token
@@ -42,7 +42,8 @@ for variable, service in {
     "BACKEND_IMAGE": "catalog-service", "FRONTEND_IMAGE": "frontend",
     "INGESTION_IMAGE": "book-ingestion-service", "ANALYTICS_IMAGE": "book-analytics-service",
     "ANALYTICS_RUNTIME_IMAGE": "book-analytics-runtime", "RECOMMENDATION_IMAGE": "recommendation-service",
-    "READER_BFF_IMAGE": "reader-bff-service", "READER_PROFILE_IMAGE": "reader-profile-service",
+    "READER_BFF_IMAGE": "reader-bff-service", "READER_STATE_IMAGE": "reader-state-service",
+    "READER_PROFILE_IMAGE": "reader-profile-service",
     "SOCIAL_IMAGE": "social-service", "ADMIN_SERVICE_IMAGE": "admin-service", "ADMIN_WEB_IMAGE": "admin-web",
 }.items():
     assert services[service]["image"] == "contract/bookrush/" + variable.lower() + ":revision", service

@@ -369,6 +369,10 @@ export function LiveReader({
           message={message}
           onSave={save}
           onOpen={openCatalogBook}
+          onProfile={(subject) => {
+            runtime().__BOOKRUSH_LEGACY__.openProfile(subject);
+            onLegacy();
+          }}
         />
       ) : tab === "library" ? (
         <LibraryPage
