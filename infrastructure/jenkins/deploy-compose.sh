@@ -8,12 +8,28 @@ if [[ -z "${ANALYTICS_RUNTIME_IMAGE:-}" ]]; then
   export ANALYTICS_RUNTIME_IMAGE="${ANALYTICS_IMAGE/book-analytics-service/book-analytics-runtime}"
 fi
 : "${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}"
-: "${RECOMMENDATION_IMAGE:?Imagem recommendation ausente}"
-: "${READER_BFF_IMAGE:?Imagem reader-bff ausente}"
-: "${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}"
-: "${SOCIAL_IMAGE:?Imagem social ausente}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
+
+# Uma definição antiga do job pode não conhecer os serviços adicionados pela
+# branch selecionada. Preserve registry/tag e construa a revisão do checkout,
+# sem recorrer a imagens :local antigas do host.
+compatibility_services=()
+resolve_service_image() {
+  local variable="$1" service="$2" image
+  [[ -z "${!variable:-}" ]] || return 0
+  [[ "$BACKEND_IMAGE" == */bookrush/catalog-service:* ]] || {
+    echo "Não foi possível derivar $variable de BACKEND_IMAGE." >&2
+    exit 1
+  }
+  image="${BACKEND_IMAGE%/bookrush/catalog-service:*}/bookrush/$service:${BACKEND_IMAGE##*:}"
+  export "$variable=$image"
+  compatibility_services+=("$service|$image")
+}
+resolve_service_image RECOMMENDATION_IMAGE recommendation-service
+resolve_service_image READER_BFF_IMAGE reader-bff-service
+resolve_service_image READER_PROFILE_IMAGE reader-profile-service
+resolve_service_image SOCIAL_IMAGE social-service
 
 # O job parametrizado pode carregar o Jenkinsfile da main antes de fazer
 # checkout de uma feature. Durante a transição para uma pipeline que publica as
@@ -48,6 +64,14 @@ if [[ "$storage_health" != healthy ]]; then
   echo 'SeaweedFS não está provisionado/saudável. Execute o procedimento inicial de infraestrutura antes do deploy.' >&2
   exit 1
 fi
+for entry in "${compatibility_services[@]}"; do
+  service="${entry%%|*}"
+  image="${entry#*|}"
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    echo "Imagem $image ausente; construindo compatibilidade do $service." >&2
+    docker build -t "$image" -f "$repo_dir/services/$service/Dockerfile" "$repo_dir"
+  fi
+done
 if ! docker image inspect "$ADMIN_SERVICE_IMAGE" >/dev/null 2>&1; then
   echo "Imagem $ADMIN_SERVICE_IMAGE ausente; construindo compatibilidade do admin-service." >&2
   docker build -t "$ADMIN_SERVICE_IMAGE" -f "$repo_dir/services/admin-service/Dockerfile" "$repo_dir"

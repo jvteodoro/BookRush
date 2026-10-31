@@ -274,6 +274,22 @@ from SCM**, repositório `https://github.com/jvteodoro/BookRush.git`, branch
 `*/main`, Script Path `Jenkinsfile`. Essa branch fornece a definição da pipeline;
 **BRANCH** seleciona o código que será compilado e implantado.
 
+Se a definição carregada pela `main` (ou um script inline antigo) ainda não
+exportar `RECOMMENDATION_IMAGE`, `READER_BFF_IMAGE`, `READER_PROFILE_IMAGE` ou
+`SOCIAL_IMAGE`, o deploy deriva as imagens ausentes do registry, namespace e tag
+de `BACKEND_IMAGE`. As imagens derivadas que não existirem no daemon são
+construídas com os Dockerfiles do checkout selecionado antes de alterar os
+containers. Imagens explicitamente fornecidas pela pipeline são preservadas.
+Esse mecanismo exige o formato `<prefixo>/bookrush/catalog-service:<tag>`;
+nomes personalizados exigem informar as imagens explicitamente. A solução
+preferencial continua sendo carregar a definição atual da pipeline da branch
+desejada no SCM. Não é necessário apagar jobs ou volumes.
+
+Valide essa compatibilidade sem Docker ou credenciais com
+`python3 scripts/test-deploy-compose-images.py` (também executado por
+`bash scripts/validate-pipelines.sh`). O teste cobre variáveis ausentes,
+registry com porta, imagens explícitas, cache, formato inválido e falha de build.
+
 ## Proxy e visualização de estágios
 
 A imagem inclui `pipeline-stage-view` (tabela de estágios no job) e
