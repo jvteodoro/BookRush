@@ -17,6 +17,7 @@ SCRIPT = ROOT / 'infrastructure/jenkins/deploy-compose.sh'
 SERVICES = {
     'RECOMMENDATION_IMAGE': 'recommendation-service',
     'READER_BFF_IMAGE': 'reader-bff-service',
+    'READER_STATE_IMAGE': 'reader-state-service',
     'READER_PROFILE_IMAGE': 'reader-profile-service',
     'SOCIAL_IMAGE': 'social-service',
 }
@@ -82,7 +83,7 @@ exit 99
             image = f'registry.example:5000/team/bookrush/{service}:42-abcdef0'
             self.assertIn(f'{variable}={image}', result.stdout)
             self.assertIn(f'build -t {image} -f {ROOT}/services/{service}/Dockerfile {ROOT}', calls)
-        self.assertEqual(calls.count('build -t'), 5)
+        self.assertEqual(calls.count('build -t'), 6)
 
     def test_runtime_cpu_is_built_before_compose_validation(self):
         result, calls = self.prepare()
@@ -120,7 +121,7 @@ exit 99
     def test_existing_derived_images_are_reused(self):
         result, calls = self.prepare(cached=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(calls.count('image inspect registry.example'), 13)
+        self.assertEqual(calls.count('image inspect registry.example'), 15)
         self.assertNotIn('build -t', calls)
 
     def test_unrecognized_backend_fails_before_docker(self):

@@ -33,6 +33,7 @@ resolve_service_image() {
 }
 resolve_service_image RECOMMENDATION_IMAGE recommendation-service
 resolve_service_image READER_BFF_IMAGE reader-bff-service
+resolve_service_image READER_STATE_IMAGE reader-state-service
 resolve_service_image READER_PROFILE_IMAGE reader-profile-service
 resolve_service_image SOCIAL_IMAGE social-service
 
@@ -96,7 +97,7 @@ fi
 # Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
 # Este preflight também detecta builds feitos em um daemon diferente do deploy.
 missing_images=false
-for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
   if ! docker image inspect "${!variable}" >/dev/null 2>&1; then
     echo "Imagem de deploy ausente no daemon: $variable=${!variable}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
     missing_images=true
@@ -111,13 +112,14 @@ old_analytics="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analy
 old_analytics_runtime="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analytics-runtime-1 2>/dev/null || true)"
 old_recommendation="$(docker inspect --format '{{.Config.Image}}' bookrush-recommendation-service-1 2>/dev/null || true)"
 old_reader_bff="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-bff-service-1 2>/dev/null || true)"
+old_reader_state="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-state-service-1 2>/dev/null || true)"
 old_reader_profile="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-profile-service-1 2>/dev/null || true)"
 old_social="$(docker inspect --format '{{.Config.Image}}' bookrush-social-service-1 2>/dev/null || true)"
 old_admin_service="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-service-1 2>/dev/null || true)"
 old_admin_web="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-web-1 2>/dev/null || true)"
 keycloak_state="$(docker inspect --format '{{.State.Status}}' bookrush-keycloak-1 2>/dev/null || true)"
 diagnose() {
-  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-recommendation-service-1 bookrush-reader-bff-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-frontend-1; do
+  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-recommendation-service-1 bookrush-reader-bff-service-1 bookrush-reader-state-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-frontend-1; do
     echo "--- diagnóstico $service ---" >&2
     docker inspect --format 'state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} image={{.Config.Image}}' "$service" >&2 || true
     if [[ "$service" == bookrush-admin-service-1 ]]; then
@@ -129,7 +131,7 @@ diagnose() {
     fi
   done
 }
-compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service recommendation-service reader-bff-service reader-profile-service social-service admin-service admin-web frontend)
+compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
 if [[ -n "$keycloak_state" ]]; then
   if [[ "$keycloak_state" != running ]]; then
     docker start bookrush-keycloak-1 >/dev/null
@@ -317,8 +319,8 @@ probe_catalog() {
 
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
-  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
+  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
   else

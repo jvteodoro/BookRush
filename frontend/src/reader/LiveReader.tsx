@@ -38,6 +38,10 @@ type Runtime = {
     streakDays?: number;
     totalReadingMinutes?: number;
     measuredUntil?: string;
+    sad?: boolean;
+    todaySeconds?: number;
+    goalSeconds?: number;
+    goalReached?: boolean;
   } | null;
   __BOOKRUSH_API__: {
     saved: Set<string>;
@@ -77,6 +81,36 @@ export function LiveReader({
   legacyQuery?: string;
 }) {
   const [tab, setTab] = useState<ReaderTab>("feed");
+  const [plant, setPlant] = useState(runtime().__BOOKRUSH_PLANT__);
+  const [plantLoading, setPlantLoading] = useState(false);
+  const [plantError, setPlantError] = useState(false);
+  useEffect(() => {
+    if (tab !== "plant") return;
+    let cancelled = false;
+    const refresh = async () => {
+      setPlantLoading(true);
+      try {
+        const response = await authClient.fetch(apiRoutes.reader.plant());
+        if (!response.ok) throw new Error("plant unavailable");
+        const value = await response.json();
+        if (!cancelled) {
+          runtime().__BOOKRUSH_PLANT__ = value;
+          setPlant(value);
+          setPlantError(false);
+        }
+      } catch {
+        if (!cancelled) setPlantError(true);
+      } finally {
+        if (!cancelled) setPlantLoading(false);
+      }
+    };
+    void refresh();
+    window.addEventListener("bookrush:plant-updated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("bookrush:plant-updated", refresh);
+    };
+  }, [tab]);
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState(() => [
     ...runtime().__BOOKRUSH_API__.saved,
@@ -278,8 +312,8 @@ export function LiveReader({
     setMessage("");
     setTab(nextTab);
   };
-  const streak = runtime().__BOOKRUSH_STREAK__?.currentDays;
-  const plant = runtime().__BOOKRUSH_PLANT__;
+  const streak =
+    plant?.streakDays ?? runtime().__BOOKRUSH_STREAK__?.currentDays;
   const openCatalogBook = (book: LibraryBook) =>
     void action(book.id, async () => {
       // The existing reader resolves IDs from its catalog array. Register books
@@ -369,6 +403,8 @@ export function LiveReader({
           savedCount={saved.length}
           streak={streak}
           plant={plant}
+          plantLoading={plantLoading}
+          plantError={plantError}
           onNavigate={navigate}
         />
       ) : (

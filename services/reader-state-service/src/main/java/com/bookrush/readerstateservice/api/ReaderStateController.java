@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import com.bookrush.readerstateservice.BehaviorEventPublisher;
 import java.security.Principal;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.UUID;
@@ -26,14 +25,14 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1/reader")
 public class ReaderStateController {
-  private static final String PLANT_FORMULA_VERSION = "reading-minutes-v1";
-  private static final int MAX_PLANT_STAGE = 5;
   private final JdbcTemplate jdbc;
   private final BehaviorEventPublisher behavior;
+  private final DailyPlantService dailyPlant;
 
-  public ReaderStateController(JdbcTemplate jdbc, BehaviorEventPublisher behavior) {
+  public ReaderStateController(JdbcTemplate jdbc, BehaviorEventPublisher behavior, DailyPlantService dailyPlant) {
     this.jdbc = jdbc;
     this.behavior = behavior;
+    this.dailyPlant = dailyPlant;
   }
 
   private String subject(Principal principal) {
@@ -110,53 +109,26 @@ public class ReaderStateController {
     Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
     payload.put("activeSeconds", seconds);
     behavior.publish("READ_SESSION", null, payload, authorization(request));
-    return Map.of("id", id, "activeSeconds", seconds, "plant", refreshPlant(subject));
+    return Map.of("id", id, "activeSeconds", seconds, "plant", dailyPlant.get(subject));
   }
 
   @GetMapping("/streak")
   public Map<String, Object> streak(Principal principal) {
     String subject = subject(principal);
-    return Map.of("currentDays", currentStreak(subject), "measuredUntil", LocalDate.now());
+    var plant = dailyPlant.get(subject);
+    return Map.of("currentDays", plant.get("streakDays"), "measuredUntil", plant.get("measuredUntil"));
   }
 
   @GetMapping("/plant")
   public Map<String, Object> plant(Principal principal) {
-    return refreshPlant(subject(principal));
+    return dailyPlant.get(subject(principal));
   }
 
-  private Map<String, Object> refreshPlant(String subject) {
-    Number totalMinutesValue = jdbc.queryForObject(
-        "SELECT COALESCE(SUM(minutes), 0) FROM reader_state.reading_day WHERE subject_key = ?",
-        Number.class, subject);
-    long totalMinutes = totalMinutesValue == null ? 0 : Math.max(0, totalMinutesValue.longValue());
-    int streakDays = currentStreak(subject);
-    int stage = (int) Math.min(MAX_PLANT_STAGE, totalMinutes / 60);
-    LocalDate measuredUntil = LocalDate.now();
-    jdbc.update("INSERT INTO reader_state.plant_state(subject_key, formula_version, stage, streak_days, "
-            + "total_reading_minutes, measured_until) VALUES (?, ?, ?, ?, ?, ?) "
-            + "ON CONFLICT (subject_key) DO UPDATE SET formula_version = EXCLUDED.formula_version, "
-            + "stage = EXCLUDED.stage, streak_days = EXCLUDED.streak_days, "
-            + "total_reading_minutes = EXCLUDED.total_reading_minutes, "
-            + "measured_until = EXCLUDED.measured_until, updated_at = now()",
-        subject, PLANT_FORMULA_VERSION, stage, streakDays, totalMinutes, measuredUntil);
-    return Map.of("formulaVersion", PLANT_FORMULA_VERSION, "stage", stage,
-        "streakDays", streakDays, "totalReadingMinutes", totalMinutes,
-        "measuredUntil", measuredUntil);
-  }
+  public record ReadingInterval(@NotNull UUID eventId, @NotNull Integer activeSeconds, @NotNull Instant endedAt) {}
 
-  private int currentStreak(String subject) {
-    var days = jdbc.queryForList("SELECT day FROM reader_state.reading_day WHERE subject_key = ? "
-        + "AND minutes > 0 ORDER BY day DESC LIMIT 366", subject);
-    int current = 0;
-    LocalDate expected = LocalDate.now();
-    for (var row : days) {
-      Object rawDay = row.get("day");
-      LocalDate day = rawDay instanceof java.sql.Date sqlDate
-          ? sqlDate.toLocalDate() : LocalDate.parse(String.valueOf(rawDay));
-      if (day.equals(expected)) { current++; expected = expected.minusDays(1); }
-      else if (day.isBefore(expected)) break;
-    }
-    return current;
+  @PostMapping("/plant")
+  public Map<String, Object> readingTime(@Valid @RequestBody ReadingInterval interval, Principal principal) {
+    return dailyPlant.record(subject(principal), interval.eventId(), interval.activeSeconds(), interval.endedAt());
   }
 
   @GetMapping("/library")
