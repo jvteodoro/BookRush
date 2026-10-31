@@ -24,6 +24,8 @@ cleanup() {
   local rc=$?
   docker rm -f "$probe" "$web" "$service" "$social_service" "$keycloak" "$postgres" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
+  # Remove only this invocation's unique image tags; retain shared build cache.
+  docker image rm "$image" "$social_image" "$web_image" >/dev/null 2>&1 || true
   rm -rf -- "$work_dir"
   exit "$rc"
 }
@@ -232,7 +234,98 @@ for visibility in HIDDEN REMOVED VISIBLE; do
     http://admin-web/api/v1/admin/moderation/comments \
     | jq -r --arg id "$legacy_comment_id" '.[] | select(.id == $id) | .visibility')"
   [[ "$listed_visibility" == "$visibility" ]]
+  # Confirm the same moderation state is enforced by the reader-facing service.
+  expected=0
+  [[ "$visibility" == VISIBLE ]] && expected=1
+  docker exec "$probe" curl -fsS -H "Authorization: Bearer $token" \
+    "http://$social_service:8096/api/v1/social/books/33333333-3333-4333-8333-333333333333/comments" \
+    | jq -e --arg id "$legacy_comment_id" --argjson expected "$expected" \
+      '[.[] | select(.id == $id)] | length == $expected' >/dev/null
 done
+# Pagination, literal search, visibility filters and immutable decision history.
+docker exec "$probe" curl -fsS -G -H "Authorization: Bearer $token" \
+  --data-urlencode 'search=Ana Leitora' --data-urlencode 'visibility=VISIBLE' \
+  --data-urlencode 'size=1' --data-urlencode 'page=0' \
+  http://admin-web/api/v1/admin/moderation/comments/page \
+  | jq -e --arg id "$legacy_comment_id" '.totalItems == 1 and .last == true and .items[0].id == $id' >/dev/null
+docker exec "$probe" curl -fsS -G -H "Authorization: Bearer $token" \
+  --data-urlencode 'search=%' http://admin-web/api/v1/admin/moderation/comments/page \
+  | jq -e '.totalItems == 0 and (.items | length) == 0' >/dev/null
+docker exec "$probe" curl -fsS -G -H "Authorization: Bearer $token" \
+  --data-urlencode 'page=1' --data-urlencode 'size=1' \
+  http://admin-web/api/v1/admin/moderation/comments/page \
+  | jq -e '.totalItems == 1 and .last == true and (.items | length) == 0' >/dev/null
+history_url="http://admin-web/api/v1/admin/moderation/comments/$legacy_comment_id/history"
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $token" "$history_url" \
+  | jq -e 'length == 3 and .[0].visibility == "VISIBLE" and .[0].previous_visibility == "REMOVED" and all(.[]; .reason == "E2E_REVIEW")' >/dev/null
+# Invalid requests must leave the comment and audit unchanged.
+for payload in \
+  "{\"commentId\":\"$legacy_comment_id\",\"visibility\":\"HIDDEN\"}" \
+  "{\"commentId\":\"$legacy_comment_id\",\"visibility\":\"INVALID\",\"reasonCode\":\"test\"}"; do
+  status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X POST \
+    -H "Authorization: Bearer $token" -H 'Content-Type: application/json' --data "$payload" \
+    http://admin-web/api/v1/admin/moderation/comments)"
+  [[ "$status" == 400 ]]
+done
+# Repeating the current state is idempotent and produces no extra audit entry.
+docker exec "$probe" curl -fsS -X POST -H "Authorization: Bearer $token" \
+  -H 'Content-Type: application/json' \
+  --data "{\"commentId\":\"$legacy_comment_id\",\"visibility\":\"VISIBLE\",\"reasonCode\":\"repeat review\"}" \
+  http://admin-web/api/v1/admin/moderation/comments | jq -e '.updated == false' >/dev/null
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $token" "$history_url" \
+  | jq -e 'length == 3' >/dev/null
+# A failed audit insert must roll back visibility as well.
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  -c "ALTER TABLE admin.audit_log ADD CONSTRAINT e2e_audit_failure CHECK (details->>'reason' IS DISTINCT FROM 'rollback probe')" >/dev/null
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X POST \
+  -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+  --data "{\"commentId\":\"$legacy_comment_id\",\"visibility\":\"HIDDEN\",\"reasonCode\":\"rollback probe\"}" \
+  http://admin-web/api/v1/admin/moderation/comments)"
+[[ "$status" == 500 ]]
+docker exec "$postgres" psql -At -U bookrush -d bookrush \
+  -c "SELECT visibility FROM social.comment_moderation_state WHERE comment_id='$legacy_comment_id'" | grep -qx VISIBLE
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  -c 'ALTER TABLE admin.audit_log DROP CONSTRAINT e2e_audit_failure' >/dev/null
+for url in http://admin-web/api/v1/admin/moderation/comments/page "$history_url"; do
+  status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' "$url")"
+  [[ "$status" == 401 ]]
+done
+# A freshly issued platform token without operator privileges must be forbidden.
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh create users -r bookrush-platform \
+  -s username=disposable-reviewer -s firstName=Disposable -s lastName=Reviewer \
+  -s email=disposable-reviewer@bookrush.test -s enabled=true -s emailVerified=true \
+  -s 'requiredActions=[]' >/dev/null
+reviewer_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get users \
+  -r bookrush-platform -q username=disposable-reviewer --fields id --format csv --noquotes)"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh set-password -r bookrush-platform \
+  --userid "$reviewer_id" --new-password "$human_password" >/dev/null
+reviewer_response="$(docker exec "$probe" curl -fsS -X POST \
+  http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=labsoft-admin-web \
+  --data-urlencode username=disposable-reviewer --data-urlencode "password=$human_password")"
+reviewer_token="$(jq -er '.access_token' <<<"$reviewer_response")"
+for url in http://admin-web/api/v1/admin/moderation/comments/page "$history_url"; do
+  status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer $reviewer_token" "$url")"
+  [[ "$status" == 403 ]]
+  status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
+    -H 'Authorization: Bearer invalid-token' "$url")"
+  [[ "$status" == 401 ]]
+done
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X POST \
+  -H "Authorization: Bearer $reviewer_token" -H 'Content-Type: application/json' \
+  --data "{\"commentId\":\"$legacy_comment_id\",\"visibility\":\"HIDDEN\",\"reasonCode\":\"forbidden review\"}" \
+  http://admin-web/api/v1/admin/moderation/comments)"
+[[ "$status" == 403 ]]
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer $token" \
+  http://admin-web/api/v1/admin/moderation/comments/99999999-9999-4999-8999-999999999999/history)"
+[[ "$status" == 404 ]]
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' -X OPTIONS \
+  -H 'Origin: https://bookrush.jteodoro.tec.br' -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: authorization,content-type,x-admin-client' \
+  http://admin-web/api/v1/admin/moderation/comments)"
+[[ "$status" == 200 ]]
 docker exec "$probe" curl -fsS -H "Authorization: Bearer $token" \
   http://admin-web/api/v1/admin/reports \
   | jq -e --arg report "$report_id" --arg comment "$legacy_comment_id" \
@@ -251,4 +344,4 @@ docker exec "$postgres" psql -At -U bookrush -d bookrush \
   -c "SELECT count(*) FROM admin.audit_log WHERE action='REPORT_STATUS_CHANGED' AND target='$report_id'" \
   | grep -qx '4'
 
-echo 'Admin user management E2E: names, legacy comments, report lifecycle and audit OK'
+echo 'Admin moderation E2E: users, comment visibility/history/rollback, authorization, CORS and report lifecycle OK'

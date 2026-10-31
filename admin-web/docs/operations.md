@@ -47,3 +47,17 @@ vazios não podem chegar ao bundle, pois produziriam `/realms//` e
   gateway e o cabeçalho `Access-Control-Allow-Origin`.
 - tela vazia após alteração de configuração: reconstrua a imagem, pois variáveis
   `VITE_*` são compiladas, e limpe o cache do navegador.
+
+## Comentários
+
+A seção Comentários em Users & moderation permite buscar pelo texto, autor ou
+ID do livro e filtrar por visibilidade. A listagem usa páginas de 25 registros.
+Ocultar, remover e restaurar exigem confirmação com justificativa de 3 a 80
+caracteres. Cancelar não envia uma decisão. Durante o envio as ações ficam
+bloqueadas; falhas preservam a justificativa para nova tentativa. Após sucesso,
+a listagem, os indicadores e o histórico são atualizados pelo servidor.
+
+Histórico exibe as últimas 100 decisões com operador, data, motivo e transição
+de visibilidade. Remover preserva o texto para auditoria e permite restaurar;
+comentários ocultos/removidos deixam de aparecer aos leitores. O fluxo de
+resolução de denúncias é independente da visibilidade do comentário.

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: BookRush Admin API
-  version: 0.2.0
+  version: 0.3.0
   description: Administrative user lifecycle and audit operations.
 paths:
   /api/v1/admin/feed:
@@ -123,14 +123,49 @@ paths:
           application/json:
             schema:
               type: object
-              required: [commentId, visibility]
+              required: [commentId, visibility, reasonCode]
               properties:
                 commentId: { type: string, format: uuid }
                 visibility: { type: string, enum: [VISIBLE, HIDDEN, REMOVED] }
-                reasonCode: { type: string, maxLength: 80 }
+                reasonCode: { type: string, minLength: 3, maxLength: 80 }
       responses:
-        '200': { description: Visibility changed }
+        '200': { description: Visibility and audit saved atomically; updated is false for an unchanged state }
         '400': { description: Invalid comment ID or visibility }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+        '404': { description: Comment not found }
+  /api/v1/admin/moderation/comments/page:
+    get:
+      summary: Search comments by text, author, comment ID or book ID with visibility filter and stable pagination
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 200, default: '' } }
+        - { name: visibility, in: query, schema: { type: string, enum: ['', VISIBLE, HIDDEN, REMOVED], default: '' } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses:
+        '200':
+          description: Paginated comments, including legacy rows with implicit VISIBLE state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommentPage' }
+        '400': { description: Invalid filters or pagination }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+  /api/v1/admin/moderation/comments/{commentId}/history:
+    get:
+      summary: Read the latest 100 immutable comment decisions, newest first
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Actor, previous and new visibility, reason and date for each decision
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CommentDecision' }
         '401': { description: Authentication required }
         '403': { description: Platform operator role required }
         '404': { description: Comment not found }
@@ -138,6 +173,39 @@ components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   schemas:
+    ModeratedComment:
+      type: object
+      required: [id, book_id, subject_key, author_name, body, visibility, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        book_id: { type: string, format: uuid }
+        subject_key: { type: string }
+        author_name: { type: string }
+        body: { type: string }
+        visibility: { type: string, enum: [VISIBLE, HIDDEN, REMOVED] }
+        reason_code: { type: string, nullable: true }
+        updated_by_subject: { type: string, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    CommentPage:
+      type: object
+      required: [items, page, size, totalItems, last]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ModeratedComment' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalItems: { type: integer, format: int64 }
+        last: { type: boolean }
+    CommentDecision:
+      type: object
+      required: [id, actor_subject, created_at, previous_visibility, visibility, reason]
+      properties:
+        id: { type: string, format: uuid }
+        actor_subject: { type: string }
+        created_at: { type: string, format: date-time }
+        previous_visibility: { type: string, enum: [VISIBLE, HIDDEN, REMOVED] }
+        visibility: { type: string, enum: [VISIBLE, HIDDEN, REMOVED] }
+        reason: { type: string }
     UserStatusChange:
       type: object
       required: [reason]

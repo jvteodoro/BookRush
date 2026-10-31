@@ -24,3 +24,11 @@ aceita somente as origens configuradas em `BOOKRUSH_CORS_ALLOWED_ORIGINS`.
 The service validates the `bookrush-platform` issuer/JWK set and requires the
 `bookrush-ingestion` audience. It maps OAuth scopes and the Keycloak `groups`
 claim to `SCOPE_*`/`ROLE_*` authorities for moderation operations.
+
+## Validade dos tokens e moderação administrativa
+
+A validação JWT preserva os validadores padrão de expiração e not-before junto
+com issuer e audience. Comentários ocultos/removidos pela fachada administrativa
+continuam excluídos da listagem de leitores; restaurar devolve a visibilidade.
+O teste integrado `scripts/test-admin-user-management-e2e.sh` verifica esse
+comportamento contra os serviços reais e PostgreSQL descartável.
