@@ -1,4 +1,12 @@
 services:
+  catalog-service:
+    image: ${BACKEND_IMAGE:?Imagem backend ausente}
+  frontend:
+    image: ${FRONTEND_IMAGE:?Imagem frontend ausente}
+  book-ingestion-service:
+    image: ${INGESTION_IMAGE:?Imagem ingestion ausente}
+  book-analytics-service:
+    image: ${ANALYTICS_IMAGE:?Imagem analytics ausente}
   recommendation-service:
     image: ${RECOMMENDATION_IMAGE:?Imagem recommendation ausente}
   reader-bff-service:
@@ -13,5 +21,10 @@ services:
     image: ${SOCIAL_IMAGE:?Imagem social ausente}
   admin-service:
     image: ${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}
+    environment:
+      KEYCLOAK_ADMIN_TOKEN_URI: ${KEYCLOAK_ADMIN_TOKEN_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/token}
+      KEYCLOAK_ADMIN_BASE: ${KEYCLOAK_ADMIN_BASE:-http://keycloak:8080/admin/realms/bookrush}
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-bookrush-admin-service}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
   admin-web:
     image: ${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}

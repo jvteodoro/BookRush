@@ -24,3 +24,50 @@ aceita somente as origens configuradas em `BOOKRUSH_CORS_ALLOWED_ORIGINS`.
 The service validates the `bookrush-platform` issuer/JWK set and requires the
 `bookrush-ingestion` audience. It maps OAuth scopes and the Keycloak `groups`
 claim to `SCOPE_*`/`ROLE_*` authorities for moderation operations.
+
+## Validade dos tokens e moderação administrativa
+
+A validação JWT preserva os validadores padrão de expiração e not-before junto
+com issuer e audience. Comentários ocultos/removidos pela fachada administrativa
+continuam excluídos da listagem de leitores; restaurar devolve a visibilidade.
+O teste integrado `scripts/test-admin-user-management-e2e.sh` verifica esse
+comportamento contra os serviços reais e PostgreSQL descartável.
+
+## Remover o próprio comentário
+
+`DELETE /api/v1/social/comments/{commentId}` retorna 204 sem corpo, inclusive
+quando repetido pelo mesmo autor. Exige token do realm de produto `bookrush`,
+issuer e audience configurados do serviço. O subject vem do token e deve ser
+igual a `social.comments.subject_key`: token ausente/inválido/expirado recebe
+401, outro autor recebe 403 e UUID inexistente recebe 404. O método DELETE e os
+cabeçalhos Authorization/Content-Type já fazem parte do CORS explícito; o
+reverse proxy mantém o prefixo `/api/v1/social/` ao encaminhar ao social-service.
+
+A listagem devolve `canDelete` calculado no servidor; nomes de apresentação não
+concedem autorização. A interface solicita confirmação e atualiza lista e
+contagem somente após o sucesso. Conteúdo, autoria e denúncias permanecem
+preservados para moderação. [Contrato OpenAPI](../api/openapi.yaml).
+
+Em rollout parcial, implante primeiro o social-service para aplicar V8 e depois
+o admin-service/admin-web, que exibem a remoção pelo autor e bloqueiam restauração.
+A pipeline integrada já constrói e implanta esses serviços.
+
+## Contagem de seguidores
+
+`GET /api/v1/social/followers` usa o subject do token para consultar a própria
+contagem; `?user=<subject>` consulta outro perfil existente. Responde `user`,
+`following`, `visible` e `followerCount` inteiro quando visível. Se a privacidade
+não permitir acesso, `visible=false` e o número é omitido/nulo, nunca um zero
+fictício. O autor vê sua própria contagem mesmo com perfil privado ou sem perfil
+persistido. Outra identidade inexistente recebe 404; ausência de token recebe
+401. Issuer/audience de produto e CORS GET permanecem os mesmos do serviço.
+
+A leitura respeita `profileVisibility` e `socialGraphVisibility` da configuração
+do reader-profile-service: PUBLIC para leitores autenticados; FOLLOWERS para
+quem segue o perfil; PRIVATE apenas para o próprio leitor. O flag legado
+`is_public=false` também bloqueia um perfil que ainda esteja marcado PUBLIC na
+projeção de privacidade. Somente agregados são retornados, sem lista de pessoas.
+A consulta usa snapshot consistente e o índice V9 por `followed`. A chave
+primária existente impede que seguir repetidamente infle a contagem. O frontend
+consulta novamente após seguir/desseguir e apresenta indisponibilidade em caso
+de erro. Não há contadores duplicados nem novas dependências de runtime.

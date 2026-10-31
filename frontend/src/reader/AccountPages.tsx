@@ -1,3 +1,4 @@
+import { FollowerCount } from "./FollowerCount";
 import type { ReactNode } from "react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -181,6 +182,7 @@ export function AccountPage({
           </span>
           <div>
             <h2>{displayName}</h2>
+            <FollowerCount />
             <p>
               {profile?.bio?.trim() ||
                 "Entre um capítulo e outro, descobrindo novos mundos."}

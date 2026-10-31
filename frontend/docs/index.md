@@ -320,3 +320,31 @@ run:android` ou EAS. Os tokens também ficam somente na memória.
 ## Limitações intencionais
 
 Feed social, comentários, progresso de leitura e recomendações dependem de APIs de produto que ainda não existem. A interface mostra o catálogo canônico sem inventar métricas editoriais ou dados sociais.
+
+## Remover comentários próprios
+
+Na conversa do livro, o autor vê Remover nos próprios comentários. Após a
+confirmação, a interface usa o cliente autenticado para enviar DELETE ao
+social-service e atualiza a conversa e a contagem. Cancelar não envia nada;
+falhas preservam o comentário e exibem a mensagem correspondente. A propriedade
+`canDelete` vem do servidor; a autorização real compara o subject do token com o
+autor persistido. A remoção é definitiva para a leitura pública; moderação e
+referências de denúncias ficam preservadas.
+
+## Seguidores no perfil
+
+O perfil próprio e o perfil de outro leitor exibem a contagem real de seguidores,
+com singular/plural e formatação pt-BR. Seguir ou deixar de seguir atualiza a
+contagem consultando novamente o social-service. Preferências privadas exibem
+"Seguidores privados"; erros exibem indisponibilidade, sem simular zero. O perfil
+próprio oferece nova tentativa quando a consulta falha.
+
+## Feed e capas após login
+
+A indisponibilidade de uma capa (rede, CORS ou leitura da resposta) usa o
+fallback existente e não impede a abertura do feed. A requisição inicial da
+thumbnail continua usando o cliente autenticado e a restrição same-origin.
+O gateway S3 precisa atender o domínio público do storage com CORS adequado;
+uma resposta HTML da aplicação nesse domínio indica roteamento incorreto.
+Consulte `docs/operations/feed-after-login.md` no repositório para o diagnóstico
+e a correção do arquivo Traefik efetivamente montado no servidor.

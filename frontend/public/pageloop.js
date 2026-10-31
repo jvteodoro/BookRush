@@ -1009,18 +1009,24 @@
         return;
       }
       let following = null;
+      let followerLabel = "Seguidores indisponíveis";
       try {
-        const status = await window.__BOOKRUSH_API__?.followStatus?.(subject);
-        following = typeof status === "boolean" ? status : null;
+        const stats = await window.__BOOKRUSH_API__?.followerStats?.(subject);
+        following =
+          typeof stats?.following === "boolean" ? stats.following : null;
+        followerLabel = stats?.label || followerLabel;
       } catch {
         /* O perfil público continua acessível se o serviço social falhar. */
       }
       if (state.route !== "otherProfile" || state.otherUser !== subject) return;
       const name = profile.displayName;
       const bio = profile.bio?.trim();
-      const content = `<main class="content"><section class="profile-hero"><div class="profile-avatar">${esc(name.slice(0, 2).toUpperCase())}</div><div><div class="eyebrow">PERFIL PÚBLICO</div><h1>${esc(name)}</h1>${bio ? `<p class="muted">${esc(bio)}</p>` : ""}</div><div class="profile-actions"><button class="primary-btn" id="profileFollow" aria-pressed="${following === true}" ${following === null ? "disabled" : ""}>${following === null ? "Acompanhamento indisponível" : following ? "Seguindo" : "Seguir"}</button><button class="secondary-btn" data-route="feed">Voltar ao feed</button></div></section></main>`;
+      const content = `<main class="content"><section class="profile-hero"><div class="profile-avatar">${esc(name.slice(0, 2).toUpperCase())}</div><div><div class="eyebrow">PERFIL PÚBLICO</div><h1>${esc(name)}</h1>${bio ? `<p class="muted">${esc(bio)}</p>` : ""}<p class="profile-followers" id="profileFollowers" aria-live="polite"><strong>${esc(followerLabel)}</strong></p></div><div class="profile-actions"><button class="primary-btn" id="profileFollow" aria-pressed="${following === true}" ${following === null ? "disabled" : ""}>${following === null ? "Acompanhamento indisponível" : following ? "Seguindo" : "Seguir"}</button><button class="secondary-btn" data-route="feed">Voltar ao feed</button></div></section></main>`;
       shell(content, name);
       const followButton = document.getElementById("profileFollow");
+      const followerLabelNode = document.querySelector(
+        "#profileFollowers strong",
+      );
       followButton.onclick = async () => {
         const enabled = !following;
         followButton.disabled = true;
@@ -1031,6 +1037,20 @@
           if (state.route === "otherProfile" && state.otherUser === subject) {
             followButton.textContent = enabled ? "Seguindo" : "Seguir";
             followButton.setAttribute("aria-pressed", String(enabled));
+            try {
+              const stats =
+                await window.__BOOKRUSH_API__?.followerStats?.(subject);
+              if (
+                state.route === "otherProfile" &&
+                state.otherUser === subject
+              ) {
+                followerLabelNode.textContent =
+                  stats?.label || "Seguidores indisponíveis";
+              }
+            } catch {
+              if (state.route === "otherProfile" && state.otherUser === subject)
+                followerLabelNode.textContent = "Seguidores indisponíveis";
+            }
           }
         } catch (error) {
           toast(error.message || "Não foi possível atualizar o acompanhamento");

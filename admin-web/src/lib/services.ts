@@ -134,6 +134,24 @@ export type AdminComment = {
   visibility: string;
   reasonCode?: string;
   createdAt?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+  authorDeletedAt?: string;
+};
+export type AdminCommentPage = {
+  items: AdminComment[];
+  page: number;
+  size: number;
+  totalItems: number;
+  last: boolean;
+};
+export type CommentHistory = {
+  id: string;
+  actor: string;
+  createdAt: string;
+  previousVisibility: string;
+  visibility: string;
+  reason: string;
 };
 
 const sleep = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -262,9 +280,18 @@ export const services = {
     );
     return data;
   },
-  async listAdminComments(): Promise<AdminComment[]> {
-    const { data } = await adminHttp.get("/api/v1/admin/moderation/comments");
-    return (data.items ?? data).map((item: Record<string, unknown>) => ({
+  async listAdminComments(
+    search = "",
+    visibility = "",
+    page = 0,
+  ): Promise<AdminCommentPage> {
+    const { data } = await adminHttp.get(
+      "/api/v1/admin/moderation/comments/page",
+      {
+        params: { search: search.trim(), visibility, page, size: 25 },
+      },
+    );
+    const items = data.items.map((item: Record<string, unknown>) => ({
       id: String(item.id),
       bookId: String(item.bookId ?? item.book_id),
       subjectKey: String(item.subjectKey ?? item.subject_key),
@@ -278,13 +305,40 @@ export const services = {
       visibility: String(item.visibility ?? "VISIBLE"),
       reasonCode: item.reasonCode ?? item.reason_code,
       createdAt: item.createdAt ?? item.created_at,
+      updatedAt: item.updatedAt ?? item.updated_at,
+      updatedBy: item.updatedBy ?? item.updated_by_subject,
+      authorDeletedAt: item.authorDeletedAt ?? item.author_deleted_at,
+    }));
+    return {
+      items,
+      page: Number(data.page),
+      size: Number(data.size),
+      totalItems: Number(data.totalItems),
+      last: Boolean(data.last),
+    };
+  },
+  async commentHistory(commentId: string): Promise<CommentHistory[]> {
+    const { data } = await adminHttp.get(
+      `/api/v1/admin/moderation/comments/${encodeURIComponent(commentId)}/history`,
+    );
+    return data.map((item: Record<string, unknown>) => ({
+      id: String(item.id),
+      actor: String(item.actor_subject),
+      createdAt: String(item.created_at),
+      previousVisibility: String(item.previous_visibility),
+      visibility: String(item.visibility),
+      reason: String(item.reason),
     }));
   },
-  async moderateAdminComment(commentId: string, visibility: string) {
+  async moderateAdminComment(
+    commentId: string,
+    visibility: string,
+    reason: string,
+  ) {
     const { data } = await adminHttp.post("/api/v1/admin/moderation/comments", {
       commentId,
       visibility,
-      reasonCode: "ADMIN_REVIEW",
+      reasonCode: reason,
     });
     return data;
   },

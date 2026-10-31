@@ -66,4 +66,108 @@ class SocialControllerTest {
         org.mockito.ArgumentMatchers.any(), eq("subject-1"), eq(bookId), eq(commentId),
         eq("conteúdo ofensivo"));
   }
+  @Test
+  void deletionRequiresAuthenticationAndOwnershipEvenForOperators() {
+    UUID id = UUID.randomUUID();
+    assertEquals(401, assertThrows(ResponseStatusException.class,
+        () -> controller.deleteOwnComment(id, null)).getStatusCode().value());
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id)))
+        .thenReturn(java.util.List.of(Map.of("subject_key", "another-reader")));
+    assertEquals(403, assertThrows(ResponseStatusException.class,
+        () -> controller.deleteOwnComment(id, principal)).getStatusCode().value());
+    org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never()).update(
+        contains("author_deleted_at"), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void deletionOfMissingCommentReturnsNotFound() {
+    assertEquals(404, assertThrows(ResponseStatusException.class,
+        () -> controller.deleteOwnComment(UUID.randomUUID(), principal)).getStatusCode().value());
+  }
+
+  @Test
+  void deletionRetainsTheRowAndOnlySetsTheFirstRemovalTime() {
+    UUID id = UUID.randomUUID();
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id)))
+        .thenReturn(java.util.List.of(Map.of("subject_key", "subject-1")));
+    controller.deleteOwnComment(id, principal);
+    verify(jdbc).update(contains("author_deleted_at IS NULL"), eq(id), eq("subject-1"));
+  }
+
+  @Test
+  void legacyModerationCannotRestoreAnAuthorRemovedComment() {
+    UUID id = UUID.randomUUID();
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id)))
+        .thenReturn(java.util.List.of(Map.of("author_deleted_at", java.time.Instant.now())));
+    var operator = new TestingAuthenticationToken(principal, "credentials", "ROLE_operators");
+    assertEquals(409, assertThrows(ResponseStatusException.class,
+        () -> controller.moderateComment(id, new SocialController.ModerationDecision("VISIBLE", "restore"),
+            principal, operator)).getStatusCode().value());
+  }
+
+  @Test
+  void ownFollowerCountDoesNotRequireAPublicProfile() {
+    when(jdbc.queryForObject(contains("SELECT count(*) FROM social.follows"), eq(Long.class), eq("subject-1")))
+        .thenReturn(0L);
+    @SuppressWarnings("unchecked")
+    var result = (Map<String, Object>) controller.followers("", principal);
+    assertEquals(0L, result.get("followerCount"));
+    assertEquals(true, result.get("visible"));
+  }
+
+  @Test
+  void publicFollowerCountUsesIncomingRelations() {
+    when(jdbc.queryForList(contains("profile_privacy"), eq("reader-2"))).thenReturn(java.util.List.of(
+        Map.of("is_public", true, "profile_visibility", "PUBLIC", "social_graph_visibility", "PUBLIC")));
+    when(jdbc.queryForObject(contains("SELECT count(*) FROM social.follows"), eq(Long.class), eq("reader-2")))
+        .thenReturn(12L);
+    @SuppressWarnings("unchecked")
+    var result = (Map<String, Object>) controller.followers("reader-2", principal);
+    assertEquals(12L, result.get("followerCount"));
+    assertEquals(false, result.get("following"));
+  }
+
+  @Test
+  void privateCountsAreNotQueriedOrExposedToAnotherReader() {
+    for (var profile : java.util.List.<Map<String, Object>>of(
+        Map.of("is_public", true, "profile_visibility", "PUBLIC", "social_graph_visibility", "PRIVATE"),
+        Map.of("is_public", false, "profile_visibility", "PRIVATE", "social_graph_visibility", "PUBLIC"),
+        Map.of("is_public", false, "profile_visibility", "PUBLIC", "social_graph_visibility", "PUBLIC"))) {
+      when(jdbc.queryForList(contains("profile_privacy"), eq("reader-2"))).thenReturn(java.util.List.of(profile));
+      @SuppressWarnings("unchecked")
+      var result = (Map<String, Object>) controller.followers("reader-2", principal);
+      assertEquals(false, result.get("visible"));
+      assertEquals(null, result.get("followerCount"));
+    }
+    org.mockito.Mockito.verify(jdbc, org.mockito.Mockito.never()).queryForObject(
+        contains("SELECT count(*) FROM social.follows"), eq(Long.class), eq("reader-2"));
+  }
+
+  @Test
+  void followerOnlyVisibilityUsesTheViewersOwnRelationship() {
+    when(jdbc.queryForList(contains("profile_privacy"), eq("reader-2"))).thenReturn(java.util.List.of(
+        Map.of("is_public", false, "profile_visibility", "FOLLOWERS", "social_graph_visibility", "FOLLOWERS")));
+    @SuppressWarnings("unchecked")
+    var hidden = (Map<String, Object>) controller.followers("reader-2", principal);
+    assertEquals(false, hidden.get("visible"));
+    when(jdbc.queryForObject(contains("SELECT EXISTS"), eq(Boolean.class), eq("subject-1"), eq("reader-2")))
+        .thenReturn(true);
+    when(jdbc.queryForObject(contains("SELECT count(*) FROM social.follows"), eq(Long.class), eq("reader-2")))
+        .thenReturn(1L);
+    @SuppressWarnings("unchecked")
+    var visible = (Map<String, Object>) controller.followers("reader-2", principal);
+    assertEquals(true, visible.get("visible"));
+    assertEquals(1L, visible.get("followerCount"));
+  }
+
+  @Test
+  void followerCountsRequireAuthenticationAndAnExistingOtherProfile() {
+    assertEquals(401, assertThrows(ResponseStatusException.class,
+        () -> controller.followers("", null)).getStatusCode().value());
+    assertEquals(404, assertThrows(ResponseStatusException.class,
+        () -> controller.followers("missing", principal)).getStatusCode().value());
+    assertEquals(400, assertThrows(ResponseStatusException.class,
+        () -> controller.followers("x".repeat(201), principal)).getStatusCode().value());
+  }
+
 }

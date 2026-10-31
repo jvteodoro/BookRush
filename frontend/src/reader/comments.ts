@@ -5,6 +5,7 @@ export type BookComment = {
   body: string;
   subject_key?: string;
   authorName?: string;
+  canDelete?: boolean;
   created_at?: string;
 };
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
@@ -65,3 +66,23 @@ export async function reportComment(
     );
 }
 import { apiRoutes } from "../app/apiRoutes";
+
+export async function deleteComment(
+  commentId: string,
+  fetcher: Fetcher = authClient.fetch.bind(authClient),
+): Promise<void> {
+  const response = await fetcher(apiRoutes.social.comment(commentId), {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const messages: Record<number, string> = {
+      401: "Sua sessão expirou. Entre novamente.",
+      403: "Você só pode remover os próprios comentários.",
+      404: "Comentário não encontrado. Atualize a lista.",
+    };
+    throw new Error(
+      messages[response.status] ??
+        "Não foi possível remover o comentário. Tente novamente.",
+    );
+  }
+}

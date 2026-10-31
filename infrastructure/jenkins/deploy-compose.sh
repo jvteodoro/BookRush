@@ -4,22 +4,38 @@ set -Eeuo pipefail
 : "${FRONTEND_IMAGE:?Imagem frontend ausente}"
 : "${INGESTION_IMAGE:?Imagem ingestion ausente}"
 : "${ANALYTICS_IMAGE:?Imagem analytics ausente}"
-if [[ -z "${ANALYTICS_RUNTIME_IMAGE:-}" ]]; then
-  export ANALYTICS_RUNTIME_IMAGE="${ANALYTICS_IMAGE/book-analytics-service/book-analytics-runtime}"
-fi
-: "${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}"
-: "${RECOMMENDATION_IMAGE:?Imagem recommendation ausente}"
-: "${READER_BFF_IMAGE:?Imagem reader-bff ausente}"
-: "${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}"
-: "${SOCIAL_IMAGE:?Imagem social ausente}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
 
-if [[ -z "${READER_STATE_IMAGE:-}" ]]; then
-  READER_STATE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/reader-state-service}"
-  [[ "$READER_STATE_IMAGE" != "$BACKEND_IMAGE" ]] || { echo 'Não foi possível derivar READER_STATE_IMAGE de BACKEND_IMAGE.' >&2; exit 1; }
-  export READER_STATE_IMAGE
+# Uma definição antiga do job pode não conhecer os serviços adicionados pela
+# branch selecionada. Preserve registry/tag e construa a revisão do checkout,
+# sem recorrer a imagens :local antigas do host.
+compatibility_services=()
+if [[ -z "${ANALYTICS_RUNTIME_IMAGE:-}" ]]; then
+  ANALYTICS_RUNTIME_IMAGE="${ANALYTICS_IMAGE/book-analytics-service/book-analytics-runtime}"
+  [[ "$ANALYTICS_RUNTIME_IMAGE" != "$ANALYTICS_IMAGE" ]] || {
+    echo 'Não foi possível derivar ANALYTICS_RUNTIME_IMAGE de ANALYTICS_IMAGE.' >&2
+    exit 1
+  }
+  export ANALYTICS_RUNTIME_IMAGE
+  compatibility_services+=("book-analytics-runtime|$ANALYTICS_RUNTIME_IMAGE")
 fi
+resolve_service_image() {
+  local variable="$1" service="$2" image
+  [[ -z "${!variable:-}" ]] || return 0
+  [[ "$BACKEND_IMAGE" == */bookrush/catalog-service:* ]] || {
+    echo "Não foi possível derivar $variable de BACKEND_IMAGE." >&2
+    exit 1
+  }
+  image="${BACKEND_IMAGE%/bookrush/catalog-service:*}/bookrush/$service:${BACKEND_IMAGE##*:}"
+  export "$variable=$image"
+  compatibility_services+=("$service|$image")
+}
+resolve_service_image RECOMMENDATION_IMAGE recommendation-service
+resolve_service_image READER_BFF_IMAGE reader-bff-service
+resolve_service_image READER_STATE_IMAGE reader-state-service
+resolve_service_image READER_PROFILE_IMAGE reader-profile-service
+resolve_service_image SOCIAL_IMAGE social-service
 
 # O job parametrizado pode carregar o Jenkinsfile da main antes de fazer
 # checkout de uma feature. Durante a transição para uma pipeline que publica as
@@ -54,18 +70,41 @@ if [[ "$storage_health" != healthy ]]; then
   echo 'SeaweedFS não está provisionado/saudável. Execute o procedimento inicial de infraestrutura antes do deploy.' >&2
   exit 1
 fi
+for entry in "${compatibility_services[@]}"; do
+  service="${entry%%|*}"
+  image="${entry#*|}"
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    echo "Imagem $image ausente; construindo compatibilidade do $service." >&2
+    if [[ "$service" == book-analytics-runtime ]]; then
+      runtime_build_args=()
+      if [[ "${ANALYTICS_GPU:-false}" == true ]]; then
+        runtime_build_args+=(--build-arg ANALYTICS_RUNTIME_REQUIREMENTS=requirements.cuda.txt)
+      fi
+      docker build "${runtime_build_args[@]}" -t "$image" "$repo_dir/services/$service"
+    else
+      docker build -t "$image" -f "$repo_dir/services/$service/Dockerfile" "$repo_dir"
+    fi
+  fi
+done
 if ! docker image inspect "$ADMIN_SERVICE_IMAGE" >/dev/null 2>&1; then
   echo "Imagem $ADMIN_SERVICE_IMAGE ausente; construindo compatibilidade do admin-service." >&2
   docker build -t "$ADMIN_SERVICE_IMAGE" -f "$repo_dir/services/admin-service/Dockerfile" "$repo_dir"
-fi
-if ! docker image inspect "$READER_STATE_IMAGE" >/dev/null 2>&1; then
-  echo "Imagem $READER_STATE_IMAGE ausente; construindo compatibilidade do reader-state-service." >&2
-  docker build -t "$READER_STATE_IMAGE" -f "$repo_dir/services/reader-state-service/Dockerfile" "$repo_dir"
 fi
 if ! docker image inspect "$ADMIN_WEB_IMAGE" >/dev/null 2>&1; then
   echo "Imagem $ADMIN_WEB_IMAGE ausente; construindo compatibilidade do admin-web." >&2
   docker build -t "$ADMIN_WEB_IMAGE" "$repo_dir/admin-web"
 fi
+# Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
+# Este preflight também detecta builds feitos em um daemon diferente do deploy.
+missing_images=false
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+  if ! docker image inspect "${!variable}" >/dev/null 2>&1; then
+    echo "Imagem de deploy ausente no daemon: $variable=${!variable}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
+    missing_images=true
+  fi
+done
+if $missing_images; then exit 1; fi
+"${compose[@]}" config --quiet
 old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1 2>/dev/null || true)"
 old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1 2>/dev/null || true)"
 old_ingestion="$(docker inspect --format '{{.Config.Image}}' bookrush-book-ingestion-service-1 2>/dev/null || true)"
@@ -208,10 +247,12 @@ probe_user_management() {
     return 1
   fi
   for attempt in {1..6}; do
-    probe_token="$(docker run --rm --network bookrush_bookrush curlimages/curl:8.10.1 -fsS -X POST \
-      http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token \
-      -d grant_type=client_credentials -d client_id=bookrush-ingestion-admin \
-      --data-urlencode "client_secret=$probe_secret" 2>/dev/null | jq -er '.access_token' 2>/dev/null)" && break
+    probe_token="$(docker run --rm -i --network bookrush_bookrush \
+      -e KEYCLOAK_URL=http://keycloak:8080 \
+      -e KEYCLOAK_REALM=bookrush-platform \
+      -e KEYCLOAK_CLIENT_ID=bookrush-ingestion-admin \
+      -e KEYCLOAK_CLIENT_SECRET="$probe_secret" \
+      python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/request-client-token.py")" && break
     echo "Smoke de usuários: token técnico ainda indisponível (tentativa $attempt/6)." >&2
     sleep 5
   done
@@ -289,7 +330,7 @@ rollback() {
 }
 
 echo "Iniciando deploy das imagens:" >&2
-printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${RECOMMENDATION_IMAGE}" "${READER_BFF_IMAGE}" "${READER_STATE_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${ADMIN_SERVICE_IMAGE}" "${ADMIN_WEB_IMAGE}" "${FRONTEND_IMAGE}" >&2
+printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${RECOMMENDATION_IMAGE}" "${READER_BFF_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${ADMIN_SERVICE_IMAGE}" "${ADMIN_WEB_IMAGE}" "${FRONTEND_IMAGE}" >&2
 
 # Não usar somente trap ERR: docker compose pode falhar durante --wait e o
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.
