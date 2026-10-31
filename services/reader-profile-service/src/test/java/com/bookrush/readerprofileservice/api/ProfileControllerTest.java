@@ -6,6 +6,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.isNull;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 import java.security.Principal;
 import java.util.List;
@@ -45,4 +49,19 @@ class ProfileControllerTest {
             new ProfileController.Privacy("EVERYONE", "PUBLIC", "PRIVATE", "PRIVATE", "PUBLIC"),
             reader));
   }
+  @Test
+  void indexesOnlyAuthenticatedIdentityClaims() {
+    var jwt = Jwt.withTokenValue("fixture").header("alg", "RS256").subject("reader-1")
+        .claim("preferred_username", "ana.reader").claim("name", "Ana Silva").build();
+    controller.get(new JwtAuthenticationToken(jwt));
+    verify(jdbc).update(anyString(), eq("reader-1"), eq("Ana Silva"), eq("ana.reader"));
+  }
+
+  @Test
+  void identityWithoutNamesDoesNotInventPersonalData() {
+    var jwt = Jwt.withTokenValue("fixture").header("alg", "RS256").subject("reader-1").build();
+    controller.get(new JwtAuthenticationToken(jwt));
+    verify(jdbc).update(anyString(), eq("reader-1"), isNull(), isNull());
+  }
+
 }

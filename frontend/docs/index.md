@@ -348,3 +348,22 @@ O gateway S3 precisa atender o domínio público do storage com CORS adequado;
 uma resposta HTML da aplicação nesse domínio indica roteamento incorreto.
 Consulte `docs/operations/feed-after-login.md` no repositório para o diagnóstico
 e a correção do arquivo Traefik efetivamente montado no servidor.
+
+## Pesquisa de pessoas
+
+A barra de busca mantém os resultados de livros e oferece a opção **Pessoas**.
+O mesmo texto pesquisa nome ou `@usuário` em perfis públicos, com debounce,
+paginação, cancelamento de consultas antigas, estados vazios e retry de erros.
+**Ver perfil** usa a navegação existente para perfis de leitores. A pesquisa de
+pessoas usa o cliente autenticado e `/api/v1/profile/search`; contas que ainda
+não acessaram seu perfil não são importadas da administração do Keycloak.
+
+## Avaliações por estrelas
+
+Abra **Sobre e avaliações** no feed, busca de livros, recomendações ou biblioteca;
+no leitor, use o botão ★. O painel mostra título, autor, média e quantidade de
+avaliações; livros ainda sem notas têm mensagem própria. Escolha 1–5 estrelas
+com mouse ou teclado e salve; é possível atualizar ou remover a própria nota.
+O servidor confirma cada alteração antes de atualizar a média. Falhas permitem
+tentar novamente sem apagar a nota anterior. A integração usa authClient.fetch
+e o contrato `/api/v1/social/books/{bookId}/ratings`.

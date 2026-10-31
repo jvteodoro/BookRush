@@ -3,6 +3,35 @@ info:
   title: reader-profile-service
   version: 0.1.0
 paths:
+  /api/v1/profile/search:
+    get:
+      summary: Search public readers by display name or username
+      description: >-
+        Authenticated product-realm search (audience account, no additional scope).
+        Case-insensitive literal substring; optional leading @ is ignored.
+        Only profiles with is_public=true and PUBLIC profile visibility are returned.
+        Empty queries return no users. No emails, biographies or identity-provider data are exposed.
+        Profile identities are indexed on authenticated profile reads; existing custom names are preserved.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100, default: '' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 10000, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Stable name/subject ordered page of public readers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserSearchPage' }
+        '400': { description: Invalid query length or pagination }
+        '401': { description: Missing or invalid product token }
+        '403': { description: Request blocked by origin or authorization policy }
   /api/v1/profile:
     get:
       security: [{ bearerAuth: [] }]
@@ -55,6 +84,24 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    SearchUser:
+      type: object
+      required: [subject]
+      properties:
+        subject: { type: string, description: Opaque profile identifier }
+        displayName: { type: string, nullable: true }
+        username: { type: string, nullable: true }
+    UserSearchPage:
+      type: object
+      required: [items, totalItems, totalPages, page, size]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SearchUser' }
+        totalItems: { type: integer, format: int64, minimum: 0 }
+        totalPages: { type: integer, format: int64, minimum: 0 }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 50 }
     Privacy:
       type: object
       required: [profileVisibility, activityVisibility, libraryVisibility, recentVisibility, socialGraphVisibility]

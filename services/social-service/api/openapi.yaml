@@ -1,10 +1,64 @@
 openapi: 3.0.3
 info:
   title: BookRush Social API
-  version: 0.2.0
-  description: Reader comments, author removal and privacy-aware follower counts.
+  version: 0.3.0
+  description: Reader comments, author removal, privacy-aware follower counts and book star ratings.
 security: [{ bearerAuth: [] }]
 paths:
+  /api/v1/social/books/{bookId}/ratings:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Read aggregate stars and the authenticated reader's own rating
+      description: Product realm, audience account; no extra scope. No other reader identities are returned.
+      responses:
+        '200':
+          description: Live aggregate; average and personal rating are absent when unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RatingSummary' }
+        '400': { description: Invalid book identifier }
+        '401': { description: Missing or invalid product token }
+        '403': { description: Origin or authorization policy denied the request }
+        '404': { description: Book not found in catalog }
+        '503': { description: Catalog unavailable }
+    put:
+      summary: Create or replace the authenticated reader's rating
+      description: One integer score from 1 through 5 per reader and book. Caller-supplied identities are not used.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stars]
+              properties:
+                stars: { type: integer, minimum: 1, maximum: 5 }
+      responses:
+        '200':
+          description: Authoritative aggregate including the saved personal rating
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RatingSummary' }
+        '400': { description: Invalid identifier or non-integer score outside 1 through 5 }
+        '401': { description: Missing or invalid product token }
+        '403': { description: Origin or authorization policy denied the request }
+        '404': { description: Book not found in catalog }
+        '503': { description: Catalog unavailable }
+    delete:
+      summary: Remove only the authenticated reader's rating
+      description: Idempotent; never removes another reader's score.
+      responses:
+        '200':
+          description: Authoritative aggregate after removal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RatingSummary' }
+        '400': { description: Invalid book identifier }
+        '401': { description: Missing or invalid product token }
+        '403': { description: Origin or authorization policy denied the request }
+        '404': { description: Book not found in catalog }
+        '503': { description: Catalog unavailable }
   /api/v1/social/followers:
     get:
       summary: Read incoming follower count subject to profile and social graph privacy
@@ -71,6 +125,14 @@ components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   schemas:
+    RatingSummary:
+      type: object
+      required: [bookId, totalRatings]
+      properties:
+        bookId: { type: string, format: uuid }
+        totalRatings: { type: integer, format: int64, minimum: 0 }
+        averageRating: { type: number, minimum: 1, maximum: 5, nullable: true, description: Mean rounded to two decimals; absent when no ratings exist }
+        myRating: { type: integer, minimum: 1, maximum: 5, nullable: true }
     Comment:
       type: object
       required: [id, subject_key, body, authorName, canDelete, created_at]

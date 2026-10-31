@@ -28,3 +28,7 @@ adotar um limite de cobertura no CI.
 Falhas de rede/CORS ou leitura de capas usam o fallback visual e não devem
 interromper o feed. Para diagnosticar o endpoint público e o proxy S3, consulte
 [Feed após login](../../docs/operations/feed-after-login.md).
+
+- `user-search.test.mjs`: busca autenticada de pessoas, query literal e
+  paginação, erros de sessão/permissão, abertura do perfil, estados vazios/retry
+  e cancelamento de resultados antigos.

@@ -46,3 +46,14 @@ A chave primária existente `(follower, followed)` continua garantindo unicidade
 não são criadas linhas de contagem nem copiados dados. A contagem é calculada por
 `count(*)` no banco. A migration preserva relações existentes; o E2E valida
 upgrade com relação legada e boot Flyway em PostgreSQL descartável.
+
+## V10 — avaliações de livros
+
+`V10__book_ratings.sql` cria `social.book_rating`, com chave composta
+`(subject_key, book_id)`, stars SMALLINT restrito a 1–5 e timestamps
+timestamptz. O índice por livro inclui stars para calcular count/avg; não há
+FK entre schemas de serviços. A existência do livro é validada via catálogo.
+Upsert concorrente preserva uma nota por leitor/livro; repetição da mesma nota
+não altera updated_at. A média e a nota do leitor vêm da mesma consulta.
+Nenhuma tabela anterior é alterada. O E2E cobre boot vazio, upgrade V9 e
+validação Flyway em segundo boot.

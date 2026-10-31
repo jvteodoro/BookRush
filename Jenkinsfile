@@ -80,6 +80,8 @@ pipeline {
           bash -n infrastructure/bootstrap/*.sh infrastructure/keycloak/*.sh infrastructure/jenkins/*.sh scripts/*.sh
           docker compose --project-name bookrush-contracts --file infrastructure/compose.yaml --env-file .env.example config >/dev/null
           bash scripts/test-deploy-compose-config.sh
+          bash scripts/test-profile-search-e2e.sh
+          bash scripts/test-book-ratings-e2e.sh
           bash scripts/validate-pipelines.sh
           bash scripts/test-keycloak-realms.sh
           bash scripts/test-keycloak-reconcile.sh

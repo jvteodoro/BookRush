@@ -807,7 +807,7 @@
     const content = `<div class="reader-shell" id="readerShell">
       <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${getMode() === "app" ? "feed" : "library"}" aria-label="Voltar">${icon("chevron", "icon-sm")}<span>Voltar</span></button></div>
       <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
-      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir aparência" aria-controls="settingsPanel" aria-expanded="false">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
+      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="bookDetailsBtn" aria-label="Sobre o livro e avaliações">★</button><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir aparência" aria-controls="settingsPanel" aria-expanded="false">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
       <aside class="reader-panel reader-toc" id="tocPanel" hidden><div class="reader-panel-heading"><strong>Sumário</strong><button class="reader-panel-close" data-reader-close="tocPanel" aria-label="Fechar">×</button></div><nav>${chapterItems(chapters) || emptyChapterItems}</nav></aside>
       <aside class="reader-panel reader-settings" id="settingsPanel" role="region" aria-label="Aparência da leitura" hidden><div class="reader-panel-heading"><strong>Aparência</strong><button class="reader-panel-close" data-reader-close="settingsPanel" aria-label="Fechar">×</button></div>
         <div id="readerAppearance"></div>
@@ -816,6 +816,11 @@
       <main class="reader-main"><div class="readium-host" id="readium-reader" aria-label="Leitor Readium"></div></main>
     </div>`;
     shell(content, b.title);
+    document.getElementById("bookDetailsBtn")?.addEventListener("click", () => {
+      window.dispatchEvent(
+        new CustomEvent("bookrush:open-book-details", { detail: b.id }),
+      );
+    });
     window.__BOOKRUSH_APPEARANCE__?.mount(
       document.getElementById("readerAppearance"),
       (preferences) =>
