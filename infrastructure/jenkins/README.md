@@ -421,3 +421,13 @@ nenhuma configuração extra do job ou do host é necessária para essa rota.
 A integração com a planta diária inclui `READER_STATE_IMAGE` no teste de merge
 Compose: as doze imagens da revisão são verificadas tanto com o Compose atual
 quanto com um host antigo simulado, junto com a configuração administrativa.
+
+### Contrato de avaliações de livros
+
+A etapa de contratos executa `scripts/test-book-ratings-e2e.sh`: testes Java e
+imagens do social/catalog, PostgreSQL 16, upgrade de migration, Keycloak e
+gateway Traefik reais em rede descartável. Não publica portas nem usa volumes
+ou credenciais existentes. O Compose passa `SOCIAL_CATALOG_URL` ao social-service
+como `CATALOG_URL`, default `http://catalog-service:8080`, sem secret adicional.
+Após publicar e implantar a branch, confirme no site a média e o CRUD da própria
+nota com dois leitores. Testes locais não substituem esse smoke do deploy.

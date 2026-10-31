@@ -31,7 +31,7 @@ test -f infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertica
 test -f infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline do SeaweedFS ausente'
 test -f infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline do admin-web ausente'
 
-for file in scripts/test-profile-search-e2e.sh scripts/test-deploy-compose-config.sh scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-keycloak-access-lifecycle.sh scripts/test-keycloak-user-management.sh scripts/test-microservice.sh scripts/test-reader-bff-e2e.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
+for file in scripts/test-book-ratings-e2e.sh scripts/test-profile-search-e2e.sh scripts/test-deploy-compose-config.sh scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-keycloak-access-lifecycle.sh scripts/test-keycloak-user-management.sh scripts/test-microservice.sh scripts/test-reader-bff-e2e.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
   test -f "$file" || fail "script referenciado não existe: $file"
   bash -n "$file" || fail "sintaxe inválida: $file"
 done
@@ -74,4 +74,5 @@ grep -Fq 'deploy-seaweedfs.sh' infrastructure/jenkins/seaweedfs.Jenkinsfile || f
 grep -Fq 'docker build --target build' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem build validado'
 grep -Fq 'docker push "$ADMIN_WEB_IMAGE"' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem publicação da imagem'
 grep -Fq 'PUBLISH exige REGISTRY' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem guarda de publicação'
+grep -Fq 'bash scripts/test-book-ratings-e2e.sh' Jenkinsfile || fail 'pipeline principal sem E2E de avaliações'
 echo 'Pipeline contracts: OK'

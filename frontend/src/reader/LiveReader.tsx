@@ -8,6 +8,8 @@ import { LibraryPage } from "./LibraryPage";
 import type { LibraryBook } from "./library";
 import { SearchPage } from "./SearchPage";
 import { RecommendationsPage } from "./RecommendationsPage";
+import { BookDetailsDrawer, type DetailsBook } from "./BookDetailsDrawer";
+import "../styles/ratings.css";
 import { CommentsDrawer } from "./CommentsDrawer";
 import { AccountPage } from "./AccountPages";
 import type { FeedExcerpt } from "../app/types";
@@ -121,6 +123,16 @@ export function LiveReader({
     ),
   );
   const [pending, setPending] = useState<string[]>([]);
+  const [detailsBook, setDetailsBook] = useState<DetailsBook | null>(null);
+  useEffect(() => {
+    const open = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      const book = runtime().__BOOKRUSH_BOOKS__.find((item) => item.id === id);
+      if (book) setDetailsBook({ ...book, description: book.quote });
+    };
+    window.addEventListener("bookrush:open-book-details", open);
+    return () => window.removeEventListener("bookrush:open-book-details", open);
+  }, []);
   const [commentsBook, setCommentsBook] = useState<{
     id: string;
     title: string;
@@ -350,6 +362,7 @@ export function LiveReader({
           pending={pending}
           message={message}
           onSave={save}
+          onDetails={setDetailsBook}
           onOpen={(book) =>
             void action(book.id, async () => {
               await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query);
@@ -368,6 +381,7 @@ export function LiveReader({
           pending={pending}
           message={message}
           onSave={save}
+          onDetails={setDetailsBook}
           onOpen={openCatalogBook}
           onProfile={(subject) => {
             runtime().__BOOKRUSH_LEGACY__.openProfile(subject);
@@ -383,6 +397,7 @@ export function LiveReader({
           onLoaded={syncSaved}
           onOpen={openCatalogBook}
           onRemove={save}
+          onDetails={setDetailsBook}
           onDiscover={() => navigate("feed")}
         />
       ) : [
@@ -416,6 +431,7 @@ export function LiveReader({
           books={books}
           saved={saved}
           onSave={save}
+          onDetails={setDetailsBook}
           onOpen={(book) =>
             void action(book.id, async () => {
               await runtime().__BOOKRUSH_LEGACY__.openBook(book.id);
@@ -462,6 +478,13 @@ export function LiveReader({
               </>
             ),
           }}
+        />
+      )}
+      {detailsBook && (
+        <BookDetailsDrawer
+          key={detailsBook.id}
+          book={detailsBook}
+          onClose={() => setDetailsBook(null)}
         />
       )}
       {commentsBook && (

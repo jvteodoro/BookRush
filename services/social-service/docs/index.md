@@ -71,3 +71,26 @@ A consulta usa snapshot consistente e o índice V9 por `followed`. A chave
 primária existente impede que seguir repetidamente infle a contagem. O frontend
 consulta novamente após seguir/desseguir e apresenta indisponibilidade em caso
 de erro. Não há contadores duplicados nem novas dependências de runtime.
+
+## Avaliações de livros
+
+`GET/PUT/DELETE /api/v1/social/books/{bookId}/ratings` pertence ao social-service
+e atravessa a rota `/api/v1/social` existente no Traefik. Exige bearer do realm
+produto `bookrush`, audience `account`, sem scope adicional. O subject do token
+é a única identidade aceita: PUT cria/substitui a própria nota inteira de 1 a 5,
+DELETE remove apenas a própria nota e é idempotente. GET retorna `bookId`,
+`totalRatings`, `averageRating` arredondada a duas casas e `myRating`, quando
+existem. Sem notas, média e nota pessoal são omitidas. Nenhuma identidade alheia
+é exposta; notas de perfis privados contribuem somente ao agregado anônimo.
+
+O catálogo valida a existência do livro por GET público, sem encaminhar bearer
+de produto a endpoints do realm de plataforma. UUID/nota inválidos retornam 400,
+ausência de autenticação 401, livro ausente 404 e catálogo indisponível 503.
+Origens CORS explícitas em `BOOKRUSH_CORS_ALLOWED_ORIGINS`; PUT/DELETE e
+Authorization/Content-Type já permitidos. `CATALOG_URL` no serviço usa
+`http://catalog-service:8080` por padrão (`SOCIAL_CATALOG_URL` no Compose).
+
+Validação isolada: `bash scripts/test-book-ratings-e2e.sh` executa Maven verify,
+imagens reais, PostgreSQL 16, upgrade V9→V10, JWTs de dois leitores e chamadas
+pelo gateway versionado, incluindo CORS, concorrência, edição e exclusão.
+Recursos do teste são descartados, sem usar `.env` ou volumes de produção.

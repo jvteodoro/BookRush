@@ -37,6 +37,7 @@ export const apiRoutes = {
     book: (bookId: string) => `/api/v1/content/books/${id(bookId)}`,
   },
   social: {
+    ratings: (bookId: string) => `/api/v1/social/books/${id(bookId)}/ratings`,
     likes: (bookId: string) => `/api/v1/social/books/${id(bookId)}/likes`,
     comments: (bookId: string) => `/api/v1/social/books/${id(bookId)}/comments`,
     comment: (commentId: string) => `/api/v1/social/comments/${id(commentId)}`,

@@ -511,6 +511,7 @@ services:
       context: ..
       dockerfile: services/social-service/Dockerfile
     environment:
+      CATALOG_URL: ${SOCIAL_CATALOG_URL:-http://catalog-service:8080}
       <<: *java-db-pool
       SPRING_PROFILES_ACTIVE: docker
       DB_HOST: postgres

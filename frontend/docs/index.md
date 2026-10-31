@@ -357,3 +357,13 @@ paginação, cancelamento de consultas antigas, estados vazios e retry de erros.
 **Ver perfil** usa a navegação existente para perfis de leitores. A pesquisa de
 pessoas usa o cliente autenticado e `/api/v1/profile/search`; contas que ainda
 não acessaram seu perfil não são importadas da administração do Keycloak.
+
+## Avaliações por estrelas
+
+Abra **Sobre e avaliações** no feed, busca de livros, recomendações ou biblioteca;
+no leitor, use o botão ★. O painel mostra título, autor, média e quantidade de
+avaliações; livros ainda sem notas têm mensagem própria. Escolha 1–5 estrelas
+com mouse ou teclado e salve; é possível atualizar ou remover a própria nota.
+O servidor confirma cada alteração antes de atualizar a média. Falhas permitem
+tentar novamente sem apagar a nota anterior. A integração usa authClient.fetch
+e o contrato `/api/v1/social/books/{bookId}/ratings`.

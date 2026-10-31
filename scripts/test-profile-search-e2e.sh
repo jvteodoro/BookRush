@@ -44,9 +44,8 @@ docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d upgrade -c "INSER
 docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d upgrade < services/reader-profile-service/src/main/resources/db/migration/V4__profile_search_username.sql >/dev/null
 [[ "$(docker exec "$postgres" psql -At -U bookrush -d upgrade -c "SELECT display_name||':'||is_public||':'||profile_visibility FROM reader_profile.profile JOIN reader_profile.profile_privacy USING(subject_key) WHERE subject_key='legacy' AND username IS NULL")" == Legacy:false:PRIVATE ]]
 
-cat > "$work_dir/realm.json" <<'JSON'
-{"realm":"search-tests","enabled":true,"clients":[{"clientId":"search-web","publicClient":true,"directAccessGrantsEnabled":true,"protocol":"openid-connect","protocolMappers":[{"name":"subject","protocol":"openid-connect","protocolMapper":"oidc-sub-mapper","config":{"access.token.claim":"true"}},{"name":"username","protocol":"openid-connect","protocolMapper":"oidc-usermodel-property-mapper","config":{"user.attribute":"username","claim.name":"preferred_username","jsonType.label":"String","access.token.claim":"true"}},{"name":"full name","protocol":"openid-connect","protocolMapper":"oidc-full-name-mapper","config":{"access.token.claim":"true"}},{"name":"audience","protocol":"openid-connect","protocolMapper":"oidc-audience-mapper","config":{"included.custom.audience":"account","access.token.claim":"true"}}]}],"users":[{"username":"ana.reader","email":"ana@example.test","emailVerified":true,"enabled":true,"firstName":"Ana","lastName":"Leitora","credentials":[{"type":"password","value":"disposable-pass","temporary":false}]},{"username":"bruno.reader","email":"bruno@example.test","emailVerified":true,"enabled":true,"firstName":"Bruno","lastName":"Leitor","credentials":[{"type":"password","value":"disposable-pass","temporary":false}]}]}
-JSON
+cp scripts/fixtures/reader-test-realm.json "$work_dir/realm.json"
+
 docker create --name "$keycloak" --network "$network" --network-alias keycloak \
   -e JAVA_OPTS_APPEND="-Xms128m -Xmx512m" quay.io/keycloak/keycloak:25.0 start-dev --import-realm >/dev/null
 chmod 755 "$work_dir"

@@ -8,8 +8,8 @@ import type { LibraryBook } from './library';
 import { UserSearchResults } from './UserSearchResults';
 import { searchCatalog, type SearchResult } from './search';
 
-type Props = { visible: boolean; query: string; onQuery: (value: string) => void; saved: string[]; pending: string[]; message: string; onSave: (id: string) => void; onOpen: (book: LibraryBook) => void; onProfile: (subject: string) => void };
-export function SearchPage({ visible, query, onQuery, saved, pending, message, onSave, onOpen, onProfile }: Props) {
+type Props = { onDetails?: (book: LibraryBook) => void; visible: boolean; query: string; onQuery: (value: string) => void; saved: string[]; pending: string[]; message: string; onSave: (id: string) => void; onOpen: (book: LibraryBook) => void; onProfile: (subject: string) => void };
+export function SearchPage({ visible, query, onQuery, saved, pending, message, onSave, onOpen, onProfile, onDetails }: Props) {
   const [kind, setKind] = useState<"books" | "people">("books");
   const [page, setPage] = useState(0);
   const [attempt, setAttempt] = useState(0);
@@ -40,7 +40,7 @@ export function SearchPage({ visible, query, onQuery, saved, pending, message, o
       <div className="br-search-results">{data.books.map(book => <Card className="br-search-result" key={book.id}>
         <div className="br-search-result__cover"><BookCard book={book} onOpen={() => onOpen(book)} disabled={pending.includes(book.id)} /></div>
         <div className="br-search-result__copy"><h2>{book.title}</h2><p>{book.author} · {book.genre}</p>{book.description && <p className="br-search-result__description">{book.description}</p>}</div>
-        <div className="br-search-result__actions"><Button variant={saved.includes(book.id) ? 'secondary' : 'ghost'} size="sm" disabled={pending.includes(book.id)} aria-pressed={saved.includes(book.id)} aria-label={`${saved.includes(book.id) ? 'Remover' : 'Salvar'} ${book.title} na biblioteca`} onClick={() => onSave(book.id)}><Icon name="bookmark" />{saved.includes(book.id) ? 'Salvo' : 'Salvar'}</Button><Button size="sm" disabled={pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora</Button></div>
+        <div className="br-search-result__actions">{onDetails && <Button variant="ghost" size="sm" onClick={() => onDetails(book)}>Sobre e avaliações</Button>}<Button variant={saved.includes(book.id) ? 'secondary' : 'ghost'} size="sm" disabled={pending.includes(book.id)} aria-pressed={saved.includes(book.id)} aria-label={`${saved.includes(book.id) ? 'Remover' : 'Salvar'} ${book.title} na biblioteca`} onClick={() => onSave(book.id)}><Icon name="bookmark" />{saved.includes(book.id) ? 'Salvo' : 'Salvar'}</Button><Button size="sm" disabled={pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora</Button></div>
       </Card>)}</div>
       {data.totalPages > 1 && <nav className="br-search-pagination" aria-label="Páginas de resultados"><CarouselControl direction="previous" label="Página anterior" disabled={page === 0} onClick={() => setPage(current => current - 1)} /><span>Página {data.page + 1} de {data.totalPages}</span><CarouselControl direction="next" label="Próxima página" disabled={page >= data.totalPages - 1} onClick={() => setPage(current => current + 1)} /></nav>}
     </>}
