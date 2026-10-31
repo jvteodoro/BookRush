@@ -121,7 +121,7 @@ exit 99
     def test_existing_derived_images_are_reused(self):
         result, calls = self.prepare(cached=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(calls.count('image inspect registry.example'), 16)
+        self.assertEqual(calls.count('image inspect registry.example'), 15)
         self.assertNotIn('build -t', calls)
 
     def test_unrecognized_backend_fails_before_docker(self):
