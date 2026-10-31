@@ -1,4 +1,12 @@
 services:
+  catalog-service:
+    image: ${BACKEND_IMAGE:?Imagem backend ausente}
+  frontend:
+    image: ${FRONTEND_IMAGE:?Imagem frontend ausente}
+  book-ingestion-service:
+    image: ${INGESTION_IMAGE:?Imagem ingestion ausente}
+  book-analytics-service:
+    image: ${ANALYTICS_IMAGE:?Imagem analytics ausente}
   recommendation-service:
     image: ${RECOMMENDATION_IMAGE:?Imagem recommendation ausente}
   reader-bff-service:

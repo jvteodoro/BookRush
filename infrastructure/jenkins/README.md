@@ -294,6 +294,16 @@ teste em `python:3.12-slim` pelo Docker. Somente os dois arquivos necessários
 são enviados por stdin, sem montar o workspace ou acessar credenciais. O
 container usa `--rm` e rede desativada; não é preciso instalar Python no Jenkins.
 
+O mesmo preparo cobre `ANALYTICS_RUNTIME_IMAGE` ausente: deriva o nome de
+`ANALYTICS_IMAGE` e constrói o runtime do checkout quando necessário, usando
+`requirements.cuda.txt` se `ANALYTICS_GPU=true`. Apenas derivar o nome não
+garante que a imagem exista. Antes de iniciar ou alterar containers, o deploy
+confere as onze imagens no daemon e valida o Compose; imagem explícita ausente
+interrompe o processo com o nome da variável, sem iniciar recriação ou rollback.
+O override `deploy-images.compose.yaml` fixa as onze imagens da revisão, inclusive
+catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
+Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
+
 ## Proxy e visualização de estágios
 
 A imagem inclui `pipeline-stage-view` (tabela de estágios no job) e

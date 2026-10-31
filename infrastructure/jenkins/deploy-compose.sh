@@ -4,10 +4,6 @@ set -Eeuo pipefail
 : "${FRONTEND_IMAGE:?Imagem frontend ausente}"
 : "${INGESTION_IMAGE:?Imagem ingestion ausente}"
 : "${ANALYTICS_IMAGE:?Imagem analytics ausente}"
-if [[ -z "${ANALYTICS_RUNTIME_IMAGE:-}" ]]; then
-  export ANALYTICS_RUNTIME_IMAGE="${ANALYTICS_IMAGE/book-analytics-service/book-analytics-runtime}"
-fi
-: "${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
 
@@ -15,6 +11,15 @@ repo_dir="$(cd "${script_dir}/../.." && pwd)"
 # branch selecionada. Preserve registry/tag e construa a revisão do checkout,
 # sem recorrer a imagens :local antigas do host.
 compatibility_services=()
+if [[ -z "${ANALYTICS_RUNTIME_IMAGE:-}" ]]; then
+  ANALYTICS_RUNTIME_IMAGE="${ANALYTICS_IMAGE/book-analytics-service/book-analytics-runtime}"
+  [[ "$ANALYTICS_RUNTIME_IMAGE" != "$ANALYTICS_IMAGE" ]] || {
+    echo 'Não foi possível derivar ANALYTICS_RUNTIME_IMAGE de ANALYTICS_IMAGE.' >&2
+    exit 1
+  }
+  export ANALYTICS_RUNTIME_IMAGE
+  compatibility_services+=("book-analytics-runtime|$ANALYTICS_RUNTIME_IMAGE")
+fi
 resolve_service_image() {
   local variable="$1" service="$2" image
   [[ -z "${!variable:-}" ]] || return 0
@@ -69,7 +74,15 @@ for entry in "${compatibility_services[@]}"; do
   image="${entry#*|}"
   if ! docker image inspect "$image" >/dev/null 2>&1; then
     echo "Imagem $image ausente; construindo compatibilidade do $service." >&2
-    docker build -t "$image" -f "$repo_dir/services/$service/Dockerfile" "$repo_dir"
+    if [[ "$service" == book-analytics-runtime ]]; then
+      runtime_build_args=()
+      if [[ "${ANALYTICS_GPU:-false}" == true ]]; then
+        runtime_build_args+=(--build-arg ANALYTICS_RUNTIME_REQUIREMENTS=requirements.cuda.txt)
+      fi
+      docker build "${runtime_build_args[@]}" -t "$image" "$repo_dir/services/$service"
+    else
+      docker build -t "$image" -f "$repo_dir/services/$service/Dockerfile" "$repo_dir"
+    fi
   fi
 done
 if ! docker image inspect "$ADMIN_SERVICE_IMAGE" >/dev/null 2>&1; then
@@ -80,6 +93,17 @@ if ! docker image inspect "$ADMIN_WEB_IMAGE" >/dev/null 2>&1; then
   echo "Imagem $ADMIN_WEB_IMAGE ausente; construindo compatibilidade do admin-web." >&2
   docker build -t "$ADMIN_WEB_IMAGE" "$repo_dir/admin-web"
 fi
+# Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
+# Este preflight também detecta builds feitos em um daemon diferente do deploy.
+missing_images=false
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+  if ! docker image inspect "${!variable}" >/dev/null 2>&1; then
+    echo "Imagem de deploy ausente no daemon: $variable=${!variable}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
+    missing_images=true
+  fi
+done
+if $missing_images; then exit 1; fi
+"${compose[@]}" config --quiet
 old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1 2>/dev/null || true)"
 old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1 2>/dev/null || true)"
 old_ingestion="$(docker inspect --format '{{.Config.Image}}' bookrush-book-ingestion-service-1 2>/dev/null || true)"
