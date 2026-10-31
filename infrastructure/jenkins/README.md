@@ -289,6 +289,10 @@ Valide essa compatibilidade sem Docker ou credenciais com
 `python3 scripts/test-deploy-compose-images.py` (também executado por
 `bash scripts/validate-pipelines.sh`). O teste cobre variáveis ausentes,
 registry com porta, imagens explícitas, cache, formato inválido e falha de build.
+Quando o agente não possui Python 3, `validate-pipelines.sh` executa esse mesmo
+teste em `python:3.12-slim` pelo Docker. Somente os dois arquivos necessários
+são enviados por stdin, sem montar o workspace ou acessar credenciais. O
+container usa `--rm` e rede desativada; não é preciso instalar Python no Jenkins.
 
 ## Proxy e visualização de estágios
 

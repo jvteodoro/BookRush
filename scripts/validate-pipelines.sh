@@ -8,7 +8,23 @@ fail() { echo "pipeline validation: $*" >&2; exit 1; }
 test -f Jenkinsfile || fail 'Jenkinsfile ausente'
 test -f infrastructure/jenkins/bookrush.Jenkinsfile || fail 'cópia do Jenkinsfile ausente'
 cmp -s Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile || fail 'Jenkinsfiles principais divergem'
-python3 scripts/test-deploy-compose-images.py || fail 'contrato de imagens do deploy Compose inválido'
+if command -v python3 >/dev/null 2>&1; then
+  python3 scripts/test-deploy-compose-images.py || fail 'contrato de imagens do deploy Compose inválido'
+elif command -v docker >/dev/null 2>&1; then
+  # O agente Jenkins tem Docker, mas não necessariamente Python. Envie apenas
+  # os arquivos do teste por stdin: funciona também com daemon fora do agente,
+  # sem depender de bind mounts ou instalar pacotes no host.
+  tar -cf - scripts/test-deploy-compose-images.py infrastructure/jenkins/deploy-compose.sh |
+    docker run --rm -i --network none python:3.12-slim bash -lc '
+      set -euo pipefail
+      workspace=$(mktemp -d)
+      tar -xf - -C "$workspace"
+      cd "$workspace"
+      python3 scripts/test-deploy-compose-images.py
+    ' || fail 'contrato de imagens do deploy Compose inválido (Docker)'
+else
+  fail 'contrato de imagens exige Python 3 ou Docker'
+fi
 test -f infrastructure/jenkins/backstage.Jenkinsfile || fail 'pipeline dedicada do Backstage ausente'
 test -f infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de microserviço ausente'
 test -f infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical ausente'
