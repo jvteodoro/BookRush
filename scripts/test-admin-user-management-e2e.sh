@@ -139,6 +139,15 @@ docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d comments_upgra
   < "$repo_dir/services/social-service/src/main/resources/db/migration/V8__comment_author_deletion.sql" >/dev/null
 docker exec "$postgres" psql -At -U bookrush -d comments_upgrade \
   -c "SELECT c.author_deleted_at IS NULL AND c.body='migration fixture' AND m.visibility='HIDDEN' FROM social.comments c JOIN social.comment_moderation_state m ON m.comment_id=c.id" | grep -qx t
+# V9 must preserve existing follow relations while adding its incoming index.
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d comments_upgrade \
+  -c "INSERT INTO social.follows(follower,followed) VALUES ('upgrade-reader','legacy-target')" >/dev/null
+docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d comments_upgrade \
+  < "$repo_dir/services/social-service/src/main/resources/db/migration/V9__follower_count_index.sql" >/dev/null
+docker exec "$postgres" psql -At -U bookrush -d comments_upgrade \
+  -c "SELECT count(*) FROM social.follows WHERE followed='legacy-target'" | grep -qx 1
+docker exec "$postgres" psql -At -U bookrush -d comments_upgrade \
+  -c "SELECT count(*) FROM pg_indexes WHERE schemaname='social' AND indexname='social_follows_followed_idx'" | grep -qx 1
 docker run -d --name "$social_service" --network "$network" \
   -e DB_HOST=postgres -e DB_NAME=bookrush -e DB_USERNAME=bookrush -e DB_PASSWORD=bookrush \
   -e BOOKRUSH_SECURITY_ENABLED=true \
@@ -394,7 +403,7 @@ for reader_name in comment-owner comment-other; do
   case $((${#token_payload} % 4)) in 2) token_payload="${token_payload}==" ;; 3) token_payload="${token_payload}=" ;; esac
   printf '%s' "$token_payload" | tr '_-' '/+' | base64 -d \
     | jq -e '(.aud | if type == "array" then index("account") != null else . == "account" end) and .azp == "bookrush-web" and (.sub | type == "string" and length > 0)' >/dev/null
-  if [[ "$reader_name" == comment-owner ]]; then owner_token="$reader_token"; else other_token="$reader_token"; fi
+  if [[ "$reader_name" == comment-owner ]]; then owner_token="$reader_token"; owner_subject="$reader_id"; else other_token="$reader_token"; other_subject="$reader_id"; fi
 done
 product_base="http://$product_social:8096/api/v1/social"
 comments_url="$product_base/books/33333333-3333-4333-8333-333333333333/comments"
@@ -461,5 +470,55 @@ headers="$(docker exec "$probe" curl -sS -D - -o /dev/null -X OPTIONS \
 printf '%s' "$headers" | grep -iq 'Access-Control-Allow-Origin: https://bookrush.jteodoro.tec.br'
 printf '%s' "$headers" | grep -iq 'Access-Control-Allow-Methods:.*DELETE'
 echo 'Comment author removal E2E: product ownership, 401/403/404/204, idempotency, evidence, restore409, CORS and V8 upgrade OK'
+
+# Incoming followers are counted from persisted relations, respecting profile privacy.
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  -c "INSERT INTO reader_profile.profile(subject_key,display_name,is_public) VALUES ('$owner_subject','Follower target',true),('$other_subject','Follower viewer',true) ON CONFLICT DO NOTHING" >/dev/null
+docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  < "$repo_dir/services/reader-profile-service/src/main/resources/db/migration/V3__profile_privacy.sql" >/dev/null
+followers_url="$product_base/followers?user=$owner_subject"
+follow_url="$product_base/follow?user=$owner_subject"
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$followers_url" \
+  | jq -e '.visible == true and .followerCount == 0 and .following == false' >/dev/null
+for _ in 1 2; do
+  docker exec "$probe" curl -fsS -X PUT -H "Authorization: Bearer $other_token" "$follow_url" >/dev/null
+  docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$followers_url" \
+    | jq -e '.visible == true and .followerCount == 1 and .following == true' >/dev/null
+done
+# A reader's following count must not be confused with their incoming followers.
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$product_base/followers" \
+  | jq -e '.visible == true and .followerCount == 0' >/dev/null
+# PRIVATE hides numbers from others while retaining the owner's access.
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  -c "UPDATE reader_profile.profile_privacy SET social_graph_visibility='PRIVATE' WHERE subject_key='$owner_subject'" >/dev/null
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$followers_url" \
+  | jq -e '.visible == false and .followerCount == null' >/dev/null
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $owner_token" "$product_base/followers" \
+  | jq -e '.visible == true and .followerCount == 1' >/dev/null
+# FOLLOWERS is visible only while the viewer actually follows the target.
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  -c "UPDATE reader_profile.profile_privacy SET social_graph_visibility='FOLLOWERS' WHERE subject_key='$owner_subject'" >/dev/null
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$followers_url" \
+  | jq -e '.visible == true and .followerCount == 1' >/dev/null
+for _ in 1 2; do
+  docker exec "$probe" curl -fsS -X DELETE -H "Authorization: Bearer $other_token" "$follow_url" >/dev/null
+  docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$followers_url" \
+    | jq -e '.visible == false and .followerCount == null and .following == false' >/dev/null
+done
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  -c "UPDATE reader_profile.profile_privacy SET social_graph_visibility='PUBLIC' WHERE subject_key='$owner_subject'" >/dev/null
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$followers_url" \
+  | jq -e '.visible == true and .followerCount == 0' >/dev/null
+# Legacy private-profile flags also take precedence over a stale PUBLIC preference.
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush \
+  -c "UPDATE reader_profile.profile SET is_public=false WHERE subject_key='$owner_subject'" >/dev/null
+docker exec "$probe" curl -fsS -H "Authorization: Bearer $other_token" "$followers_url" \
+  | jq -e '.visible == false and .followerCount == null' >/dev/null
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' "$followers_url")"
+[[ "$status" == 401 ]]
+status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer $other_token" "$product_base/followers?user=missing-profile")"
+[[ "$status" == 404 ]]
+echo 'Follower count E2E: V9 upgrade, 0/1 counts, repeated follow/unfollow, incoming direction, privacy and authorization OK'
 
 echo 'Admin moderation E2E: users, comment visibility/history/rollback, authorization, CORS and report lifecycle OK'

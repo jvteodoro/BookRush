@@ -51,3 +51,23 @@ preservados para moderação. [Contrato OpenAPI](../api/openapi.yaml).
 Em rollout parcial, implante primeiro o social-service para aplicar V8 e depois
 o admin-service/admin-web, que exibem a remoção pelo autor e bloqueiam restauração.
 A pipeline integrada já constrói e implanta esses serviços.
+
+## Contagem de seguidores
+
+`GET /api/v1/social/followers` usa o subject do token para consultar a própria
+contagem; `?user=<subject>` consulta outro perfil existente. Responde `user`,
+`following`, `visible` e `followerCount` inteiro quando visível. Se a privacidade
+não permitir acesso, `visible=false` e o número é omitido/nulo, nunca um zero
+fictício. O autor vê sua própria contagem mesmo com perfil privado ou sem perfil
+persistido. Outra identidade inexistente recebe 404; ausência de token recebe
+401. Issuer/audience de produto e CORS GET permanecem os mesmos do serviço.
+
+A leitura respeita `profileVisibility` e `socialGraphVisibility` da configuração
+do reader-profile-service: PUBLIC para leitores autenticados; FOLLOWERS para
+quem segue o perfil; PRIVATE apenas para o próprio leitor. O flag legado
+`is_public=false` também bloqueia um perfil que ainda esteja marcado PUBLIC na
+projeção de privacidade. Somente agregados são retornados, sem lista de pessoas.
+A consulta usa snapshot consistente e o índice V9 por `followed`. A chave
+primária existente impede que seguir repetidamente infle a contagem. O frontend
+consulta novamente após seguir/desseguir e apresenta indisponibilidade em caso
+de erro. Não há contadores duplicados nem novas dependências de runtime.

@@ -38,3 +38,11 @@ por restauração administrativa.
 O teste `scripts/test-admin-user-management-e2e.sh` aplica V1–V7 em um banco
 PostgreSQL 16 descartável com comentário legado, valida upgrade V8 e também o
 boot normal do social-service em banco vazio com todas as migrations Flyway.
+
+## V9 — índice para seguidores recebidos
+
+`V9__follower_count_index.sql` adiciona índice por `social.follows.followed`.
+A chave primária existente `(follower, followed)` continua garantindo unicidade;
+não são criadas linhas de contagem nem copiados dados. A contagem é calculada por
+`count(*)` no banco. A migration preserva relações existentes; o E2E valida
+upgrade com relação legada e boot Flyway em PostgreSQL descartável.

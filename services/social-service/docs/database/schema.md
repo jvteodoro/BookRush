@@ -15,3 +15,8 @@ fonte de autorização e auditoria; nomes são apenas dados de apresentação.
 autor; o ator é a identidade imutável `subject_key` da mesma linha. A marca é
 independente de `comment_moderation_state` e exclui a linha da leitura pública
 mesmo que um estado legado de moderação ainda seja `VISIBLE`.
+
+`social.follows` possui chave primária `(follower, followed)` e índice V9 em
+`followed` para contar seguidores recebidos, preservando idempotência de seguir
+e deixar de seguir. A privacidade é lida das tabelas já existentes de
+`reader_profile` antes de revelar um agregado de outro usuário.

@@ -330,3 +330,11 @@ falhas preservam o comentário e exibem a mensagem correspondente. A propriedade
 `canDelete` vem do servidor; a autorização real compara o subject do token com o
 autor persistido. A remoção é definitiva para a leitura pública; moderação e
 referências de denúncias ficam preservadas.
+
+## Seguidores no perfil
+
+O perfil próprio e o perfil de outro leitor exibem a contagem real de seguidores,
+com singular/plural e formatação pt-BR. Seguir ou deixar de seguir atualiza a
+contagem consultando novamente o social-service. Preferências privadas exibem
+"Seguidores privados"; erros exibem indisponibilidade, sem simular zero. O perfil
+próprio oferece nova tentativa quando a consulta falha.

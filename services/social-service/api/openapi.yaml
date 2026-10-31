@@ -1,10 +1,31 @@
 openapi: 3.0.3
 info:
-  title: BookRush Social Comment Lifecycle API
-  version: 0.1.0
-  description: Reader comment publication and author removal. Moderation remains independent.
+  title: BookRush Social API
+  version: 0.2.0
+  description: Reader comments, author removal and privacy-aware follower counts.
 security: [{ bearerAuth: [] }]
 paths:
+  /api/v1/social/followers:
+    get:
+      summary: Read incoming follower count subject to profile and social graph privacy
+      parameters:
+        - { name: user, in: query, description: Omit to read the authenticated reader's own count, schema: { type: string, maxLength: 200 } }
+      responses:
+        '200':
+          description: Authoritative count or visible false with no count for a private social graph
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, following, visible]
+                properties:
+                  user: { type: string }
+                  following: { type: boolean }
+                  visible: { type: boolean }
+                  followerCount: { type: integer, format: int64, minimum: 0, nullable: true }
+        '400': { description: Invalid subject }
+        '401': { description: Authentication required }
+        '404': { description: Other reader profile not found }
   /api/v1/social/books/{bookId}/comments:
     parameters:
       - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }

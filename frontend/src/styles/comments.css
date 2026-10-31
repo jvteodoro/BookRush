@@ -30,3 +30,4 @@
 .br-comment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
 .br-comment-delete-confirm { margin: .75rem 0 0 2.75rem; padding: 1rem; border: 1px solid var(--br-outline-soft); border-radius: 12px; }
 .br-comment-delete-confirm p { margin: 0 0 .75rem; font-size: .85rem; }
+.br-follower-count { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: .75rem 0; font-size: .9rem; }

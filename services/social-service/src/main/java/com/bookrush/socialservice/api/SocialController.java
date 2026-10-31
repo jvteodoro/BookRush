@@ -147,6 +147,44 @@ public class SocialController {
     return Map.of("user", user, "following", following);
   }
 
+  @GetMapping("/followers")
+  @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+  public Object followers(@RequestParam(defaultValue = "") String user, Principal principal) {
+    String viewer = subject(principal);
+    String target = user.isBlank() ? viewer : user;
+    if (target.length() > 200) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid user");
+    }
+    boolean following = Boolean.TRUE.equals(jdbc.queryForObject(
+        "SELECT EXISTS (SELECT 1 FROM social.follows WHERE follower=? AND followed=?)",
+        Boolean.class, viewer, target));
+    boolean visible = true;
+    if (!viewer.equals(target)) {
+      var profiles = jdbc.queryForList("SELECT p.is_public, COALESCE(v.profile_visibility, "
+          + "CASE WHEN p.is_public THEN 'PUBLIC' ELSE 'PRIVATE' END) AS profile_visibility, "
+          + "COALESCE(v.social_graph_visibility, 'PUBLIC') AS social_graph_visibility "
+          + "FROM reader_profile.profile p LEFT JOIN reader_profile.profile_privacy v "
+          + "ON v.subject_key=p.subject_key WHERE p.subject_key=?", target);
+      if (profiles.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "profile not found");
+      var profile = profiles.getFirst();
+      visible = visibleTo(profile.get("profile_visibility"), following)
+          && visibleTo(profile.get("social_graph_visibility"), following)
+          && !(Boolean.FALSE.equals(profile.get("is_public"))
+              && "PUBLIC".equals(profile.get("profile_visibility")));
+    }
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("user", target);
+    result.put("following", following);
+    result.put("visible", visible);
+    result.put("followerCount", visible ? jdbc.queryForObject(
+        "SELECT count(*) FROM social.follows WHERE followed=?", Long.class, target) : null);
+    return result;
+  }
+
+  private boolean visibleTo(Object visibility, boolean following) {
+    return "PUBLIC".equals(visibility) || ("FOLLOWERS".equals(visibility) && following);
+  }
+
   @DeleteMapping("/follow")
   public void unfollow(@RequestParam String user, Principal principal, HttpServletRequest request) {
     jdbc.update("DELETE FROM social.follows WHERE follower = ? AND followed = ?",
