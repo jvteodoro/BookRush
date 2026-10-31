@@ -360,3 +360,5 @@ Compose. Isso evita o conflito de nome `bookrush-keycloak-1` durante a
 reconciliação ou rollback; o container continua na rede `bookrush_bookrush` e
 os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
 estiver parado, o deploy volta a incluí-lo na operação.
+
+A planta diária exige a imagem `READER_STATE_IMAGE` da mesma revisão do frontend; o deploy integrado atualiza o reader-state-service e preserva seu schema existente.

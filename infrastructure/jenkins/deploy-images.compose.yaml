@@ -5,6 +5,8 @@ services:
     image: ${READER_BFF_IMAGE:?Imagem reader-bff ausente}
   book-analytics-runtime:
     image: ${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}
+  reader-state-service:
+    image: ${READER_STATE_IMAGE:?Imagem reader-state ausente}
   reader-profile-service:
     image: ${READER_PROFILE_IMAGE:?Imagem reader-profile ausente}
   social-service:

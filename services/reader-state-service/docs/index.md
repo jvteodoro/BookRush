@@ -6,12 +6,16 @@ Migrations V2/V3 persist library, progress, bookmarks and reading-day projection
 
 V4 adiciona recentes e sessões; updates são restringidos ao subject autenticado.
 
-V5 adiciona locators imutáveis para progresso/bookmarks e a projeção persistente
-da planta. `GET /api/v1/reader/plant` materializa a projeção por subject usando
-a fórmula versionada `reading-minutes-v1`: cada 60 minutos acumulados avança um
-estágio, limitado ao estágio 5; o streak atual e a data medida são retornados
-junto com o total de minutos. Encerrar uma sessão atualiza a projeção na mesma
-transação da leitura diária, tornando retries e concorrência de sessões seguros.
+V5 adiciona locators e a projeção legada. V6 introduz a planta diária
+`daily-reading-v2`, independente do histórico anterior. Intervalos autenticados
+em `POST /api/v1/reader/plant` são idempotentes por eventId e
+somados por dia no fuso America/Sao_Paulo. Ao atingir 900 segundos, a planta
+cresce ou se recupera; cada dia encerrado sem meta alterna tristeza e regressão
+até o estágio 0. O estado é recalculado por usuário e exposto em
+`GET /api/v1/reader/plant`. A contabilização depende do leitor visível e das
+requisições recebidas pelo servidor.
+O preflight da rota aceita apenas as origens explícitas de
+`BOOKRUSH_CORS_ALLOWED_ORIGINS`; autenticação continua obrigatória para GET e POST.
 
 Every mutation requires the authenticated `(iss, sub)` principal. Opening a
 book is an idempotent upsert in `reader_state.recent`, so retries from a mobile
