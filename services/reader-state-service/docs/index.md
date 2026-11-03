@@ -10,6 +10,9 @@ V6 adiciona `book_id` nullable à sessão de leitura para manter compatibilidade
 com sessões antigas. Novas sessões podem receber `bookId`; ao encerrá-las,
 `READ_SESSION` é publicado para esse livro e preserva `recommendationItemId` e
 `impressionId` quando os headers de correlação vierem do feed.
+V7 persiste essa origem na própria sessão ao iniciar; o encerramento reutiliza
+os IDs persistidos quando o cliente não repete os headers, sem associar a sessão
+à última recomendação visualizada.
 
 V5 adiciona locators imutáveis para progresso/bookmarks e a projeção persistente
 da planta. `GET /api/v1/reader/plant` materializa a projeção por subject usando

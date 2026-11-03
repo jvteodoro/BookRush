@@ -88,11 +88,13 @@ public class ReaderStateController {
 
   @PostMapping("/sessions")
   public Object startSession(@RequestBody(required = false) Map<String, Object> body,
-      Principal principal) {
+      Principal principal, HttpServletRequest request) {
     UUID id = UUID.randomUUID();
     UUID bookId = uuidValue(body == null ? null : body.get("bookId"));
-    jdbc.update("INSERT INTO reader_state.session(id, subject_key, book_id, started_at) VALUES (?, ?, ?, now())",
-        id, subject(principal), bookId);
+    Map<String, Object> origin = correlation(request);
+    jdbc.update("INSERT INTO reader_state.session(id, subject_key, book_id, recommendation_item_id, impression_id, started_at) "
+        + "VALUES (?, ?, ?, ?, ?, now())", id, subject(principal), bookId,
+        origin.get("recommendationItemId"), origin.get("impressionId"));
     return Map.of("id", id, "startedAt", Instant.now());
   }
 
@@ -102,10 +104,18 @@ public class ReaderStateController {
       Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
     int seconds = integerValue(body, "activeSeconds");
-    UUID bookId = jdbc.query("SELECT book_id FROM reader_state.session "
-        + "WHERE id = ? AND subject_key = ? AND ended_at IS NULL",
-        rs -> rs.next() && rs.getObject("book_id") != null ? rs.getObject("book_id", UUID.class) : null,
+    Map<String, Object> sessionOrigin = jdbc.query("SELECT book_id, recommendation_item_id, impression_id "
+        + "FROM reader_state.session WHERE id = ? AND subject_key = ? AND ended_at IS NULL",
+        rs -> {
+          if (!rs.next()) return Map.of();
+          Map<String, Object> value = new LinkedHashMap<>();
+          value.put("bookId", rs.getObject("book_id", UUID.class));
+          value.put("recommendationItemId", rs.getObject("recommendation_item_id", UUID.class));
+          value.put("impressionId", rs.getObject("impression_id", UUID.class));
+          return value;
+        },
         id, subject);
+    UUID bookId = (UUID) sessionOrigin.get("bookId");
     int updated = jdbc.update("UPDATE reader_state.session SET ended_at = now(), active_seconds = ? "
         + "WHERE id = ? AND subject_key = ? AND ended_at IS NULL", seconds, id, subject);
     if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -114,6 +124,12 @@ public class ReaderStateController {
         + "ON CONFLICT (subject_key, day) DO UPDATE SET minutes = "
         + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, seconds / 60);
     Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
+    if (!payload.containsKey("recommendationItemId") && sessionOrigin.get("recommendationItemId") != null) {
+      payload.put("recommendationItemId", sessionOrigin.get("recommendationItemId"));
+    }
+    if (!payload.containsKey("impressionId") && sessionOrigin.get("impressionId") != null) {
+      payload.put("impressionId", sessionOrigin.get("impressionId"));
+    }
     payload.put("activeSeconds", seconds);
     behavior.publish("READ_SESSION", bookId, payload, authorization(request));
     return Map.of("id", id, "activeSeconds", seconds, "plant", refreshPlant(subject));
