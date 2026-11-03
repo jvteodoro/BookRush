@@ -34,4 +34,15 @@ class RecommendationSignalsControllerTest {
     assertEquals(400, response.getStatusCode().value());
     verifyNoInteractions(jdbc);
   }
+
+  @Test
+  void rejectsUnboundedTrendingLimitBeforeTouchingTheDatabase() {
+    JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
+    var controller = new RecommendationSignalsController(jdbc);
+
+    ResponseEntity<?> response = controller.trending(101);
+
+    assertEquals(400, response.getStatusCode().value());
+    verifyNoInteractions(jdbc);
+  }
 }

@@ -41,6 +41,29 @@ paths:
           description: Missing or invalid S2S token
         '403':
           description: Valid token without the required S2S scope or audience
+  /api/internal/v1/recommendation/trending:
+    get:
+      summary: Read bounded recent positive-trend candidates
+      description: >-
+        Internal S2S heuristic over a seven-day window. Unlike events are
+        excluded. The score is bounded and versioned as trending-v1; it is not
+        a calibrated engagement probability.
+      operationId: readRecommendationTrending
+      security:
+        - behaviorSignalsS2S: []
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        '200':
+          description: Bounded trending snapshot
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TrendingResponse' }
+        '400': { description: Invalid limit }
+        '401': { description: Missing or invalid S2S token }
+        '403': { description: Missing S2S scope or audience }
 components:
   securitySchemes:
     behaviorSignalsS2S:
@@ -106,3 +129,18 @@ components:
         lastOpenedAt: { type: string, format: date-time, nullable: true }
         lastProgressAt: { type: string, format: date-time, nullable: true }
         lastImpressionAt: { type: string, format: date-time, nullable: true }
+    TrendingResponse:
+      type: object
+      required: [window, heuristic, items]
+      properties:
+        window: { type: string, example: 7d }
+        heuristic: { type: string, example: trending-v1 }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TrendingItem' }
+    TrendingItem:
+      type: object
+      required: [bookId, score]
+      properties:
+        bookId: { type: string, format: uuid }
+        score: { type: number, format: double, minimum: 0, maximum: 1 }

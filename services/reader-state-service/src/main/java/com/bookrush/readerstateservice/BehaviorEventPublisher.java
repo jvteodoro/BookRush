@@ -22,8 +22,18 @@ public class BehaviorEventPublisher {
   }
 
   public void publish(String type, UUID bookId, Map<String, ?> payload, String authorization) {
+    publish(type, bookId, payload, authorization, type + ":" + UUID.randomUUID());
+  }
+
+  public void publishWithKey(String type, UUID bookId, Map<String, ?> payload,
+      String authorization, String eventKey) {
+    publish(type, bookId, payload, authorization, eventKey);
+  }
+
+  private void publish(String type, UUID bookId, Map<String, ?> payload,
+      String authorization, String eventKey) {
     Map<String, Object> event = new LinkedHashMap<>();
-    event.put("eventKey", type + ":" + UUID.randomUUID());
+    event.put("eventKey", eventKey);
     event.put("eventType", type);
     if (bookId != null) event.put("bookId", bookId);
     event.put("occurredAt", Instant.now().toString());

@@ -40,4 +40,22 @@ if [[ "${PFV1_EXPECT_DIFFERENT_TOP1:-false}" == true ]]; then
   }
 fi
 
+if [[ "${PFV1_EXPECT_PERSONALIZED:-false}" == true ]]; then
+  for name in user-a user-b; do
+    jq -e '.personalization.path == "PERSONALIZED" and
+      (.personalization.profileCoverage > 0) and
+      ([.items[].candidateSources? // []] | flatten | any(. == "semantic"))' \
+      "${workdir}/${name}.json" >/dev/null || {
+        echo "${name} did not prove live semantic personalized serving" >&2
+        exit 1
+      }
+  done
+  jq -e '.personalization.path == "FALLBACK" and
+    (.personalization.reason == "cold-start" or .personalization.reason == "coverage-low")' \
+    "${workdir}/cold.json" >/dev/null || {
+      echo "cold subject did not prove an explicit safe fallback reason" >&2
+      exit 1
+    }
+fi
+
 echo "PFV1 gateway contract smoke passed (three authenticated subjects; tokens withheld)."

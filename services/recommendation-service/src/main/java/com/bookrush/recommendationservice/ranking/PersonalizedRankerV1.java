@@ -42,7 +42,7 @@ public final class PersonalizedRankerV1 {
     }
     double normalized = totalWeight == 0 ? 0 : weighted / totalWeight;
     var breakdown = new Breakdown(value(values.affinity()), value(values.quality()),
-        value(values.trend()), value(values.exploration()), value(values.fatigue()));
+        value(values.trend()), value(values.exploration()), value(values.freshness()));
     return new ScoredCandidate(candidate, normalized, breakdown, tieBreak(candidate.id(), seed));
   }
 
@@ -61,7 +61,7 @@ public final class PersonalizedRankerV1 {
     }
   }
 
-  public enum Component { AFFINITY, QUALITY, TREND, EXPLORATION, FATIGUE }
+  public enum Component { AFFINITY, QUALITY, TREND, EXPLORATION, FRESHNESS }
   public enum MissingPolicy { RENORMALIZE, ZERO, EXCLUDE }
 
   public record Candidate(String id, Components components) {
@@ -71,30 +71,30 @@ public final class PersonalizedRankerV1 {
   }
 
   public record Components(Double affinity, Double quality, Double trend,
-      Double exploration, Double fatigue) {
+      Double exploration, Double freshness) {
     public Double value(Component component) {
       return switch (component) {
         case AFFINITY -> affinity;
         case QUALITY -> quality;
         case TREND -> trend;
         case EXPLORATION -> exploration;
-        case FATIGUE -> fatigue;
+        case FRESHNESS -> freshness;
       };
     }
   }
 
   public record Breakdown(double affinity, double quality, double trend,
-      double exploration, double fatigue) { }
+      double exploration, double freshness) { }
   public record ScoredCandidate(Candidate candidate, double score, Breakdown breakdown, long tieBreak) { }
 
   public record Config(String version, double affinityWeight, double qualityWeight,
-      double trendWeight, double explorationWeight, double fatigueWeight,
+      double trendWeight, double explorationWeight, double freshnessWeight,
       MissingPolicy missingPolicy) {
     public Config {
       if (version == null || version.isBlank() || missingPolicy == null
           || affinityWeight < 0 || qualityWeight < 0 || trendWeight < 0
-          || explorationWeight < 0 || fatigueWeight < 0
-          || affinityWeight + qualityWeight + trendWeight + explorationWeight + fatigueWeight == 0) {
+          || explorationWeight < 0 || freshnessWeight < 0
+          || affinityWeight + qualityWeight + trendWeight + explorationWeight + freshnessWeight == 0) {
         throw new IllegalArgumentException("invalid personalized ranker configuration");
       }
     }
@@ -104,7 +104,7 @@ public final class PersonalizedRankerV1 {
         case QUALITY -> qualityWeight;
         case TREND -> trendWeight;
         case EXPLORATION -> explorationWeight;
-        case FATIGUE -> fatigueWeight;
+        case FRESHNESS -> freshnessWeight;
       };
     }
     public String hash() { return Integer.toHexString(toString().hashCode()); }

@@ -17,7 +17,7 @@ public class PersonalizedFeedConfiguration {
   @Bean
   PersonalizedRankerV1 personalizedRanker() {
     return new PersonalizedRankerV1(new PersonalizedRankerV1.Config(
-        PersonalizedRankerV1.MODEL_VERSION, .55, .25, 0, .10, .10,
+        PersonalizedRankerV1.MODEL_VERSION, .50, .20, .10, .10, .10,
         PersonalizedRankerV1.MissingPolicy.RENORMALIZE));
   }
 

@@ -55,6 +55,10 @@ public final class PersonalizedProfileService {
     return result;
   }
 
+  public List<BehaviorSignalsClient.Trending> loadTrending() {
+    return behavior.trending();
+  }
+
   public record Result(UserTasteProfile profile, boolean behaviorAvailable,
       boolean snapshotAvailable, List<BehaviorSignalsClient.Signal> signals,
       Map<UUID, AnalyticsScoreClient.BookFeatureSnapshot> snapshots) {

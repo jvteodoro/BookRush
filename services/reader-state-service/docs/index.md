@@ -6,7 +6,21 @@ Migrations V2/V3 persist library, progress, bookmarks and reading-day projection
 
 V4 adiciona recentes e sessões; updates são restringidos ao subject autenticado.
 
-V5 adiciona locators e a projeção legada. V6 introduz a planta diária
+V6 adiciona `book_id` nullable à sessão de leitura para manter compatibilidade
+com sessões antigas. Novas sessões podem receber `bookId`; ao encerrá-las,
+`READ_SESSION` é publicado para esse livro e preserva `recommendationItemId` e
+`impressionId` quando os headers de correlação vierem do feed.
+V7 persiste essa origem na própria sessão ao iniciar; o encerramento reutiliza
+os IDs persistidos quando o cliente não repete os headers, sem associar a sessão
+à última recomendação visualizada.
+
+V5 adiciona locators imutáveis para progresso/bookmarks e a projeção persistente
+da planta. `GET /api/v1/reader/plant` materializa a projeção por subject usando
+a fórmula versionada `reading-minutes-v1`: cada 60 minutos acumulados avança um
+estágio, limitado ao estágio 5; o streak atual e a data medida são retornados
+junto com o total de minutos. Encerrar uma sessão atualiza a projeção na mesma
+transação da leitura diária, tornando retries e concorrência de sessões seguros.
+Além da projeção legada, V6 introduz a planta diária
 `daily-reading-v2`, independente do histórico anterior. Intervalos autenticados
 em `POST /api/v1/reader/plant` são idempotentes por eventId e
 somados por dia no fuso America/Sao_Paulo. Ao atingir 900 segundos, a planta
@@ -31,3 +45,8 @@ Eventos `BOOK_OPEN`, `READ_PROGRESS` e `READ_SESSION` são enviados ao
 behavior-service com o bearer do cliente, chave idempotente e até três
 tentativas; o behavior-service persiste o evento e seu outbox na mesma
 transação.
+
+Ao atingir 100% de progresso, o serviço publica `BOOK_COMPLETE` uma única vez
+por subject/livro usando uma chave idempotente estável, preservando a correlação
+do feed quando aplicável. A origem direta/search continua sem correlação
+inventada.

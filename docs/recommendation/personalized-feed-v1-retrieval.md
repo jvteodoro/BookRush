@@ -11,10 +11,21 @@ candidate universe.
 - `FEED_RETRIEVAL_MAX_PAGES` (default `5`)
 - `FEED_RETRIEVAL_VERSION` (default `catalog-page-v1`)
 
+The live controller requests the configured `FEED_RETRIEVAL_MAX_CANDIDATES`
+through the retriever contract; it does not hard-code the old `limit * 3`
+universe.
+
 The retriever preserves the first occurrence of each book ID, accepts books
 without an embedding, and stops at the configured candidate limit or a short
 catalog page. The resulting `CandidateSet` carries version, configuration hash,
 source, and a deterministic list of IDs for replay/provenance.
+
+When personalized serving is eligible, the controller enriches the bounded
+catalog universe with versioned candidate snapshots and passes semantic and
+global sources through `CandidateUnionBuilder`. Candidate snapshots are fetched
+through the analytics S2S cache in explicit batches no larger than
+`FEED_ANALYTICS_RANKING_MAX_CANDIDATES`; candidate embeddings are internal
+ranking data and are removed from the public book response.
 
 The implementation is intentionally catalog-backed and bounded. Future PFV1
 retrievers can combine semantic, global, trending, and exploration sources
@@ -27,10 +38,16 @@ monopolizing the pool, and duplicate books retain all contributing source names.
 The union is deterministic and bounded. The current catalog API has no trending
 or embedding-vector serving endpoint, so the live adapter remains catalog-backed
 until those providers are connected; no fake trending signal is generated.
+Exploration is applied by a request-seeded policy and contributes an explicit
+ranker component; the seed is persisted in the ledger.
 
 Validation is covered by `CatalogCandidateRetrieverTest`, including a book
 returned beyond the former first-page boundary, duplicate IDs, missing
 embeddings, and bounded pagination.
+
+`PersonalizedFeedV1FixtureTest` also builds profiles from valid versioned
+embeddings, computes candidate cosine affinity, and verifies that A/B histories
+rank unseen candidates from their own semantic cluster.
 
 ## Repeat-exposure fatigue
 
@@ -41,12 +58,13 @@ that was never marked viewable therefore contributes no fatigue. The
 recommendation ledger query is bounded to the current candidate IDs and the
 lookup indexes are installed by `V5__fatigue_lookup_indexes.sql`.
 
-The effective score and the persisted `reason` include the fatigue component,
-so a ranking decision can be explained and replayed. Configuration is
-versioned through `FEED_FATIGUE_*` and the behavior is covered by unit tests.
+The effective score and persisted `reason` include a positive `freshness`
+component (`1 - fatiguePenalty`), while the raw fatigue penalty remains
+available for explanation. Configuration is versioned through `FEED_FATIGUE_*`
+and the behavior is covered by unit tests.
 
 `PersonalizedRankerV1` is the next serving contract. It combines normalized
-affinity, quality, trend, exploration, and fatigue components and returns the
+affinity, quality, trend, exploration, and freshness components and returns the
 full `Breakdown` alongside the score. Missing features use an explicit policy
 (`RENORMALIZE`, `ZERO`, or `EXCLUDE`), and tie-breaking is deterministic from a
 seed. Its weights are bootstrap/unvalidated and must not be interpreted as

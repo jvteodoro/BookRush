@@ -56,7 +56,10 @@ public final class AnalyticsScoreClient {
 
   public Map<UUID, BookFeatureSnapshot> findSnapshots(List<UUID> bookIds, boolean includeEmbedding) {
     if (!properties.enabled() || !properties.configured() || bookIds.isEmpty()) return Map.of();
-    var bounded = bookIds.stream().distinct().limit(properties.maxCandidates()).toList();
+    // The analytics endpoint accepts at most maxCandidates IDs per request. The
+    // candidate universe may be larger; batch it explicitly instead of silently
+    // dropping candidates after the first page.
+    var bounded = bookIds.stream().distinct().toList();
     var current = cache.get();
     var result = new HashMap<UUID, BookFeatureSnapshot>();
     var missing = new java.util.ArrayList<UUID>();
@@ -85,32 +88,36 @@ public final class AnalyticsScoreClient {
     }
     long started = System.nanoTime();
     try {
-      String bearer = accessToken();
-      var requestBody = new java.util.LinkedHashMap<String, Object>();
-      requestBody.put("bookIds", missing);
-      requestBody.put("offset", 0);
-      requestBody.put("limit", missing.size());
-      if (includeEmbedding) requestBody.put("includeEmbedding", true);
-      Map<String, Object> body = analytics.post()
-          .uri("/api/internal/v1/content-analytics/recommendation-snapshot")
-          .contentType(MediaType.APPLICATION_JSON)
-          .headers(headers -> headers.setBearerAuth(bearer))
-          .body(requestBody)
-          .retrieve().body(Map.class);
-      Object rawItems = body == null ? null : body.get("items");
       var updates = new HashMap<CacheKey, CacheEntry>();
-      if (rawItems instanceof List<?> rows) {
-        for (Object value : rows) {
-          if (!(value instanceof Map<?, ?> row) || row.get("bookId") == null) continue;
-          try {
-            UUID id = UUID.fromString(String.valueOf(row.get("bookId")));
-            var snapshot = snapshot(id, row);
-            String embeddingModel = snapshot.embedding() == null ? "" : snapshot.embedding().model();
-            updates.put(new CacheKey(id, snapshot.sourceAssetVersionId(), embeddingModel),
-                new CacheEntry(snapshot, now.plus(properties.cacheTtl())));
-            result.put(id, snapshot);
-          } catch (IllegalArgumentException ignored) {
-            // One malformed row cannot poison the projection or the feed.
+      String bearer = accessToken();
+      int batchSize = Math.max(1, properties.maxCandidates());
+      for (int offset = 0; offset < missing.size(); offset += batchSize) {
+        var batch = missing.subList(offset, Math.min(offset + batchSize, missing.size()));
+        var requestBody = new java.util.LinkedHashMap<String, Object>();
+        requestBody.put("bookIds", batch);
+        requestBody.put("offset", 0);
+        requestBody.put("limit", batch.size());
+        if (includeEmbedding) requestBody.put("includeEmbedding", true);
+        Map<String, Object> body = analytics.post()
+            .uri("/api/internal/v1/content-analytics/recommendation-snapshot")
+            .contentType(MediaType.APPLICATION_JSON)
+            .headers(headers -> headers.setBearerAuth(bearer))
+            .body(requestBody)
+            .retrieve().body(Map.class);
+        Object rawItems = body == null ? null : body.get("items");
+        if (rawItems instanceof List<?> rows) {
+          for (Object value : rows) {
+            if (!(value instanceof Map<?, ?> row) || row.get("bookId") == null) continue;
+            try {
+              UUID id = UUID.fromString(String.valueOf(row.get("bookId")));
+              var snapshot = snapshot(id, row);
+              String embeddingModel = snapshot.embedding() == null ? "" : snapshot.embedding().model();
+              updates.put(new CacheKey(id, snapshot.sourceAssetVersionId(), embeddingModel),
+                  new CacheEntry(snapshot, now.plus(properties.cacheTtl())));
+              result.put(id, snapshot);
+            } catch (IllegalArgumentException ignored) {
+              // One malformed row cannot poison the projection or the feed.
+            }
           }
         }
       }

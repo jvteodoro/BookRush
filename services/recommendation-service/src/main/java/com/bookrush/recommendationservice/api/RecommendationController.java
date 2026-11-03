@@ -34,12 +34,15 @@ import com.bookrush.recommendationservice.ranking.BehaviorSignalsClient;
 import com.bookrush.recommendationservice.observability.FeedMetrics;
 import com.bookrush.recommendationservice.fatigue.ExposureFatigue;
 import com.bookrush.recommendationservice.retrieval.CandidateRetriever;
+import com.bookrush.recommendationservice.retrieval.CandidateUnionBuilder;
+import com.bookrush.recommendationservice.retrieval.CandidateSet;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
 public class RecommendationController {
   private static final String MODEL_VERSION = "heuristic-v1";
   private final CandidateRetriever candidateRetriever;
+  private final CandidateUnionBuilder candidateUnionBuilder;
   private final JdbcTemplate jdbc;
   private final ExcerptEnrichmentService excerptEnrichment;
   private final BehaviorEventPublisher behavior;
@@ -57,6 +60,7 @@ public class RecommendationController {
 
   public RecommendationController(
       CandidateRetriever candidateRetriever,
+      CandidateUnionBuilder candidateUnionBuilder,
       JdbcTemplate jdbc,
       ExcerptEnrichmentService excerptEnrichment,
       BehaviorEventPublisher behavior,
@@ -72,6 +76,7 @@ public class RecommendationController {
       ExplorationPolicy explorationPolicy,
       PersonalizedDecisionReplay decisionReplay) {
     this.candidateRetriever = candidateRetriever;
+    this.candidateUnionBuilder = candidateUnionBuilder;
     this.jdbc = jdbc;
     this.excerptEnrichment = excerptEnrichment;
     this.behavior = behavior;
@@ -108,11 +113,11 @@ public class RecommendationController {
         Long.class, subject));
     Strategy selectedStrategy = RecommendationHeuristic.strategyFor(previousImpressions);
     String strategy = selectedStrategy.name();
-    var candidateSet = feedMetrics.time("catalog_fetch", () ->
-        candidateRetriever.retrieve(Math.max(limit * 3, 20)));
-    List<?> books = candidateSet.books();
-    var candidateIds = books.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
-    var scoreById = feedMetrics.time("analytics_scores", () -> analyticsScores.find(candidateIds).entrySet().stream()
+    var retrievedCandidateSet = feedMetrics.time("catalog_fetch", () ->
+        candidateRetriever.retrieve(candidateRetriever.configuredLimit()));
+    List<?> retrievedBooks = retrievedCandidateSet.books();
+    var retrievedCandidateIds = retrievedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
+    var scoreById = feedMetrics.time("analytics_scores", () -> analyticsScores.find(retrievedCandidateIds).entrySet().stream()
         .collect(java.util.stream.Collectors.toMap(entry -> entry.getKey().toString(), Map.Entry::getValue)));
     var profileResult = personalizedFeedGate.mode() == PersonalizedFeedGate.Mode.OFF
         ? new PersonalizedProfileService.Result(null, false, false, List.of(), Map.of())
@@ -120,16 +125,33 @@ public class RecommendationController {
     var personalizationDecision = personalizedFeedGate.decide(profileResult.profile(),
         profileResult.behaviorAvailable(), profileResult.snapshotAvailable(), subject);
     boolean personalized = personalizationDecision.path() == PersonalizedFeedGate.Path.PERSONALIZED;
+    var candidateSnapshots = personalizationDecision.path() == PersonalizedFeedGate.Path.FALLBACK
+        ? Map.<UUID, AnalyticsScoreClient.BookFeatureSnapshot>of()
+        : feedMetrics.time("personalized_candidate_embeddings", () ->
+            analyticsScores.findSnapshots(retrievedCandidateIds, true));
+    var trending = personalizationDecision.path() == PersonalizedFeedGate.Path.FALLBACK
+        ? List.<BehaviorSignalsClient.Trending>of()
+        : feedMetrics.time("personalized_trending", personalizedProfiles::loadTrending);
+    final CandidateSet candidateSet = personalizationDecision.path() == PersonalizedFeedGate.Path.FALLBACK
+        ? retrievedCandidateSet
+        : buildLiveCandidateUnion(profileResult.profile(), retrievedBooks, scoreById,
+            candidateSnapshots, trending);
+    final List<?> books = candidateSet.books();
+    final List<UUID> candidateIds = books.stream().map(this::bookId)
+        .filter(java.util.Objects::nonNull).toList();
+    UUID requestId = UUID.randomUUID();
     var fatigueById = loadFatigue(subject, candidateIds);
     boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
     List<?> rankedBooks = feedMetrics.time("ranking",
         () -> RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById,
             fatigueById, Instant.now(), fatiguePolicy));
-    var explorationIds = personalized ? explorationIds(rankedBooks, subject, limit) : java.util.Set.<String>of();
+    var explorationIds = personalized ? explorationIds(rankedBooks, requestId.getLeastSignificantBits(), limit)
+        : java.util.Set.<String>of();
     PersonalizedRankingResult personalizedRanking = new PersonalizedRankingResult(rankedBooks,
         Map.of(), Map.of());
     if (personalized) {
-      personalizedRanking = personalizedRank(rankedBooks, scoreById, fatigueById, profileResult, subject, limit);
+      personalizedRanking = personalizedRank(rankedBooks, scoreById, fatigueById, profileResult,
+          candidateSnapshots, trending, explorationIds, subject, limit);
       rankedBooks = personalizedRanking.books();
     }
     if (analyticsRequired) {
@@ -144,7 +166,7 @@ public class RecommendationController {
     if (personalizationDecision.path() == PersonalizedFeedGate.Path.SHADOW) {
       final var shadowInput = rankedBooks;
       var shadowRanking = feedMetrics.time("personalized_shadow", () -> personalizedRank(shadowInput,
-          scoreById, fatigueById, profileResult, subject, limit));
+          scoreById, fatigueById, profileResult, candidateSnapshots, trending, explorationIds, subject, limit));
       var baselineIds = rankedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull)
           .map(UUID::toString).limit(limit).toList();
       var shadowIds = shadowRanking.books().stream().map(this::bookId).filter(java.util.Objects::nonNull)
@@ -167,7 +189,6 @@ public class RecommendationController {
           personalizationDecision.reason(), profileResult.profile() == null ? 0 : profileResult.profile().confidence(),
           profileResult.signals().size(), 0, 0);
     }
-    UUID requestId = UUID.randomUUID();
     List<Map<String, Object>> candidates = new ArrayList<>();
     int candidateRank = 1;
     for (Object book : rankedBooks) {
@@ -179,10 +200,11 @@ public class RecommendationController {
           : selectedStrategy == Strategy.COLD_START ? "popular-cold-start"
           : selectedStrategy == Strategy.LUCKY ? "lucky-exploration" : "diversity-heuristic";
       var item = new java.util.LinkedHashMap<String, Object>();
-      item.put("book", book);
+      item.put("book", publicBook(book));
       item.put("modelVersion", modelVersion);
       item.put("rank", candidateRank++);
       item.put("reason", reason);
+      item.put("candidateSources", candidateSet.sourcesFor(String.valueOf(bookId)));
       var bookScore = scoreById.get(String.valueOf(bookId));
       var personalizedScore = personalizedRanking.scoredById().get(String.valueOf(bookId));
       if (personalizedScore != null) item.put("score", personalizedScore.score());
@@ -204,7 +226,7 @@ public class RecommendationController {
     final var ledgerPersonalizedRanking = personalizedRanking;
     feedMetrics.time("ledger_persist", () -> {
       jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
-          requestId, subject, modelVersion, strategy, subject.hashCode(),
+          requestId, subject, modelVersion, strategy, requestId.getLeastSignificantBits(),
           mapper.createObjectNode()
               .put("candidateSetHash", candidateSetHash)
               .put("personalizationPath", personalizationDecision.path().name())
@@ -239,6 +261,9 @@ public class RecommendationController {
         reasonPayload.put("rankerVersion", modelVersion);
         if (item.get("score") != null) reasonPayload.put("score", item.get("score"));
         reasonPayload.put("candidateSetHash", candidateSetHash);
+        reasonPayload.put("candidateSources", candidateSet.sourcesFor(parsedBookId.toString()));
+        reasonPayload.put("candidateSetVersion", candidateSet.version());
+        reasonPayload.put("candidateConfigurationHash", candidateSet.configurationHash());
         if (personalized) {
           var scored = ledgerPersonalizedRanking.scoredById().get(parsedBookId.toString());
           if (scored != null) reasonPayload.put("personalizedComponents", scored.breakdown());
@@ -253,6 +278,13 @@ public class RecommendationController {
               profileResult.profile() == null ? "" : profileResult.profile().configurationHash());
           reasonPayload.put("mmrConfigHash", bookDiversityMmr.configurationHash());
           reasonPayload.put("explorationPolicy", explorationPolicy.policyVersion());
+          var embeddingSnapshot = candidateSnapshots.get(parsedBookId);
+          if (embeddingSnapshot != null && embeddingSnapshot.embedding() != null) {
+            reasonPayload.put("embeddingModel", embeddingSnapshot.embedding().model());
+            reasonPayload.put("embeddingModelVersion", embeddingSnapshot.embedding().modelVersion());
+            reasonPayload.put("embeddingSourceAssetVersionId",
+                embeddingSnapshot.embedding().sourceAssetVersionId());
+          }
         }
         var fatigue = fatigueById.get(String.valueOf(parsedBookId));
         if (fatigue != null) {
@@ -303,30 +335,36 @@ public class RecommendationController {
   private PersonalizedRankingResult personalizedRank(List<?> books,
       Map<String, AnalyticsScoreClient.BookScore> scoreById,
       Map<String, ExposureFatigue.Signal> fatigueById, PersonalizedProfileService.Result profile,
-      String subject, int limit) {
-    var signalById = profile.signals().stream().collect(java.util.stream.Collectors.toMap(
-        signal -> signal.bookId().toString(), signal -> signal, (left, right) -> left));
-    double maxAffinity = signalById.values().stream()
-        .mapToDouble(BehaviorSignalsClient.Signal::positiveWeight).max().orElse(1);
+      Map<UUID, AnalyticsScoreClient.BookFeatureSnapshot> candidateSnapshots,
+      List<BehaviorSignalsClient.Trending> trending,
+      java.util.Set<String> explorationIds, String subject, int limit) {
     var originals = new java.util.LinkedHashMap<String, Object>();
     var candidates = new ArrayList<PersonalizedRankerV1.Candidate>();
     var embeddings = new java.util.HashMap<String, List<Double>>();
+    var trendById = trending.stream().collect(java.util.stream.Collectors.toMap(
+        BehaviorSignalsClient.Trending::bookId, BehaviorSignalsClient.Trending::score,
+        Math::max));
     Instant now = Instant.now();
     for (Object book : books) {
       UUID id = bookId(book);
       if (id == null) continue;
       String key = id.toString();
-      var signal = signalById.get(key);
-      double affinity = signal == null ? 0 : signal.positiveWeight() / Math.max(1, maxAffinity);
+      var candidateSnapshot = candidateSnapshots.get(id);
+      double affinity = candidateSnapshot == null || candidateSnapshot.embedding() == null
+          ? 0 : cosine(profile.profile() == null ? null : profile.profile().vector(),
+              candidateSnapshot.embedding().vector());
       var score = scoreById.get(key);
       double quality = score == null ? 0 : Math.max(0, Math.min(1, score.score()));
-      double fatigue = fatiguePolicy.multiplier(fatigueById.get(key), now);
+      double freshness = fatiguePolicy.freshness(fatigueById.get(key), now);
+      double trend = trendById.getOrDefault(id, 0d);
       candidates.add(new PersonalizedRankerV1.Candidate(key,
-          new PersonalizedRankerV1.Components(affinity, quality, null, null, fatigue)));
+          new PersonalizedRankerV1.Components(affinity, quality, trend,
+              explorationIds.contains(key) ? 1d : 0d, freshness)));
       originals.putIfAbsent(key, book);
-      var snapshot = profile.snapshots().get(id);
-      if (snapshot != null && snapshot.embedding() != null && snapshot.embedding().vector() != null) {
-        embeddings.put(key, snapshot.embedding().vector());
+      var embeddingSnapshot = candidateSnapshots.get(id);
+      if (embeddingSnapshot != null && embeddingSnapshot.embedding() != null
+          && embeddingSnapshot.embedding().vector() != null) {
+        embeddings.put(key, embeddingSnapshot.embedding().vector());
       }
     }
     var ranked = personalizedRanker.rank(candidates, subject.hashCode());
@@ -340,14 +378,82 @@ public class RecommendationController {
     return new PersonalizedRankingResult(selectedBooks, scoredById, selectionsById);
   }
 
+  private static double cosine(List<Double> left, List<Double> right) {
+    if (left == null || right == null || left.isEmpty() || left.size() != right.size()) return 0;
+    double dot = 0;
+    double leftNorm = 0;
+    double rightNorm = 0;
+    for (int index = 0; index < left.size(); index++) {
+      if (left.get(index) == null || right.get(index) == null) return 0;
+      double a = left.get(index);
+      double b = right.get(index);
+      if (!Double.isFinite(a) || !Double.isFinite(b)) return 0;
+      dot += a * b;
+      leftNorm += a * a;
+      rightNorm += b * b;
+    }
+    return leftNorm == 0 || rightNorm == 0 ? 0 : dot / Math.sqrt(leftNorm * rightNorm);
+  }
+
+  private CandidateSet buildLiveCandidateUnion(
+      com.bookrush.recommendationservice.taste.UserTasteProfile profile,
+      List<?> books, Map<String, AnalyticsScoreClient.BookScore> scores,
+      Map<UUID, AnalyticsScoreClient.BookFeatureSnapshot> snapshots,
+      List<BehaviorSignalsClient.Trending> trending) {
+    var global = new ArrayList<CandidateUnionBuilder.Candidate>();
+    var semantic = new ArrayList<CandidateUnionBuilder.Candidate>();
+    var trendingById = trending.stream().collect(java.util.stream.Collectors.toMap(
+        BehaviorSignalsClient.Trending::bookId, BehaviorSignalsClient.Trending::score,
+        Math::max));
+    var trendingCandidates = new ArrayList<CandidateUnionBuilder.Candidate>();
+    for (Object value : books) {
+      if (!(value instanceof Map<?, ?> raw) || raw.get("id") == null) continue;
+      var book = new java.util.LinkedHashMap<String, Object>();
+      raw.forEach((key, item) -> book.put(String.valueOf(key), item));
+      String id = String.valueOf(raw.get("id"));
+      double quality = scores.get(id) == null ? 0 : scores.get(id).score();
+      global.add(new CandidateUnionBuilder.Candidate(book, quality));
+      try {
+        double trendScore = trendingById.getOrDefault(UUID.fromString(id), 0d);
+        if (trendScore > 0) trendingCandidates.add(new CandidateUnionBuilder.Candidate(book, trendScore));
+      } catch (IllegalArgumentException ignored) { }
+      try {
+        var snapshot = snapshots.get(UUID.fromString(id));
+        if (snapshot != null && snapshot.embedding() != null
+            && snapshot.embedding().vector() != null) {
+          book.put("embedding", snapshot.embedding().vector());
+          semantic.add(new CandidateUnionBuilder.Candidate(book, 0));
+        }
+      } catch (IllegalArgumentException ignored) {
+        // Catalog IDs are validated later by the existing feed contract.
+      }
+    }
+    var sources = new ArrayList<CandidateUnionBuilder.Source>();
+    if (profile != null && profile.status() == com.bookrush.recommendationservice.taste.UserTasteProfile.Status.READY) {
+      sources.add(new CandidateUnionBuilder.Source("semantic", semantic));
+    }
+    sources.add(new CandidateUnionBuilder.Source("global", global));
+    sources.add(new CandidateUnionBuilder.Source("trending", trendingCandidates));
+    return candidateUnionBuilder.build(profile, sources);
+  }
+
+  private static Object publicBook(Object book) {
+    if (!(book instanceof Map<?, ?> raw) || !raw.containsKey("embedding")) return book;
+    var copy = new java.util.LinkedHashMap<String, Object>();
+    raw.forEach((key, value) -> {
+      if (!"embedding".equals(String.valueOf(key))) copy.put(String.valueOf(key), value);
+    });
+    return copy;
+  }
+
   private record PersonalizedRankingResult(List<?> books,
       Map<String, PersonalizedRankerV1.ScoredCandidate> scoredById,
       Map<String, BookDiversityMmr.Selection> selectionsById) { }
 
-  private java.util.Set<String> explorationIds(List<?> books, String subject, int limit) {
+  private java.util.Set<String> explorationIds(List<?> books, long seed, int limit) {
     var ids = books.stream().map(this::bookId).filter(java.util.Objects::nonNull)
         .map(UUID::toString).toList();
-    return explorationPolicy.choose(ids, java.util.Set.of(), subject.hashCode(), limit).stream()
+    return explorationPolicy.choose(ids, java.util.Set.of(), seed, limit).stream()
         .map(ExplorationPolicy.Choice::bookId).collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 
@@ -409,6 +515,7 @@ public class RecommendationController {
     UUID bookId = row.get("book_id") == null ? null : UUID.fromString(String.valueOf(row.get("book_id")));
     jdbc.update("UPDATE recommendation.impression SET viewable = true WHERE id = ?", impressionId);
     Map<String, Object> payload = new java.util.LinkedHashMap<>();
+    payload.put("viewable", true);
     payload.put("impressionId", impressionId);
     if (itemId != null) payload.put("recommendationItemId", itemId);
     behavior.publish("EXCERPT_IMPRESSION", bookId, payload,

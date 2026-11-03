@@ -16,4 +16,12 @@ public class RetrievalConfiguration {
       CandidateRetrievalProperties properties, MeterRegistry metrics) {
     return new CatalogCandidateRetriever(builder, catalogUrl, properties, metrics);
   }
+
+  @Bean
+  CandidateUnionBuilder candidateUnionBuilder(CandidateRetrievalProperties properties) {
+    return new CandidateUnionBuilder(new CandidateUnionBuilder.Config(
+        properties.unionVersion(), properties.maxCandidates(),
+        properties.semanticQuota(), properties.globalQuota(),
+        properties.trendingQuota(), properties.explorationQuota()));
+  }
 }
