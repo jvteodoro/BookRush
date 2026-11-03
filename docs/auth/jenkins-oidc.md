@@ -36,6 +36,11 @@ O fluxo solicita `openid`; os client scopes padrão `profile` e
 ao endpoint administrativo de timings e usa a audience `bookrush-analytics`;
 ele não concede permissões de catálogo, ingestão ou administração de usuários.
 
+O client `bookrush-jenkins` também possui service account para operações
+automatizadas de analytics. O scope padrão `bookrush.analytics` e o mapper de
+audience emitem `aud=bookrush-analytics`; o token continua limitado ao escopo
+de analytics e não deve ser usado para ingestão ou administração geral.
+
 ## Variáveis de runtime
 
 No `.env` do host, mantenha os valores abaixo sem versioná-los:
