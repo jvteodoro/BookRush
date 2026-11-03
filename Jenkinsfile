@@ -18,6 +18,8 @@ pipeline {
     string(name: 'INGESTION_BASE_URL', defaultValue: 'https://bookrush.jteodoro.tec.br/ingestion', description: 'Base externa do gateway para o ingestion-service.')
     string(name: 'INGESTION_CREDENTIAL_ID', defaultValue: 'bookrush-ingestion-token', description: 'Credential Jenkins Secret text com token OIDC do operador.')
     booleanParam(name: 'RUN_INGESTION_S2S_E2E', defaultValue: false, description: 'Validar client_credentials e dry-run da ingestão pelo gateway após o deploy.')
+    booleanParam(name: 'RUN_ANALYTICS_SAMPLE', defaultValue: false, description: 'Cancelar jobs analíticos ativos e processar um lote pequeno de scores para o feed.')
+    string(name: 'ANALYTICS_SAMPLE_MAX_BOOKS', defaultValue: '4', description: 'Quantidade máxima de livros no lote controlado de scores.')
     choice(name: 'GUTENBERG_TIMEOUT_MINUTES', choices: ['5', '15', '30', '60'], description: 'Tempo máximo de polling do job Gutenberg.')
   }
 
@@ -154,6 +156,21 @@ pipeline {
           set +a
           set -x
           bash scripts/reconcile-keycloak-agent.sh
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Processar amostra de scores analíticos') {
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.RUN_ANALYTICS_SAMPLE } }
+      steps {
+        script {
+          withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'ANALYTICS_OPERATOR_TOKEN')]) {
+            sh '''
+              set -euo pipefail
+              set +x
+              BOOKRUSH_BEARER_TOKEN="$ANALYTICS_OPERATOR_TOKEN" ANALYTICS_SAMPLE_MAX_BOOKS="$ANALYTICS_SAMPLE_MAX_BOOKS" bash scripts/run-analytics-sample.sh
             '''
           }
         }

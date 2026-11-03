@@ -72,7 +72,7 @@ O binding de `feed.retrieval` usa construtor explícito para que o
 Boot no container; sem essa configuração o serviço falha no boot antes de
 expor o feed personalizado.
 
-Scores analíticos são enriquecimento opcional do ranking. Quando o PFV1 está
-ativo, ou quando o usuário está em fallback/cold-start, a resposta mantém os
-candidatos do catálogo mesmo que apenas parte deles tenha score analítico;
-essa regra evita que uma cobertura parcial reduza o feed a um único livro.
+Com o ranking analítico habilitado, a resposta mantém apenas livros com score
+analítico elegível. A operação deve processar uma amostra controlada de livros
+antes do teste do feed para evitar uma resposta vazia ou pequena por baixa
+cobertura.
