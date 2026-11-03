@@ -20,7 +20,6 @@ import { readiumBridge } from "./reader/readiumBridge";
 import { AuthenticatedShell } from "./app/AuthenticatedShell";
 import { AuthLanding } from "./app/AuthLanding";
 import {
-  loadCatalog,
   loadLibrary,
   loadRecent,
   loadRecommendationFeed,
@@ -85,7 +84,6 @@ function App() {
           });
           if (!response.ok) throw new Error("telemetry rejected");
         });
-        const catalog = await loadCatalog();
         const recommendations = await loadRecommendationFeed();
         if (!active) return;
         const recommendationFor = (bookId: string) =>
