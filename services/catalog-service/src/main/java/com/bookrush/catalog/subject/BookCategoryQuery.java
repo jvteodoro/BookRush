@@ -28,8 +28,12 @@ public class BookCategoryQuery {
         WHERE bs.book_id IN (:books) AND s.status='ACTIVE'
         ORDER BY bs.book_id, s.canonical_name, s.scheme, s.id
         """, Map.of("books", bookIds), row -> {
-          result.computeIfAbsent(row.getObject("book_id", UUID.class), ignored -> new ArrayList<>())
-              .add(new Category(row.getObject("id", UUID.class), row.getString("canonical_name"), row.getString("scheme")));
+          String scheme = row.getString("scheme");
+          String name = CategoryDisplayPolicy.displayName(row.getString("canonical_name"), scheme);
+          if (name != null) {
+            result.computeIfAbsent(row.getObject("book_id", UUID.class), ignored -> new ArrayList<>())
+                .add(new Category(row.getObject("id", UUID.class), name, scheme));
+          }
         });
     return result;
   }

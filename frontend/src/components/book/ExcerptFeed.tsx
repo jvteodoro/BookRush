@@ -90,7 +90,7 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: P
         {books.map((book, index) => <article key={book.id} data-book-id={book.id} className={`br-excerpt-card br-excerpt-card--${index % 3}`} aria-label={book.title}>
           <div className="br-excerpt-copy">
             <span className="br-excerpt-quote-mark" aria-hidden="true">“</span><OverflowQuote text={book.excerpt?.text || 'Trecho analítico indisponível.'} />
-            <div className="br-excerpt-book"><span className="br-excerpt-mini" aria-hidden="true">{book.coverUrl ? <AuthenticatedImage src={book.coverUrl} alt="" /> : 'B'}</span><div><h2>{book.title}</h2><p>{book.author}</p><div className="br-excerpt-classification"><SeenBadge seen={book.seen} /><span className="br-book-category" title={book.genre}>{book.genre || "Sem categoria"}</span></div></div></div>
+            <div className="br-excerpt-book"><span className="br-excerpt-mini" aria-hidden="true">{book.coverUrl ? <AuthenticatedImage src={book.coverUrl} alt="" /> : 'B'}</span><div><h2>{book.title}</h2><p>{book.author}</p><div className="br-excerpt-classification"><span className="br-book-category" title={book.genre}>{book.genre || "Sem categoria"}</span><SeenBadge seen={book.seen} /></div></div></div>
             <div>{onDetails && <Button variant="ghost" onClick={() => onDetails(book)}>Sobre e avaliações</Button>}<Button disabled={live?.pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora →</Button></div>
           </div>
           <div className="br-action-rail">

@@ -386,3 +386,5 @@ metadados de um livro do histórico ficam indisponíveis.
 O cliente consulta o estado em lotes de 100 via authClient.fetch. Falhas mostram
 mensagem com retry, sem bloquear a leitura ou fingir que o servidor confirmou
 uma marca. Navegação durante um carregamento ignora a conclusão obsoleta.
+
+Cards de livros usam linhas de altura automática para título, autor, categorias, selo Visto e progresso. Categorias longas são limitadas a duas linhas no card, com texto completo no painel de informações. Valores MIME, tipo RDF Text e códigos legados Gutenberg não são apresentados como categorias; o prefixo técnico Category: das prateleiras é removido somente da legenda.

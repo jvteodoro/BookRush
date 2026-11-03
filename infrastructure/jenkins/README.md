@@ -448,3 +448,9 @@ de produção; não há variável, segredo ou serviço novo no Compose.
 Após publicar a branch e implantar, o smoke público deve confirmar categorias
 e “Visto” com duas sessões de leitor. Validação local não equivale a Jenkins
 remoto ou produção validada.
+
+O E2E de metadados inclui fixtures com MIME/Text/PR legados: o catálogo mantém
+os registros mas não os expõe como categorias. A etapa de imagens executa
+`mvn verify` da ingestão, incluindo regressões do parser RDF para contextos
+LCSH/LCC/prateleira/idioma/formato e texto fragmentado. Para validar a correção
+em produção, implante catálogo, ingestão e frontend da mesma revisão.

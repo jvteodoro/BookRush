@@ -24,3 +24,5 @@ Sem classificação, o contrato retorna `[]`; idioma continua em `originalLangua
 e nunca é usado como categoria. A ingestão Gutenberg já registra subjects com
 proveniência; esta alteração não inventa categorias nem reclassifica dados.
 A rota pública de metadados continua pública, sem bearer do realm produto.
+
+A projeção de categorias oculta valores técnicos legados: MIME (incluindo parâmetros charset), tipo Gutenberg Text e códigos curtos de classificação Gutenberg/LCC/DDC. Prateleiras Category: recebem legenda sem o prefixo. IDs e associações originais são preservados, sem apagar proveniência ou exigir reimportação. Subjects literários descritivos continuam disponíveis.

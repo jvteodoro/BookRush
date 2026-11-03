@@ -1,9 +1,9 @@
 .br-seen-badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .75rem; font-weight: 700; color: var(--br-content); background: var(--br-surface); border: 1px solid var(--br-outline); border-radius: var(--br-radius-pill); padding: .15rem .55rem; width: fit-content; }
-.br-book-card__category { font-size: .75rem; color: var(--br-content-dim); white-space: normal; overflow-wrap: anywhere; }
+.br-book-card__category { font-size: .75rem; color: var(--br-content-dim); white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
 .br-book-categories { display: flex; flex-wrap: wrap; gap: .5rem; padding: 0; list-style: none; }
 .br-book-categories li { border: 1px solid var(--br-outline); border-radius: var(--br-radius-pill); padding: .3rem .6rem; overflow-wrap: anywhere; max-width: 100%; }
 .br-seen-warning { font-size: .85rem; margin: .75rem 0; }
 
-.br-excerpt-classification { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.br-excerpt-classification { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-width: 0; }
 .br-excerpt-classification > .br-book-category { font-size: .75rem; color: var(--br-content-dim); max-width: min(20rem, 45vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .br-excerpt-classification > .br-seen-badge { flex-shrink: 0; }

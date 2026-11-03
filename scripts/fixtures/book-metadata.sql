@@ -9,3 +9,12 @@ INSERT INTO catalog.book_subject(book_id,subject_id,source_id,assignment_method)
  ('11111111-1111-4111-8111-111111111111','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','10000000-0000-4000-8000-000000000001','SOURCE'),
  ('11111111-1111-4111-8111-111111111111','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','CURATED'),
  ('11111111-1111-4111-8111-111111111111','cccccccc-cccc-4ccc-8ccc-cccccccccccc','10000000-0000-4000-8000-000000000001','SOURCE');
+
+-- Legacy RDF contamination must stay stored for provenance but never be a category.
+INSERT INTO catalog.subject(id,canonical_name,normalized_name,scheme) VALUES
+ ('dddddddd-dddd-4ddd-8ddd-dddddddddddd','application/rdf+xml','application/rdf+xml','GUTENBERG'),
+ ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee','Text','text','GUTENBERG'),
+ ('ffffffff-ffff-4fff-8fff-ffffffffffff','PR','pr','GUTENBERG');
+INSERT INTO catalog.book_subject(book_id,subject_id,source_id,assignment_method)
+SELECT book.id, subject.id,'10000000-0000-4000-8000-000000000001'::uuid,'SOURCE'
+FROM catalog.book book CROSS JOIN catalog.subject subject WHERE subject.scheme='GUTENBERG';

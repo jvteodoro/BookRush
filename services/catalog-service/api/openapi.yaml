@@ -710,7 +710,7 @@ components:
         thumbnailUrl: {type: string, format: uri, nullable: true}
         categories:
           type: array
-          description: Active bibliographic classifications from catalog.subject, deduplicated across sources. Empty when unclassified; language is separate metadata.
+          description: Active bibliographic classifications from catalog.subject, deduplicated across sources. Legacy MIME/RDF types and raw classification codes are omitted; bookshelf labels omit the Category prefix. Empty when unclassified; language is separate metadata.
           items:
             type: object
             required: [id, name, scheme]

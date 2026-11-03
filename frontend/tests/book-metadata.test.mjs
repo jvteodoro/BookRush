@@ -25,7 +25,7 @@ async function load(entry, hooks = false) {
   return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
 }
 const { loadSeenBooks, recordOpenedBook, bookOpenedEvent } = await load('../src/reader/seen.ts');
-const { categoryLabel } = await load('../src/reader/bookCategories.ts');
+const { categoryLabel, categoryNames } = await load('../src/reader/bookCategories.ts');
 const { searchCatalog } = await load('../src/reader/search.ts');
 const response = (data, status = 200) => ({ ok: status < 300, status, json: async () => data });
 const category = { id: 'category', name: 'Adventure', scheme: 'LCSH' };
@@ -41,6 +41,14 @@ test('classification uses real categories and never substitutes a language or gu
   assert.equal(result.books[0].language, 'en');
   assert.deepEqual(result.books[0].categories, [category]);
   assert.equal(result.books[1].genre, 'Sem categoria');
+});
+
+test('technical legacy values are hidden while literary classifications retain readable names', () => {
+  const terms = ['application/rdf+xml', 'application/epub+zip', 'image/jpeg', 'text/plain; charset=utf-8', 'Text', 'PR', 'Category: British Literature', 'Art', 'Christmas stories'];
+  assert.deepEqual(categoryNames(terms.map(name => ({ id: name, name, scheme: 'GUTENBERG' }))), ['British Literature', 'Art', 'Christmas stories']);
+  assert.equal(categoryLabel([{ id: 'technical', name: 'application/rdf+xml', scheme: 'GUTENBERG' }]), 'Sem categoria');
+  assert.deepEqual(categoryNames([{ id: 'a', name: 'Category: Novels', scheme: 'GUTENBERG' }, { id: 'b', name: 'Novels', scheme: 'LCSH' }]), ['Novels']);
+  assert.deepEqual(categoryNames([{ id: 'code', name: 'PR', scheme: 'LCSH' }, { id: 'type', name: 'Textbooks', scheme: 'GUTENBERG' }]), ['PR', 'Textbooks']);
 });
 
 test('seen status batches and deduplicates all requested books without the recent-history limit', async () => {
