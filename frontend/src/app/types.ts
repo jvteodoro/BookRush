@@ -1,3 +1,5 @@
+import type { BookCategory } from "../reader/bookCategories";
+
 export type ReaderPreferences = {
   fontFamily: "serif" | "sans" | "literary" | "verdana" | "times";
   fontSize: number;
@@ -31,6 +33,7 @@ export type ReadiumBridge = {
 export type CatalogBook = {
   id: string;
   canonicalTitle: string;
+  categories?: BookCategory[];
   originalLanguage?: string | null;
   description?: string | null;
   thumbnailUrl?: string | null;
@@ -53,6 +56,8 @@ export type PageLoopBook = {
   title: string;
   author: string;
   genre: string;
+  categories?: BookCategory[];
+  language?: string | null;
   keywords: string[];
   match: number;
   a: string;

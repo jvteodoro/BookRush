@@ -1,3 +1,6 @@
+import type { BookCategory } from "./bookCategories";
+import { useSeenBooks } from "./useSeenBooks";
+import "../styles/book-metadata.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, type ReaderTab } from "../components/layout/AppShell";
 import { ExcerptFeed } from "../components/book/ExcerptFeed";
@@ -18,6 +21,8 @@ type SourceBook = {
   title: string;
   author: string;
   genre: string;
+  categories?: BookCategory[];
+  language?: string | null;
   quote: string;
   progress: number;
   likes?: number;
@@ -190,6 +195,10 @@ export function LiveReader({
     ids.forEach((id) => runtime().__BOOKRUSH_API__.saved.add(id));
     setSaved(ids);
   }, []);
+  const seenState = useSeenBooks(
+    runtime().__BOOKRUSH_BOOKS__.map((book) => book.id),
+    visible,
+  );
   const books = useMemo(
     () =>
       runtime().__BOOKRUSH_BOOKS__.map((book) => ({
@@ -197,13 +206,16 @@ export function LiveReader({
         title: book.title,
         author: book.author,
         genre: book.genre,
+        categories: book.categories,
+        language: book.language,
+        seen: seenState.seen.has(book.id),
         progress: book.progress,
         minutes: 0,
         description: book.excerpt?.text ?? "",
         excerpt: book.excerpt ?? null,
         coverUrl: book.thumbnailUrl ?? undefined,
       })),
-    [],
+    [seenState.seen],
   );
   useEffect(() => {
     if (initialTab === "search") setQuery(legacyQuery);
@@ -354,6 +366,14 @@ export function LiveReader({
       onNavigate={navigate}
       userName={userName}
     >
+      {seenState.error && (
+        <p className="br-seen-warning" role="status">
+          {seenState.error}{" "}
+          <button type="button" onClick={seenState.retry}>
+            Tentar novamente
+          </button>
+        </p>
+      )}
       {tab === "recommendations" ? (
         <RecommendationsPage
           books={books}

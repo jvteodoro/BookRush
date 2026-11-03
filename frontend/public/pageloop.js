@@ -605,7 +605,16 @@
             id: i.id,
             title: i.canonicalTitle,
             author: "Catálogo BookRush",
-            genre: (i.originalLanguage || "Clássico").toUpperCase(),
+            genre:
+              [
+                ...new Set(
+                  (i.categories || [])
+                    .map((category) => category.name.trim())
+                    .filter(Boolean),
+                ),
+              ].join(" · ") || "Sem categoria",
+            categories: i.categories || [],
+            language: i.originalLanguage,
             keywords: [],
             match: 80,
             a: p[0],
@@ -773,7 +782,6 @@
     state.route = "reader";
     try {
       await window.__BOOKRUSH_API__?.viewable?.(id);
-      await window.__BOOKRUSH_API__?.open?.(id);
       window.__BOOKRUSH_CHAPTERS__ =
         (await window.__BOOKRUSH_API__?.chapters?.(id)) || [];
     } catch (e) {
@@ -856,9 +864,10 @@
         () => void window.__BOOKRUSH_READIUM__?.next?.(),
       );
     const host = document.getElementById("readium-reader");
+    const readingBookId = state.readerBook;
     if (host && window.__BOOKRUSH_READIUM__) {
       window.__BOOKRUSH_READIUM__
-        .mount(state.readerBook, host, (p) => {
+        .mount(readingBookId, host, (p) => {
           const percent = Math.round((p || 0) * 100);
           if (percent > 0) {
             state.readerPage = percent;
@@ -868,6 +877,20 @@
           }
         })
         .then(async () => {
+          if (
+            !host.isConnected ||
+            state.route !== "reader" ||
+            state.readerBook !== readingBookId
+          )
+            return;
+          try {
+            await window.__BOOKRUSH_API__?.open?.(readingBookId);
+          } catch (error) {
+            toast(
+              error.message ||
+                "Não foi possível registrar o histórico de leitura.",
+            );
+          }
           const structuredChapters =
             (await window.__BOOKRUSH_READIUM__?.chapters?.()) || [];
           if (!structuredChapters.length) return;

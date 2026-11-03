@@ -21,3 +21,26 @@ identificador do evento evita a duplicação em retentativas.
 As alterações de atribuição da sessão seguem a sequência Flyway V7 (livro,
 recommendation item e impression) e V8 (correlação complementar). A separação
 mantém V6 reservado à planta diária e evita versões duplicadas no boot.
+
+## Marca persistente de conteúdo visto
+
+V9 acrescenta a entidade privada abaixo. O subject é derivado da autenticação
+e book_id é referência lógica ao catálogo, preservando histórico após remoção.
+Categorias continuam no domínio catalog.subject/book_subject (V14).
+
+```mermaid
+erDiagram
+    READER_PROFILE ||--o{ SEEN_BOOK : owns
+    CATALOG_BOOK ||--o{ SEEN_BOOK : logically_references
+    SEEN_BOOK {
+        text subject_key PK
+        uuid book_id PK
+        timestamptz first_seen_at
+        timestamptz last_seen_at
+    }
+```
+
+Visto = publicação carregada no leitor. Há uma linha por subject/livro, sem
+limite de histórico ou FK entre serviços. A consulta utiliza PK e um lote
+limitado de IDs; não revela o histórico de outro perfil. A transação de abertura
+escreve recent e seen_book; nenhuma tabela de planta ou progresso é modificada.

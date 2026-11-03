@@ -28,3 +28,15 @@ mock data. Upstream URLs are configured with `READER_STATE_URL` and
 `BOOK_CONTENT_URL`. In the Compose topology, `book-content-service` listens
 on port `8093`; the BFF default and Compose override must remain aligned with
 that port.
+
+## Estado de livros vistos
+
+`GET /api/v1/reader/books/seen?bookIds=<uuid>,<uuid>` encaminha uma lista validada de
+1–100 UUIDs e o bearer original ao reader-state, mantendo identidade no serviço
+dono do dado. A rota existente POST `/books/{bookId}/opened` agora registra
+carregamento concluído e a marca persistente, sem alterar a API de progresso.
+Produto bookrush, audience account, sem permissão adicional. Respostas: 200
+com items, 400 para lote inválido, 401 para token ausente/inválido, 403 por origem
+CORS indevida e 502 se o reader-state estiver indisponível.
+Não há retorno silencioso de lista vazia em caso de falha da dependência.
+O gateway Traefik existente já roteia `/api/v1/reader` para este BFF.

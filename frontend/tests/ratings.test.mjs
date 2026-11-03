@@ -10,6 +10,8 @@ async function load(entry, hooks = false) {
     plugins: [{ name: 'ratings-test', setup(builder) {
       builder.onResolve({ filter: /auth$/ }, () => ({ path: 'auth', namespace: 'test' }));
       builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const authClient = { fetch(...args) { return globalThis.__ratingFetch(...args); } };' }));
+      builder.onResolve({ filter: /useSeenBooks$/ }, () => ({ path: 'seen-hook', namespace: 'seen-hook' }));
+      builder.onLoad({ filter: /.*/, namespace: 'seen-hook' }, () => ({ contents: 'export const useSeenBooks = () => ({seen:new Set(),error:"",retry(){}});' }));
       if (hooks) {
         builder.onResolve({ filter: /\/Drawer$/ }, () => ({ path: 'drawer', namespace: 'drawer' }));
         builder.onLoad({ filter: /.*/, namespace: 'drawer' }, () => ({ contents: 'export const Drawer = props => props.children;' }));

@@ -1,3 +1,4 @@
+import { categoryLabel, type BookCategory } from "./bookCategories";
 import type { LibraryBook } from "./library";
 
 export type SearchResult = {
@@ -12,6 +13,7 @@ type CatalogBook = {
   canonicalTitle: string;
   originalTitle?: string;
   originalLanguage?: string;
+  categories?: BookCategory[];
   description?: string;
   thumbnailUrl?: string;
 };
@@ -48,7 +50,9 @@ export async function searchCatalog(
       id: book.id,
       title: book.canonicalTitle,
       author: "Catálogo BookRush",
-      genre: book.originalLanguage?.toUpperCase() ?? "Clássico",
+      genre: categoryLabel(book.categories),
+      categories: book.categories ?? [],
+      language: book.originalLanguage,
       description: book.description ?? "",
       coverUrl: book.thumbnailUrl,
       minutes: 0,
