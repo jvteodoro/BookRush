@@ -200,6 +200,7 @@ public class ReaderBffController {
       return requestSpec
           .headers(headers -> {
             if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
+            copyReaderCorrelation(request, headers);
           })
           .retrieve()
           .body(Object.class);
@@ -215,6 +216,7 @@ public class ReaderBffController {
     try {
       var requestSpec = client.method(method).uri(path).headers(headers -> {
         if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
+        copyReaderCorrelation(request, headers);
         if (body != null) headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
       });
       return body == null ? requestSpec.retrieve().body(Object.class) : requestSpec.body(body).retrieve().body(Object.class);
@@ -230,11 +232,19 @@ public class ReaderBffController {
     try {
       return client.get().uri(path).headers(headers -> {
         if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
+        copyReaderCorrelation(request, headers);
       }).retrieve().toEntity(byte[].class);
     } catch (HttpStatusCodeException exception) {
       throw translateUpstreamFailure("content dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "content dependency unavailable", exception);
+    }
+  }
+
+  private void copyReaderCorrelation(HttpServletRequest request, HttpHeaders headers) {
+    for (String name : new String[] {"X-BookRush-Recommendation-Item", "X-BookRush-Impression"}) {
+      String value = request.getHeader(name);
+      if (value != null && !value.isBlank()) headers.set(name, value);
     }
   }
 
