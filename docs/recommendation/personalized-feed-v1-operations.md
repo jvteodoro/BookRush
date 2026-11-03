@@ -76,3 +76,9 @@ Com o ranking analítico habilitado, a resposta mantém apenas livros com score
 analítico elegível. A operação deve processar uma amostra controlada de livros
 antes do teste do feed para evitar uma resposta vazia ou pequena por baixa
 cobertura.
+
+O frontend trata essa resposta como a fonte exclusiva do feed. Quando a lista
+de recomendações vem vazia, ele não substitui o resultado pelo catálogo geral:
+o feed permanece vazio até que existam livros com score/excerpt analítico
+elegível. Isso evita apresentar livros que não passaram pela política de
+elegibilidade durante o rollout.

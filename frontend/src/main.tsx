@@ -106,7 +106,10 @@ function App() {
           .filter((book): book is CatalogBook =>
             Boolean(book && byId.has(book.id)),
           );
-        const source = ordered.length ? ordered : catalog;
+        // The live feed is the source of truth.  Do not fall back to the full
+        // catalog: analytics-required deployments must never show books that
+        // have no eligible recommendation/excerpt.
+        const source = ordered;
         const palettes = [
           ["#82d4a4", "#213e35"],
           ["#74b9ff", "#202b52"],
