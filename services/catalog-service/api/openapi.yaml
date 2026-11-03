@@ -699,7 +699,7 @@ components:
         last: {type: boolean}
     BookView:
       type: object
-      required: [id, canonicalTitle, status]
+      required: [id, canonicalTitle, status, categories]
       properties:
         id: {type: string, format: uuid}
         canonicalTitle: {type: string}
@@ -708,6 +708,16 @@ components:
         firstPublicationYear: {type: integer, format: int32, nullable: true}
         description: {type: string, nullable: true}
         thumbnailUrl: {type: string, format: uri, nullable: true}
+        categories:
+          type: array
+          description: Active bibliographic classifications from catalog.subject, deduplicated across sources. Empty when unclassified; language is separate metadata.
+          items:
+            type: object
+            required: [id, name, scheme]
+            properties:
+              id: {type: string, format: uuid}
+              name: {type: string}
+              scheme: {type: string}
         status: {type: string, enum: [ACTIVE, INACTIVE, MERGED, REVIEW_REQUIRED]}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}

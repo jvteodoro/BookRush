@@ -15,3 +15,11 @@ editoriais de aprovação e revogação de livros. Cada evento guarda o livro, o
 estados anterior e novo, o subject autenticado, motivo opcional e timestamp;
 essa tabela sustenta o histórico administrativo e não deve ser apagada quando
 uma aprovação for revogada.
+
+## Leitura das categorias
+
+A exibição de categorias reutiliza V14 (`subject`/`book_subject`), sem nova
+migration no catálogo. O DTO usa id/nome/esquema e ignora subjects INACTIVE;
+`DISTINCT` elimina associações repetidas por fontes diferentes. O E2E de
+metadados cobre múltiplas fontes, subject inativo, livro sem categorias, detalhe,
+listagem e busca por categoria no PostgreSQL 16 real.

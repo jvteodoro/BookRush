@@ -435,3 +435,16 @@ ou credenciais existentes. O Compose passa `SOCIAL_CATALOG_URL` ao social-servic
 como `CATALOG_URL`, default `http://catalog-service:8080`, sem secret adicional.
 Após publicar e implantar a branch, confirme no site a média e o CRUD da própria
 nota com dois leitores. Testes locais não substituem esse smoke do deploy.
+
+### Categorias e livros vistos
+
+Os Jenkinsfiles executam `scripts/test-book-metadata-e2e.sh` nos contratos: Maven
+verify de catalog/reader-state/reader-bff, suíte de integração de catálogo em
+PostgreSQL16, migração V8→V9 com dados legados, imagens reais, dois usuários
+Keycloak e chamadas pelo Traefik versionado. Cobrem categorias/proveniência,
+CORS, isolamento, validação de lote, histórico >50, persistência após restart e
+502 de dependência. Recursos são descartáveis, sem portas publicadas ou `.env`
+de produção; não há variável, segredo ou serviço novo no Compose.
+Após publicar a branch e implantar, o smoke público deve confirmar categorias
+e “Visto” com duas sessões de leitor. Validação local não equivale a Jenkins
+remoto ou produção validada.

@@ -1,3 +1,6 @@
+import { categoryNames, type BookCategory } from "./bookCategories";
+import { useSeenBooks } from "./useSeenBooks";
+import { SeenBadge } from "../components/book/SeenBadge";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "../components/ui/Drawer";
 import { Button } from "../components/ui/Button";
@@ -14,6 +17,8 @@ export type DetailsBook = {
   title: string;
   author?: string;
   description?: string;
+  categories?: BookCategory[];
+  language?: string | null;
 };
 export function BookDetailsDrawer({
   book,
@@ -30,6 +35,8 @@ export function BookDetailsDrawer({
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const lock = useRef(false);
+  const seenState = useSeenBooks([book.id]);
+  const categories = categoryNames(book.categories);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -84,6 +91,28 @@ export function BookDetailsDrawer({
       onClose={onClose}
     >
       {book.author && <p>{book.author}</p>}
+      <SeenBadge seen={seenState.seen.has(book.id)} />
+      {seenState.error && (
+        <p role="status">
+          {seenState.error}{" "}
+          <Button variant="ghost" size="sm" onClick={seenState.retry}>
+            Tentar novamente
+          </Button>
+        </p>
+      )}
+      <section aria-label="Categorias do livro">
+        <h3>Categorias</h3>
+        {categories.length ? (
+          <ul className="br-book-categories">
+            {categories.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>Sem categoria cadastrada.</p>
+        )}
+      </section>
+      {book.language && <p>Idioma: {book.language.toUpperCase()}</p>}
       {book.description && (
         <p className="br-book-description">{book.description}</p>
       )}

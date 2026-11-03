@@ -55,3 +55,28 @@ Ao atingir 100% de progresso, o serviço publica `BOOK_COMPLETE` uma única vez
 por subject/livro usando uma chave idempotente estável, preservando a correlação
 do feed quando aplicável. A origem direta/search continua sem correlação
 inventada.
+
+## Livros vistos
+
+Um livro é **visto** quando o conteúdo carrega com sucesso no leitor. Passar pelo
+feed, abrir somente as informações, salvar na estante ou tentar carregar uma
+publicação que falha não conta. Visto não significa leitura concluída.
+
+O cliente chama `POST /api/v1/reader/books/{bookId}/opened` somente após
+`Readium.load` bem-sucedido. A transação persiste histórico e `seen_book`;
+reaberturas atualizam last_seen_at, preservando first_seen_at. Eventos de
+recomendação/correlação existentes são mantidos.
+
+`GET /api/v1/reader/books/seen?bookIds=<uuid>,<uuid>` retorna `{items:[{bookId,
+firstSeenAt,lastSeenAt}]}` apenas para os IDs vistos pelo subject autenticado.
+A lista exige 1–100 UUIDs (400 para inválida) e não depende do limite de 50
+recentes. Sem token válido/issuer/audience corretos: 401. Não aceita identidade
+fornecida pelo cliente. O acesso público atravessa o reader-bff, cujo CORS
+permite somente origens explícitas, GET/POST e Authorization/Content-Type;
+origem indevida retorna 403 e dependência indisponível retorna 502 no BFF.
+Tokens do realm produto bookrush, audience account, sem scope extra.
+
+Validação: `bash scripts/test-book-metadata-e2e.sh` usa serviços/imagens reais,
+Keycloak e PostgreSQL 16 descartáveis com gateway Traefik versionado. Não usa
+`.env` nem dados persistentes existentes. Inclui upgrade V8→V9 e segundo boot
+Flyway, isolamento por perfil e marca preservada além dos 50 recentes.

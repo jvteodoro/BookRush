@@ -367,3 +367,22 @@ com mouse ou teclado e salve; é possível atualizar ou remover a própria nota.
 O servidor confirma cada alteração antes de atualizar a média. Falhas permitem
 tentar novamente sem apagar a nota anterior. A integração usa authClient.fetch
 e o contrato `/api/v1/social/books/{bookId}/ratings`.
+
+## Categorias e livros vistos
+
+Cards, feed, busca, biblioteca, recomendações e o painel de informações mostram
+as categorias bibliográficas fornecidas pelo catálogo. Idioma é metadado
+separado; um livro sem classificação é apresentado como “Sem categoria”.
+Categorias completas podem ser consultadas em “Sobre e avaliações”; textos
+longos no feed são compactados para preservar espaço para o trecho.
+
+A marca **✓ Visto** indica conteúdo carregado no leitor, e não conclusão da
+leitura. Não é acionada por impressão de feed, abertura do painel de avaliações
+ou falha de carregamento. Ela aparece após confirmação do servidor, persiste
+entre sessões e não desaparece quando o livro sai dos 50 recentes. A marca
+pertence ao perfil autenticado; a biblioteca pode mantê-la mesmo quando os
+metadados de um livro do histórico ficam indisponíveis.
+
+O cliente consulta o estado em lotes de 100 via authClient.fetch. Falhas mostram
+mensagem com retry, sem bloquear a leitura ou fingir que o servidor confirmou
+uma marca. Navegação durante um carregamento ignora a conclusão obsoleta.

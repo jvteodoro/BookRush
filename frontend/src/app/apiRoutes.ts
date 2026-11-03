@@ -12,6 +12,8 @@ export const apiRoutes = {
     recommendations: () => "/api/v1/reader/recommendations",
     library: () => "/api/v1/reader/library",
     libraryBook: (bookId: string) => `/api/v1/reader/library/${id(bookId)}`,
+    seen: (bookIds: string[]) =>
+      `/api/v1/reader/books/seen?${new URLSearchParams({ bookIds: bookIds.join(",") })}`,
     recent: () => "/api/v1/reader/recent",
     streak: () => "/api/v1/reader/streak",
     plant: () => "/api/v1/reader/plant",

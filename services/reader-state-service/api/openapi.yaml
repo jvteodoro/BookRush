@@ -6,6 +6,57 @@ info:
 servers:
   - url: https://bookrush.jteodoro.tec.br
 paths:
+  /api/v1/reader/books/{bookId}/opened:
+    post:
+      summary: Record a successfully loaded reading and mark the book as seen
+      description: Called only after content loads. Atomically records history and seen status for the authenticated subject; reopening preserves firstSeenAt. Does not mark a book as completed.
+      security: [{bearerAuth: []}]
+      parameters: [{name: bookId, in: path, required: true, schema: {type: string, format: uuid}}]
+      responses:
+        '200': {description: Opening recorded and private seen status persisted}
+        '400': {description: Invalid book ID}
+        '401': {description: Authentication required}
+        '403': {description: Disallowed CORS origin}
+
+  /api/v1/reader/books/seen:
+    get:
+      summary: Read private seen status for a bounded batch of books
+      description: A book is seen after its content loads in the reader, not after a feed impression. Product realm, audience account, no extra scope. Only the authenticated subject is queried; the result is independent of the recent-history limit.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: bookIds
+          in: query
+          required: true
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 100
+            items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Seen entries from the requested batch; unseen books are absent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [bookId, firstSeenAt, lastSeenAt]
+                      properties:
+                        bookId: {type: string, format: uuid}
+                        firstSeenAt: {type: string, format: date-time}
+                        lastSeenAt: {type: string, format: date-time}
+        '400': {description: Missing, malformed or oversized book ID batch}
+        '401': {description: Missing, invalid, expired or wrong-audience product token}
+        '403': {description: Disallowed CORS origin}
+        '502': {description: Reader state service unavailable at the gateway}
+
   /api/v1/reader/plant:
     get:
       operationId: getReaderPlant

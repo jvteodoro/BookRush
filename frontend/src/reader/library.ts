@@ -1,3 +1,4 @@
+import { categoryLabel, type BookCategory } from "./bookCategories";
 import { authClient } from "../auth";
 import type { ReaderBook } from "../components/book/BookCard";
 
@@ -62,6 +63,7 @@ export async function loadLibrary(
           const book = (await response.json()) as {
             canonicalTitle: string;
             originalLanguage?: string;
+            categories?: BookCategory[];
             description?: string;
             thumbnailUrl?: string;
           };
@@ -85,7 +87,9 @@ export async function loadLibrary(
             id,
             title: book.canonicalTitle,
             author: "Catálogo BookRush",
-            genre: book.originalLanguage?.toUpperCase() ?? "Clássico",
+            genre: categoryLabel(book.categories),
+            categories: book.categories ?? [],
+            language: book.originalLanguage,
             description: book.description ?? "",
             coverUrl: book.thumbnailUrl,
             minutes: 0,

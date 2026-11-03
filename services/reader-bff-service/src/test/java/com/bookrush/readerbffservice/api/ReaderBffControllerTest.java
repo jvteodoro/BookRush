@@ -45,4 +45,14 @@ class ReaderBffControllerTest {
 
     org.junit.jupiter.api.Assertions.assertEquals(HttpStatus.BAD_GATEWAY, translated.getStatusCode());
   }
+  @Test
+  void seenRequiresAnAuthenticatedReaderAndABoundedBatch() {
+    var request = new MockHttpServletRequest();
+    var book = java.util.UUID.randomUUID();
+    assertThrows(ResponseStatusException.class, () -> controller.seen(java.util.List.of(book), null, request));
+    assertThrows(ResponseStatusException.class, () -> controller.seen(java.util.List.of(), () -> "reader", request));
+    assertThrows(ResponseStatusException.class,
+        () -> controller.seen(java.util.Collections.nCopies(101, book), () -> "reader", request));
+  }
+
 }
