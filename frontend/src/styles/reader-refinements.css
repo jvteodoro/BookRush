@@ -342,7 +342,7 @@
 }
 .br-feed-scroll {
   position: relative;
-  height: clamp(460px, calc(100dvh - 220px), 740px);
+  height: max(460px, calc(100dvh - 180px));
   max-height: none;
   padding: 0;
   overflow-y: auto;
@@ -352,6 +352,9 @@
 }
 .br-feed-scroll::-webkit-scrollbar {
   display: none;
+}
+.br-feed-layout--live .br-feed-scroll {
+  height: max(460px, calc(100dvh - 128px));
 }
 .br-excerpt-card {
   height: 100%;
@@ -759,6 +762,9 @@
   .br-feed-scroll {
     height: max(460px, calc(100dvh - 250px));
     overflow-y: auto;
+  }
+  .br-feed-layout--live .br-feed-scroll {
+    height: max(460px, calc(100dvh - 200px));
   }
   .br-excerpt-card {
     min-height: 0;

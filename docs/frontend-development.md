@@ -59,6 +59,8 @@ validar o build do admin separadamente do frontend principal.
 O card de trecho ocupa toda a largura disponível do conteúdo do feed, sem
 coluna lateral. Os controles de curtir, comentar, salvar e compartilhar
 permanecem no card, assim como a navegação entre trechos.
+A altura acompanha a janela, sem o antigo teto de 740 px, deixando espaço
+para o cabeçalho e, no celular, para a navegação inferior.
 
 As informações de sequência, descoberta e livros salvos ficam na aba Perfil,
 no componente `src/reader/ReadingSummary.tsx`. Os números usam o mesmo estado
