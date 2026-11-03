@@ -71,9 +71,9 @@ recommendation service's own bounded analytics clients.
 
 ## Personalized Feed V1
 
-The safe default remains `FEED_PERSONALIZED_MODE=OFF` in application.yml,
-Compose, `.env.example` and Jenkins, serving the existing
-analytics-aware/heuristic path. `SHADOW` calculates `PERSONALIZED_V1` without
+The test-phase default is `FEED_PERSONALIZED_MODE=ON` in application.yml,
+Compose, `.env.example` and Jenkins. Setting it explicitly to `OFF` serves the
+existing analytics-aware/heuristic path. `SHADOW` calculates `PERSONALIZED_V1` without
 changing the control response. `ON` serves it only after behavior, snapshot,
 coverage and confidence gates pass. `FEED_PERSONALIZED_ROLLOUT_PERCENTAGE`
 provides deterministic staged activation and setting the mode back to `OFF` is
@@ -86,4 +86,4 @@ subject or book IDs as metric labels.
 The `feed.personalized` properties use Spring's mutable configuration binding
 so the service starts correctly in Docker and in the production profile. The
 binding is covered by a context-property test; invalid rollout values are
-handled by the gate's validation rather than changing the default `OFF` mode.
+handled by the gate's validation rather than changing the default `ON` mode.

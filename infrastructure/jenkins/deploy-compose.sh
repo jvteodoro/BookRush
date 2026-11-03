@@ -209,7 +209,7 @@ if [[ -n "$keycloak_admin_password" ]]; then
 fi
 KEYCLOAK_ADMIN_CLIENT_SECRET="${live_admin_client_secret:-$configured_admin_client_secret}"
 BEHAVIOR_S2S_CLIENT_SECRET="${live_behavior_s2s_client_secret:-$configured_behavior_s2s_client_secret}"
-if [[ "${FEED_PERSONALIZED_MODE:-OFF}" == ON && -z "$BEHAVIOR_S2S_CLIENT_SECRET" ]]; then
+if [[ "${FEED_PERSONALIZED_MODE:-ON}" == ON && -z "$BEHAVIOR_S2S_CLIENT_SECRET" ]]; then
   echo 'Não foi possível resolver o segredo vigente do cliente S2S do behavior-service.' >&2
   exit 1
 fi

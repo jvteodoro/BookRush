@@ -9,7 +9,7 @@ pipeline {
     string(name: 'REGISTRY_CREDENTIAL_ID', defaultValue: 'docker-registry', description: 'Credential Jenkins de usuário/senha do registry.')
     booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Atualizar a aplicação no destino escolhido após o build.')
     booleanParam(name: 'ANALYTICS_GPU', defaultValue: false, description: 'Construir e implantar o runtime analytics com PyTorch CUDA e override NVIDIA. Requer host com NVIDIA Container Toolkit.')
-    choice(name: 'FEED_PERSONALIZED_MODE', choices: ['OFF', 'ON'], description: 'Ativar explicitamente o fluxo experimental de feed personalizado no Compose. OFF é o padrão seguro; ON deve ser escolhido para rollout/testes.')
+    choice(name: 'FEED_PERSONALIZED_MODE', choices: ['ON', 'OFF'], description: 'Modo do feed personalizado no Compose. ON é o padrão durante os testes; OFF mantém o caminho legado.')
     string(name: 'KUBECONFIG_CREDENTIAL_ID', defaultValue: 'bookrush-kubeconfig', description: 'Credential Jenkins do tipo Secret file.')
     booleanParam(name: 'RUN_GUTENBERG_IMPORT', defaultValue: false, description: 'Executar explicitamente a importação Gutenberg depois dos testes. Desmarcado: nenhuma importação.')
     booleanParam(name: 'GUTENBERG_DRY_RUN', defaultValue: true, description: 'Executar a importação Gutenberg em modo dry-run (recomendado).')

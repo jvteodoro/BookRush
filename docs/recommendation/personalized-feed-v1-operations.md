@@ -4,7 +4,8 @@
 
 O caminho personalizado é controlado por `FEED_PERSONALIZED_MODE`:
 
-* `OFF` (padrão): mantém `analytics-aware-v1`/heurística existente.
+* `ON` (padrão durante a fase de testes): ativa o serving personalizado com fallback controlado quando as gates não passam.
+* `OFF`: mantém `analytics-aware-v1`/heurística existente.
 * `SHADOW`: calcula `PERSONALIZED_V1`, mas entrega a ordenação do controle.
 * `ON`: entrega o ranking personalizado apenas quando behavior, snapshot,
   cobertura e confiança passam o gate.
@@ -14,9 +15,9 @@ subject para ativação gradual. O rollback operacional é definir `MODE=OFF` e
 reiniciar somente o recommendation-service; não requer migration rollback nem
 remove dados do ledger.
 
-O default operacional é `OFF` em `application.yml`, Compose, `.env.example` e
-Jenkins. A ativação experimental precisa escolher `FEED_PERSONALIZED_MODE=ON`
-explicitamente.
+O default operacional é `ON` durante a fase de testes em `application.yml`,
+Compose, `.env.example` e Jenkins. `OFF` continua disponível para rollback
+explícito.
 
 No caminho `PERSONALIZED`, a ordem é: candidate retrieval limitado → candidate
 union → score personalizado de todo o pool → quota de exploration → MMR
