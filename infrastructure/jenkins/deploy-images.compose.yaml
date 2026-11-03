@@ -1,4 +1,14 @@
 services:
+  behavior-service:
+    environment:
+      BOOKRUSH_SECURITY_ENABLED: ${BOOKRUSH_SECURITY_ENABLED:-true}
+      BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_PRODUCT_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_PRODUCT_SECURITY_AUDIENCE:-account}
+      BOOKRUSH_S2S_SECURITY_ISSUER: ${BOOKRUSH_ADMIN_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      BOOKRUSH_S2S_SECURITY_JWK_SET_URI: ${BOOKRUSH_ADMIN_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
+      BOOKRUSH_S2S_SECURITY_AUDIENCE: ${BOOKRUSH_S2S_SECURITY_AUDIENCE:-bookrush-behavior}
+      BOOKRUSH_S2S_SECURITY_SCOPE: ${BOOKRUSH_S2S_SECURITY_SCOPE:-bookrush.behavior.read}
   catalog-service:
     image: ${BACKEND_IMAGE:?Imagem backend ausente}
   frontend:

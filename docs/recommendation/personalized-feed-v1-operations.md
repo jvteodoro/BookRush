@@ -19,9 +19,9 @@ O default operacional é `ON` durante a fase de testes em `application.yml`,
 Compose, `.env.example` e Jenkins. O script e o override de imagens do deploy
 também carregam a configuração PFV1 completa do recommendation service,
 incluindo o cliente S2S de behavior. O deploy recria o behavior service junto
-com o recommendation service para renovar a configuração/JWKS do serving S2S,
-mesmo quando o Compose persistente do host estiver defasado; `OFF` continua
-disponível para rollback explícito.
+com o recommendation service e fixa explicitamente issuer, JWKS, audience e
+scope S2S do serving, mesmo quando o Compose persistente do host estiver
+defasado; `OFF` continua disponível para rollback explícito.
 
 No caminho `PERSONALIZED`, a ordem é: candidate retrieval limitado → candidate
 union → score personalizado de todo o pool → quota de exploration → MMR
