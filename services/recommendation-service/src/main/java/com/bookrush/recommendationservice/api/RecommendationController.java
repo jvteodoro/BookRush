@@ -220,7 +220,10 @@ public class RecommendationController {
       excerptEnrichment.enrich(candidates);
       return null;
     });
+    // Analytics scores enrich ranking when available; they must not collapse
+    // the personalized/cold-start candidate set to only scored books.
     List<Map<String, Object>> items = analyticsRequired
+        && personalizedFeedGate.mode() == PersonalizedFeedGate.Mode.OFF
         ? new ArrayList<>(FeedEligibility.retainAnalyticsReady(candidates))
         : candidates;
     final var ledgerPersonalizedRanking = personalizedRanking;

@@ -71,3 +71,8 @@ O binding de `feed.retrieval` usa construtor explícito para que o
 `CandidateRetrievalProperties` seja materializado corretamente pelo Spring
 Boot no container; sem essa configuração o serviço falha no boot antes de
 expor o feed personalizado.
+
+Scores analíticos são enriquecimento opcional do ranking. Quando o PFV1 está
+ativo, ou quando o usuário está em fallback/cold-start, a resposta mantém os
+candidatos do catálogo mesmo que apenas parte deles tenha score analítico;
+essa regra evita que uma cobertura parcial reduza o feed a um único livro.
