@@ -22,6 +22,11 @@ public final class ExposureFatigue {
     return Math.max(0, 1 - penalty(signal, now));
   }
 
+  /** Positive ranker feature: higher means fresher / less exposed recently. */
+  public double freshness(Signal signal, Instant now) {
+    return multiplier(signal, now);
+  }
+
   public record Signal(long viewableCount, Instant lastViewableAt) { }
 
   public record Config(String version, Duration halfLife, double perExposurePenalty,

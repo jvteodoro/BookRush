@@ -58,12 +58,13 @@ that was never marked viewable therefore contributes no fatigue. The
 recommendation ledger query is bounded to the current candidate IDs and the
 lookup indexes are installed by `V5__fatigue_lookup_indexes.sql`.
 
-The effective score and the persisted `reason` include the fatigue component,
-so a ranking decision can be explained and replayed. Configuration is
-versioned through `FEED_FATIGUE_*` and the behavior is covered by unit tests.
+The effective score and persisted `reason` include a positive `freshness`
+component (`1 - fatiguePenalty`), while the raw fatigue penalty remains
+available for explanation. Configuration is versioned through `FEED_FATIGUE_*`
+and the behavior is covered by unit tests.
 
 `PersonalizedRankerV1` is the next serving contract. It combines normalized
-affinity, quality, trend, exploration, and fatigue components and returns the
+affinity, quality, trend, exploration, and freshness components and returns the
 full `Breakdown` alongside the score. Missing features use an explicit policy
 (`RENORMALIZE`, `ZERO`, or `EXCLUDE`), and tie-breaking is deterministic from a
 seed. Its weights are bootstrap/unvalidated and must not be interpreted as

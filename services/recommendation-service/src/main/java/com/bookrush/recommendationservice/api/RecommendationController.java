@@ -344,10 +344,10 @@ public class RecommendationController {
               candidateSnapshot.embedding().vector());
       var score = scoreById.get(key);
       double quality = score == null ? 0 : Math.max(0, Math.min(1, score.score()));
-      double fatigue = fatiguePolicy.multiplier(fatigueById.get(key), now);
+      double freshness = fatiguePolicy.freshness(fatigueById.get(key), now);
       candidates.add(new PersonalizedRankerV1.Candidate(key,
           new PersonalizedRankerV1.Components(affinity, quality, null,
-              explorationIds.contains(key) ? 1d : 0d, fatigue)));
+              explorationIds.contains(key) ? 1d : 0d, freshness)));
       originals.putIfAbsent(key, book);
       var embeddingSnapshot = candidateSnapshots.get(id);
       if (embeddingSnapshot != null && embeddingSnapshot.embedding() != null

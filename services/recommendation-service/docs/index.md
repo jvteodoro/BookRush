@@ -24,6 +24,8 @@ embeddings in bounded cached batches, computes candidate affinity as cosine
 similarity against `UserTasteProfile.vector()`, and supplies those same
 candidate embeddings to book-level MMR. Exploration uses a request seed stored
 in the ledger; no complete embedding vector is persisted in the ledger.
+The positive ranker component is named `freshness` (`1 - fatiguePenalty`);
+the separate `fatiguePenalty` remains available in provenance.
 Trending candidates come from behavior's authenticated `trending-v1` serving
 endpoint and are merged with semantic/global candidates; recommendation does
 not query the behavior schema directly.
