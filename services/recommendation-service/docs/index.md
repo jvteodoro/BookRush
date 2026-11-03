@@ -38,6 +38,10 @@ The public feed item also exposes the bounded source names, without exposing
 embeddings or private profile vectors.
 Personalized ledger reasons include embedding model/version and source-asset
 version metadata, never the vector itself.
+Candidate objects keep optional catalog fields, including null values, while
+remaining immutable. This is important on the personalized path because
+enrichment adds embeddings to the full catalog candidate union; a missing
+optional field must not turn a valid candidate into a server error.
 
 The dataset handoff reads recommendation decisions and behavior outcomes from
 separate read-only database URLs and joins them locally by explicit

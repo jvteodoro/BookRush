@@ -10,6 +10,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 
 /**
  * Deterministic source union used by PFV1. Providers own how each source is
@@ -89,7 +91,10 @@ public final class CandidateUnionBuilder {
 
   public record Candidate(Map<String, Object> book, double score) {
     public Candidate {
-      book = Map.copyOf(Objects.requireNonNull(book));
+      // Catalog responses legitimately contain null optional fields. Keep the
+      // candidate immutable without Map.copyOf, which rejects those values and
+      // turns a valid personalized request into a 502.
+      book = Collections.unmodifiableMap(new LinkedHashMap<>(Objects.requireNonNull(book)));
       score = Double.isFinite(score) ? score : 0;
     }
   }
