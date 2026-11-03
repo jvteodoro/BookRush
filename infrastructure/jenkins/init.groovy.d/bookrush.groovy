@@ -88,15 +88,19 @@ if (!(job.getDefinition() instanceof CpsFlowDefinition) || job.getDefinition().g
     job.setDefinition(new CpsFlowDefinition(pipelineScript, true))
     job.save()
 }
-if (job.getProperty(ParametersDefinitionProperty.class) == null) {
-    job.addProperty(new ParametersDefinitionProperty([
-        new StringParameterDefinition('BRANCH', 'main', 'Branch a compilar e implantar.'),
-        new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação após o build.'),
-        new ChoiceParameterDefinition('DEPLOY_TARGET', ['compose', 'kubernetes'] as String[], 'Destino.'),
-        new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git HTTPS opcional.'),
-        new StringParameterDefinition('REGISTRY', '', 'Registry opcional para Compose.'),
-        new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential do registry.'),
-        new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Kubeconfig.')
-    ]))
-    job.save()
-}
+def mainParameters = [
+    new StringParameterDefinition('BRANCH', 'main', 'Branch a compilar e implantar.'),
+    new ChoiceParameterDefinition('DEPLOY_TARGET', ['compose', 'kubernetes'] as String[], 'Destino do deploy.'),
+    new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git HTTPS opcional.'),
+    new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica imagens.'),
+    new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação no destino escolhido após o build.'),
+    new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Credential Jenkins do tipo Secret file.'),
+    new BooleanParameterDefinition('RUN_GUTENBERG_IMPORT', false, 'Executar explicitamente a importação Gutenberg.'),
+    new BooleanParameterDefinition('GUTENBERG_DRY_RUN', true, 'Executar a importação Gutenberg em modo dry-run.'),
+    new StringParameterDefinition('GUTENBERG_EXTERNAL_IDS', '1342', 'IDs Gutenberg separados por vírgula.'),
+    new StringParameterDefinition('INGESTION_BASE_URL', 'https://bookrush.jteodoro.tec.br/ingestion', 'Base externa do gateway para o ingestion-service.'),
+    new StringParameterDefinition('INGESTION_CREDENTIAL_ID', 'bookrush-ingestion-token', 'Credential Jenkins Secret text do operador.'),
+    new ChoiceParameterDefinition('GUTENBERG_TIMEOUT_MINUTES', ['5', '15', '30'] as String[], 'Tempo máximo de polling do job Gutenberg.')
+]
+replaceParameters(job, mainParameters)

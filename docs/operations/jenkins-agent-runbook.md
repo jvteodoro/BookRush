@@ -98,6 +98,13 @@ Para o `admin-web`, use os parâmetros `BRANCH=main` e `DEPLOY=true`. Esse job
 é separado do `bookrush-deploy`; executar somente o deploy principal não
 recria automaticamente o `admin-web`.
 
+O bootstrap Jenkins mantém a definição de parâmetros do job `bookrush-deploy`
+sincronizada com o `Jenkinsfile` principal, inclusive `RUN_GUTENBERG_IMPORT`,
+`GUTENBERG_DRY_RUN`, `GUTENBERG_EXTERNAL_IDS`, `INGESTION_BASE_URL`,
+`INGESTION_CREDENTIAL_ID` e `GUTENBERG_TIMEOUT_MINUTES`. Ao atualizar o
+bootstrap, reinicie/recarregue a configuração do Jenkins conforme o runbook e
+confirme que o job expõe os mesmos parâmetros antes de disparar uma execução.
+
 Nos jobs isolados, use `DEPLOY_TARGET=compose` para recriar somente o
 microserviço ou todos os serviços da vertical. Para Kubernetes, use
 `DEPLOY_TARGET=kubernetes`, `PUBLISH=true`, `REGISTRY` e
