@@ -8,6 +8,9 @@ set -Eeuo pipefail
 # phase default must be explicit in the deploy process when Jenkins does not
 # provide the optional parameter; OFF remains an intentional override.
 export FEED_PERSONALIZED_MODE="${FEED_PERSONALIZED_MODE:-ON}"
+mode_env_file="$(mktemp /tmp/bookrush-deploy-mode.XXXXXX)"
+trap 'rm -f "$mode_env_file"' EXIT
+printf 'FEED_PERSONALIZED_MODE=%s\n' "$FEED_PERSONALIZED_MODE" > "$mode_env_file"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
 
@@ -57,7 +60,7 @@ if [[ -z "${ADMIN_WEB_IMAGE:-}" ]]; then
 fi
 : "${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}"
 : "${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}"
-compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --profile auth)
+compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --env-file "$mode_env_file" --profile auth)
 if [[ "${ANALYTICS_GPU:-false}" == "true" ]]; then
   compose+=( -f "${script_dir}/../compose.analytics-gpu.yaml" )
   export ANALYTICS_NLI_ENABLED=true
