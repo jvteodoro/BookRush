@@ -14,6 +14,8 @@
     : document.body.dataset.start || "feed";
 
   const BOOKS = window.__BOOKRUSH_BOOKS__ || [];
+  let legacyFeedRendered = 0;
+  let legacyFeedLoading = false;
 
   const defaultState = {
     route: initialRoute,
@@ -347,8 +349,30 @@
         <div class="side-card"><h3>Seu catálogo</h3><p>Este feed é composto pelo recommendation-service e registra request, impressão, modelo e posição para cada item.</p><div class="taste-row"><span class="taste">Dados reais</span><span class="taste">heuristic-v1</span></div></div>
         <div class="side-card"><h3>Leitura</h3><p>Abra um livro para registrar a abertura e continue pelo conteúdo reader-ready quando estiver disponível.</p></div>
       </aside></div>`;
+    legacyFeedRendered = Math.min(6, BOOKS.length);
     shell(main, "Para você");
     bindFeed();
+  }
+
+  function maybeLoadMoreLegacyFeed() {
+    const scroll = document.getElementById("feedScroll");
+    const loadMore = window.__BOOKRUSH_API__?.loadMoreFeed;
+    if (!scroll || !loadMore || legacyFeedLoading || window.__BOOKRUSH_API__?.feedHasMore?.() === false) return;
+    const threshold = window.__BOOKRUSH_API__?.feedPrefetchThreshold?.() || 2;
+    const remainingScreens = (scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight) / Math.max(1, scroll.clientHeight);
+    if (remainingScreens > threshold) return;
+    legacyFeedLoading = true;
+    const previousLength = BOOKS.length;
+    Promise.resolve(loadMore()).then(() => {
+      const additions = BOOKS.slice(previousLength);
+      if (additions.length) {
+        scroll.insertAdjacentHTML("beforeend", additions.map(feedCard).join(""));
+        legacyFeedRendered = BOOKS.length;
+        bindFeed();
+      }
+    }).catch(() => toast("Não foi possível carregar mais recomendações agora.")).finally(() => {
+      legacyFeedLoading = false;
+    });
   }
 
   function bindFeed() {
@@ -464,6 +488,7 @@
       );
     const fs = document.getElementById("feedScroll");
     if (fs) {
+      fs.addEventListener("scroll", maybeLoadMoreLegacyFeed, { passive: true });
       document.onkeydown = (e) => {
         if (
           document.getElementById("app")?.hidden ||
@@ -474,7 +499,9 @@
           top: (e.key === "ArrowDown" ? 1 : -1) * fs.clientHeight,
           behavior: "smooth",
         });
+        maybeLoadMoreLegacyFeed();
       };
+      maybeLoadMoreLegacyFeed();
     }
     scheduleFeedQuoteFit();
   }

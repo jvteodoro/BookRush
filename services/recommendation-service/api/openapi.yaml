@@ -9,6 +9,7 @@ paths:
       security: [{bearerAuth: []}]
       parameters:
         - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}, description: Number of eligible ranked items to skip for the next page}
       responses:
         '200':
           description: Feed with request, impression, versioned ranking strategy and analytics-ready excerpt lineage. When analytics ranking is enabled, only books with an eligible score and persisted non-empty excerpt are returned.
@@ -33,10 +34,14 @@ components:
   schemas:
     FeedResponse:
       type: object
-      required: [requestId, modelVersion, items, personalization]
+      required: [requestId, modelVersion, items, personalization, offset, nextOffset, hasMore]
       properties:
         requestId: {type: string, format: uuid}
         modelVersion: {type: string}
+        offset: {type: integer, minimum: 0}
+        size: {type: integer, minimum: 1, maximum: 100}
+        nextOffset: {type: integer, minimum: 0}
+        hasMore: {type: boolean}
         rankingVersion: {type: string}
         candidateSetHash: {type: string, pattern: '^[0-9a-f]{64}$'}
         personalization:

@@ -1,6 +1,6 @@
 # API BFF
 
-`GET /api/v1/reader/feed` compõe o feed do recommendation-service e preserva request, impression, model version e rank.
+`GET /api/v1/reader/feed?size=24&offset=0` compõe o feed do recommendation-service e preserva request, impression, model version e rank. A resposta inclui `nextOffset` e `hasMore`; o cliente solicita a próxima página antes do fim da lista para manter o scroll contínuo.
 
 Rotas autenticadas adicionais:
 

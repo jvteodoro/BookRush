@@ -8,6 +8,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 }, description: Number of eligible ranked items to skip for the next page }
       responses:
         '200': { description: Composed analytics-ready recommendation feed; when analytics ranking is enabled, books without an eligible score and non-empty excerpt are omitted }
         '401': { description: Authentication required }

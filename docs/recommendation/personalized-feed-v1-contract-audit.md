@@ -40,10 +40,13 @@ audience/scope explícitos.
 
 O `recommendation-service` atende `GET /api/v1/recommendations/feed` e o
 `reader-bff-service` expõe a mesma operação em
-`GET /api/v1/reader/feed?size=N`.
+`GET /api/v1/reader/feed?size=N&offset=O`. `offset` pagina o conjunto já
+ranqueado e elegível, e a resposta inclui `nextOffset` e `hasMore` para que o
+cliente mantenha uma fila de páginas sem exibir livros fora da elegibilidade
+analítica.
 
 O response atual contém `requestId`, `modelVersion`, `rankingVersion`,
-`strategy`, `generatedAt` e `items`. Cada item contém o livro, `rank`,
+`strategy`, `generatedAt`, `offset`, `nextOffset`, `hasMore` e `items`. Cada item contém o livro, `rank`,
 `reason`, `modelVersion`, `recommendationRequestId`, `impressionId` e, quando
 disponível, um excerpt.
 

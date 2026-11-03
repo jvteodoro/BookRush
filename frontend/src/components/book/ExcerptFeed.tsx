@@ -6,7 +6,7 @@ import { Icon } from '../ui/Icon';
 import { OverflowQuote } from '../ui/OverflowQuote';
 import { AuthenticatedImage } from './AuthenticatedImage';
 
-type Props = { onDetails?: (book: ReaderBook) => void; books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; sidebar: ReactNode; message: string } };
+type Props = { onDetails?: (book: ReaderBook) => void; books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; onNearEnd?: () => void; loadingMore?: boolean; hasMore?: boolean; prefetchThreshold?: number; sidebar: ReactNode; message: string } };
 const compactCount = (count: number) => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(count);
 export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: Props) {
   const [demoLiked, setLiked] = useState<string[]>([]);
@@ -16,6 +16,7 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: P
   const [draft, setDraft] = useState('');
   const [message, setMessage] = useState('');
   const scroll = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
   const onViewable = live?.onViewable;
   useEffect(() => {
     const element = scroll.current;
@@ -32,6 +33,19 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: P
     element.querySelectorAll('.br-excerpt-card').forEach(card => observer.observe(card));
     return () => observer.disconnect();
   }, [books, onViewable]);
+  useEffect(() => {
+    const root = scroll.current;
+    const target = sentinel.current;
+    if (!root || !target || !live?.onNearEnd || !books.length) return;
+    const observer = new window.IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && !live.loadingMore && live.hasMore !== false) live.onNearEnd?.();
+      },
+      { root, rootMargin: `0px 0px ${Math.max(500, (live.prefetchThreshold ?? 2) * 180)}px` },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [books.length, live?.onNearEnd, live?.loadingMore, live?.hasMore, live?.prefetchThreshold]);
   useEffect(() => {
     const element = scroll.current;
     if (!element) return;
@@ -102,6 +116,8 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: P
             <form onSubmit={event => { event.preventDefault(); if (!draft.trim()) return; setComments(current => ({ ...current, [book.id]: [...(current[book.id] ?? []), draft.trim()] })); setDraft(''); }}><label htmlFor={`comment-${book.id}`}>Seu comentário</label><input id={`comment-${book.id}`} maxLength={500} value={draft} onChange={event => setDraft(event.target.value)} /><Button size="sm" disabled={!draft.trim()} type="submit">Comentar</Button></form>
           </div>}
         </article>)}
+        <div ref={sentinel} aria-hidden="true" style={{ height: 1 }} />
+        {live?.loadingMore && <p className="br-feed-message" role="status">Preparando mais recomendações…</p>}
       </div>
       {!books.length && <Card className="br-live-empty"><h2>Nenhum livro disponível</h2><p>Seu feed ainda não tem livros para mostrar.</p></Card>}
       <p className="br-feed-message" role="status">{live?.message ?? message}</p>

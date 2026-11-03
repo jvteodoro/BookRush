@@ -101,13 +101,16 @@ public class RecommendationController {
   }
 
   @GetMapping("/feed")
-  public Map<String, Object> feed(@RequestParam(defaultValue = "20") int size, Principal principal,
+  public Map<String, Object> feed(@RequestParam(defaultValue = "20") int size,
+      @RequestParam(defaultValue = "0") int offset, Principal principal,
       HttpServletRequest request) {
     var totalSample = feedMetrics.start();
     boolean resultRecorded = false;
     try {
       String subject = subject(principal);
     int limit = Math.max(1, Math.min(size, 100));
+    int pageOffset = Math.max(0, Math.min(offset, candidateRetriever.configuredLimit()));
+    int rankingLimit = Math.min(candidateRetriever.configuredLimit(), pageOffset + limit);
     long previousImpressions = feedMetrics.time("history_count", () -> jdbc.queryForObject(
         "SELECT count(*) FROM recommendation.impression i JOIN recommendation.request r ON r.id=i.request_id WHERE r.subject_key=?",
         Long.class, subject));
@@ -143,15 +146,15 @@ public class RecommendationController {
     var fatigueById = loadFatigue(subject, candidateIds);
     boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
     List<?> rankedBooks = feedMetrics.time("ranking",
-        () -> RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById,
+        () -> RecommendationHeuristic.rank(books, subject, rankingLimit, selectedStrategy, scoreById,
             fatigueById, Instant.now(), fatiguePolicy));
-    var explorationIds = personalized ? explorationIds(rankedBooks, requestId.getLeastSignificantBits(), limit)
+    var explorationIds = personalized ? explorationIds(rankedBooks, requestId.getLeastSignificantBits(), rankingLimit)
         : java.util.Set.<String>of();
     PersonalizedRankingResult personalizedRanking = new PersonalizedRankingResult(rankedBooks,
         Map.of(), Map.of());
     if (personalized) {
       personalizedRanking = personalizedRank(rankedBooks, scoreById, fatigueById, profileResult,
-          candidateSnapshots, trending, explorationIds, subject, limit);
+          candidateSnapshots, trending, explorationIds, subject, rankingLimit);
       rankedBooks = personalizedRanking.books();
     }
     if (analyticsRequired) {
@@ -166,11 +169,11 @@ public class RecommendationController {
     if (personalizationDecision.path() == PersonalizedFeedGate.Path.SHADOW) {
       final var shadowInput = rankedBooks;
       var shadowRanking = feedMetrics.time("personalized_shadow", () -> personalizedRank(shadowInput,
-          scoreById, fatigueById, profileResult, candidateSnapshots, trending, explorationIds, subject, limit));
+          scoreById, fatigueById, profileResult, candidateSnapshots, trending, explorationIds, subject, rankingLimit));
       var baselineIds = rankedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull)
-          .map(UUID::toString).limit(limit).toList();
+          .map(UUID::toString).limit(rankingLimit).toList();
       var shadowIds = shadowRanking.books().stream().map(this::bookId).filter(java.util.Objects::nonNull)
-          .map(UUID::toString).limit(limit).toList();
+          .map(UUID::toString).limit(rankingLimit).toList();
       int overlap = (int) shadowIds.stream().filter(baselineIds::contains).count();
       int rankMovement = 0;
       for (int index = 0; index < shadowIds.size(); index++) {
@@ -220,9 +223,14 @@ public class RecommendationController {
       excerptEnrichment.enrich(candidates);
       return null;
     });
-    List<Map<String, Object>> items = analyticsRequired
+    List<Map<String, Object>> eligibleItems = analyticsRequired
         ? new ArrayList<>(FeedEligibility.retainAnalyticsReady(candidates))
         : candidates;
+    int pageStart = Math.min(pageOffset, eligibleItems.size());
+    int pageEnd = Math.min(pageStart + limit, eligibleItems.size());
+    List<Map<String, Object>> items = new ArrayList<>(eligibleItems.subList(pageStart, pageEnd));
+    boolean hasMore = pageEnd < eligibleItems.size() || rankingLimit < candidateSet.books().size();
+    int nextOffset = pageEnd;
     final var ledgerPersonalizedRanking = personalizedRanking;
     feedMetrics.time("ledger_persist", () -> {
       jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
@@ -314,10 +322,20 @@ public class RecommendationController {
         "rankerConfigHash", personalized ? personalizedRanker.configurationHash() : "",
         "mmrConfigHash", personalized ? bookDiversityMmr.configurationHash() : "",
         "explorationPolicy", personalized ? explorationPolicy.policyVersion() : "");
-    return Map.of("requestId", requestId, "modelVersion", modelVersion,
-        "rankingVersion", modelVersion, "strategy", strategy,
-        "candidateSetHash", candidateSetHash, "personalization", personalizationMetadata,
-        "generatedAt", Instant.now(), "items", items);
+    var response = new java.util.LinkedHashMap<String, Object>();
+    response.put("requestId", requestId);
+    response.put("modelVersion", modelVersion);
+    response.put("rankingVersion", modelVersion);
+    response.put("strategy", strategy);
+    response.put("candidateSetHash", candidateSetHash);
+    response.put("personalization", personalizationMetadata);
+    response.put("generatedAt", Instant.now());
+    response.put("offset", pageOffset);
+    response.put("size", limit);
+    response.put("nextOffset", nextOffset);
+    response.put("hasMore", hasMore);
+    response.put("items", items);
+    return response;
     } catch (ResourceAccessException timeout) {
       feedMetrics.recordResult("timeout");
       resultRecorded = true;

@@ -41,11 +41,36 @@ export async function loadRecent(): Promise<string[]> {
     .filter((id): id is string => Boolean(id));
 }
 
-export async function loadRecommendationFeed(): Promise<RecommendationItem[]> {
-  const response = await authClient.fetch(apiRoutes.reader.feed());
-  if (!response.ok) return [];
-  const payload = (await response.json()) as { items?: RecommendationItem[] };
-  return payload.items ?? [];
+export type RecommendationPage = {
+  items: RecommendationItem[];
+  offset: number;
+  nextOffset: number;
+  hasMore: boolean;
+  generatedAt?: string;
+};
+
+export async function loadRecommendationFeed(
+  size = 24,
+  offset = 0,
+): Promise<RecommendationPage> {
+  const response = await authClient.fetch(apiRoutes.reader.feed(size, offset));
+  if (!response.ok) {
+    return { items: [], offset, nextOffset: offset, hasMore: false };
+  }
+  const payload = (await response.json()) as {
+    items?: RecommendationItem[];
+    offset?: number;
+    nextOffset?: number;
+    hasMore?: boolean;
+    generatedAt?: string;
+  };
+  return {
+    items: payload.items ?? [],
+    offset: payload.offset ?? offset,
+    nextOffset: payload.nextOffset ?? offset + (payload.items?.length ?? 0),
+    hasMore: payload.hasMore === true,
+    generatedAt: payload.generatedAt,
+  };
 }
 
 export async function loadSocialCounts(

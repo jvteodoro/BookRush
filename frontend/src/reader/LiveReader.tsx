@@ -57,6 +57,9 @@ type Runtime = {
       excerpt: unknown,
       payload?: Record<string, unknown>,
     ) => void;
+    loadMoreFeed?: () => Promise<boolean>;
+    feedHasMore?: () => boolean;
+    feedPrefetchThreshold?: () => number;
   };
   __BOOKRUSH_LEGACY__: {
     navigate: (route: string, query?: string) => void;
@@ -123,6 +126,8 @@ export function LiveReader({
     ),
   );
   const [pending, setPending] = useState<string[]>([]);
+  const [feedRevision, setFeedRevision] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [detailsBook, setDetailsBook] = useState<DetailsBook | null>(null);
   useEffect(() => {
     const open = (event: Event) => {
@@ -204,8 +209,23 @@ export function LiveReader({
         excerpt: book.excerpt ?? null,
         coverUrl: book.thumbnailUrl ?? undefined,
       })),
-    [],
+    [feedRevision],
   );
+  useEffect(() => {
+    const update = () => setFeedRevision((current) => current + 1);
+    window.addEventListener("bookrush:feed-updated", update);
+    return () => window.removeEventListener("bookrush:feed-updated", update);
+  }, []);
+  const onNearEnd = useCallback(async () => {
+    const loadMore = runtime().__BOOKRUSH_API__.loadMoreFeed;
+    if (!loadMore || loadingMore || runtime().__BOOKRUSH_API__.feedHasMore?.() === false) return;
+    setLoadingMore(true);
+    try {
+      await loadMore();
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore]);
   useEffect(() => {
     if (initialTab === "search") setQuery(legacyQuery);
   }, [initialTab, legacyQuery]);
@@ -450,6 +470,10 @@ export function LiveReader({
             },
             onShare: (id) => runtime().__BOOKRUSH_LEGACY__.openShare(id),
             onViewable,
+            onNearEnd,
+            loadingMore,
+            hasMore: runtime().__BOOKRUSH_API__.feedHasMore?.() ?? false,
+            prefetchThreshold: runtime().__BOOKRUSH_API__.feedPrefetchThreshold?.() ?? 2,
             sidebar: (
               <>
                 <Card>

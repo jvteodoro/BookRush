@@ -8,7 +8,8 @@ export const apiRoutes = {
     search: (query: string) => `/api/v1/books?${query}`,
   },
   reader: {
-    feed: (size = 50) => `/api/v1/reader/feed?size=${size}`,
+    feed: (size = 24, offset = 0) =>
+      `/api/v1/reader/feed?size=${size}&offset=${offset}`,
     recommendations: () => "/api/v1/reader/recommendations",
     library: () => "/api/v1/reader/library",
     libraryBook: (bookId: string) => `/api/v1/reader/library/${id(bookId)}`,

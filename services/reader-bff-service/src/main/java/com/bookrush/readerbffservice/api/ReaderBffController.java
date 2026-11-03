@@ -36,9 +36,17 @@ public class ReaderBffController {
   }
 
   @GetMapping("/feed")
-  public Object feed(@RequestParam(defaultValue = "20") int size, Principal principal, HttpServletRequest request) {
+  public Object feed(@RequestParam(defaultValue = "20") int size,
+      @RequestParam(defaultValue = "0") int offset, Principal principal, HttpServletRequest request) {
     requireReader(principal);
-    return get(recommendations, "/api/v1/recommendations/feed", request, Map.of("size", Math.min(Math.max(size, 1), 100)));
+    return get(recommendations, "/api/v1/recommendations/feed", request, Map.of(
+        "size", Math.min(Math.max(size, 1), 100),
+        "offset", Math.max(offset, 0)));
+  }
+
+  /** Keeps direct callers source-compatible while the HTTP endpoint gains pagination. */
+  public Object feed(int size, Principal principal, HttpServletRequest request) {
+    return feed(size, 0, principal, request);
   }
 
   @GetMapping("/recommendations")

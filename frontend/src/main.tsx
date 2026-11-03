@@ -25,7 +25,7 @@ import {
   loadRecommendationFeed,
   loadSocialCounts,
 } from "./app/catalogApi";
-import type { CatalogBook, FeedExcerpt, PageLoopBook } from "./app/types";
+import type { FeedExcerpt, PageLoopBook, RecommendationItem } from "./app/types";
 import type { ReadiumBridge } from "./app/types";
 import { useLegacyNavigation } from "./app/useLegacyNavigation";
 import { apiRoutes } from "./app/apiRoutes";
@@ -84,8 +84,14 @@ function App() {
           });
           if (!response.ok) throw new Error("telemetry rejected");
         });
-        const recommendations = await loadRecommendationFeed();
-        if (!active) return;
+        const recommendations: RecommendationItem[] = [];
+        const recommendationIds = new Set<string>();
+        const books: PageLoopBook[] = [];
+        const likedById = new Map<string, boolean>();
+        let nextOffset = 0;
+        let hasMore = true;
+        let loadingMore: Promise<boolean> | null = null;
+        let lastGenerationMs = 1000;
         const recommendationFor = (bookId: string) =>
           recommendations.find((item) => item.book?.id === bookId);
         const correlationHeaders = (bookId: string): Record<string, string> => {
@@ -98,13 +104,6 @@ function App() {
             headers["X-BookRush-Impression"] = recommendation.impressionId;
           return headers;
         };
-        const ordered = recommendations
-          .map((item) => item.book)
-          .filter((book): book is CatalogBook => Boolean(book));
-        // The live feed is the source of truth.  Do not fall back to the full
-        // catalog: analytics-required deployments must never show books that
-        // have no eligible recommendation/excerpt.
-        const source = ordered;
         const palettes = [
           ["#82d4a4", "#213e35"],
           ["#74b9ff", "#202b52"],
@@ -112,12 +111,21 @@ function App() {
           ["#c7d87a", "#26311f"],
           ["#d2aa6d", "#4a2e1f"],
         ];
-        const books: PageLoopBook[] = await Promise.all(
-          source.map(async (book, index) => {
+        const appendPage = async (page: Awaited<ReturnType<typeof loadRecommendationFeed>>) => {
+          const newItems = page.items.filter((item) => {
+            const book = item.book;
+            if (!book || recommendationIds.has(book.id)) return false;
+            recommendationIds.add(book.id);
+            recommendations.push(item);
+            return true;
+          });
+          const additions = await Promise.all(newItems.map(async (item, pageIndex) => {
+            const book = item.book!;
+            const index = books.length + pageIndex;
             const recommendation = recommendations.find(
               (item) => item.book?.id === book.id,
             );
-            return {
+            const nextBook: PageLoopBook = {
               id: book.id,
               title: book.canonicalTitle,
               author: "Catálogo BookRush",
@@ -145,24 +153,46 @@ function App() {
               modelVersion: recommendation?.modelVersion,
               rank: recommendation?.rank,
             };
-          }),
-        );
-        const socialCounts = await Promise.all(
-          books.map((book) =>
-            loadSocialCounts(book.id).catch(() => ({
+            const socialCounts = await loadSocialCounts(nextBook.id).catch(() => ({
               likes: 0,
               comments: 0,
               liked: false,
-            })),
-          ),
-        );
-        books.forEach((book, index) =>
-          Object.assign(book, socialCounts[index]),
-        );
+            }));
+            Object.assign(nextBook, socialCounts);
+            likedById.set(nextBook.id, socialCounts.liked);
+            return nextBook;
+          }));
+          books.push(...additions);
+          nextOffset = page.nextOffset;
+          hasMore = page.hasMore && page.items.length > 0;
+          const likes = ((window as Window & {
+            __BOOKRUSH_LIKES__?: Record<string, boolean>;
+          }).__BOOKRUSH_LIKES__ ??= {});
+          likedById.forEach((liked, id) => { likes[id] = liked; });
+          (window as Window & { __BOOKRUSH_BOOKS__?: PageLoopBook[] }).__BOOKRUSH_BOOKS__ = books;
+          window.dispatchEvent(new CustomEvent("bookrush:feed-updated"));
+        };
+        const loadMoreFeed = async (): Promise<boolean> => {
+          if (!hasMore || loadingMore) return Boolean(loadingMore);
+          loadingMore = (async () => {
+            const startedAt = window.performance.now();
+            const page = await loadRecommendationFeed(24, nextOffset);
+            lastGenerationMs = Math.max(1, window.performance.now() - startedAt);
+            await appendPage(page);
+            return page.items.length > 0;
+          })();
+          try {
+            return await loadingMore;
+          } finally {
+            loadingMore = null;
+          }
+        };
+        await loadMoreFeed();
+        if (!active) return;
         (
           window as Window & { __BOOKRUSH_LIKES__?: Record<string, boolean> }
         ).__BOOKRUSH_LIKES__ = Object.fromEntries(
-          books.map((book, index) => [book.id, socialCounts[index].liked]),
+          books.map((book) => [book.id, likedById.get(book.id) === true]),
         );
         const saved = new Set(await loadLibrary());
         const recent = await loadRecent();
@@ -171,10 +201,7 @@ function App() {
         // The dedicated admin console obtains the correct platform token.
         const submissions: unknown[] = [];
         (
-          window as Window & {
-            __BOOKRUSH_BOOKS__?: PageLoopBook[];
-            __BOOKRUSH_API__?: Record<string, unknown>;
-          }
+          window as Window & { __BOOKRUSH_BOOKS__?: PageLoopBook[] }
         ).__BOOKRUSH_BOOKS__ = books;
         (
           window as Window & { __BOOKRUSH_RECENT__?: string[] }
@@ -238,6 +265,9 @@ function App() {
         ).__BOOKRUSH_API__ = {
           ...(window as Window & { __BOOKRUSH_API__?: Record<string, unknown> })
             .__BOOKRUSH_API__,
+          loadMoreFeed,
+          feedHasMore: () => hasMore,
+          feedPrefetchThreshold: () => Math.min(12, Math.max(2, Math.ceil(lastGenerationMs / 750))),
           saved,
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(
