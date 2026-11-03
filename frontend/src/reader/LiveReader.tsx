@@ -60,7 +60,11 @@ type Runtime = {
   };
   __BOOKRUSH_LEGACY__: {
     navigate: (route: string, query?: string) => void;
-    openBook: (id: string, query?: string) => Promise<void>;
+    openBook: (
+      id: string,
+      query?: string,
+      fromRecommendation?: boolean,
+    ) => Promise<void>;
     openComments: (id: string) => Promise<void>;
     openShare: (id: string) => void;
     openLucky: () => void;
@@ -365,7 +369,11 @@ export function LiveReader({
           onDetails={setDetailsBook}
           onOpen={(book) =>
             void action(book.id, async () => {
-              await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query);
+              await runtime().__BOOKRUSH_LEGACY__.openBook(
+                book.id,
+                query,
+                true,
+              );
               onLegacy();
             })
           }
@@ -434,7 +442,11 @@ export function LiveReader({
           onDetails={setDetailsBook}
           onOpen={(book) =>
             void action(book.id, async () => {
-              await runtime().__BOOKRUSH_LEGACY__.openBook(book.id);
+              await runtime().__BOOKRUSH_LEGACY__.openBook(
+                book.id,
+                undefined,
+                true,
+              );
               onLegacy();
             })
           }

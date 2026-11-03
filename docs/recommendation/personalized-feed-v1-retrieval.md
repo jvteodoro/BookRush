@@ -100,6 +100,24 @@ NaN. This is intentionally separate from excerpt-level analytics MMR.
 
 ## Personalized serving gate
 
+### Serving order and pool boundary
+
+For `PERSONALIZED`, `CandidateUnionBuilder` produces the bounded candidate
+universe first. The controller sends that complete universe to
+`PersonalizedFeedSelector`; it does not call the legacy global heuristic with
+the requested feed size before personalized scoring. The selector scores all
+candidates, reserves the configured exploration quota from a freshness-prioritized
+slice of the lower-ranked post-score pool, applies book-level MMR to the remaining exploitation slots,
+and inserts the exploration choices deterministically to produce the final
+bounded `limit` items. The request seed drives both tie-breaking and
+exploration draws. `OFF` and fallback continue to use the legacy heuristic and
+analytics eligibility policy.
+
+Missing analytics quality is represented as a missing ranker feature and is
+renormalized by the configured missing-feature policy in the personalized
+path. It is not an automatic candidate-removal rule. Analytics/excerpt
+eligibility remains strict for the legacy control path.
+
 `PersonalizedFeedGate` is the rollout boundary for PFV1. It is configured with
 `FEED_PERSONALIZED_MODE=OFF|SHADOW|ON` and minimum `coverage`/`confidence`
 thresholds. `OFF` keeps the existing analytics-aware/heuristic feed; `SHADOW`

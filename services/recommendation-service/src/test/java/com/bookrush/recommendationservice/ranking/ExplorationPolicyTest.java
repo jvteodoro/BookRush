@@ -34,4 +34,17 @@ class ExplorationPolicyTest {
     assertTrue(total <= 600);
     assertTrue(total >= 100, "exploration should remain observable over the sample");
   }
+
+  @Test
+  void reservesTheConfiguredQuotaFromTheExplorationPool() {
+    var policy = new ExplorationPolicy(new ExplorationPolicy.Config("explore-v1", true, .1, 2));
+    var first = policy.choose(List.of("outside-a", "outside-b", "outside-c"), Set.of(), 11, 20);
+    assertEquals(2, first.size());
+    assertTrue(first.stream().allMatch(choice -> choice.reason().equals("epsilon-exploration")));
+    var variants = new java.util.HashSet<List<ExplorationPolicy.Choice>>();
+    for (int seed = 1; seed <= 20; seed++) {
+      variants.add(policy.choose(List.of("outside-a", "outside-b", "outside-c"), Set.of(), seed, 20));
+    }
+    assertTrue(variants.size() > 1);
+  }
 }

@@ -3,6 +3,7 @@ package com.bookrush.recommendationservice.ranking;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -15,20 +16,26 @@ public final class ExplorationPolicy {
 
   public String policyVersion() { return config.version(); }
 
+  public int quota(int feedSize) {
+    if (!config.enabled() || feedSize < 1) return 0;
+    return Math.min(config.quota(), Math.max(1, (int) Math.ceil(feedSize * config.epsilon())));
+  }
+
   public List<Choice> choose(List<String> rankedIds, Set<String> alreadySelected,
       long requestSeed, int feedSize) {
     if (!config.enabled() || rankedIds == null || feedSize < 1) return List.of();
     var selected = alreadySelected == null ? Set.<String>of() : alreadySelected;
-    int target = Math.min(config.quota(), Math.max(1, (int) Math.ceil(feedSize * config.epsilon())));
+    int target = quota(feedSize);
     var result = new ArrayList<Choice>();
     var seen = new HashSet<String>(selected);
+    var available = new ArrayList<Choice>();
     for (String id : rankedIds) {
       if (id == null || !seen.add(id)) continue;
       double probability = unit(requestSeed, id);
-      if (probability <= config.epsilon() && result.size() < target) {
-        result.add(new Choice(id, config.version(), "epsilon-exploration", probability));
-      }
+      available.add(new Choice(id, config.version(), "epsilon-exploration", probability));
     }
+    available.sort(Comparator.comparingDouble(Choice::draw).thenComparing(Choice::bookId));
+    result.addAll(available.subList(0, Math.min(target, available.size())));
     return List.copyOf(result);
   }
 

@@ -14,6 +14,18 @@ subject para ativação gradual. O rollback operacional é definir `MODE=OFF` e
 reiniciar somente o recommendation-service; não requer migration rollback nem
 remove dados do ledger.
 
+O default operacional é `OFF` em `application.yml`, Compose, `.env.example` e
+Jenkins. A ativação experimental precisa escolher `FEED_PERSONALIZED_MODE=ON`
+explicitamente.
+
+No caminho `PERSONALIZED`, a ordem é: candidate retrieval limitado → candidate
+union → score personalizado de todo o pool → quota de exploration → MMR
+book-level nos slots de exploitation → inserção determinística dos slots de
+exploration → top-N final. O score pode renormalizar features analíticas
+ausentes; a ausência de quality não remove automaticamente um candidato
+semântico válido. No caminho `OFF`/fallback, a política analytics-aware antiga
+continua valendo.
+
 ## Observabilidade
 
 O serviço publica timers em `bookrush.feed.stage.duration` e contadores de baixa
@@ -91,3 +103,8 @@ complementares, não para descartar candidatos válidos.
 O carregamento inicial do feed não depende de uma chamada separada à primeira
 página do catálogo; os metadados necessários devem vir do contrato de
 recomendação autenticado.
+
+O caminho de feedback do leitor faz parte da validação controlada: o leitor web
+abre e encerra uma única sessão persistida, enquanto os intervalos da planta
+continuam sendo um agregado independente de streak. A imagem frontend só deve
+ser promovida após `format:check`, testes, lint e build concluírem com sucesso.

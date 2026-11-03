@@ -1,0 +1,4 @@
+recommendation_item_id,outcome_type,active_seconds,percent,occurred_at
+item-1,READ_SESSION,120,,2026-11-03T10:00:10Z
+item-1,READ_PROGRESS,,55,2026-11-03T10:01:00Z
+item-1,BOOK_COMPLETE,,,2026-11-03T10:02:00Z

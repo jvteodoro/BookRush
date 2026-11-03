@@ -4,6 +4,7 @@
 
 Rotas autenticadas adicionais:
 
+- `POST /api/v1/reader/sessions` e `POST /api/v1/reader/sessions/{id}/end`
 - `GET /api/v1/reader/recommendations`
 - `GET /api/v1/reader/library`
 - `GET /api/v1/reader/recent`

@@ -65,6 +65,20 @@ public class ReaderBffController {
     return get(state, "/api/v1/reader/streak", request, Map.of());
   }
 
+  @PostMapping("/sessions")
+  public Object startSession(@RequestBody(required = false) Object body, Principal principal,
+      HttpServletRequest request) {
+    requireReader(principal);
+    return mutate(state, HttpMethod.POST, "/api/v1/reader/sessions", request, body);
+  }
+
+  @PostMapping("/sessions/{id}/end")
+  public Object endSession(@PathVariable UUID id, @RequestBody Object body, Principal principal,
+      HttpServletRequest request) {
+    requireReader(principal);
+    return mutate(state, HttpMethod.POST, "/api/v1/reader/sessions/" + id + "/end", request, body);
+  }
+
   @GetMapping("/books/{bookId}/progress")
   public Object progress(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     requireReader(principal);

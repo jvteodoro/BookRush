@@ -32,6 +32,12 @@ public class PersonalizedFeedConfiguration {
   }
 
   @Bean
+  PersonalizedFeedSelector personalizedFeedSelector(PersonalizedRankerV1 ranker,
+      ExplorationPolicy exploration, BookDiversityMmr mmr) {
+    return new PersonalizedFeedSelector(ranker, exploration, mmr);
+  }
+
+  @Bean
   ExplorationPolicy explorationPolicy() {
     return new ExplorationPolicy(new ExplorationPolicy.Config("exploration-v1", true, .10, 1));
   }

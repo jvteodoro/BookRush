@@ -55,3 +55,23 @@ Ao atingir 100% de progresso, o serviço publica `BOOK_COMPLETE` uma única vez
 por subject/livro usando uma chave idempotente estável, preservando a correlação
 do feed quando aplicável. A origem direta/search continua sem correlação
 inventada.
+# Reader sessions and attribution
+
+`POST /api/v1/reader/sessions` starts a reading session with an optional
+`bookId`. Feed-origin sessions may include recommendation and impression
+headers; direct library/search sessions omit them. `POST /sessions/{id}/end`
+publishes `READ_SESSION` with the persisted session origin and active seconds.
+
+`PUT /books/{bookId}/progress` publishes `READ_PROGRESS` and, at 100%, an
+idempotent `BOOK_COMPLETE`; the frontend sends the correlation headers only
+while the active reader session originated from a feed item.
+
+Plant intervals remain a separate gamification/streak aggregate. Reader
+sessions feed recommendation behavior/outcomes; the two paths do not share
+event requests or double-count active time.
+
+The web Readium bridge captures feed attribution before mounting the
+publication, starts the session only after the publication is validated, and
+ends the same session on reader unmount or page hide. Leaving the reader
+clears the origin, so a later library/search opening of the same book remains
+direct and un-attributed.

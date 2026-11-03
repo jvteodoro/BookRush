@@ -98,6 +98,10 @@ function App() {
             headers["X-BookRush-Impression"] = recommendation.impressionId;
           return headers;
         };
+        let readerOrigin: {
+          bookId: string;
+          headers: Record<string, string>;
+        } | null = null;
         const ordered = recommendations
           .map((item) => item.book)
           .filter((book): book is CatalogBook => Boolean(book));
@@ -239,6 +243,11 @@ function App() {
           ...(window as Window & { __BOOKRUSH_API__?: Record<string, unknown> })
             .__BOOKRUSH_API__,
           saved,
+          readerSessionCorrelation: (bookId: string) =>
+            readerOrigin?.bookId === bookId ? { ...readerOrigin.headers } : {},
+          clearReaderSessionOrigin: () => {
+            readerOrigin = null;
+          },
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(
               apiRoutes.reader.libraryBook(id),
@@ -523,7 +532,10 @@ function App() {
           ) => {
             await authClient.fetch(apiRoutes.reader.progress(id), {
               method: "PUT",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                ...(readerOrigin?.bookId === id ? readerOrigin.headers : {}),
+              },
               body: JSON.stringify({ percent, positionCodepoint }),
             });
           },
@@ -534,10 +546,13 @@ function App() {
               body: JSON.stringify({ positionCodepoint }),
             });
           },
-          open: async (id: string) => {
+          open: async (id: string, fromRecommendation = false) => {
+            readerOrigin = fromRecommendation
+              ? { bookId: id, headers: correlationHeaders(id) }
+              : null;
             await authClient.fetch(apiRoutes.reader.opened(id), {
               method: "POST",
-              headers: correlationHeaders(id),
+              headers: readerOrigin?.headers ?? {},
             });
           },
           chapters: async (id: string) => {

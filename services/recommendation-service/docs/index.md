@@ -71,7 +71,8 @@ recommendation service's own bounded analytics clients.
 
 ## Personalized Feed V1
 
-The safe default remains `FEED_PERSONALIZED_MODE=OFF`, serving the existing
+The safe default remains `FEED_PERSONALIZED_MODE=OFF` in application.yml,
+Compose, `.env.example` and Jenkins, serving the existing
 analytics-aware/heuristic path. `SHADOW` calculates `PERSONALIZED_V1` without
 changing the control response. `ON` serves it only after behavior, snapshot,
 coverage and confidence gates pass. `FEED_PERSONALIZED_ROLLOUT_PERCENTAGE`
