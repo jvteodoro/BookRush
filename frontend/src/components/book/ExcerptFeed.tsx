@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReaderBook } from './BookCard';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -6,7 +6,7 @@ import { Icon } from '../ui/Icon';
 import { OverflowQuote } from '../ui/OverflowQuote';
 import { AuthenticatedImage } from './AuthenticatedImage';
 
-type Props = { onDetails?: (book: ReaderBook) => void; books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; sidebar: ReactNode; message: string } };
+type Props = { onDetails?: (book: ReaderBook) => void; books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; message: string } };
 const compactCount = (count: number) => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(count);
 export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: Props) {
   const [demoLiked, setLiked] = useState<string[]>([]);
@@ -106,6 +106,5 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: P
       {!books.length && <Card className="br-live-empty"><h2>Nenhum livro disponível</h2><p>Seu feed ainda não tem livros para mostrar.</p></Card>}
       <p className="br-feed-message" role="status">{live?.message ?? message}</p>
     </section>
-    <aside className="br-feed-side" aria-label="Sua leitura">{live?.sidebar ?? <><Card><h2>12 dias de sequência</h2><p>Mais um capítulo, mais um dia cultivando seu hábito.</p><span className="br-feed-badge">6 min para a meta de hoje</span></Card><Card><h2>Feito para você</h2><p>Histórias para descobrir, salvar e continuar no seu tempo.</p><span className="br-feed-badge">Romance</span> <span className="br-feed-badge">Suspense</span></Card><Card><h2>Sua próxima leitura</h2><p>Gostou de um trecho? Salve o livro na sua biblioteca ou abra os detalhes.</p></Card></>}</aside>
   </div>;
 }

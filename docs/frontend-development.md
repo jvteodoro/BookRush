@@ -54,6 +54,19 @@ root vazio quando a sessão não puder ser restaurada. Alterações visuais deve
 reutilizar os tokens BookRush definidos em `admin-web/src/styles/app.css` e
 validar o build do admin separadamente do frontend principal.
 
+## Feed e resumo de leitura
+
+O card de trecho ocupa toda a largura disponível do conteúdo do feed, sem
+coluna lateral. Os controles de curtir, comentar, salvar e compartilhar
+permanecem no card, assim como a navegação entre trechos.
+
+As informações de sequência, descoberta e livros salvos ficam na aba Perfil,
+no componente `src/reader/ReadingSummary.tsx`. Os números usam o mesmo estado
+real de sequência e biblioteca do leitor. Os atalhos abrem Minha planta,
+Recomendações e Biblioteca. Em telas menores, os blocos se reorganizam em uma
+coluna. A prévia local `/home-preview` reproduz a mesma organização com dados
+demonstrativos.
+
 ## Leitor EPUB e Readium
 
 O leitor usa `src/reader/readiumBridge.ts` para montar a publicação protegida

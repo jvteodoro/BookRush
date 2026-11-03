@@ -1,3 +1,4 @@
+import { ReadingSummary } from "./ReadingSummary";
 import { FollowerCount } from "./FollowerCount";
 import type { ReactNode } from "react";
 import { Button } from "../components/ui/Button";
@@ -192,6 +193,11 @@ export function AccountPage({
             </span>
           </div>
         </Card>
+        <ReadingSummary
+          streak={streak}
+          savedCount={savedCount}
+          onNavigate={onNavigate}
+        />
         <Card className="br-account-panel">
           <h2>Preferências da conta</h2>
           <p className="br-muted">

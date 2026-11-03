@@ -771,3 +771,16 @@
     margin-bottom: 1.25rem;
   }
 }
+
+/* Reading activity lives on Profile; the feed keeps the full content width. */
+.br-reading-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.br-reading-summary .br-account-panel {
+  min-width: 0;
+  margin-top: 0;
+}
