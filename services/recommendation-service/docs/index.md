@@ -86,6 +86,9 @@ the immediate rollback. See
 and the read-only dataset handoff. In `SHADOW`, the service records a bounded
 timer plus overlap and aggregate rank movement; these measurements never use
 subject or book IDs as metric labels.
+Usuários sem sinais permanecem no fallback `cold-start` sem exigir snapshot
+semântico; o snapshot só é requisito quando já existe um perfil pronto para
+personalização.
 
 The `feed.personalized` properties use Spring's mutable configuration binding
 so the service starts correctly in Docker and in the production profile. The
