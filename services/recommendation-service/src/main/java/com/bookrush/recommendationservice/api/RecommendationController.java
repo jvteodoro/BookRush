@@ -204,6 +204,7 @@ public class RecommendationController {
       item.put("modelVersion", modelVersion);
       item.put("rank", candidateRank++);
       item.put("reason", reason);
+      item.put("candidateSources", candidateSet.sourcesFor(String.valueOf(bookId)));
       var bookScore = scoreById.get(String.valueOf(bookId));
       var personalizedScore = personalizedRanking.scoredById().get(String.valueOf(bookId));
       if (personalizedScore != null) item.put("score", personalizedScore.score());

@@ -29,6 +29,8 @@ endpoint and are merged with semantic/global candidates; recommendation does
 not query the behavior schema directly.
 Each ledger item also records its contributing candidate sources, union version
 and configuration hash alongside the candidate-set hash for replay.
+The public feed item also exposes the bounded source names, without exposing
+embeddings or private profile vectors.
 
 The dataset handoff reads recommendation decisions and behavior outcomes from
 separate read-only database URLs and joins them locally by explicit

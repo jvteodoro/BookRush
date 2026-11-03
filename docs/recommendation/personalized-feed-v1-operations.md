@@ -59,3 +59,10 @@ Antes de ativar `ON`, executar os testes da branch, `SHADOW` com uma amostra
 controlada e o smoke autenticado do gateway. Registrar commit, imagem/digest,
 configuração efetiva, população e horários. O status de produção só pode ser
 `GO` após pipeline Jenkins e smoke da revisão exata; sem isso permanece `NO-GO`.
+
+Para a prova semântica controlada, executar `scripts/pfv1-gateway-e2e.sh` com
+`PFV1_EXPECT_PERSONALIZED=true` e três tokens de sujeitos distintos. O modo
+estrito exige `PERSONALIZED` e fonte `semantic` para os dois usuários com
+histórico, além de `FALLBACK` com motivo `cold-start` ou `coverage-low` para o
+usuário frio. `PFV1_EXPECT_DIFFERENT_TOP1=true` adiciona a asserção de top-1
+divergente, quando a fixture controlar os demais componentes.
