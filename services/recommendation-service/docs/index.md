@@ -36,6 +36,8 @@ Each ledger item also records its contributing candidate sources, union version
 and configuration hash alongside the candidate-set hash for replay.
 The public feed item also exposes the bounded source names, without exposing
 embeddings or private profile vectors.
+Personalized ledger reasons include embedding model/version and source-asset
+version metadata, never the vector itself.
 
 The dataset handoff reads recommendation decisions and behavior outcomes from
 separate read-only database URLs and joins them locally by explicit

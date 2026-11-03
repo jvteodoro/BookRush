@@ -278,6 +278,13 @@ public class RecommendationController {
               profileResult.profile() == null ? "" : profileResult.profile().configurationHash());
           reasonPayload.put("mmrConfigHash", bookDiversityMmr.configurationHash());
           reasonPayload.put("explorationPolicy", explorationPolicy.policyVersion());
+          var embeddingSnapshot = candidateSnapshots.get(parsedBookId);
+          if (embeddingSnapshot != null && embeddingSnapshot.embedding() != null) {
+            reasonPayload.put("embeddingModel", embeddingSnapshot.embedding().model());
+            reasonPayload.put("embeddingModelVersion", embeddingSnapshot.embedding().modelVersion());
+            reasonPayload.put("embeddingSourceAssetVersionId",
+                embeddingSnapshot.embedding().sourceAssetVersionId());
+          }
         }
         var fatigue = fatigueById.get(String.valueOf(parsedBookId));
         if (fatigue != null) {
