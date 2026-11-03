@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReaderBook } from './BookCard';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
@@ -6,7 +6,7 @@ import { Icon } from '../ui/Icon';
 import { OverflowQuote } from '../ui/OverflowQuote';
 import { AuthenticatedImage } from './AuthenticatedImage';
 
-type Props = { onDetails?: (book: ReaderBook) => void; books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; sidebar: ReactNode; message: string } };
+type Props = { onDetails?: (book: ReaderBook) => void; books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; message: string } };
 const compactCount = (count: number) => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(count);
 export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: Props) {
   const [demoLiked, setLiked] = useState<string[]>([]);
@@ -87,7 +87,7 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: P
     <section className="br-feed-stage" aria-label="Feed Para você">
       <div ref={scroll} className="br-feed-scroll" tabIndex={0} aria-label={`${live ? 'Feed de leitura' : 'Trechos demonstrativos'}; role ou use as setas para ver mais livros`}>
         {books.map((book, index) => <article key={book.id} data-book-id={book.id} className={`br-excerpt-card br-excerpt-card--${index % 3}`} aria-label={book.title}>
-          <div className="br-excerpt-copy"><div className="br-excerpt-meta"><span>{book.genre}</span><span>{live ? 'Para você' : 'Prévia'} · {index + 1} de {books.length}</span></div>
+          <div className="br-excerpt-copy">
             <span className="br-excerpt-quote-mark" aria-hidden="true">“</span><OverflowQuote text={book.excerpt?.text || 'Trecho analítico indisponível.'} />
             <div className="br-excerpt-book"><span className="br-excerpt-mini" aria-hidden="true">{book.coverUrl ? <AuthenticatedImage src={book.coverUrl} alt="" /> : 'B'}</span><div><h2>{book.title}</h2><p>{book.author}</p></div></div>
             <div>{onDetails && <Button variant="ghost" onClick={() => onDetails(book)}>Sobre e avaliações</Button>}<Button disabled={live?.pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora →</Button></div>
@@ -106,6 +106,5 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: P
       {!books.length && <Card className="br-live-empty"><h2>Nenhum livro disponível</h2><p>Seu feed ainda não tem livros para mostrar.</p></Card>}
       <p className="br-feed-message" role="status">{live?.message ?? message}</p>
     </section>
-    <aside className="br-feed-side" aria-label="Sua leitura">{live?.sidebar ?? <><Card><h2>12 dias de sequência</h2><p>Mais um capítulo, mais um dia cultivando seu hábito.</p><span className="br-feed-badge">6 min para a meta de hoje</span></Card><Card><h2>Feito para você</h2><p>Histórias para descobrir, salvar e continuar no seu tempo.</p><span className="br-feed-badge">Romance</span> <span className="br-feed-badge">Suspense</span></Card><Card><h2>Sua próxima leitura</h2><p>Gostou de um trecho? Salve o livro na sua biblioteca ou abra os detalhes.</p></Card></>}</aside>
   </div>;
 }

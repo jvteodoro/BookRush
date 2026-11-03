@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, type ReaderTab } from "../components/layout/AppShell";
 import { ExcerptFeed } from "../components/book/ExcerptFeed";
-import { Card } from "../components/ui/Card";
 import { authClient } from "../auth";
 import { apiRoutes } from "../app/apiRoutes";
 import { LibraryPage } from "./LibraryPage";
@@ -462,33 +461,6 @@ export function LiveReader({
             },
             onShare: (id) => runtime().__BOOKRUSH_LEGACY__.openShare(id),
             onViewable,
-            sidebar: (
-              <>
-                <Card>
-                  <h2>
-                    {typeof streak === "number"
-                      ? `${streak} dias de sequência`
-                      : "Sua leitura"}
-                  </h2>
-                  <p>Continue seu hábito, uma história de cada vez.</p>
-                </Card>
-                <Card>
-                  <h2>Feito para você</h2>
-                  <p>
-                    Descubra histórias do seu catálogo e salve as que quiser ler
-                    depois.
-                  </p>
-                </Card>
-                <Card>
-                  <h2>Sua biblioteca</h2>
-                  <p>
-                    {saved.length}{" "}
-                    {saved.length === 1 ? "livro salvo" : "livros salvos"} para
-                    sua próxima leitura.
-                  </p>
-                </Card>
-              </>
-            ),
           }}
         />
       )}

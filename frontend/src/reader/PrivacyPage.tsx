@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { authClient } from "../auth";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { Icon, type IconName } from "../components/ui/Icon";
 import {
   DEFAULT_PRIVACY,
   loadPrivacy,
@@ -28,29 +29,35 @@ const SETTINGS: Array<{
   key: keyof PrivacyPreferences;
   label: string;
   description: string;
+  icon: IconName;
 }> = [
   {
     key: "profileVisibility",
+    icon: "user",
     label: "Perfil",
     description: "Quem pode encontrar seu perfil e ler sua biografia.",
   },
   {
     key: "activityVisibility",
+    icon: "heart",
     label: "Atividade",
     description: "Quem pode ver curtidas, comentários e atividades de leitura.",
   },
   {
     key: "libraryVisibility",
+    icon: "library",
     label: "Biblioteca",
     description: "Quem pode consultar os livros salvos na sua estante.",
   },
   {
     key: "recentVisibility",
+    icon: "bookmark",
     label: "Leituras recentes",
     description: "Quem pode ver os livros que você abriu recentemente.",
   },
   {
     key: "socialGraphVisibility",
+    icon: "share",
     label: "Seguidores e seguindo",
     description: "Quem pode consultar suas conexões com outros leitores.",
   },
@@ -125,11 +132,18 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
         </p>
       </div>
       <Card className="br-account-panel br-privacy-panel">
-        <h2>Preferências de compartilhamento</h2>
-        <p className="br-muted">
-          “Todos” permite acesso público; “Seguidores” limita a quem acompanha
-          você; “Somente eu” mantém o conteúdo privado.
-        </p>
+        <div className="br-privacy-intro">
+          <span className="br-privacy-symbol" aria-hidden="true">
+            <Icon name="shield" />
+          </span>
+          <div>
+            <h2>Você escolhe o que compartilhar</h2>
+            <p className="br-muted">
+              Compartilhe com todos, apenas com seus seguidores ou guarde só
+              para você.
+            </p>
+          </div>
+        </div>
         {loading ? (
           <p className="br-account-status" role="status">
             Carregando preferências…
@@ -137,28 +151,45 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
         ) : (
           <div className="br-privacy-grid">
             {SETTINGS.map((setting) => (
-              <label className="br-privacy-field" key={setting.key}>
-                <span>
-                  <strong>{setting.label}</strong>
-                  <small>{setting.description}</small>
-                </span>
-                <select
-                  aria-label={`Visibilidade de ${setting.label}`}
-                  disabled={saving}
-                  value={
-                    preferences[setting.key] ?? DEFAULT_PRIVACY[setting.key]
-                  }
-                  onChange={(event) =>
-                    update(setting.key, event.target.value as Visibility)
-                  }
-                >
+              <fieldset
+                className="br-privacy-field"
+                key={setting.key}
+                disabled={saving}
+                aria-describedby={`${setting.key}-description`}
+              >
+                <legend className="br-sr-only">
+                  Visibilidade de {setting.label}
+                </legend>
+                <div className="br-privacy-description">
+                  <span className="br-privacy-setting-icon" aria-hidden="true">
+                    <Icon name={setting.icon} />
+                  </span>
+                  <div>
+                    <strong>{setting.label}</strong>
+                    <p id={`${setting.key}-description`}>
+                      {setting.description}
+                    </p>
+                  </div>
+                </div>
+                <div className="br-privacy-choices">
                   {OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
+                    <label className="br-privacy-choice" key={option.value}>
+                      <input
+                        className="br-sr-only"
+                        type="radio"
+                        name={setting.key}
+                        value={option.value}
+                        checked={
+                          (preferences[setting.key] ??
+                            DEFAULT_PRIVACY[setting.key]) === option.value
+                        }
+                        onChange={() => update(setting.key, option.value)}
+                      />
+                      <span>{option.label}</span>
+                    </label>
                   ))}
-                </select>
-              </label>
+                </div>
+              </fieldset>
             ))}
           </div>
         )}
