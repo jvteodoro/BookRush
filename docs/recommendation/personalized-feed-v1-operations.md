@@ -42,12 +42,16 @@ uma fixture sem reprocessar PII.
 ## Dataset para LTR futuro
 
 `services/recommendation-service/scripts/export-pfv1-dataset.sh` exporta o
-contrato `recommendation-pfv1-dataset-v1` a partir de um snapshot somente-leitura.
-Cada linha liga `recommendation_item_id` à impressão, decisão, posição, score e
-componentes persistidos. O cutoff é obrigatório; eventos posteriores são
-excluídos para evitar leakage. O arquivo deve ser acompanhado de SHA-256, número
-de linhas, cutoff, commit e versão do schema. O export não treina nem promove
-LTR e é destinado ao bead downstream `bookrush-iv0y`.
+contrato `recommendation-pfv1-dataset-v1` a partir de snapshots somente-leitura
+separados (`DATABASE_URL` para recommendation e `BEHAVIOR_DATABASE_URL` para
+behavior), sem JDBC cross-schema. Cada linha liga `recommendation_item_id` à
+impressão, decisão, posição, score e componentes persistidos, além de labels e
+timestamps separados para viewable, dwell, open, save, like, share,
+meaningful_read, read_progress, read_10, read_50 e complete. O cutoff é
+obrigatório; a janela de observação é de sete dias e eventos posteriores são
+excluídos para evitar leakage. O arquivo deve ser acompanhado de SHA-256,
+número de linhas, cutoff, commit e versão do schema. O export não treina nem
+promove LTR e é destinado ao bead downstream `bookrush-iv0y`.
 
 ## Rollout e evidência
 

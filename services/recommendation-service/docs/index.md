@@ -30,6 +30,12 @@ not query the behavior schema directly.
 Each ledger item also records its contributing candidate sources, union version
 and configuration hash alongside the candidate-set hash for replay.
 
+The dataset handoff reads recommendation decisions and behavior outcomes from
+separate read-only database URLs and joins them locally by explicit
+`recommendation_item_id`; recommendation never queries the behavior schema.
+The export requires `BEHAVIOR_DATABASE_URL`, applies a seven-day observation
+window capped by the dataset cutoff, and emits separate outcome labels.
+
 Requests de feed e impressões viewable emitem eventos server-side ao
 behavior-service com o bearer autenticado e retry limitado. O behavior-service
 é responsável pela persistência idempotente e pelo outbox transacional.
