@@ -1,11 +1,13 @@
 package com.bookrush.recommendationservice.retrieval;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties(prefix = "feed.retrieval")
 public record CandidateRetrievalProperties(int maxCandidates, int pageSize, int maxPages,
     String version, String unionVersion, int semanticQuota, int globalQuota,
     int trendingQuota, int explorationQuota) {
+  @ConstructorBinding
   public CandidateRetrievalProperties {
     maxCandidates = maxCandidates < 1 ? 500 : Math.min(maxCandidates, 2_000);
     pageSize = pageSize < 1 ? 100 : Math.min(pageSize, 100);

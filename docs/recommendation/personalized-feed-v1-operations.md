@@ -66,3 +66,8 @@ estrito exige `PERSONALIZED` e fonte `semantic` para os dois usuários com
 histórico, além de `FALLBACK` com motivo `cold-start` ou `coverage-low` para o
 usuário frio. `PFV1_EXPECT_DIFFERENT_TOP1=true` adiciona a asserção de top-1
 divergente, quando a fixture controlar os demais componentes.
+
+O binding de `feed.retrieval` usa construtor explícito para que o
+`CandidateRetrievalProperties` seja materializado corretamente pelo Spring
+Boot no container; sem essa configuração o serviço falha no boot antes de
+expor o feed personalizado.
