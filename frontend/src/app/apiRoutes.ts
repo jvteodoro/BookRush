@@ -15,6 +15,7 @@ export const apiRoutes = {
     recent: () => "/api/v1/reader/recent",
     streak: () => "/api/v1/reader/streak",
     plant: () => "/api/v1/reader/plant",
+    plantReadingTime: () => "/api/v1/reader/plant",
     book: (bookId: string) => `/api/v1/reader/books/${id(bookId)}`,
     progress: (bookId: string) => `${apiRoutes.reader.book(bookId)}/progress`,
     bookmarks: (bookId: string) => `${apiRoutes.reader.book(bookId)}/bookmarks`,
@@ -36,15 +37,20 @@ export const apiRoutes = {
     book: (bookId: string) => `/api/v1/content/books/${id(bookId)}`,
   },
   social: {
+    ratings: (bookId: string) => `/api/v1/social/books/${id(bookId)}/ratings`,
     likes: (bookId: string) => `/api/v1/social/books/${id(bookId)}/likes`,
     comments: (bookId: string) => `/api/v1/social/books/${id(bookId)}/comments`,
+    comment: (commentId: string) => `/api/v1/social/comments/${id(commentId)}`,
     like: (bookId: string) => `/api/v1/social/books/${id(bookId)}/like`,
     share: (bookId: string) => `/api/v1/social/books/${id(bookId)}/share`,
+    followers: (subject?: string) =>
+      `/api/v1/social/followers${subject ? `?user=${id(subject)}` : ""}`,
     follow: (subject: string) => `/api/v1/social/follow?user=${id(subject)}`,
     reports: () => "/api/v1/social/reports",
   },
   behavior: () => "/api/v1/behavior/events",
   profile: {
+    search: (query: string) => `/api/v1/profile/search?${query}`,
     self: () => "/api/v1/profile",
     privacy: () => "/api/v1/profile/privacy",
     public: (subject: string) =>

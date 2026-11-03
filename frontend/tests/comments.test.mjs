@@ -12,7 +12,7 @@ const bundled = await build({
     builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const authClient = { fetch() { throw new Error("Unexpected live request"); } };' }));
   } }],
 });
-const { loadComments, postComment, reportComment } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
+const { loadComments, postComment, reportComment, deleteComment } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 const response = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
 
 test('comment loading preserves author identity and text returned by the server', async () => {
@@ -64,4 +64,20 @@ test('an empty report reason is rejected without a request', async () => {
   let requests = 0;
   await assert.rejects(reportComment('book-id', 'comment-1', ' ', async () => { requests++; return response({}); }), /motivo/);
   assert.equal(requests, 0);
+});
+
+test('deleting uses the authenticated comment resource and accepts an empty 204 body', async () => {
+  await deleteComment('comment/id', async (url, init) => {
+    assert.equal(url, '/api/v1/social/comments/comment%2Fid');
+    assert.equal(init.method, 'DELETE');
+    assert.equal(init.body, undefined);
+    return { ok: true, status: 204, json() { throw new Error('204 has no body'); } };
+  });
+});
+
+test('removal reports expired sessions, foreign authors, missing records and server errors', async () => {
+  for (const [status, message] of [[401, /sessão expirou/], [403, /próprios comentários/],
+    [404, /não encontrado/], [500, /Não foi possível remover/]]) {
+    await assert.rejects(deleteComment('comment-1', async () => response(null, status)), message);
+  }
 });

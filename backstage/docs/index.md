@@ -18,3 +18,7 @@ Não há editor wiki nem armazenamento de documentação autoral no portal.
 O handbook de plataforma é outro Component TechDocs: expõe docs/ do monorepo,
 incluindo banco, storage, ingestão e decisões já existentes. Nada foi copiado
 para uma wiki paralela. README dos serviços aponta para TechDocs e contratos.
+
+O contrato de ciclo de vida dos comentários do social-service está registrado
+como `social-comments-api`, incluindo a remoção autenticada pelo próprio autor.
+O build do portal inclui o arquivo OpenAPI versionado na validação do catálogo.

@@ -21,7 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 class ReaderStateControllerTest {
   private final JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
   private final BehaviorEventPublisher behavior = org.mockito.Mockito.mock(BehaviorEventPublisher.class);
-  private final ReaderStateController controller = new ReaderStateController(jdbc, behavior);
+  private final DailyPlantService dailyPlant = org.mockito.Mockito.mock(DailyPlantService.class);
+  private final ReaderStateController controller = new ReaderStateController(jdbc, behavior, dailyPlant);
   private final Principal user = () -> "iss:subject-1";
 
   @Test
@@ -39,18 +40,21 @@ class ReaderStateControllerTest {
   }
 
   @Test
-  void plantProjectionIsVersionedAndDerivedFromReadingDays() {
-    when(jdbc.queryForList(anyString(), eq("iss:subject-1")))
-        .thenReturn(List.of(Map.of("day", Date.valueOf(LocalDate.now()))));
-    when(jdbc.queryForObject(anyString(), eq(Number.class), any(Object[].class))).thenReturn(125L);
+  void plantUsesTheAuthenticatedSubject() {
+    when(dailyPlant.get("iss:subject-1")).thenReturn(Map.of("stage", 2, "sad", false));
+    org.junit.jupiter.api.Assertions.assertEquals(2, controller.plant(user).get("stage"));
+    verify(dailyPlant).get("iss:subject-1");
+    assertThrows(ResponseStatusException.class, () -> controller.plant(null));
+  }
 
-    var plant = controller.plant(user);
-
-    org.junit.jupiter.api.Assertions.assertEquals("reading-minutes-v1", plant.get("formulaVersion"));
-    org.junit.jupiter.api.Assertions.assertEquals(2, plant.get("stage"));
-    org.junit.jupiter.api.Assertions.assertEquals(1, plant.get("streakDays"));
-    org.junit.jupiter.api.Assertions.assertEquals(125L, plant.get("totalReadingMinutes"));
-    verify(jdbc).update(anyString(), eq("iss:subject-1"), eq("reading-minutes-v1"), eq(2), eq(1),
-        eq(125L), any(LocalDate.class));
+  @Test
+  void readingIntervalIsScopedToTheAuthenticatedReader() {
+    var id = UUID.randomUUID();
+    var end = java.time.Instant.now();
+    var interval = new ReaderStateController.ReadingInterval(id, 15, end);
+    when(dailyPlant.record("iss:subject-1", id, 15, end)).thenReturn(Map.of("stage", 0));
+    controller.readingTime(interval, user);
+    verify(dailyPlant).record("iss:subject-1", id, 15, end);
+    assertThrows(ResponseStatusException.class, () -> controller.readingTime(interval, null));
   }
 }

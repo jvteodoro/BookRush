@@ -21,6 +21,30 @@ paths:
                 $ref: '#/components/schemas/PlantState'
         '401':
           description: Token ausente ou inválido.
+    post:
+      operationId: recordPlantReadingTime
+      summary: Registrar um intervalo de leitura visível
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [eventId, activeSeconds, endedAt]
+              properties:
+                eventId: { type: string, format: uuid }
+                activeSeconds: { type: integer, minimum: 1, maximum: 60 }
+                endedAt: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Estado atualizado; repetições do mesmo eventId são idempotentes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlantState' }
+        '400': { description: Intervalo inválido ou fora da janela permitida. }
+        '401': { description: Token ausente ou inválido. }
 components:
   securitySchemes:
     bearerAuth:
@@ -30,10 +54,14 @@ components:
   schemas:
     PlantState:
       type: object
-      required: [formulaVersion, stage, streakDays, totalReadingMinutes, measuredUntil]
+      required: [formulaVersion, stage, sad, streakDays, todaySeconds, goalSeconds, goalReached, totalReadingMinutes, measuredUntil]
       properties:
-        formulaVersion: { type: string, example: reading-minutes-v1 }
+        formulaVersion: { type: string, example: daily-reading-v2 }
         stage: { type: integer, minimum: 0, maximum: 5 }
+        sad: { type: boolean }
+        todaySeconds: { type: integer, minimum: 0 }
+        goalSeconds: { type: integer, example: 900 }
+        goalReached: { type: boolean }
         streakDays: { type: integer, minimum: 0 }
         totalReadingMinutes: { type: integer, format: int64, minimum: 0 }
         measuredUntil: { type: string, format: date }

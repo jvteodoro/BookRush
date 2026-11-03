@@ -1,6 +1,7 @@
 import { HttpFetcher, Manifest, Publication } from "@readium/shared";
 import { WebPubNavigator, WebPubPreferences } from "@readium/navigator";
 import { authClient } from "../auth";
+import { startReadingTimer } from "./readingTimer";
 import { apiRoutes, readerApiPath } from "../app/apiRoutes";
 import type {
   ReadiumBridge,
@@ -15,6 +16,7 @@ import {
   textWidths,
 } from "./appearance";
 
+let stopReadingTimer: (() => void) | undefined;
 let navigator: any;
 let manifest: any;
 let publication: Publication | undefined;
@@ -138,9 +140,12 @@ export const readiumBridge: ReadiumBridge = {
     } as any);
     await navigator.load();
     applyPreferences(preferences);
+    stopReadingTimer = startReadingTimer();
   },
 
   async unmount() {
+    stopReadingTimer?.();
+    stopReadingTimer = undefined;
     if (navigator) await navigator.destroy();
     navigator = undefined;
     manifest = undefined;

@@ -2491,3 +2491,29 @@ table td {
     width: 100%;
   }
 }
+
+.comment-card {
+  border-bottom: 1px solid var(--br-ink);
+  padding: 16px 0;
+}
+.comment-card .review-asset {
+  border: 0;
+}
+.comment-decision,
+.comment-history {
+  padding: 16px;
+  margin-top: 12px;
+  border: 1px solid var(--br-ink);
+  border-radius: 12px;
+}
+.comment-decision label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.comment-history li {
+  margin-bottom: 16px;
+}
+.comment-history p {
+  overflow-wrap: anywhere;
+}

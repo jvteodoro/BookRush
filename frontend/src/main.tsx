@@ -1,3 +1,4 @@
+import { loadFollowerStats } from "./reader/followers";
 import { mountAppearance } from "./reader/appearancePanel";
 import { mountReaderPanels } from "./reader/readerPanels";
 import "./styles/reader-appearance.css";
@@ -375,6 +376,7 @@ function App() {
               throw new Error("Não foi possível salvar a privacidade.");
             return response.json();
           },
+          followerStats: (subject?: string) => loadFollowerStats(subject),
           follow: async (subject: string, enabled: boolean) => {
             const response = await authClient.fetch(
               apiRoutes.social.follow(subject),

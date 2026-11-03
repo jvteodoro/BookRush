@@ -6,9 +6,9 @@ import { Icon } from '../ui/Icon';
 import { OverflowQuote } from '../ui/OverflowQuote';
 import { AuthenticatedImage } from './AuthenticatedImage';
 
-type Props = { books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; sidebar: ReactNode; message: string } };
+type Props = { onDetails?: (book: ReaderBook) => void; books: ReaderBook[]; saved: string[]; onSave: (id: string) => void; onOpen: (book: ReaderBook) => void; live?: { liked: string[]; counts: Record<string, { likes: number; comments: number }>; pending: string[]; onLike: (id: string) => void; onComments: (id: string) => void; onShare: (id: string) => void; onViewable: (id: string) => void; sidebar: ReactNode; message: string } };
 const compactCount = (count: number) => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(count);
-export function ExcerptFeed({ books, saved, onSave, onOpen, live }: Props) {
+export function ExcerptFeed({ books, saved, onSave, onOpen, live, onDetails }: Props) {
   const [demoLiked, setLiked] = useState<string[]>([]);
   const liked = live?.liked ?? demoLiked;
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export function ExcerptFeed({ books, saved, onSave, onOpen, live }: Props) {
           <div className="br-excerpt-copy"><div className="br-excerpt-meta"><span>{book.genre}</span><span>{live ? 'Para você' : 'Prévia'} · {index + 1} de {books.length}</span></div>
             <span className="br-excerpt-quote-mark" aria-hidden="true">“</span><OverflowQuote text={book.excerpt?.text || 'Trecho analítico indisponível.'} />
             <div className="br-excerpt-book"><span className="br-excerpt-mini" aria-hidden="true">{book.coverUrl ? <AuthenticatedImage src={book.coverUrl} alt="" /> : 'B'}</span><div><h2>{book.title}</h2><p>{book.author}</p></div></div>
-            <Button disabled={live?.pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora →</Button>
+            <div>{onDetails && <Button variant="ghost" onClick={() => onDetails(book)}>Sobre e avaliações</Button>}<Button disabled={live?.pending.includes(book.id)} onClick={() => onOpen(book)}>Ler agora →</Button></div>
           </div>
           <div className="br-action-rail">
             <button type="button" className="br-like" disabled={live?.pending.includes(book.id)} aria-pressed={liked.includes(book.id)} aria-label={`${liked.includes(book.id) ? 'Descurtir' : 'Curtir'} ${book.title}, ${live?.counts[book.id]?.likes ?? Number(liked.includes(book.id))} curtidas`} onClick={() => live ? live.onLike(book.id) : setLiked(current => current.includes(book.id) ? current.filter(id => id !== book.id) : [...current, book.id])}><span className="br-like__bubble"><Icon name="heart" /></span><small>{compactCount(live?.counts[book.id]?.likes ?? Number(liked.includes(book.id)))}</small></button>

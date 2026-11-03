@@ -57,8 +57,8 @@ export function AppShell({ children, active, onNavigate, query, onSearch, userNa
         <span className="br-header__title">{tabs.find(tab => tab.id === active)?.label}</span>
         <div className="br-header__center"><button type="button" className="br-home-shortcut" aria-current={active === 'feed' ? 'page' : undefined} aria-label="Ir para Para você" title="Para você" onClick={() => onNavigate('feed')}><Icon name="home" /></button>
         <form role="search" className="br-header__search" onSubmit={event => { event.preventDefault(); onNavigate('search'); }}>
-          <label className="br-sr-only" htmlFor="header-search">Buscar livros ou autores</label>
-          <Icon name="search" /><input id="header-search" value={query} onChange={event => onSearch(event.target.value)} placeholder="Buscar livros, autores…" /><button type="submit" aria-label="Buscar"><Icon name="arrow" /></button>
+          <label className="br-sr-only" htmlFor="header-search">Buscar livros ou pessoas</label>
+          <Icon name="search" /><input id="header-search" value={query} onChange={event => onSearch(event.target.value)} placeholder="Buscar livros, pessoas…" /><button type="submit" aria-label="Buscar"><Icon name="arrow" /></button>
         </form></div>
         <div className="br-header__actions"><Button className="br-theme-toggle" variant="ghost" size="sm" onClick={toggle} aria-label={`Ativar tema ${theme === 'dark' ? 'claro' : 'escuro'}`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></Button>
         <button className="br-avatar" type="button" aria-label={`Abrir perfil de ${userName}`} onClick={() => onNavigate('profile')}>{userName.trim().slice(0, 1).toUpperCase() || 'L'}</button></div>

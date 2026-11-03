@@ -12,7 +12,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
@@ -44,7 +44,7 @@ public class SocialSecurityConfiguration {
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
       @Value("${bookrush.security.audience}") String audience) {
     NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-    OAuth2TokenValidator<Jwt> issuerValidator = new JwtIssuerValidator(issuer);
+    OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
     OAuth2TokenValidator<Jwt> audienceValidator = token ->
         token.getAudience().contains(audience)
             ? OAuth2TokenValidatorResult.success()

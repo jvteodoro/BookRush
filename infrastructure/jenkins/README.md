@@ -274,6 +274,52 @@ from SCM**, repositório `https://github.com/jvteodoro/BookRush.git`, branch
 `*/main`, Script Path `Jenkinsfile`. Essa branch fornece a definição da pipeline;
 **BRANCH** seleciona o código que será compilado e implantado.
 
+Se a definição carregada pela `main` (ou um script inline antigo) ainda não
+exportar `RECOMMENDATION_IMAGE`, `READER_BFF_IMAGE`, `READER_PROFILE_IMAGE` ou
+`SOCIAL_IMAGE`, o deploy deriva as imagens ausentes do registry, namespace e tag
+de `BACKEND_IMAGE`. As imagens derivadas que não existirem no daemon são
+construídas com os Dockerfiles do checkout selecionado antes de alterar os
+containers. Imagens explicitamente fornecidas pela pipeline são preservadas.
+Esse mecanismo exige o formato `<prefixo>/bookrush/catalog-service:<tag>`;
+nomes personalizados exigem informar as imagens explicitamente. A solução
+preferencial continua sendo carregar a definição atual da pipeline da branch
+desejada no SCM. Não é necessário apagar jobs ou volumes.
+
+Valide essa compatibilidade sem Docker ou credenciais com
+`python3 scripts/test-deploy-compose-images.py` (também executado por
+`bash scripts/validate-pipelines.sh`). O teste cobre variáveis ausentes,
+registry com porta, imagens explícitas, cache, formato inválido e falha de build.
+Quando o agente não possui Python 3, `validate-pipelines.sh` executa esse mesmo
+teste em `python:3.12-slim` pelo Docker. Somente os dois arquivos necessários
+são enviados por stdin, sem montar o workspace ou acessar credenciais. O
+container usa `--rm` e rede desativada; não é preciso instalar Python no Jenkins.
+
+O mesmo preparo cobre `ANALYTICS_RUNTIME_IMAGE` ausente: deriva o nome de
+`ANALYTICS_IMAGE` e constrói o runtime do checkout quando necessário, usando
+`requirements.cuda.txt` se `ANALYTICS_GPU=true`. Apenas derivar o nome não
+garante que a imagem exista. Antes de iniciar ou alterar containers, o deploy
+confere as doze imagens no daemon e valida o Compose; imagem explícita ausente
+interrompe o processo com o nome da variável, sem iniciar recriação ou rollback.
+O override `deploy-images.compose.yaml` fixa as doze imagens da revisão, inclusive
+catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
+Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
+
+O override também repassa as quatro variáveis `KEYCLOAK_ADMIN_*` ao
+`admin-service`. Exportá-las no agente não basta quando `/opt/bookrush/compose.yaml`
+ainda não declara essas variáveis. O segredo vigente continua sendo resolvido
+pelo script de deploy após o reconcile e conferido no container, sem exposição
+nos logs. Não substitua essa verificação apenas pelo healthcheck.
+`bash scripts/test-deploy-compose-config.sh` testa o merge real do Compose atual
+e de um host antigo, usando somente credenciais fictícias; faz parte da etapa
+de contratos do Jenkinsfile atualizado e não inicia a aplicação.
+
+O smoke de usuários solicita o token `client_credentials` do cliente
+`bookrush-ingestion-admin` no realm `bookrush-platform` dentro de
+`python:3.12-slim`, sem exigir `jq` ou Python no agente. Erros mostram somente
+o status HTTP ou a categoria de falha; segredo, token e corpo da resposta não
+são registrados. Um HTTP 400/401 deve ser investigado no cliente/segredo/service
+account; uma falha de conexão indica rede/DNS/disponibilidade do Keycloak.
+
 ## Proxy e visualização de estágios
 
 A imagem inclui `pipeline-stage-view` (tabela de estágios no job) e
@@ -360,3 +406,28 @@ Compose. Isso evita o conflito de nome `bookrush-keycloak-1` durante a
 reconciliação ou rollback; o container continua na rede `bookrush_bookrush` e
 os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
 estiver parado, o deploy volta a incluí-lo na operação.
+
+A planta diária exige a imagem `READER_STATE_IMAGE` da mesma revisão do frontend; o deploy integrado atualiza o reader-state-service e preserva seu schema existente.
+
+## Contrato da busca de pessoas
+
+A etapa de contratos executa `scripts/test-profile-search-e2e.sh`, incluindo
+`mvn verify` e imagem do reader-profile-service, migrations em PostgreSQL16 e
+requisições autenticadas pelo Traefik/Keycloak25 descartáveis. O teste não
+altera `.env`, realms ou volumes de produção e remove recursos da execução.
+O build integrado continua entregando `READER_PROFILE_IMAGE` e `FRONTEND_IMAGE`;
+nenhuma configuração extra do job ou do host é necessária para essa rota.
+
+A integração com a planta diária inclui `READER_STATE_IMAGE` no teste de merge
+Compose: as doze imagens da revisão são verificadas tanto com o Compose atual
+quanto com um host antigo simulado, junto com a configuração administrativa.
+
+### Contrato de avaliações de livros
+
+A etapa de contratos executa `scripts/test-book-ratings-e2e.sh`: testes Java e
+imagens do social/catalog, PostgreSQL 16, upgrade de migration, Keycloak e
+gateway Traefik reais em rede descartável. Não publica portas nem usa volumes
+ou credenciais existentes. O Compose passa `SOCIAL_CATALOG_URL` ao social-service
+como `CATALOG_URL`, default `http://catalog-service:8080`, sem secret adicional.
+Após publicar e implantar a branch, confirme no site a média e o CRUD da própria
+nota com dois leitores. Testes locais não substituem esse smoke do deploy.

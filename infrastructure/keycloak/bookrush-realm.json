@@ -43,6 +43,31 @@
   "clients": [
     {
       "clientId": "bookrush-web",
+      "protocolMappers": [
+        {
+          "name": "bookrush-product-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "sub",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "bookrush-product-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "account",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
       "enabled": true,
       "publicClient": true,
       "standardFlowEnabled": true,

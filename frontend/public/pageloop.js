@@ -807,7 +807,7 @@
     const content = `<div class="reader-shell" id="readerShell">
       <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${getMode() === "app" ? "feed" : "library"}" aria-label="Voltar">${icon("chevron", "icon-sm")}<span>Voltar</span></button></div>
       <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
-      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir aparência" aria-controls="settingsPanel" aria-expanded="false">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
+      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="bookDetailsBtn" aria-label="Sobre o livro e avaliações">★</button><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir aparência" aria-controls="settingsPanel" aria-expanded="false">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
       <aside class="reader-panel reader-toc" id="tocPanel" hidden><div class="reader-panel-heading"><strong>Sumário</strong><button class="reader-panel-close" data-reader-close="tocPanel" aria-label="Fechar">×</button></div><nav>${chapterItems(chapters) || emptyChapterItems}</nav></aside>
       <aside class="reader-panel reader-settings" id="settingsPanel" role="region" aria-label="Aparência da leitura" hidden><div class="reader-panel-heading"><strong>Aparência</strong><button class="reader-panel-close" data-reader-close="settingsPanel" aria-label="Fechar">×</button></div>
         <div id="readerAppearance"></div>
@@ -816,6 +816,11 @@
       <main class="reader-main"><div class="readium-host" id="readium-reader" aria-label="Leitor Readium"></div></main>
     </div>`;
     shell(content, b.title);
+    document.getElementById("bookDetailsBtn")?.addEventListener("click", () => {
+      window.dispatchEvent(
+        new CustomEvent("bookrush:open-book-details", { detail: b.id }),
+      );
+    });
     window.__BOOKRUSH_APPEARANCE__?.mount(
       document.getElementById("readerAppearance"),
       (preferences) =>
@@ -1009,18 +1014,24 @@
         return;
       }
       let following = null;
+      let followerLabel = "Seguidores indisponíveis";
       try {
-        const status = await window.__BOOKRUSH_API__?.followStatus?.(subject);
-        following = typeof status === "boolean" ? status : null;
+        const stats = await window.__BOOKRUSH_API__?.followerStats?.(subject);
+        following =
+          typeof stats?.following === "boolean" ? stats.following : null;
+        followerLabel = stats?.label || followerLabel;
       } catch {
         /* O perfil público continua acessível se o serviço social falhar. */
       }
       if (state.route !== "otherProfile" || state.otherUser !== subject) return;
       const name = profile.displayName;
       const bio = profile.bio?.trim();
-      const content = `<main class="content"><section class="profile-hero"><div class="profile-avatar">${esc(name.slice(0, 2).toUpperCase())}</div><div><div class="eyebrow">PERFIL PÚBLICO</div><h1>${esc(name)}</h1>${bio ? `<p class="muted">${esc(bio)}</p>` : ""}</div><div class="profile-actions"><button class="primary-btn" id="profileFollow" aria-pressed="${following === true}" ${following === null ? "disabled" : ""}>${following === null ? "Acompanhamento indisponível" : following ? "Seguindo" : "Seguir"}</button><button class="secondary-btn" data-route="feed">Voltar ao feed</button></div></section></main>`;
+      const content = `<main class="content"><section class="profile-hero"><div class="profile-avatar">${esc(name.slice(0, 2).toUpperCase())}</div><div><div class="eyebrow">PERFIL PÚBLICO</div><h1>${esc(name)}</h1>${bio ? `<p class="muted">${esc(bio)}</p>` : ""}<p class="profile-followers" id="profileFollowers" aria-live="polite"><strong>${esc(followerLabel)}</strong></p></div><div class="profile-actions"><button class="primary-btn" id="profileFollow" aria-pressed="${following === true}" ${following === null ? "disabled" : ""}>${following === null ? "Acompanhamento indisponível" : following ? "Seguindo" : "Seguir"}</button><button class="secondary-btn" data-route="feed">Voltar ao feed</button></div></section></main>`;
       shell(content, name);
       const followButton = document.getElementById("profileFollow");
+      const followerLabelNode = document.querySelector(
+        "#profileFollowers strong",
+      );
       followButton.onclick = async () => {
         const enabled = !following;
         followButton.disabled = true;
@@ -1031,6 +1042,20 @@
           if (state.route === "otherProfile" && state.otherUser === subject) {
             followButton.textContent = enabled ? "Seguindo" : "Seguir";
             followButton.setAttribute("aria-pressed", String(enabled));
+            try {
+              const stats =
+                await window.__BOOKRUSH_API__?.followerStats?.(subject);
+              if (
+                state.route === "otherProfile" &&
+                state.otherUser === subject
+              ) {
+                followerLabelNode.textContent =
+                  stats?.label || "Seguidores indisponíveis";
+              }
+            } catch {
+              if (state.route === "otherProfile" && state.otherUser === subject)
+                followerLabelNode.textContent = "Seguidores indisponíveis";
+            }
           }
         } catch (error) {
           toast(error.message || "Não foi possível atualizar o acompanhamento");

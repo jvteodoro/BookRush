@@ -8,6 +8,8 @@ import { LibraryPage } from "./LibraryPage";
 import type { LibraryBook } from "./library";
 import { SearchPage } from "./SearchPage";
 import { RecommendationsPage } from "./RecommendationsPage";
+import { BookDetailsDrawer, type DetailsBook } from "./BookDetailsDrawer";
+import "../styles/ratings.css";
 import { CommentsDrawer } from "./CommentsDrawer";
 import { AccountPage } from "./AccountPages";
 import type { FeedExcerpt } from "../app/types";
@@ -38,6 +40,10 @@ type Runtime = {
     streakDays?: number;
     totalReadingMinutes?: number;
     measuredUntil?: string;
+    sad?: boolean;
+    todaySeconds?: number;
+    goalSeconds?: number;
+    goalReached?: boolean;
   } | null;
   __BOOKRUSH_API__: {
     saved: Set<string>;
@@ -77,6 +83,36 @@ export function LiveReader({
   legacyQuery?: string;
 }) {
   const [tab, setTab] = useState<ReaderTab>("feed");
+  const [plant, setPlant] = useState(runtime().__BOOKRUSH_PLANT__);
+  const [plantLoading, setPlantLoading] = useState(false);
+  const [plantError, setPlantError] = useState(false);
+  useEffect(() => {
+    if (tab !== "plant") return;
+    let cancelled = false;
+    const refresh = async () => {
+      setPlantLoading(true);
+      try {
+        const response = await authClient.fetch(apiRoutes.reader.plant());
+        if (!response.ok) throw new Error("plant unavailable");
+        const value = await response.json();
+        if (!cancelled) {
+          runtime().__BOOKRUSH_PLANT__ = value;
+          setPlant(value);
+          setPlantError(false);
+        }
+      } catch {
+        if (!cancelled) setPlantError(true);
+      } finally {
+        if (!cancelled) setPlantLoading(false);
+      }
+    };
+    void refresh();
+    window.addEventListener("bookrush:plant-updated", refresh);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("bookrush:plant-updated", refresh);
+    };
+  }, [tab]);
   const [query, setQuery] = useState("");
   const [saved, setSaved] = useState(() => [
     ...runtime().__BOOKRUSH_API__.saved,
@@ -87,6 +123,16 @@ export function LiveReader({
     ),
   );
   const [pending, setPending] = useState<string[]>([]);
+  const [detailsBook, setDetailsBook] = useState<DetailsBook | null>(null);
+  useEffect(() => {
+    const open = (event: Event) => {
+      const id = (event as CustomEvent<string>).detail;
+      const book = runtime().__BOOKRUSH_BOOKS__.find((item) => item.id === id);
+      if (book) setDetailsBook({ ...book, description: book.quote });
+    };
+    window.addEventListener("bookrush:open-book-details", open);
+    return () => window.removeEventListener("bookrush:open-book-details", open);
+  }, []);
   const [commentsBook, setCommentsBook] = useState<{
     id: string;
     title: string;
@@ -278,8 +324,8 @@ export function LiveReader({
     setMessage("");
     setTab(nextTab);
   };
-  const streak = runtime().__BOOKRUSH_STREAK__?.currentDays;
-  const plant = runtime().__BOOKRUSH_PLANT__;
+  const streak =
+    plant?.streakDays ?? runtime().__BOOKRUSH_STREAK__?.currentDays;
   const openCatalogBook = (book: LibraryBook) =>
     void action(book.id, async () => {
       // The existing reader resolves IDs from its catalog array. Register books
@@ -316,6 +362,7 @@ export function LiveReader({
           pending={pending}
           message={message}
           onSave={save}
+          onDetails={setDetailsBook}
           onOpen={(book) =>
             void action(book.id, async () => {
               await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query);
@@ -334,7 +381,12 @@ export function LiveReader({
           pending={pending}
           message={message}
           onSave={save}
+          onDetails={setDetailsBook}
           onOpen={openCatalogBook}
+          onProfile={(subject) => {
+            runtime().__BOOKRUSH_LEGACY__.openProfile(subject);
+            onLegacy();
+          }}
         />
       ) : tab === "library" ? (
         <LibraryPage
@@ -345,6 +397,7 @@ export function LiveReader({
           onLoaded={syncSaved}
           onOpen={openCatalogBook}
           onRemove={save}
+          onDetails={setDetailsBook}
           onDiscover={() => navigate("feed")}
         />
       ) : [
@@ -369,6 +422,8 @@ export function LiveReader({
           savedCount={saved.length}
           streak={streak}
           plant={plant}
+          plantLoading={plantLoading}
+          plantError={plantError}
           onNavigate={navigate}
         />
       ) : (
@@ -376,6 +431,7 @@ export function LiveReader({
           books={books}
           saved={saved}
           onSave={save}
+          onDetails={setDetailsBook}
           onOpen={(book) =>
             void action(book.id, async () => {
               await runtime().__BOOKRUSH_LEGACY__.openBook(book.id);
@@ -422,6 +478,13 @@ export function LiveReader({
               </>
             ),
           }}
+        />
+      )}
+      {detailsBook && (
+        <BookDetailsDrawer
+          key={detailsBook.id}
+          book={detailsBook}
+          onClose={() => setDetailsBook(null)}
         />
       )}
       {commentsBook && (

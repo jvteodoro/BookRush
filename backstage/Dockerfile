@@ -35,6 +35,7 @@ COPY services/reader-profile-service/docs /repo/services/reader-profile-service/
 COPY services/reader-profile-service/api /repo/services/reader-profile-service/api
 COPY services/social-service/catalog-info.yaml services/social-service/mkdocs.yml /repo/services/social-service/
 COPY services/social-service/docs /repo/services/social-service/docs
+COPY services/social-service/api /repo/services/social-service/api
 COPY services/behavior-service/catalog-info.yaml services/behavior-service/mkdocs.yml /repo/services/behavior-service/
 COPY services/behavior-service/docs /repo/services/behavior-service/docs
 COPY services/recommendation-service/catalog-info.yaml services/recommendation-service/mkdocs.yml /repo/services/recommendation-service/

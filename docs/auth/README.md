@@ -110,3 +110,15 @@ uso diário do bootstrap admin quando a instalação permitir.
 O cliente local deve usar redirect URI explícita para a porta local e credenciais fornecidas em runtime. Nunca copie `.env` para Git. O frontend usa o issuer público `https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush`; administração e S2S usam `https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform`. JWKS fica sob configuração confiável; rotação de `kid` não exige rebuild.
 
 Referências: [ADR-007](../adr/ADR-007-product-login-pkce.md), [ADR-008](../adr/ADR-008-service-credential-transition.md) e [documentação de política](../documentation-policy.md).
+
+O cliente de produto `bookrush-web` declara o mapper
+`bookrush-product-audience`, que inclui `account` no access token. Isso mantém
+contas recém-criadas compatíveis com `BOOKRUSH_PRODUCT_SECURITY_AUDIENCE=account`
+sem depender de atribuições prévias de roles do cliente account. A API mantém
+validação de issuer, audience e prazo. Instalações persistentes precisam do
+reconcile normal do realm e de tokens novos para receber a claim; import de
+container não modifica automaticamente um realm existente.
+O mapper `bookrush-product-subject` também declara `sub` nos tokens de acesso e
+identidade, seguindo o padrão já usado pelo Admin Console/Jenkins. A autoria de
+comentários usa esse identificador imutável, e nunca nome ou e-mail. O E2E exige
+as duas claims antes de exercitar publicação e remoção com usuários novos.

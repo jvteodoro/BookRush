@@ -105,18 +105,23 @@ class AdminControllerTest {
   @Test
   void moderationCreatesMissingLegacyStateOrUpdatesExistingState() {
     var commentId = java.util.UUID.randomUUID();
-    when(jdbc.update(contains("INSERT INTO social.comment_moderation_state"),
-        eq("HIDDEN"), eq("ADMIN_REVIEW"), eq("operator-1"), eq(commentId))).thenReturn(1);
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(commentId)))
+        .thenReturn(List.of(Map.of("id", commentId)));
+    when(jdbc.queryForObject(contains("SELECT COALESCE"), eq(String.class), eq(commentId)))
+        .thenReturn("VISIBLE");
 
     @SuppressWarnings("unchecked")
     Map<String, Object> result = (Map<String, Object>) controller.moderateComment(
-        Map.of("commentId", commentId.toString(), "visibility", "HIDDEN", "reasonCode", "ADMIN_REVIEW"),
+        new AdminController.CommentModerationChange(commentId, "HIDDEN", "ADMIN_REVIEW"),
         principal, operator);
 
     assertEquals("HIDDEN", result.get("visibility"));
     assertEquals(true, result.get("updated"));
     verify(jdbc).update(contains("ON CONFLICT (comment_id) DO UPDATE"),
-        eq("HIDDEN"), eq("ADMIN_REVIEW"), eq("operator-1"), eq(commentId));
+        eq(commentId), eq("HIDDEN"), eq("ADMIN_REVIEW"), eq("operator-1"));
+    verify(jdbc).update(contains("INSERT INTO admin.audit_log"),
+        org.mockito.ArgumentMatchers.any(), eq("operator-1"), eq(commentId.toString()),
+        eq("VISIBLE"), eq("HIDDEN"), eq("ADMIN_REVIEW"));
   }
 
   @Test
@@ -145,4 +150,66 @@ class AdminControllerTest {
         org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
         org.mockito.ArgumentMatchers.any());
   }
+  @Test
+  void commentModerationRejectsReadersAndInvalidDecisionsBeforeWriting() {
+    var id = java.util.UUID.randomUUID();
+    var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
+    var valid = new AdminController.CommentModerationChange(id, "HIDDEN", "spam review");
+    assertEquals(403, assertThrows(ResponseStatusException.class,
+        () -> controller.moderateComment(valid, principal, reader)).getStatusCode().value());
+    for (var change : List.of(
+        new AdminController.CommentModerationChange(id, "UNKNOWN", "spam"),
+        new AdminController.CommentModerationChange(null, "HIDDEN", "spam"),
+        new AdminController.CommentModerationChange(id, "HIDDEN", " "),
+        new AdminController.CommentModerationChange(id, "HIDDEN", "x".repeat(81)),
+        new AdminController.CommentModerationChange(id, null, "spam"))) {
+      assertEquals(400, assertThrows(ResponseStatusException.class,
+          () -> controller.moderateComment(change, principal, operator)).getStatusCode().value());
+    }
+    org.mockito.Mockito.verifyNoInteractions(jdbc);
+  }
+
+  @Test
+  void missingCommentIs404AndRepeatedDecisionDoesNotCreateDuplicateAudit() {
+    var id = java.util.UUID.randomUUID();
+    var change = new AdminController.CommentModerationChange(id, "HIDDEN", "spam review");
+    assertEquals(404, assertThrows(ResponseStatusException.class,
+        () -> controller.moderateComment(change, principal, operator)).getStatusCode().value());
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id))).thenReturn(List.of(Map.of("id", id)));
+    when(jdbc.queryForObject(contains("SELECT COALESCE"), eq(String.class), eq(id))).thenReturn("HIDDEN");
+    @SuppressWarnings("unchecked")
+    var response = (Map<String, Object>) controller.moderateComment(change, principal, operator);
+    assertEquals(false, response.get("updated"));
+    verify(jdbc, never()).update(contains("INSERT INTO social.comment_moderation_state"),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  void commentPaginationValidatesFiltersAndPreservesLiteralSearch() {
+    assertEquals(400, assertThrows(ResponseStatusException.class,
+        () -> controller.commentPage("", "UNKNOWN", 0, 25, principal, operator)).getStatusCode().value());
+    assertThrows(ResponseStatusException.class,
+        () -> controller.commentPage("", "", -1, 25, principal, operator));
+    assertThrows(ResponseStatusException.class,
+        () -> controller.commentPage("x".repeat(201), "", 0, 25, principal, operator));
+    when(jdbc.queryForObject(contains("SELECT count(*)"), eq(Long.class),
+        eq("HIDDEN"), eq("HIDDEN"), eq("100%"), eq("100%"))).thenReturn(26L);
+    @SuppressWarnings("unchecked")
+    var response = (Map<String, Object>) controller.commentPage(" 100% ", "HIDDEN", 1, 25, principal, operator);
+    assertEquals(26L, response.get("totalItems"));
+    assertEquals(true, response.get("last"));
+    verify(jdbc).queryForList(contains("strpos"), eq("HIDDEN"), eq("HIDDEN"), eq("100%"), eq("100%"), eq(25), eq(25L));
+  }
+
+  @Test
+  void administrativeRestoreCannotUndoRemovalByTheAuthor() {
+    var id = java.util.UUID.randomUUID();
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(id))).thenReturn(List.of(Map.of(
+        "id", id, "author_deleted_at", java.time.Instant.now())));
+    assertEquals(409, assertThrows(ResponseStatusException.class,
+        () -> controller.moderateComment(new AdminController.CommentModerationChange(id, "VISIBLE", "reviewed"),
+            principal, operator)).getStatusCode().value());
+  }
+
 }
