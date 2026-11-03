@@ -4,16 +4,6 @@ const authority = import.meta.env.VITE_OIDC_AUTHORITY ?? 'https://keycloak-bookr
 const clientId = import.meta.env.VITE_OIDC_CLIENT_ID ?? 'bookrush-web';
 const origin = window.location.origin;
 
-class MemoryStorage implements Storage {
-  private readonly values = new Map<string, string>();
-  get length(): number { return this.values.size; }
-  clear(): void { this.values.clear(); }
-  getItem(key: string): string | null { return this.values.get(key) ?? null; }
-  key(index: number): string | null { return [...this.values.keys()][index] ?? null; }
-  removeItem(key: string): void { this.values.delete(key); }
-  setItem(key: string, value: string): void { this.values.set(key, value); }
-}
-
 function safeReturnTo(value: unknown): string {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return '/';
   return value;
@@ -27,10 +17,11 @@ const manager = new UserManager({
   silent_redirect_uri: `${origin}/auth/silent-callback`,
   response_type: 'code',
   scope: 'openid profile email bookrush.catalog.read',
-  // Tokens are deliberately not persisted. The protocol transaction state is
-  // short-lived and kept by oidc-client-ts only until the callback completes.
-  userStore: new WebStorageStateStore({ store: new MemoryStorage() }),
-  stateStore: new WebStorageStateStore({ store: window.sessionStorage }),
+  // Keep the session scoped to this browser profile, while allowing the
+  // short-lived PKCE transaction to survive a callback opened in another tab.
+  // oidc-client-ts removes the transaction after the callback is consumed.
+  userStore: new WebStorageStateStore({ store: window.sessionStorage }),
+  stateStore: new WebStorageStateStore({ store: window.localStorage }),
   automaticSilentRenew: false,
   loadUserInfo: false,
 });

@@ -20,7 +20,6 @@ import { readiumBridge } from "./reader/readiumBridge";
 import { AuthenticatedShell } from "./app/AuthenticatedShell";
 import { AuthLanding } from "./app/AuthLanding";
 import {
-  loadCatalog,
   loadLibrary,
   loadRecent,
   loadRecommendationFeed,
@@ -85,7 +84,6 @@ function App() {
           });
           if (!response.ok) throw new Error("telemetry rejected");
         });
-        const catalog = await loadCatalog();
         const recommendations = await loadRecommendationFeed();
         if (!active) return;
         const recommendationFor = (bookId: string) =>
@@ -100,12 +98,9 @@ function App() {
             headers["X-BookRush-Impression"] = recommendation.impressionId;
           return headers;
         };
-        const byId = new Map(catalog.map((book) => [book.id, book]));
         const ordered = recommendations
           .map((item) => item.book)
-          .filter((book): book is CatalogBook =>
-            Boolean(book && byId.has(book.id)),
-          );
+          .filter((book): book is CatalogBook => Boolean(book));
         // The live feed is the source of truth.  Do not fall back to the full
         // catalog: analytics-required deployments must never show books that
         // have no eligible recommendation/excerpt.

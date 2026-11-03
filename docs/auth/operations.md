@@ -83,3 +83,9 @@ Durante a reconciliação, o mapper de roles do `bookrush-admin-service` é cria
 quando ausente. Se já existir, a configuração declarativa preserva o mapper e
 reconcilia apenas as roles do service account; isso evita o erro HTTP 500/NPE
 observado no endpoint de atualização de protocol mappers do Keycloak 25.
+
+No cliente web, o estado transitório da transação OIDC/PKCE fica em
+`localStorage` para que o callback continue encontrando o estado quando o
+provedor abrir a conclusão do login em outra aba do mesmo perfil do navegador.
+Os tokens do usuário permanecem em `sessionStorage` e não são persistidos
+fora da sessão do navegador.
