@@ -55,6 +55,13 @@ e agregados. O cliente declarativo é
 `bookrush-recommendation-behavior-s2s`; seu segredo deve existir somente no
 ambiente protegido e não é necessário para o serviço responder.
 
+`GET /api/internal/v1/recommendation/trending?limit=N` expõe a fonte real de
+trending do PFV1. Ele usa uma janela de sete dias com decaimento exponencial
+sobre opens positivos, saves, likes, sessões/progresso de leitura e conclusões;
+`BOOK_UNLIKE`/`BOOK_UNSAVE` não entram como atividade positiva. O score é
+bounded em `[0,1]`, versionado como `trending-v1` e não representa probabilidade
+calibrada de engajamento.
+
 Os tokens S2S são JWTs `RS256` assinados pelo realm `bookrush-platform`. O
 decoder do serviço aceita explicitamente esse algoritmo para não confundir a
 chave de assinatura com chaves RSA de criptografia publicadas no mesmo JWKS.

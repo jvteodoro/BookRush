@@ -11,6 +11,8 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -86,6 +88,42 @@ public class RecommendationSignalsController {
     System.arraycopy(filterArgs, 0, countArgs, 1, filterArgs.length);
     long total = jdbc.queryForObject(count, countArgs, Long.class);
     return ResponseEntity.ok(new SignalsResponse(limit, offset, total, offset + items.size() < total, items));
+  }
+
+  public record TrendingBook(UUID bookId, double score) {}
+
+  /** Recent positive activity projection; unlike daily_book.likes it excludes unlike events. */
+  @GetMapping("/trending")
+  public ResponseEntity<?> trending(@RequestParam(defaultValue = "100") int limit) {
+    if (limit < 1 || limit > 100) {
+      return ResponseEntity.badRequest().body(Map.of("error", "limit must be 1..100"));
+    }
+    List<TrendingBook> items = jdbc.query("""
+        SELECT book_id,
+          LEAST(1.0, SUM(CASE event_type
+            WHEN 'BOOK_COMPLETE' THEN 4.0
+            WHEN 'READ_SESSION' THEN 2.0
+            WHEN 'READ_PROGRESS' THEN 1.5
+            WHEN 'BOOK_SAVE' THEN 2.5
+            WHEN 'BOOK_LIKE' THEN 2.0
+            WHEN 'BOOK_OPEN' THEN 0.5
+            ELSE 0 END * EXP(-EXTRACT(EPOCH FROM (now() - occurred_at)) / 604800.0))) AS score
+        FROM behavior.events
+        WHERE book_id IS NOT NULL
+          AND occurred_at >= now() - INTERVAL '7 days'
+          AND event_type IN ('BOOK_COMPLETE', 'READ_SESSION', 'READ_PROGRESS',
+            'BOOK_SAVE', 'BOOK_LIKE', 'BOOK_OPEN')
+        GROUP BY book_id
+        HAVING SUM(CASE event_type WHEN 'BOOK_COMPLETE' THEN 4.0
+          WHEN 'READ_SESSION' THEN 2.0 WHEN 'READ_PROGRESS' THEN 1.5
+          WHEN 'BOOK_SAVE' THEN 2.5 WHEN 'BOOK_LIKE' THEN 2.0
+          WHEN 'BOOK_OPEN' THEN 0.5 ELSE 0 END) > 0
+        ORDER BY score DESC, book_id
+        LIMIT ?
+        """, (rs, rowNum) -> new TrendingBook(rs.getObject("book_id", UUID.class),
+            rs.getDouble("score")), limit);
+    return ResponseEntity.ok(Map.of("window", "7d", "heuristic", "trending-v1",
+        "items", items));
   }
 
   private static String placeholders(int count) {

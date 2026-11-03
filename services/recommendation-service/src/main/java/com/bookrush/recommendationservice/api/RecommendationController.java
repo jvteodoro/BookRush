@@ -129,9 +129,13 @@ public class RecommendationController {
         ? Map.<UUID, AnalyticsScoreClient.BookFeatureSnapshot>of()
         : feedMetrics.time("personalized_candidate_embeddings", () ->
             analyticsScores.findSnapshots(retrievedCandidateIds, true));
+    var trending = personalizationDecision.path() == PersonalizedFeedGate.Path.FALLBACK
+        ? List.<BehaviorSignalsClient.Trending>of()
+        : feedMetrics.time("personalized_trending", personalizedProfiles::loadTrending);
     final CandidateSet candidateSet = personalizationDecision.path() == PersonalizedFeedGate.Path.FALLBACK
         ? retrievedCandidateSet
-        : buildLiveCandidateUnion(profileResult.profile(), retrievedBooks, scoreById, candidateSnapshots);
+        : buildLiveCandidateUnion(profileResult.profile(), retrievedBooks, scoreById,
+            candidateSnapshots, trending);
     final List<?> books = candidateSet.books();
     final List<UUID> candidateIds = books.stream().map(this::bookId)
         .filter(java.util.Objects::nonNull).toList();
@@ -378,9 +382,14 @@ public class RecommendationController {
   private CandidateSet buildLiveCandidateUnion(
       com.bookrush.recommendationservice.taste.UserTasteProfile profile,
       List<?> books, Map<String, AnalyticsScoreClient.BookScore> scores,
-      Map<UUID, AnalyticsScoreClient.BookFeatureSnapshot> snapshots) {
+      Map<UUID, AnalyticsScoreClient.BookFeatureSnapshot> snapshots,
+      List<BehaviorSignalsClient.Trending> trending) {
     var global = new ArrayList<CandidateUnionBuilder.Candidate>();
     var semantic = new ArrayList<CandidateUnionBuilder.Candidate>();
+    var trendingById = trending.stream().collect(java.util.stream.Collectors.toMap(
+        BehaviorSignalsClient.Trending::bookId, BehaviorSignalsClient.Trending::score,
+        Math::max));
+    var trendingCandidates = new ArrayList<CandidateUnionBuilder.Candidate>();
     for (Object value : books) {
       if (!(value instanceof Map<?, ?> raw) || raw.get("id") == null) continue;
       var book = new java.util.LinkedHashMap<String, Object>();
@@ -388,6 +397,10 @@ public class RecommendationController {
       String id = String.valueOf(raw.get("id"));
       double quality = scores.get(id) == null ? 0 : scores.get(id).score();
       global.add(new CandidateUnionBuilder.Candidate(book, quality));
+      try {
+        double trendScore = trendingById.getOrDefault(UUID.fromString(id), 0d);
+        if (trendScore > 0) trendingCandidates.add(new CandidateUnionBuilder.Candidate(book, trendScore));
+      } catch (IllegalArgumentException ignored) { }
       try {
         var snapshot = snapshots.get(UUID.fromString(id));
         if (snapshot != null && snapshot.embedding() != null
@@ -404,6 +417,7 @@ public class RecommendationController {
       sources.add(new CandidateUnionBuilder.Source("semantic", semantic));
     }
     sources.add(new CandidateUnionBuilder.Source("global", global));
+    sources.add(new CandidateUnionBuilder.Source("trending", trendingCandidates));
     return candidateUnionBuilder.build(profile, sources);
   }
 

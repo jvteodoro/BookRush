@@ -40,6 +40,8 @@ public class BehaviorSecurityConfiguration {
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers("/api/internal/v1/recommendation/signals")
                 .hasAuthority("SCOPE_bookrush.behavior.read")
+            .requestMatchers("/api/internal/v1/recommendation/trending")
+                .hasAuthority("SCOPE_bookrush.behavior.read")
             .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.authenticationManagerResolver(authenticationManagerResolver));
     return http.build();

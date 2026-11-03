@@ -44,6 +44,30 @@ public final class BehaviorSignalsClient {
     return lookup(subject).signals();
   }
 
+  public List<Trending> trending() {
+    if (!properties.configured()) return List.of();
+    try {
+      String bearer = accessToken();
+      Map<String, Object> body = behavior.get()
+          .uri(uriBuilder -> uriBuilder.path("/api/internal/v1/recommendation/trending")
+              .queryParam("limit", 100).build())
+          .headers(headers -> headers.setBearerAuth(bearer))
+          .retrieve().body(Map.class);
+      if (body == null || !(body.get("items") instanceof List<?> items)) return List.of();
+      return items.stream().filter(Map.class::isInstance).map(value -> {
+        try {
+          Map<?, ?> row = (Map<?, ?>) value;
+          return new Trending(UUID.fromString(String.valueOf(row.get("bookId"))),
+              Math.max(0, Math.min(1, numberDecimal(row.get("score")))));
+        } catch (IllegalArgumentException exception) { return null; }
+      }).filter(java.util.Objects::nonNull).toList();
+    } catch (RestClientException | IllegalStateException exception) {
+      LOGGER.warn("Behavior trending unavailable: outcome={}",
+          exception instanceof org.springframework.web.client.ResourceAccessException ? "timeout" : "error");
+      return List.of();
+    }
+  }
+
   public Lookup lookup(String subject) {
     if (!properties.configured() || subject == null || subject.isBlank()) {
       return new Lookup(List.of(), false);
@@ -121,6 +145,7 @@ public final class BehaviorSignalsClient {
 
   private static long number(Object value) { return value instanceof Number n ? n.longValue() : 0; }
   private static double decimal(Object value) { return value instanceof Number n ? n.doubleValue() : 0; }
+  private static double numberDecimal(Object value) { return decimal(value); }
   private static boolean bool(Object value) { return Boolean.TRUE.equals(value); }
   private static Instant instant(Object value) { return value == null ? null : Instant.parse(String.valueOf(value)); }
 
@@ -143,6 +168,8 @@ public final class BehaviorSignalsClient {
       signals = signals == null ? List.of() : List.copyOf(signals);
     }
   }
+
+  public record Trending(UUID bookId, double score) { }
 
   private record Entry(String subject, List<Signal> signals, boolean available, Instant expiresAt) { }
   private record Token(String value, Instant expiresAt) { }
