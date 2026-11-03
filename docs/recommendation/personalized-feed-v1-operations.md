@@ -82,3 +82,8 @@ de recomendações vem vazia, ele não substitui o resultado pelo catálogo gera
 o feed permanece vazio até que existam livros com score/excerpt analítico
 elegível. Isso evita apresentar livros que não passaram pela política de
 elegibilidade durante o rollout.
+
+Os livros recomendados não precisam estar na primeira página paginada do
+catálogo: o frontend usa os objetos de livro retornados pelo endpoint de feed
+como fonte da ordenação. A página de catálogo é usada apenas para consultas
+complementares, não para descartar candidatos válidos.
