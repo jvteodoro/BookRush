@@ -31,6 +31,11 @@ requisições recebidas pelo servidor.
 O preflight da rota aceita apenas as origens explícitas de
 `BOOKRUSH_CORS_ALLOWED_ORIGINS`; autenticação continua obrigatória para GET e POST.
 
+Na sequência Flyway efetiva, a planta diária ocupa V6; as colunas de sessão
+ocupam V7 (`book_id` e atribuição) e V8 (correlação adicional). A numeração
+evita duas migrations V6 quando os contratos de planta e de atribuição são
+implantados juntos.
+
 Every mutation requires the authenticated `(iss, sub)` principal. Opening a
 book is an idempotent upsert in `reader_state.recent`, so retries from a mobile
 client do not create duplicate rows. The controller test covers the SQL

@@ -17,3 +17,7 @@ A projeção `daily-reading-v2` da planta usa as tabelas `daily_plant`,
 estágio zero sem alterar o histórico anterior. Os intervalos autenticados são
 contados em segundos e divididos na virada de dia em America/Sao_Paulo; o
 identificador do evento evita a duplicação em retentativas.
+
+As alterações de atribuição da sessão seguem a sequência Flyway V7 (livro,
+recommendation item e impression) e V8 (correlação complementar). A separação
+mantém V6 reservado à planta diária e evita versões duplicadas no boot.
