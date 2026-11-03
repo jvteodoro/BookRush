@@ -43,7 +43,7 @@ export function AppShell({ children, active, onNavigate, query, onSearch, userNa
       <Icon name={tab.icon} /><span className="br-nav-label">{!mobile && tab.id === 'prototype' ? <>Menu do<br />protótipo</> : tab.label}</span>
     </button>)}
   </nav>;
-  return <div className={`br-shell${collapsed ? ' br-shell--collapsed' : ''}`}>
+  return <div className={`br-shell${collapsed ? ' br-shell--collapsed' : ''}${active === 'feed' ? ' br-shell--feed' : ''}`}>
     <a className="br-skip-link" href="#reader-main">Pular para conteúdo</a>
     <aside className="br-sidebar" id="reader-sidebar">
       <div className="br-sidebar__top"><button type="button" className="br-sidebar__brand" onClick={() => onNavigate('feed')} aria-label="BookRush — Para você"><Logo /><span className="br-nav-label">BookRush</span></button>

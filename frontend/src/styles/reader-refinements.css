@@ -5,7 +5,8 @@
   overflow: hidden;
 }
 .br-feed-layout--live .br-excerpt-copy .br-quote-window {
-  flex: 0 1 auto;
+  height: 0;
+  flex: 1 1 auto;
 }
 .br-quote-text,
 .br-quote-measure {
@@ -129,6 +130,7 @@
 .br-feed-layout--live .br-excerpt-copy {
   display: flex;
   flex-direction: column;
+  height: 100%;
   max-height: 100%;
   min-height: 0;
 }
@@ -342,7 +344,7 @@
 }
 .br-feed-scroll {
   position: relative;
-  height: clamp(460px, calc(100dvh - 220px), 740px);
+  height: max(460px, calc(100dvh - 180px));
   max-height: none;
   padding: 0;
   overflow-y: auto;
@@ -352,6 +354,9 @@
 }
 .br-feed-scroll::-webkit-scrollbar {
   display: none;
+}
+.br-feed-layout--live .br-feed-scroll {
+  height: max(460px, calc(100dvh - 128px));
 }
 .br-excerpt-card {
   height: 100%;
@@ -664,52 +669,122 @@
   border-bottom: 1px solid var(--br-outline-soft);
 }
 
+.br-privacy-panel {
+  border-radius: 24px;
+}
+.br-privacy-intro,
+.br-privacy-description {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.br-privacy-intro h2 {
+  margin: 0 0 0.5rem;
+}
+.br-privacy-intro p {
+  margin: 0;
+  line-height: 1.6;
+  max-width: 56ch;
+}
+.br-privacy-symbol,
+.br-privacy-setting-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.br-privacy-symbol {
+  width: 56px;
+  height: 56px;
+  border: 2px solid var(--br-outline);
+  background: var(--br-gold);
+  color: var(--br-ink);
+  box-shadow: 3px 3px 0 var(--br-outline-soft);
+}
+.br-privacy-setting-icon {
+  width: 40px;
+  height: 40px;
+  background: var(--br-surface);
+  color: var(--br-teal);
+}
+:root[data-bookrush-theme="dark"] .br-privacy-setting-icon {
+  color: var(--br-gold);
+}
 .br-privacy-grid {
   display: grid;
-  gap: 0.75rem;
-  margin: 1.5rem 0;
+  gap: 1rem;
+  margin: 1.75rem 0;
 }
-
 .br-privacy-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.35fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem;
   align-items: center;
-  padding: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: clamp(1rem, 2vw, 1.5rem);
   border: 1px solid var(--br-outline-soft);
-  border-radius: var(--br-radius-md);
+  border-radius: 20px;
   background: var(--br-surface-2);
 }
-
-.br-privacy-field strong,
-.br-privacy-field small {
+.br-privacy-description strong {
   display: block;
+  font-size: 0.9rem;
 }
-
-.br-privacy-field small {
-  margin-top: 0.35rem;
+.br-privacy-description p {
+  margin: 0.4rem 0 0;
   color: var(--br-content-dim);
-  line-height: 1.45;
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
-
-.br-privacy-field select {
-  width: 100%;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--br-outline);
-  border-radius: var(--br-radius-sm);
-  background: var(--br-surface-1);
+.br-privacy-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.br-privacy-choice {
+  position: relative;
+  cursor: pointer;
+}
+.br-privacy-choice span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border: 2px solid var(--br-outline-soft);
+  border-radius: var(--br-radius-pill);
+  background: var(--br-surface);
   color: var(--br-content);
-  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
-
-.br-privacy-field select:focus-visible {
-  outline: 2px solid var(--br-red);
-  outline-offset: 2px;
+.br-privacy-choice input:checked + span {
+  border-color: var(--br-teal);
+  background: var(--br-teal);
+  color: white;
 }
-
-.br-privacy-field select:disabled {
+.br-privacy-choice input:focus-visible + span {
+  outline: 3px solid var(--br-content);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .br-privacy-field:not(:disabled) .br-privacy-choice:hover span {
+    border-color: var(--br-teal);
+  }
+}
+.br-privacy-field:disabled .br-privacy-choice {
   cursor: wait;
   opacity: 0.65;
+}
+@media (max-width: 1100px) {
+  .br-privacy-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
 }
 
 .br-account-status {
@@ -760,6 +835,9 @@
     height: max(460px, calc(100dvh - 250px));
     overflow-y: auto;
   }
+  .br-feed-layout--live .br-feed-scroll {
+    height: max(460px, calc(100dvh - 200px));
+  }
   .br-excerpt-card {
     min-height: 0;
   }
@@ -769,5 +847,124 @@
   .br-excerpt-text {
     font-size: clamp(1.25rem, 5vw, 1.6rem);
     margin-bottom: 1.25rem;
+  }
+}
+
+/* Reading activity lives on Profile; the feed keeps the full content width. */
+.br-reading-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+.br-reading-summary .br-account-panel {
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* Keep the whole feed card in view; only the feed and long excerpts scroll. */
+.br-shell--feed {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.br-shell--feed .br-shell__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.br-shell--feed .br-header {
+  flex-shrink: 0;
+}
+.br-shell--feed .br-reader-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  margin: 0 auto;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+.br-shell--feed .br-demo-notice {
+  flex-shrink: 0;
+  margin-bottom: 0.75rem;
+}
+.br-shell--feed .br-feed-layout {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+}
+.br-shell--feed .br-feed-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.br-shell--feed .br-feed-scroll {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.br-shell--feed .br-feed-message {
+  flex-shrink: 0;
+  margin: 0.5rem 0 0;
+}
+.br-shell--feed .br-feed-message:empty {
+  display: none;
+}
+.br-shell--feed .br-excerpt-card {
+  padding-block: 1rem;
+}
+.br-shell--feed .br-excerpt-copy {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.br-shell--feed .br-excerpt-copy > :not(.br-quote-window) {
+  flex-shrink: 0;
+}
+.br-shell--feed .br-excerpt-quote-mark {
+  height: 2rem;
+  margin-top: 0;
+  font-size: 3rem;
+}
+.br-shell--feed .br-excerpt-copy .br-quote-window {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  height: 0;
+  margin: 0.25rem 0 1rem;
+}
+@media (max-width: 767px) {
+  .br-shell--feed {
+    flex-direction: column;
+  }
+  .br-shell--feed .br-tabbar {
+    position: static;
+    flex-shrink: 0;
+  }
+}
+@media (max-height: 600px) {
+  .br-shell--feed .br-excerpt-card {
+    padding-block: 0.5rem;
+  }
+  .br-shell--feed .br-excerpt-quote-mark {
+    display: none;
+  }
+  .br-shell--feed .br-excerpt-book {
+    margin-bottom: 0.5rem;
+  }
+  .br-shell--feed .br-excerpt-mini {
+    height: 38px;
+    width: 28px;
+  }
+  .br-shell--feed .br-action-rail {
+    gap: 0.35rem;
+  }
+  .br-shell--feed .br-action-rail button > span {
+    width: 32px;
+    height: 32px;
   }
 }
