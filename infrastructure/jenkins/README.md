@@ -143,6 +143,10 @@ deploy deve chamar o feed autenticado e confirmar `rankingVersion`/
 `modelVersion=analytics-aware-v1` quando houver scores elegíveis; em caso de
 indisponibilidade do analytics, o fallback esperado é `heuristic-v1`.
 
+Durante os testes, `bookrush-deploy` oferece `RUN_ANALYTICS_SAMPLE=true` para
+cancelar jobs analíticos `PENDING/RUNNING` e processar um lote pequeno de
+versões de assets existentes antes de validar o feed.
+
 ### Pipeline dedicada do SeaweedFS
 
 O bootstrap cria o job `bookrush-seaweedfs` a partir de
