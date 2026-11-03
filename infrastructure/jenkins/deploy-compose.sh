@@ -39,6 +39,7 @@ resolve_service_image() {
   compatibility_services+=("$service|$image")
 }
 resolve_service_image RECOMMENDATION_IMAGE recommendation-service
+resolve_service_image BEHAVIOR_IMAGE behavior-service
 resolve_service_image READER_BFF_IMAGE reader-bff-service
 resolve_service_image READER_STATE_IMAGE reader-state-service
 resolve_service_image READER_PROFILE_IMAGE reader-profile-service
@@ -60,6 +61,7 @@ if [[ -z "${ADMIN_WEB_IMAGE:-}" ]]; then
 fi
 : "${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}"
 : "${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}"
+: "${BEHAVIOR_IMAGE:?Imagem behavior ausente}"
 compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --env-file "$mode_env_file" --profile auth)
 if [[ "${ANALYTICS_GPU:-false}" == "true" ]]; then
   compose+=( -f "${script_dir}/../compose.analytics-gpu.yaml" )
@@ -104,7 +106,7 @@ fi
 # Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
 # Este preflight também detecta builds feitos em um daemon diferente do deploy.
 missing_images=false
-for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE BEHAVIOR_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
   if ! docker image inspect "${!variable}" >/dev/null 2>&1; then
     echo "Imagem de deploy ausente no daemon: $variable=${!variable}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
     missing_images=true
@@ -327,8 +329,8 @@ probe_catalog() {
 
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
-  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
+  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
   else
@@ -338,7 +340,7 @@ rollback() {
 }
 
 echo "Iniciando deploy das imagens:" >&2
-printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${RECOMMENDATION_IMAGE}" "${READER_BFF_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${ADMIN_SERVICE_IMAGE}" "${ADMIN_WEB_IMAGE}" "${FRONTEND_IMAGE}" >&2
+printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${BEHAVIOR_IMAGE}" "${RECOMMENDATION_IMAGE}" "${READER_BFF_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${ADMIN_SERVICE_IMAGE}" "${ADMIN_WEB_IMAGE}" "${FRONTEND_IMAGE}" >&2
 
 # Não usar somente trap ERR: docker compose pode falhar durante --wait e o
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.

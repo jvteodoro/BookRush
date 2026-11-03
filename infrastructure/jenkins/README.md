@@ -302,9 +302,9 @@ O mesmo preparo cobre `ANALYTICS_RUNTIME_IMAGE` ausente: deriva o nome de
 `ANALYTICS_IMAGE` e constrói o runtime do checkout quando necessário, usando
 `requirements.cuda.txt` se `ANALYTICS_GPU=true`. Apenas derivar o nome não
 garante que a imagem exista. Antes de iniciar ou alterar containers, o deploy
-confere as doze imagens no daemon e valida o Compose; imagem explícita ausente
+confere as treze imagens no daemon e valida o Compose; imagem explícita ausente
 interrompe o processo com o nome da variável, sem iniciar recriação ou rollback.
-O override `deploy-images.compose.yaml` fixa as doze imagens da revisão, inclusive
+O override `deploy-images.compose.yaml` fixa as treze imagens da revisão, inclusive
 catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
 Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
 
@@ -423,7 +423,7 @@ O build integrado continua entregando `READER_PROFILE_IMAGE` e `FRONTEND_IMAGE`;
 nenhuma configuração extra do job ou do host é necessária para essa rota.
 
 A integração com a planta diária inclui `READER_STATE_IMAGE` no teste de merge
-Compose: as doze imagens da revisão são verificadas tanto com o Compose atual
+Compose: as treze imagens da revisão são verificadas tanto com o Compose atual
 quanto com um host antigo simulado, junto com a configuração administrativa.
 
 ### Contrato de avaliações de livros
