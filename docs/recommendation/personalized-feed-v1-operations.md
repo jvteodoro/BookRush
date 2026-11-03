@@ -17,9 +17,10 @@ remove dados do ledger.
 
 O default operacional é `ON` durante a fase de testes em `application.yml`,
 Compose, `.env.example` e Jenkins. O script e o override de imagens do deploy
-também geram a configuração efetiva do recommendation service, para que o
-parâmetro prevaleça mesmo quando o Compose persistente do host estiver
-defasado; `OFF` continua disponível para rollback explícito.
+também carregam a configuração PFV1 completa do recommendation service,
+incluindo o cliente S2S de behavior, para que o parâmetro prevaleça mesmo
+quando o Compose persistente do host estiver defasado; `OFF` continua
+disponível para rollback explícito.
 
 No caminho `PERSONALIZED`, a ordem é: candidate retrieval limitado → candidate
 union → score personalizado de todo o pool → quota de exploration → MMR
