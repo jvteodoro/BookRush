@@ -9,6 +9,8 @@ services:
     image: ${ANALYTICS_IMAGE:?Imagem analytics ausente}
   recommendation-service:
     image: ${RECOMMENDATION_IMAGE:?Imagem recommendation ausente}
+    environment:
+      FEED_PERSONALIZED_MODE: ${FEED_PERSONALIZED_MODE:-ON}
   reader-bff-service:
     image: ${READER_BFF_IMAGE:?Imagem reader-bff ausente}
   book-analytics-runtime:
