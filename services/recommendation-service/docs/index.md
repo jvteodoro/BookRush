@@ -26,6 +26,9 @@ candidate embeddings to book-level MMR. Exploration uses a request seed stored
 in the ledger; no complete embedding vector is persisted in the ledger.
 The positive ranker component is named `freshness` (`1 - fatiguePenalty`);
 the separate `fatiguePenalty` remains available in provenance.
+The bootstrap formula activates all five components: affinity `.50`, quality
+`.20`, trend `.10`, exploration `.10` and freshness `.10`; these are weights,
+not calibrated probabilities.
 Trending candidates come from behavior's authenticated `trending-v1` serving
 endpoint and are merged with semantic/global candidates; recommendation does
 not query the behavior schema directly.

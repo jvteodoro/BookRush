@@ -151,7 +151,7 @@ public class RecommendationController {
         Map.of(), Map.of());
     if (personalized) {
       personalizedRanking = personalizedRank(rankedBooks, scoreById, fatigueById, profileResult,
-          candidateSnapshots, explorationIds, subject, limit);
+          candidateSnapshots, trending, explorationIds, subject, limit);
       rankedBooks = personalizedRanking.books();
     }
     if (analyticsRequired) {
@@ -166,7 +166,7 @@ public class RecommendationController {
     if (personalizationDecision.path() == PersonalizedFeedGate.Path.SHADOW) {
       final var shadowInput = rankedBooks;
       var shadowRanking = feedMetrics.time("personalized_shadow", () -> personalizedRank(shadowInput,
-          scoreById, fatigueById, profileResult, candidateSnapshots, explorationIds, subject, limit));
+          scoreById, fatigueById, profileResult, candidateSnapshots, trending, explorationIds, subject, limit));
       var baselineIds = rankedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull)
           .map(UUID::toString).limit(limit).toList();
       var shadowIds = shadowRanking.books().stream().map(this::bookId).filter(java.util.Objects::nonNull)
@@ -329,10 +329,14 @@ public class RecommendationController {
       Map<String, AnalyticsScoreClient.BookScore> scoreById,
       Map<String, ExposureFatigue.Signal> fatigueById, PersonalizedProfileService.Result profile,
       Map<UUID, AnalyticsScoreClient.BookFeatureSnapshot> candidateSnapshots,
+      List<BehaviorSignalsClient.Trending> trending,
       java.util.Set<String> explorationIds, String subject, int limit) {
     var originals = new java.util.LinkedHashMap<String, Object>();
     var candidates = new ArrayList<PersonalizedRankerV1.Candidate>();
     var embeddings = new java.util.HashMap<String, List<Double>>();
+    var trendById = trending.stream().collect(java.util.stream.Collectors.toMap(
+        BehaviorSignalsClient.Trending::bookId, BehaviorSignalsClient.Trending::score,
+        Math::max));
     Instant now = Instant.now();
     for (Object book : books) {
       UUID id = bookId(book);
@@ -345,8 +349,9 @@ public class RecommendationController {
       var score = scoreById.get(key);
       double quality = score == null ? 0 : Math.max(0, Math.min(1, score.score()));
       double freshness = fatiguePolicy.freshness(fatigueById.get(key), now);
+      double trend = trendById.getOrDefault(id, 0d);
       candidates.add(new PersonalizedRankerV1.Candidate(key,
-          new PersonalizedRankerV1.Components(affinity, quality, null,
+          new PersonalizedRankerV1.Components(affinity, quality, trend,
               explorationIds.contains(key) ? 1d : 0d, freshness)));
       originals.putIfAbsent(key, book);
       var embeddingSnapshot = candidateSnapshots.get(id);
