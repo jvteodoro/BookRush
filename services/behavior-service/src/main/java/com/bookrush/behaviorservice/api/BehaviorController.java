@@ -1,6 +1,7 @@
 package com.bookrush.behaviorservice.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.bookrush.behaviorservice.BehaviorMaintenance;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -19,12 +20,25 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/behavior")
 public class BehaviorController {
   private final JdbcTemplate jdbc;
-  public BehaviorController(JdbcTemplate jdbc) {
+  private final BehaviorMaintenance maintenance;
+  public BehaviorController(JdbcTemplate jdbc, BehaviorMaintenance maintenance) {
     this.jdbc = jdbc;
+    this.maintenance = maintenance;
   }
   public record Event(@NotBlank String eventKey, @NotBlank String eventType, String issuer,
       String subject, UUID bookId, @NotNull Instant occurredAt, JsonNode payload) {}
   public record Batch(@Valid List<Event> events) {}
+
+  private UUID correlationUuid(JsonNode payload, String field) {
+    if (payload == null || !payload.has(field) || payload.get(field).isNull()) return null;
+    JsonNode value = payload.get(field);
+    if (!value.isTextual()) throw new IllegalArgumentException(field + " must be a UUID string");
+    try {
+      return UUID.fromString(value.asText());
+    } catch (IllegalArgumentException exception) {
+      throw new IllegalArgumentException(field + " must be a UUID string", exception);
+    }
+  }
   @PostMapping("/events")
   @Transactional
   public ResponseEntity<Map<String,Object>> ingest(@Valid @RequestBody Batch batch, Principal principal) {
@@ -34,6 +48,14 @@ public class BehaviorController {
     if (subject == null || subject.isBlank()) return ResponseEntity.status(401).body(Map.of("error","authentication required"));
     for (Event e: batch.events()) {
       String payload = e.payload()==null?"{}":e.payload().toString();
+      try {
+        correlationUuid(e.payload(), "recommendationItemId");
+        correlationUuid(e.payload(), "impressionId");
+      } catch (IllegalArgumentException exception) {
+        jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_CORRELATION",payload);
+        duplicate++;
+        continue;
+      }
       if (e.eventType().length()>80 || e.eventKey().length()>200 || payload.length()>16_384 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",payload); duplicate++; continue; }
       UUID eventId = UUID.randomUUID();
       int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
@@ -48,53 +70,35 @@ public class BehaviorController {
   }
   @PostMapping("/aggregates/rebuild")
   public Map<String, Object> rebuild() {
-    jdbc.update("""
-        INSERT INTO behavior.daily_book(day, book_id, impressions, opens, likes, reads)
-        SELECT occurred_at::date, book_id,
-          count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
-          count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
-          count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
-          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE'))
-        FROM behavior.events
-        WHERE book_id IS NOT NULL
-        GROUP BY occurred_at::date, book_id
-        ON CONFLICT (day, book_id) DO UPDATE SET
-          impressions = excluded.impressions, opens = excluded.opens,
-          likes = excluded.likes, reads = excluded.reads
-        """);
-    jdbc.update("""
-        INSERT INTO behavior.daily_user_book
-          (day, identity_subject, book_id, impressions, opens, likes, reads, active_seconds)
-        SELECT occurred_at::date, identity_subject, book_id,
-          count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
-          count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
-          count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
-          count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE')),
-          coalesce(sum(CASE
-            WHEN event_type = 'READ_SESSION'
-              AND payload->>'activeSeconds' ~ '^[0-9]+$'
-            THEN (payload->>'activeSeconds')::bigint ELSE 0 END), 0)
-        FROM behavior.events
-        WHERE book_id IS NOT NULL AND identity_subject IS NOT NULL
-        GROUP BY occurred_at::date, identity_subject, book_id
-        ON CONFLICT (day, identity_subject, book_id) DO UPDATE SET
-          impressions = excluded.impressions, opens = excluded.opens,
-          likes = excluded.likes, reads = excluded.reads,
-          active_seconds = excluded.active_seconds
-        """);
+    maintenance.rebuildNow();
     return Map.of("rebuilt", true);
   }
+
 
   @GetMapping("/aggregates")
   public Object aggregates() {
     return jdbc.queryForList("""
-        SELECT day, book_id, impressions, opens, likes, reads
+        SELECT day, book_id, impressions, opens, likes, reads, shares, comments
         FROM behavior.daily_book ORDER BY day DESC LIMIT 500
         """);
   }
   @GetMapping("/aggregates/books/{bookId}")
   public Object bookAggregates(@PathVariable UUID bookId) {
-    return jdbc.queryForList("SELECT day, book_id, impressions, opens, likes, reads FROM behavior.daily_book WHERE book_id=? ORDER BY day DESC LIMIT 365", bookId);
+    return jdbc.queryForList("SELECT day, book_id, impressions, opens, likes, reads, shares, comments FROM behavior.daily_book WHERE book_id=? ORDER BY day DESC LIMIT 365", bookId);
+  }
+
+  @GetMapping("/aggregates/dashboard")
+  public Map<String, Object> dashboardAggregates(
+      @RequestParam(defaultValue = "30") int days) {
+    int window = Math.max(1, Math.min(days, 365));
+    var rows = jdbc.queryForList("""
+        SELECT day, sum(impressions) impressions, sum(opens) opens, sum(likes) likes,
+          sum(reads) reads, sum(shares) shares, sum(comments) comments
+        FROM behavior.daily_book
+        WHERE day >= current_date - (? - 1)
+        GROUP BY day ORDER BY day DESC
+        """, window);
+    return Map.of("days", window, "rows", rows);
   }
 
   @GetMapping("/aggregates/me")
@@ -111,5 +115,9 @@ public class BehaviorController {
  @GetMapping("/events/count")
   public Map<String, Object> count() {
     return Map.of("events", jdbc.queryForObject("select count(*) from behavior.events", Long.class));
+  }
+  @GetMapping("/operations/metrics")
+  public Map<String, Object> operationsMetrics() {
+    return maintenance.snapshot();
   }
 }

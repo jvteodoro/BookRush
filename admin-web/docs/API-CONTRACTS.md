@@ -87,3 +87,11 @@ O backend deriva o usuário autenticado do JWT. Para DWELL, usar `value` em mili
 ## Idempotência
 
 Importações e analytics devem aceitar `Idempotency-Key`. Eventos de feed devem aceitar `eventId` UUID para deduplicação quando o aplicativo retransmitir por falha de rede.
+# Contracts used by the operations console
+
+The `/admin/operations` screen calls the authenticated `/api/v1/admin/*`
+facade. The browser sends the platform-realm bearer and `X-Admin-Client`.
+User lifecycle actions return `503` when the Keycloak service account is not
+configured; the UI must surface that error and must not assume success.
+The user list preserves the API problem detail in its error state and provides
+an explicit retry action instead of rendering a generic empty state.

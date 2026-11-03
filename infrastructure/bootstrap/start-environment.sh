@@ -79,7 +79,31 @@ reconcile_portal_stack() {
 reconcile_main_stack
 [[ "$with_portal" != true ]] || reconcile_portal_stack
 up_args=(-d --wait --wait-timeout 300); [[ "$build" == true ]] && up_args+=(--build)
-"${compose[@]}" "${profiles[@]}" up "${up_args[@]}"
+start_retries="${BOOKRUSH_START_RETRIES:-3}"
+[[ "$start_retries" =~ ^[1-9][0-9]*$ ]] || { echo 'BOOKRUSH_START_RETRIES deve ser um inteiro positivo.' >&2; exit 2; }
+
+start_main_stack() {
+  local attempt
+  for ((attempt = 1; attempt <= start_retries; attempt++)); do
+    if "${compose[@]}" "${profiles[@]}" up "${up_args[@]}"; then
+      return 0
+    fi
+
+    echo "Falha ao iniciar o stack principal (tentativa ${attempt}/${start_retries})." >&2
+    echo 'Diagnóstico do book-analytics-service:' >&2
+    "${compose[@]}" ps book-analytics-service >&2 || true
+    "${compose[@]}" logs --no-color --tail=160 book-analytics-service >&2 || true
+
+    if ((attempt < start_retries)); then
+      echo 'Nova tentativa sem rebuild após 5s; volumes e containers persistentes serão preservados.' >&2
+      sleep 5
+      up_args=(-d --wait --wait-timeout 300 --no-build)
+    fi
+  done
+  return 1
+}
+
+start_main_stack
 if [[ "$with_portal" == true ]]; then
   portal_args=(-d --wait --wait-timeout 300); [[ "$build" == true ]] && portal_args+=(--build)
   "${portal[@]}" up "${portal_args[@]}" backstage-postgres backstage

@@ -46,7 +46,7 @@ pipeline {
 
     stage('Validar catálogo e TechDocs') {
       steps {
-        sh 'docker run --rm -v "$PWD:/repo" -w /repo python:3.12-slim bash -lc "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq --no-install-recommends git >/dev/null && git config --global --add safe.directory /repo && bash scripts/validate-change.sh --ci"'
+        sh 'docker run --rm --volumes-from "$HOSTNAME" -w "$WORKSPACE" python:3.12-slim bash -lc "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq --no-install-recommends git >/dev/null && git config --global --add safe.directory \"$WORKSPACE\" && bash scripts/validate-change.sh --ci"'
         sh 'bash scripts/test-portal.sh'
       }
     }

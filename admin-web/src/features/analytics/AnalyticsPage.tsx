@@ -1,56 +1,174 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, CheckCircle2, Eye, Play, RefreshCw } from 'lucide-react';
-import { services } from '../../lib/services';
-import { AnalyticsRun } from '../../types/domain';
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { RefreshCw, Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { services } from "../../lib/services";
+import { AnalyticsJob } from "../../types/domain";
 
-const terminal = new Set(['SUCCEEDED', 'FAILED']);
-const statusLabel: Record<string, string> = { PENDING: 'Na fila', RUNNING: 'Processando', SUCCEEDED: 'Concluída', FAILED: 'Falhou' };
+const statusLabel: Record<string, string> = {
+  PENDING: "Na fila",
+  RUNNING: "Executando",
+  COMPLETED: "Concluído",
+  COMPLETED_WITH_ERRORS: "Com falhas",
+  FAILED: "Falhou",
+  CANCELLED: "Cancelado",
+};
+const formatDate = (value?: string) =>
+  value ? new Date(value).toLocaleString() : "—";
 
 export function AnalyticsPage() {
-  const qc = useQueryClient();
-  const books = useQuery({ queryKey: ['books'], queryFn: () => services.listBooks() });
-  const runs = useQuery({ queryKey: ['analytics'], queryFn: services.listAnalytics });
-  const [localRuns, setLocalRuns] = useState<AnalyticsRun[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string>();
-  const run = useMutation({
-    mutationFn: ({ bookId, canonicalBookId }: { bookId: string; canonicalBookId?: string }) => services.runAnalytics(bookId, canonicalBookId),
-    onSuccess: created => { setLocalRuns(current => [created, ...current.filter(item => item.id !== created.id)]); void qc.invalidateQueries({ queryKey: ['analytics'] }); },
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("ALL");
+  const [sort, setSort] = useState<"created" | "status" | "progress" | "id">(
+    "created",
+  );
+  const jobs = useQuery({
+    queryKey: ["analytics-jobs"],
+    queryFn: services.listAnalyticsJobs,
+    refetchInterval: 4000,
+    refetchIntervalInBackground: true,
   });
-  const displayedRuns = useMemo(() => [...localRuns, ...(runs.data ?? [])].filter((item, index, all) => all.findIndex(other => other.id === item.id) === index), [localRuns, runs.data]);
-  const latestByBook = useMemo(() => new Map(displayedRuns.map(item => [item.bookId, item])), [displayedRuns]);
-  const runForBook = (bookId: string, canonicalBookId?: string) => latestByBook.get(canonicalBookId ?? bookId);
-  const titleForRun = (bookId: string) => books.data?.find(book => book.canonicalBookId === bookId || book.id === bookId)?.title ?? `Obra ${bookId}`;
+  const visibleJobs = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return [...(jobs.data ?? [])]
+      .filter((job) => status === "ALL" || job.status === status)
+      .filter(
+        (job) =>
+          !normalized ||
+          job.id.toLowerCase().includes(normalized) ||
+          job.operationKey?.toLowerCase().includes(normalized),
+      )
+      .sort((left, right) => {
+        if (sort === "status") return left.status.localeCompare(right.status);
+        if (sort === "id") return left.id.localeCompare(right.id);
+        if (sort === "progress")
+          return (
+            right.processedItems / Math.max(1, right.totalItems) -
+            left.processedItems / Math.max(1, left.totalItems)
+          );
+        return (
+          new Date(right.createdAt ?? 0).getTime() -
+          new Date(left.createdAt ?? 0).getTime()
+        );
+      });
+  }, [jobs.data, query, sort, status]);
+  return (
+    <section className="analytics-console">
+      <header className="pagehead analytics-pagehead">
+        <div>
+          <span className="eyebrow">MODEL OPERATIONS</span>
+          <h1>Analysis jobs</h1>
+          <p>Execuções persistidas, progresso e falhas operacionais.</p>
+        </div>
+        <button
+          className="button-action compact-action"
+          onClick={() => void jobs.refetch()}
+          disabled={jobs.isFetching}
+        >
+          <RefreshCw size={14} /> Atualizar
+        </button>
+      </header>
+      <div className="analytics-toolbar">
+        <label className="search-field">
+          <Search size={15} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Filtrar por ID ou operation key"
+          />
+        </label>
+        <select
+          value={status}
+          onChange={(event) => setStatus(event.target.value)}
+        >
+          <option value="ALL">Todos os status</option>
+          {Object.keys(statusLabel).map((value) => (
+            <option key={value} value={value}>
+              {statusLabel[value]}
+            </option>
+          ))}
+        </select>
+        <select
+          value={sort}
+          onChange={(event) => setSort(event.target.value as typeof sort)}
+        >
+          <option value="created">Mais recentes</option>
+          <option value="progress">Maior progresso</option>
+          <option value="id">ID</option>
+          <option value="status">Status</option>
+        </select>
+        <span className="table-count">{visibleJobs.length} jobs</span>
+      </div>
+      {jobs.isLoading && (
+        <div className="panel compact-panel">Carregando jobs…</div>
+      )}
+      {jobs.isError && (
+        <div className="panel import-error compact-panel">
+          Não foi possível consultar os jobs de analytics.
+        </div>
+      )}
+      {!jobs.isLoading && !jobs.isError && (
+        <div className="table-shell">
+          <table className="admin-table analytics-table">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Status</th>
+                <th>Progresso</th>
+                <th>Estágio</th>
+                <th>Criado em</th>
+                <th aria-label="Ações" />
+              </tr>
+            </thead>
+            <tbody>
+              {visibleJobs.map((job) => (
+                <JobRow key={job.id} job={job} />
+              ))}
+            </tbody>
+          </table>
+          {visibleJobs.length === 0 && (
+            <div className="empty-table">
+              Nenhum job corresponde aos filtros.
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
 
-  useEffect(() => {
-    const active = localRuns.filter(item => !terminal.has(item.status));
-    if (!active.length) return;
-    const timer = window.setInterval(() => {
-      void Promise.all(active.map(async item => {
-        const latest = await services.getAnalyticsJob(item.id);
-        const normalized: AnalyticsRun = {
-          ...item,
-          status: latest.status === 'COMPLETED' ? 'SUCCEEDED' : latest.status === 'FAILED' || latest.status === 'COMPLETED_WITH_ERRORS' ? 'FAILED' : latest.status === 'RUNNING' ? 'RUNNING' : 'PENDING',
-          totalItems: latest.total_items ?? latest.totalItems,
-          processedItems: latest.processed_items ?? latest.processedItems ?? latest.succeeded_items,
-          finishedAt: latest.finished_at ?? latest.finishedAt,
-        };
-        setLocalRuns(current => current.map(existing => existing.id === item.id ? normalized : existing));
-        if (terminal.has(normalized.status)) void qc.invalidateQueries({ queryKey: ['analytics'] });
-      })).catch(() => undefined);
-    }, 2000);
-    return () => window.clearInterval(timer);
-  }, [localRuns, qc]);
-
-  const scrollToRun = (id: string) => { setSelectedRunId(id); window.requestAnimationFrame(() => document.getElementById(`analytics-run-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })); };
-  const importedBooks = books.data?.filter(book => book.status === 'IMPORTED') ?? [];
-
-  return <section>
-    <header className="pagehead"><div><span className="eyebrow">MODEL OPERATIONS</span><h1>Analytics</h1><p>Consulte métricas já persistidas por versão textual e acompanhe novas execuções sem perder o histórico.</p></div><button className="runrow button-action" onClick={() => void runs.refetch()} disabled={runs.isFetching}><RefreshCw size={15}/>{runs.isFetching ? 'Atualizando…' : 'Atualizar métricas'}</button></header>
-    <div className="panel"><div className="panelhead"><div><h2>Obras importadas</h2><span>Uma execução concluída pode ser consultada sem rodar a pipeline novamente.</span></div><span>{importedBooks.length} disponíveis</span></div><div className="runrow analytics-books">{importedBooks.length === 0 && <p>Nenhuma obra importada possui analytics disponível ainda.</p>}{importedBooks.map(book => { const existing = runForBook(book.id, book.canonicalBookId); const running = existing && !terminal.has(existing.status); return <div className="analytics-book" key={book.id}><div><strong>{book.title}</strong><small>{existing ? `Última execução: ${statusLabel[existing.status] ?? existing.status}` : 'Ainda não executada'}</small></div>{existing ? <><button onClick={() => scrollToRun(existing.id)}><Eye size={15}/>Ver métricas</button><button disabled={run.isPending || running} onClick={() => run.mutate({ bookId: book.id, canonicalBookId: book.canonicalBookId })}><Play size={15}/>{running ? 'Processando…' : 'Reprocessar'}</button></> : <button disabled={run.isPending} onClick={() => run.mutate({ bookId: book.id, canonicalBookId: book.canonicalBookId })}><Play size={15}/>Executar analytics</button>}</div>; })}</div>{run.isError && <p className="error-text">{run.error instanceof Error ? run.error.message : 'Não foi possível iniciar o analytics.'}</p>}</div>
-    {runs.isLoading && <div className="panel">Consultando execuções persistidas…</div>}
-    {runs.isError && <div className="panel import-error"><h2>Métricas indisponíveis</h2><p>{runs.error instanceof Error ? runs.error.message : 'Não foi possível consultar o serviço de analytics.'}</p></div>}
-    {!runs.isLoading && !runs.isError && displayedRuns.length === 0 && <div className="panel"><h2>Nenhuma execução encontrada</h2><p>Importe uma obra e execute o analytics para gerar métricas persistidas.</p></div>}
-    <div className="runs">{displayedRuns.map(item => <article className={`run ${selectedRunId === item.id ? 'run-selected' : ''}`} id={`analytics-run-${item.id}`} key={item.id}><div className="runhead"><div><Activity size={18}/><div><strong>{titleForRun(item.bookId)}</strong><span>{item.modelVersion} · {statusLabel[item.status] ?? item.status}</span></div></div><time>{new Date(item.startedAt).toLocaleString()}</time></div>{item.status === 'SUCCEEDED' && <div className="run-success"><CheckCircle2 size={15}/> Métricas persistidas e disponíveis para consulta</div>}{item.status === 'RUNNING' && <div className="progress"><span style={{ width: `${item.totalItems ? Math.min(100, Math.round(((item.processedItems ?? 0) / item.totalItems) * 100)) : 15}%` }}/></div>}<div className="metrics">{item.metrics.map(metric => <div key={metric.key}><span>{metric.label}</span><strong>{Number.isInteger(metric.value) ? metric.value : metric.value.toFixed(3)}{metric.unit ? ` ${metric.unit}` : ''}</strong></div>)}{item.totalItems !== undefined && <div><span>Itens processados</span><strong>{item.processedItems ?? 0}/{item.totalItems}</strong></div>}</div></article>)}</div>
-  </section>;
+function JobRow({ job }: { job: AnalyticsJob }) {
+  const progress = Math.round(
+    (job.processedItems / Math.max(1, job.totalItems)) * 100,
+  );
+  return (
+    <tr>
+      <td>
+        <Link className="table-link" to={`/analytics/jobs/${job.id}`}>
+          <strong>{job.id.slice(0, 8)}</strong>
+          <small>{job.operationKey ?? "sem operation key"}</small>
+        </Link>
+      </td>
+      <td>
+        <span className={`status-dot status-${job.status.toLowerCase()}`}>
+          {statusLabel[job.status] ?? job.status}
+        </span>
+      </td>
+      <td className="progress-cell">
+        <span>
+          {job.processedItems}/{job.totalItems}
+        </span>
+        <div className="mini-progress">
+          <i style={{ width: `${progress}%` }} />
+        </div>
+      </td>
+      <td>{job.progressStage ?? "—"}</td>
+      <td>{formatDate(job.createdAt)}</td>
+      <td>
+        <Link className="row-action" to={`/analytics/jobs/${job.id}`}>
+          Abrir
+        </Link>
+      </td>
+    </tr>
+  );
 }

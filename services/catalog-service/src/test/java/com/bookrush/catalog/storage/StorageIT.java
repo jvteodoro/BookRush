@@ -215,6 +215,32 @@ class StorageIT {
   }
 
   @Test
+  void approvedThumbnailRemainsVisibleWhileBookAwaitsEditorialActivation() throws Exception {
+    UUID book = book();
+    UUID license = license();
+    byte[] image = {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe0, 0, 0x10, 'J', 'F', 'I', 'F'};
+    var uploaded =
+        service.upload(
+            book,
+            null,
+            null,
+            UUID.fromString(source),
+            license,
+            BookAssetAssetType.THUMBNAIL,
+            BookAssetAssetRole.COVER,
+            "cover.jpg",
+            "image/jpeg",
+            new ByteArrayInputStream(image));
+    service.approve(book, uploaded.asset().id());
+    jdbc.update("UPDATE catalog.book SET status='REVIEW_REQUIRED' WHERE id=?", book);
+
+    var link = service.thumbnailLink(book, uploaded.asset().id());
+    assertArrayEquals(image, get(link.url()).body());
+
+    service.delete(book, uploaded.asset().id());
+  }
+
+  @Test
   void leavesCanaryForHostDownloadAndRecreation() throws Exception {
     Path file = Files.createTempFile("canary-", ".txt");
     Files.writeString(file, "abc");

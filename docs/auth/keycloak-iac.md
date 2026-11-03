@@ -33,10 +33,18 @@ KEYCLOAK_RECONCILE_REQUIRE_CLIENT_SECRETS=true \
 O bootstrap `--import-realm` do container Keycloak é reservado para volumes
 vazios. Atualizações de uma instalação existente devem usar o reconciliador.
 
-O serviço de reconciliação executa com o UID/GID do usuário que chamou o
-script. Assim, o diretório temporário permanece `0700` e os JSONs renderizados
-`0600`, sem tornar os secrets legíveis por outros usuários do host. A imagem
+O reconciliador usado pelo agente Jenkins renderiza os JSONs em um volume
+Docker dedicado e efêmero, compartilhado explicitamente pelo renderer e pelo
+`keycloak-config-cli`. Isso evita depender de bind mounts do workspace entre
+containers irmãos. O volume é removido pelo `trap` ao terminar; os JSONs nunca
+são gravados no Git, no volume persistente do Keycloak ou no log. A imagem
 fixada do reconciliador é `adorsys/keycloak-config-cli:6.3.0-18.0.2`.
+
+Após o reconcile, o agente reaplica de forma idempotente a role de realm
+`platform-operator` ao service account `bookrush-ingestion-admin` pela Admin
+API. Essa etapa corrige instalações persistentes nas quais o
+`keycloak-config-cli` não atualiza mappings de um service account já existente;
+ela não lê, substitui ou rotaciona segredos de clients.
 
 Para validar a configuração sem tocar no ambiente persistente, execute:
 

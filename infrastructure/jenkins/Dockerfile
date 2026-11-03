@@ -1,6 +1,6 @@
 FROM jenkins/jenkins:lts-jdk21
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git jq python3 openssl \
     && install -m 0755 -d /etc/apt/keyrings \
     && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
     && . /etc/os-release \
@@ -13,5 +13,5 @@ COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
 COPY init.groovy.d/ /usr/share/jenkins/ref/init.groovy.d/
 COPY casc/ /opt/bookrush/casc/
-COPY bookrush.Jenkinsfile backstage.Jenkinsfile admin-web.Jenkinsfile microservice.Jenkinsfile vertical.Jenkinsfile deploy-compose.sh /opt/bookrush/
+COPY bookrush.Jenkinsfile backstage.Jenkinsfile admin-web.Jenkinsfile microservice.Jenkinsfile vertical.Jenkinsfile seaweedfs.Jenkinsfile deploy-compose.sh deploy-seaweedfs.sh /opt/bookrush/
 USER jenkins

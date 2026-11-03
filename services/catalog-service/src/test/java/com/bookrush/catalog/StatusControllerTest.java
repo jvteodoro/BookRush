@@ -3,6 +3,7 @@ package com.bookrush.catalog;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,5 +45,19 @@ class StatusControllerTest {
   void thumbnailRouteRequiresProductBearerEvenWhenStorageControllerIsDisabled() throws Exception {
     mvc.perform(get("/api/v1/books/00000000-0000-4000-8000-000000000001/thumbnail"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void thumbnailRouteAcceptsProductCatalogReadScope() throws Exception {
+    mvc.perform(
+            get("/api/v1/books/00000000-0000-4000-8000-000000000001/thumbnail")
+                .with(
+                    jwt()
+                        .jwt(
+                            token ->
+                                token.issuer("https://keycloak-bookrush.example/realms/bookrush")
+                                    .audience(java.util.List.of("account"))
+                                    .claim("scope", "openid bookrush.catalog.read"))))
+        .andExpect(status().isNotFound());
   }
 }

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+: "${KEYCLOAK_ADMIN_TOKEN_URI:?KEYCLOAK_ADMIN_TOKEN_URI ausente}"
+: "${KEYCLOAK_ADMIN_BASE:?KEYCLOAK_ADMIN_BASE ausente}"
+: "${KEYCLOAK_ADMIN_CLIENT_ID:?KEYCLOAK_ADMIN_CLIENT_ID ausente}"
+: "${KEYCLOAK_ADMIN_CLIENT_SECRET:?KEYCLOAK_ADMIN_CLIENT_SECRET ausente}"
+: "${KEYCLOAK_CONFIG_CLI_ADMIN_USER:=${KEYCLOAK_ADMIN:-}}"
+: "${KEYCLOAK_CONFIG_CLI_ADMIN_USER:?KEYCLOAK_CONFIG_CLI_ADMIN_USER ou KEYCLOAK_ADMIN ausente}"
+: "${KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD:?KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD ausente}"
+
+realm_base="${KEYCLOAK_ADMIN_BASE%/}"
+realm_name="${realm_base##*/}"
+server_base="${KEYCLOAK_ADMIN_TOKEN_URI%%/realms/*}"
+token="$(curl -fsS -X POST "$server_base/realms/master/protocol/openid-connect/token" \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode "username=${KEYCLOAK_CONFIG_CLI_ADMIN_USER}" \
+  --data-urlencode "password=${KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD}" \
+  --data-urlencode grant_type=password --data-urlencode client_id=admin-cli | jq -r '.access_token')"
+[[ -n "$token" && "$token" != null ]] || { echo 'Token administrativo não foi emitido.' >&2; exit 2; }
+auth=(-H "Authorization: Bearer $token")
+client_id="$(curl -fsS "${realm_base}/clients?clientId=${KEYCLOAK_ADMIN_CLIENT_ID}" "${auth[@]}" | jq -r '.[0].id')"
+service_user="$(curl -fsS "${realm_base}/clients/${client_id}/service-account-user" "${auth[@]}" | jq -r '.id')"
+realm_management="$(curl -fsS "${server_base}/admin/realms/${realm_name}/clients?clientId=realm-management" "${auth[@]}" | jq -r '.[0].id')"
+roles="$(curl -fsS "${server_base}/admin/realms/${realm_name}/clients/${realm_management}/roles?briefRepresentation=true" "${auth[@]}" | jq '[.[] | select(.name == "query-users" or .name == "view-users" or .name == "manage-users")]')"
+curl -fsS -X POST "${realm_base}/users/${service_user}/role-mappings/clients/${realm_management}" \
+  "${auth[@]}" -H 'Content-Type: application/json' -d "$roles" >/dev/null
+mapper_exists="$(curl -fsS "${realm_base}/clients/${client_id}/protocol-mappers/models" "${auth[@]}" \
+  | jq -r '.[] | select(.name == "admin-service-management-roles") | .name' | head -n1)"
+if [[ -z "$mapper_exists" ]]; then
+  curl -fsS -X POST "${realm_base}/clients/${client_id}/protocol-mappers/models" "${auth[@]}" \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"admin-service-management-roles","protocol":"openid-connect","protocolMapper":"oidc-usermodel-client-role-mapper","config":{"usermodel.clientRoleMapping.clientId":"realm-management","claim.name":"resource_access.realm-management.roles","jsonType.label":"String","multivalued":"true","access.token.claim":"true","id.token.claim":"false","userinfo.token.claim":"false"}}' >/dev/null
+else
+  mapper_id="$(curl -fsS "${realm_base}/clients/${client_id}/protocol-mappers/models" "${auth[@]}" | jq -r '.[] | select(.name == "admin-service-management-roles") | .id')"
+  curl -fsS -X PUT "${realm_base}/clients/${client_id}/protocol-mappers/models/${mapper_id}" "${auth[@]}" \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"admin-service-management-roles","protocol":"openid-connect","protocolMapper":"oidc-usermodel-client-role-mapper","config":{"usermodel.clientRoleMapping.clientId":"realm-management","claim.name":"resource_access.realm-management.roles","jsonType.label":"String","multivalued":"true","access.token.claim":"true","id.token.claim":"false","userinfo.token.claim":"false"}}' >/dev/null
+fi
+echo 'Roles do serviço admin reconciliadas.'

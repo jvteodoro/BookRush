@@ -20,6 +20,11 @@ A [implementação e operação V2](analytics-v2-implementation.md) documenta o
 runtime Python local, preparação explícita de modelos, gates, scorer experimental
 e os limites para iniciar um piloto de corpus.
 
+Os contratos de [validação linguística V1](linguistic-validation-v1.md) e de
+[seleção de candidates V2](analytics-v2-selection.md) documentam os estados
+explícitos, a ordem fail-closed, a proveniência do ranker e os critérios de
+aceitação em lotes pequenos.
+
 O [relatório de estado de 2026-10-01](analytics-status-2026-10-01.md) consolida
 as evidências reais, comandos de reprodução e pendências que ainda exigem dados
 rotulados ou aprovação antes do processamento em massa.
@@ -84,3 +89,9 @@ O benchmark de latência e projeção de custo do NLI local está em
 
 A milestone [Excerpt Quality Learning V1](annotation-quality-learning-v1.md)
 adiciona campanhas, anotação cega, leases, métricas QA e datasets imutáveis.
+## Behavior outbox sink
+
+O endpoint interno `/api/internal/v1/behavior/events` recebe linhas idempotentes
+da outbox do behavior-service e persiste `event_id`, tipo, payload e timestamps
+em `analytics.behavior_event`. Ele exige `X-Behavior-Outbox-Token`; o valor não
+deve ser versionado nem aparecer em logs.

@@ -32,15 +32,61 @@ O `recommendation-service` consulta analytics com client credentials quando as
 flags estão habilitadas. A chamada deve usar o prefixo `/api/internal`; sem
 esse prefixo o serviço responde 404 e o recommendation-service degrada para
 descrição. O `reader-bff-service` repassa o campo nullable e o
-frontend prioriza `excerpt.text`, depois descrição e por fim o fallback
-`Descubra <título> no catálogo BookRush.`. Com as flags padrão (`false`/`0`), o
-comportamento anterior continua ativo.
+frontend usa `excerpt.text`; quando não há excerpt elegível, mostra uma
+mensagem explícita de indisponibilidade, sem tratar a descrição/licença do
+catálogo como trecho literário.
+
+## Ranking analítico do feed
+
+O ranking de livros e o ranking de excerpts são responsabilidades diferentes.
+O primeiro passo da integração é o endpoint interno em lote:
+
+`POST /api/internal/v1/content-analytics/book-scores`
+
+com `{ "bookIds": ["..."] }`. Ele retorna no máximo um score por livro,
+calculado a partir do maior `analytics.excerpt_rank.final_score` elegível da
+versão apontada por `catalog.book_asset.current_version_id`, junto com
+`rankerVersion`. O recommendation-service faz
+uma única chamada por feed, aplica cache e ordena os candidatos por score
+analítico antes do desempate heurístico e da diversidade de idioma. Se o
+analytics, o token S2S ou o timeout falhar, o resultado volta integralmente ao
+`heuristic-v1`; nenhum score ausente é convertido em zero.
+
+O controller normaliza os nomes das colunas PostgreSQL (`book_id` e
+`ranker_version`) para o contrato JSON (`bookId` e `rankerVersion`) antes de
+responder ao cliente S2S.
+
+A ativação é controlada explicitamente por `FEED_ANALYTICS_RANKING_ENABLED`.
+O Compose mantém o ranking habilitado por padrão, reutilizando a mesma
+credencial S2S já configurada:
+
+```text
+FEED_ANALYTICS_RANKING_ENABLED=true
+FEED_ANALYTICS_RANKING_MODEL_VERSION=analytics-aware-v1
+FEED_ANALYTICS_RANKING_READ_TIMEOUT=2s
+```
+
+O segredo deve ser injetado explicitamente em
+`FEED_ANALYTICS_RANKING_CLIENT_SECRET`; no Compose de produção ele é ligado à
+mesma Secret Text já usada por `FEED_EXCERPTS_CLIENT_SECRET`. Isso evita
+depender de placeholders aninhados do Spring durante a inicialização.
+
+O ledger passa a registrar `modelVersion=analytics-aware-v1` e o motivo
+`analytics-score` somente quando pelo menos um candidato recebeu score. A
+ausência de scores mantém `modelVersion=heuristic-v1`, permitindo identificar
+claramente fallback em produção.
+
+O endpoint também registra a métrica de baixa cardinalidade
+`bookrush.analytics.book_scores{operation="batch"}` para acompanhar o uso do
+novo caminho sem incluir IDs de livros ou conteúdo nos rótulos.
 
 ## Trabalho restante
 
-1. **Executar o gate completo com dois livros**, um processado e outro sem analytics.
-2. **Monitorar cache, fallback, latência e erros** antes de aumentar a porcentagem.
+1. **Executar o gate com dois livros**, um processado e outro sem analytics.
+2. **Monitorar cache, fallback, latência e erros** antes de ativar em produção.
 3. **Validar a linhagem** contra `sourceAssetVersionId`, hash e troca de versão.
+4. **Comparar a ordenação** com e sem `FEED_ANALYTICS_RANKING_ENABLED` antes de
+   tratar o score técnico como sinal de produto.
 
 ## Sequência recomendada de implementação
 
@@ -74,6 +120,8 @@ Também é necessário um teste de integração com dois livros: um com excerpts
 
 - A existência de excerpts não significa que todos os livros do catálogo tenham texto processado.
 - Features semânticas, NLI e ranking podem estar ausentes no modo offline; o feed não deve inventar score ou transformar ausência em zero.
-- O ranker atual é experimental e não foi validado como métrica de qualidade editorial ou comportamento de leitores.
-- A feature continua desligada no `.env.example`; no host de desenvolvimento
-  está habilitada com rollout de 100%.
+- O score atual é técnico, derivado do ranker de excerpts, e não foi validado
+  como métrica de qualidade editorial ou comportamento de leitores.
+- O ranking analítico pode ser desligado com `FEED_ANALYTICS_RANKING_ENABLED=false`
+  para rollback controlado; a flag de excerpts não é mais usada como ativação
+  implícita.

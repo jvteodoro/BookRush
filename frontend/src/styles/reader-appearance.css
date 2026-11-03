@@ -1,0 +1,248 @@
+.reader-shell#readerShell,
+#readerShell .readium-host,
+#readerShell .readium-host iframe {
+  background: var(--reader-background, #f7f4ee);
+  color: var(--reader-foreground, #29261f);
+}
+#readerShell .reader-settings {
+  width: min(380px, calc(100vw - 32px));
+  box-sizing: border-box;
+  background: var(--reader-background, #f7f4ee);
+  color: var(--reader-foreground, #29261f);
+  max-height: calc(100dvh - 90px);
+  padding: 22px;
+}
+#readerShell .reader-settings-intro,
+#readerShell .reader-settings-status {
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+#readerAppearance fieldset {
+  border: 0;
+  padding: 0;
+  margin: 22px 0;
+  min-width: 0;
+}
+#readerAppearance legend {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+#readerAppearance .reader-options {
+  --option-columns: 3;
+  --option-gap: 7px;
+  --option-height: 44px;
+  position: relative;
+  display: flex;
+  gap: var(--option-gap);
+}
+#readerAppearance .reader-font-options {
+  --option-columns: 2;
+  --option-gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+#readerAppearance .reader-theme-options {
+  --option-gap: 10px;
+  --option-height: 72px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+#readerAppearance .reader-options button {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  height: var(--option-height);
+  box-sizing: border-box;
+  padding: 8px 4px;
+  border: 1px solid currentColor;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 180ms ease;
+}
+#readerAppearance .reader-options button[aria-pressed="true"] {
+  font-weight: 700;
+}
+#readerAppearance .reader-selection-indicator {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  box-sizing: border-box;
+  top: 0;
+  left: 0;
+  width: calc(
+    (100% - (var(--option-columns) - 1) * var(--option-gap)) /
+      var(--option-columns)
+  );
+  height: var(--option-height);
+  border-radius: 9px;
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  transform: translate(
+    calc(var(--selected-column, 0) * (100% + var(--option-gap))),
+    calc(var(--selected-row, 0) * (100% + var(--option-gap)))
+  );
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+#readerShell .reader-panel[data-open] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-10px) scale(0.98);
+  transform-origin: top right;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease,
+    visibility 0s 180ms;
+}
+#readerShell .reader-panel[data-open="true"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+  transition-delay: 0s;
+}
+#readerShell .reader-tool,
+#readerShell .reader-back,
+#readerShell .reader-bookmark,
+#readerShell .reader-panel-close,
+#readerShell .reader-page-controls button {
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    opacity 180ms ease;
+}
+#readerShell .reader-tool[aria-expanded="true"] {
+  background: var(--reader-foreground, #29261f);
+  color: var(--reader-background, #f7f4ee);
+  box-shadow: 0 0 0 2px var(--reader-foreground, #29261f);
+}
+@media (hover: hover) {
+  #readerShell .reader-tool:hover,
+  #readerShell .reader-back:hover,
+  #readerShell .reader-bookmark:hover,
+  #readerShell .reader-panel-close:hover,
+  #readerShell .reader-page-controls button:hover,
+  #readerAppearance .reader-options button:hover {
+    transform: translateY(-2px);
+  }
+}
+#readerShell .reader-tool:active,
+#readerShell .reader-back:active,
+#readerShell .reader-bookmark:active,
+#readerShell .reader-panel-close:active,
+#readerShell .reader-page-controls button:active,
+#readerAppearance .reader-options button:active {
+  transform: scale(0.95);
+}
+@media (prefers-reduced-motion: reduce) {
+  #readerShell .reader-panel[data-open],
+  #readerShell button,
+  #readerAppearance .reader-selection-indicator {
+    transition: none !important;
+    transform: none !important;
+  }
+  #readerAppearance .reader-selection-indicator {
+    transform: translate(
+      calc(var(--selected-column, 0) * (100% + var(--option-gap))),
+      calc(var(--selected-row, 0) * (100% + var(--option-gap)))
+    ) !important;
+  }
+}
+#readerAppearance .reader-theme-options button {
+  display: grid;
+  gap: 5px;
+}
+#readerAppearance .reader-theme-options span {
+  font:
+    24px Georgia,
+    serif;
+}
+#readerAppearance .reader-size-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+#readerAppearance output {
+  color: inherit;
+}
+#readerAppearance input {
+  width: 100%;
+  min-height: 36px;
+  accent-color: var(--reader-foreground, #29261f);
+}
+#readerAppearance .reader-reset {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  text-decoration: underline;
+  min-height: 44px;
+  cursor: pointer;
+}
+#readerShell button:focus-visible,
+#readerAppearance input:focus-visible {
+  outline: 3px solid var(--reader-foreground, #29261f);
+  outline-offset: 3px;
+}
+#readerShell .reader-panel,
+#readerShell .reader-title,
+#readerShell .reader-tool,
+#readerShell .reader-back,
+#readerShell .reader-bookmark,
+#readerShell .reader-page-controls button {
+  background: var(--reader-background, #f7f4ee);
+  color: var(--reader-foreground, #29261f);
+  border: 1px solid
+    color-mix(in srgb, var(--reader-foreground, #29261f) 25%, transparent);
+}
+/* Keep the active toolbar control distinct using the same theme pair. */
+#readerShell .reader-controls .reader-tool[aria-expanded="true"] {
+  background: var(--reader-foreground, #29261f);
+  color: var(--reader-background, #f7f4ee);
+}
+#readerShell .reader-chapter,
+#readerShell .reader-chapter span,
+#readerShell .reader-panel-empty,
+#readerShell .reader-panel-close,
+#readerAppearance legend {
+  color: inherit;
+}
+#readerShell .reader-chapter:hover {
+  background: color-mix(
+    in srgb,
+    var(--reader-foreground, #29261f) 10%,
+    var(--reader-background, #f7f4ee)
+  );
+}
+#readerShell .reader-chapter {
+  border-color: color-mix(
+    in srgb,
+    var(--reader-foreground, #29261f) 20%,
+    transparent
+  );
+}
+@media (hover: none), (max-width: 640px) {
+  #readerShell .reader-overlay {
+    opacity: 1;
+  }
+  #readerShell .reader-overlay-center {
+    top: 60px;
+    max-width: 80vw;
+  }
+  #readerShell .reader-title {
+    max-width: 80vw;
+  }
+  #readerShell .reader-settings {
+    right: 16px;
+  }
+}

@@ -10,8 +10,13 @@ O serviço continua sendo o único dono do schema `analytics`. O worker Java coo
 - bridge spaCy PT/EN local-only, com extração segura de wheels preparadas;
 - endpoint BGE-M3 local-only com lote, hash SHA-256, pooling mean e normalização L2;
 - gates técnicos, ranking experimental, protocolo NLI limitado e seleção MMR determinística;
-- script de artefato de scorer com split por `work_id`, seed, padronização e hash;
+- pipeline de seleção que aplica gates antes do MMR e rejeita embeddings ausentes ou de modelo diferente;
+- script de artefato de scorer supervisionado experimental com split por
+  `author_id::work_id`, seed, baseline por dimensão, GBDT determinístico de
+  stumps residuais, métricas holdout, importância explicável e hash;
 - observabilidade de baixa cardinalidade, sem IDs de livros em labels.
+- contrato operacional documentado para gates de elegibilidade, provenance do
+  ranker e seleção MMR em `docs/analytics-v2-selection.md`.
 
 ## Preparação de modelos
 
@@ -24,6 +29,19 @@ As migrations V7–V9 são aditivas. Observações carregam analyzer/configuraç
 ## Gates antes do corpus
 
 Os testes locais cobrem fórmulas e invariantes, mas não constituem GO para o corpus. Ainda é necessário preparar artefatos reais, executar os gates de 10/50/100 livros e registrar throughput, storage, avaliação humana e decisão GO/NO-GO. O scorer permanece `EXPERIMENTAL`; não representa qualidade, engajamento ou probabilidade comportamental.
+
+O comando `scripts/train-candidate-scorer.py` não baixa dependências nem
+modelos: recebe JSONL rotulado, separa grupos de autor/obra antes do treino,
+produz um artefato versionado `EXCERPT_SUPERVISED_SCORER_V1` e calcula RMSE do
+baseline e do conjunto de stumps em holdout. A importância é a frequência de
+splits; a promoção continua condicionada à revisão humana e à avaliação do
+dataset.
+
+O endpoint de excerpts retorna também `rank_configuration_hash`, `rank_components`
+e `rank_weights`. Quando dimensões H/C/A/I/Q estiverem disponíveis, elas ficam
+dentro de `rank_components.dimensions`, cada uma com `value`, `status` e
+`source_feature`. Ausência ou indisponibilidade é preservada como `null`/status
+explícito; o worker não converte feature estrutural em rótulo narrativo.
 ## Validação real no ambiente de produção
 
 Em 2026-09-30 foi executada uma prova controlada com duas versões textuais
@@ -88,3 +106,15 @@ com observações linguísticas produzidas pelo pipeline para publicar a
 normalização de estilo PT. O classificador supervisionado também permanece
 bloqueado até existir dataset rotulado suficiente, com divisão por obra e
 avaliação reproduzível.
+
+## Hipóteses NLI versionadas
+
+As hipóteses narrativas e emocionais são carregadas de
+`nli-hypotheses-v1.json`, com o código e a versão do conjunto registrados pelo
+`NliInferenceAdapter`. O catálogo mantém nove conceitos narrativos e sete
+emoções independentes para cada idioma suportado; não há tradução automática
+ou softmax entre emoções. O adaptador conserva o triplo bruto
+entailment/neutral/contradiction e os derivados support/confidence somente
+quando o runtime local retorna `VALID`. Alterações do texto devem criar uma
+nova versão do artefato, permitindo comparar execuções sem reescrever
+proveniência histórica.

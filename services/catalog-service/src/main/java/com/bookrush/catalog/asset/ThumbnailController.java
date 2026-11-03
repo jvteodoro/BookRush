@@ -33,7 +33,7 @@ public class ThumbnailController {
             .findFirst()
             .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.NOT_FOUND, "Thumbnail not found"));
-    var link = assets.link(bookId, assetId, true);
+    var link = assets.thumbnailLink(bookId, assetId);
     return ResponseEntity.status(302)
         .location(link.url())
         .cacheControl(CacheControl.noCache())

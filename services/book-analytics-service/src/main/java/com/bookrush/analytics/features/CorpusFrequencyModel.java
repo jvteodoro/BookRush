@@ -25,6 +25,10 @@ public final class CorpusFrequencyModel {
     return -Math.log(p);
   }
 
+  public boolean contains(String token) {
+    return counts.containsKey(token.toLowerCase(Locale.ROOT));
+  }
+
   public Stats summarize(Collection<String> tokens) {
     var values = tokens.stream().filter(t -> !t.isBlank()).map(this::surprisal).sorted().toList();
     if (values.isEmpty()) return new Stats(0, 0, 0, 0);

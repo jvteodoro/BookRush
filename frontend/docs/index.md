@@ -59,6 +59,10 @@ exibem erro. A regressão está em `tests/search-save.test.mjs`.
 
 A Biblioteca (`reader/LibraryPage.tsx`) consulta a estante e os recentes reais,
 resolve os metadados pelo ID de cada livro e busca progresso no reader-state.
+
+A tela Minha planta consulta `GET /api/v1/reader/plant` no reader-state-service.
+Ela exibe o estágio e os minutos acumulados da projeção versionada
+`reading-minutes-v1`; não usa métricas demonstrativas locais.
 Metadados do catálogo usam GET público sem Bearer, pois o catálogo valida o
 realm de plataforma; biblioteca, recentes e progresso usam o token do leitor.
 Ela não limita a estante aos livros do feed.
@@ -108,6 +112,22 @@ o fluxo autenticado requer validação no navegador com a conta do usuário.
 - abertura idempotente de livro e eventos de comportamento autenticados;
 - layout responsivo para desktop e telas pequenas;
 - estados explícitos de carregamento, catálogo vazio, sessão expirada e erro da API.
+
+## Telemetria web e mobile
+
+`src/telemetry.ts` e `mobile/src/telemetry.ts` implementam o mesmo contrato
+de eventos em memória. O cliente agrupa no máximo 20 eventos por envio,
+mantém no máximo 100 eventos pendentes e repete falhas com backoff exponencial
+limitado a 60 segundos. A fila é perdida ao encerrar a sessão ou o processo;
+nenhum token, e-mail ou texto do livro entra nela.
+
+O web registra impressões somente quando o elemento atinge o limiar de
+visibilidade (`IntersectionObserver`) e mede `DWELL` com duração não negativa.
+O mobile expõe os mesmos eventos por `impression` e `dwell`, pois não possui
+um DOM; `BOOK_OPEN`, `BOOK_SAVED` e `BOOK_UNSAVED` são enfileirados pelo app.
+O envio chama `POST /api/v1/behavior/events` com o bearer apenas no cabeçalho.
+Os testes estão em `tests/telemetry.test.mjs` e cobrem sanitização, batching,
+retry, viewability e dwell.
 
 A API continua sendo a fronteira de autorização. O navegador não persiste access tokens; a implementação usa memória e estado transitório de protocolo.
 
@@ -223,6 +243,11 @@ npm run build
 ```
 
 A configuração OIDC pode ser sobrescrita com `VITE_OIDC_AUTHORITY` e `VITE_OIDC_CLIENT_ID`. O cliente padrão é `bookrush-web`, provisionado em `infrastructure/keycloak/bookrush-realm.json`.
+Além dos scopes básicos (`openid profile email`), o frontend solicita
+`bookrush.catalog.read` para que o bearer emitido pelo Keycloak possa consultar
+o catálogo e as thumbnails protegidas. Tokens emitidos antes dessa alteração
+precisam ser renovados após novo login; um token já emitido não recebe scopes
+retroativamente.
 
 O Vite usa a porta fixa `18080`: abra `http://localhost:18080`, origem permitida
 no client Keycloak versionado. Se a porta estiver ocupada, o Vite informa erro
@@ -254,14 +279,27 @@ por `GET /api/v1/books` sem Bearer (leitura pública), carrega a biblioteca em
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
 fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
+As áreas administrativas e de publicação não são consultadas durante o
+bootstrap do leitor: elas pertencem ao realm `bookrush-platform` e devem ser
+abertas pela console `admin-web`, que obtém o token administrativo correto.
+Isso evita enviar um bearer do realm de produto para APIs administrativas e
+transformar uma sessão válida do leitor em uma sequência de `401`.
 O feed usa `GET /api/v1/reader/feed` e registra viewability em
 `POST /api/v1/recommendations/impressions/{id}/viewable` antes de abrir um
-livro.
+livro. Com o ranking analytics ativado, o backend só envia livros que já têm
+score elegível e excerpt textual persistido; a interface não cria cards para
+livros ainda em processamento nem usa descrição/licença como trecho. Uma
+resposta vazia é um estado válido enquanto o lote de analytics avança.
+Na aba Buscar, `searchCatalog` chama `GET /api/v1/books?q=...&page=...&size=20`
+com debounce e paginação; não baixa mais os primeiros 50 livros para filtrar
+localmente.
 As respostas do catálogo incluem `thumbnailUrl` quando a edição possui uma
 thumbnail Gutenberg aprovada. A rota exige o bearer do usuário do realm de
-produto; o frontend busca cada imagem com `authClient.fetch`, cria uma URL de
-`Blob` apenas em memória; os componentes revogam suas URLs ao desmontar. Isso evita
-enviar uma URL protegida diretamente em `<img src>` sem credenciais. O shell
+produto; o frontend troca a URL assinada por um `Blob` apenas em memória, mas
+não envia o bearer nessa segunda chamada: a assinatura da URL já autoriza o
+download e evita um preflight `OPTIONS` incompatível com a rota S3. Os
+componentes revogam suas URLs ao desmontar. Isso evita enviar uma URL protegida
+diretamente em `<img src>` sem credenciais. O shell
 aplica as imagens autenticadas nas capas do feed, recomendações, busca,
 biblioteca e sorteio; se a rota retornar `404`, o gradiente gerado permanece
 como fallback.
@@ -282,3 +320,50 @@ run:android` ou EAS. Os tokens também ficam somente na memória.
 ## Limitações intencionais
 
 Feed social, comentários, progresso de leitura e recomendações dependem de APIs de produto que ainda não existem. A interface mostra o catálogo canônico sem inventar métricas editoriais ou dados sociais.
+
+## Remover comentários próprios
+
+Na conversa do livro, o autor vê Remover nos próprios comentários. Após a
+confirmação, a interface usa o cliente autenticado para enviar DELETE ao
+social-service e atualiza a conversa e a contagem. Cancelar não envia nada;
+falhas preservam o comentário e exibem a mensagem correspondente. A propriedade
+`canDelete` vem do servidor; a autorização real compara o subject do token com o
+autor persistido. A remoção é definitiva para a leitura pública; moderação e
+referências de denúncias ficam preservadas.
+
+## Seguidores no perfil
+
+O perfil próprio e o perfil de outro leitor exibem a contagem real de seguidores,
+com singular/plural e formatação pt-BR. Seguir ou deixar de seguir atualiza a
+contagem consultando novamente o social-service. Preferências privadas exibem
+"Seguidores privados"; erros exibem indisponibilidade, sem simular zero. O perfil
+próprio oferece nova tentativa quando a consulta falha.
+
+## Feed e capas após login
+
+A indisponibilidade de uma capa (rede, CORS ou leitura da resposta) usa o
+fallback existente e não impede a abertura do feed. A requisição inicial da
+thumbnail continua usando o cliente autenticado e a restrição same-origin.
+O gateway S3 precisa atender o domínio público do storage com CORS adequado;
+uma resposta HTML da aplicação nesse domínio indica roteamento incorreto.
+Consulte `docs/operations/feed-after-login.md` no repositório para o diagnóstico
+e a correção do arquivo Traefik efetivamente montado no servidor.
+
+## Pesquisa de pessoas
+
+A barra de busca mantém os resultados de livros e oferece a opção **Pessoas**.
+O mesmo texto pesquisa nome ou `@usuário` em perfis públicos, com debounce,
+paginação, cancelamento de consultas antigas, estados vazios e retry de erros.
+**Ver perfil** usa a navegação existente para perfis de leitores. A pesquisa de
+pessoas usa o cliente autenticado e `/api/v1/profile/search`; contas que ainda
+não acessaram seu perfil não são importadas da administração do Keycloak.
+
+## Avaliações por estrelas
+
+Abra **Sobre e avaliações** no feed, busca de livros, recomendações ou biblioteca;
+no leitor, use o botão ★. O painel mostra título, autor, média e quantidade de
+avaliações; livros ainda sem notas têm mensagem própria. Escolha 1–5 estrelas
+com mouse ou teclado e salve; é possível atualizar ou remover a própria nota.
+O servidor confirma cada alteração antes de atualizar a média. Falhas permitem
+tentar novamente sem apagar a nota anterior. A integração usa authClient.fetch
+e o contrato `/api/v1/social/books/{bookId}/ratings`.

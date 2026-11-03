@@ -75,6 +75,12 @@ remota participam do build. Alterações locais deste diretório não são impla
 O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
+O estágio `Validação Mobile` executa `npm ci`, `npm run typecheck` e
+`EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export` em `mobile/` usando
+`node:20-bookworm`. O bundle Android em `mobile/dist/` é arquivado como
+artefato; a dependência `expo-asset` fica fixada no lockfile para o export do
+Expo SDK 52. Isso valida o aplicativo, mas não publica APK nem substitui um
+job de distribuição mobile.
 
 Antes dos builds, as pipelines executam `scripts/validate-change.sh --ci`.
 Esse gate exige documentação ou contrato para mudanças de código, infraestrutura
@@ -121,15 +127,70 @@ deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+Para a pipeline completa de analytics no host com NVIDIA, o deploy deve usar o
+override `infrastructure/compose.analytics-gpu.yaml` e manter
+`ANALYTICS_NLI_ENABLED=true`, `ANALYTICS_NLI_BATCH_SIZE=8` e
+`ANALYTICS_EMBEDDINGS_BATCH_SIZE=4`. A pipeline deve validar a imagem do
+`book-analytics-runtime` com CUDA e o serviço Java com as migrations antes de
+reativar um lote. O modelo de tópicos permanece experimental e não deve ser
+promovido automaticamente.
+
+O ranking analítico do feed é ativado explicitamente pela variável
+`FEED_ANALYTICS_RANKING_ENABLED=true` no `recommendation-service`. A pipeline
+vertical `bookrush-vertical-analytics` deve publicar/deployar
+`book-analytics-service` e `recommendation-service` juntos. A validação pós-
+deploy deve chamar o feed autenticado e confirmar `rankingVersion`/
+`modelVersion=analytics-aware-v1` quando houver scores elegíveis; em caso de
+indisponibilidade do analytics, o fallback esperado é `heuristic-v1`.
+
+### Pipeline dedicada do SeaweedFS
+
+O bootstrap cria o job `bookrush-seaweedfs` a partir de
+`seaweedfs.Jenkinsfile`. A execução normal apenas valida a infraestrutura,
+executa `scripts/test-storage.sh` e constrói a imagem customizada. Use
+`PUBLISH=true` com `REGISTRY` para publicar a imagem; use `DEPLOY=true` para
+recriar somente SeaweedFS, o proxy OIDC e o reverse-proxy no Compose de
+produção. O deploy exige que o container atual esteja saudável e possui
+rollback automático para a imagem anterior. O volume persistente não é
+removido.
+
+O Compose aceita `SEAWEEDFS_IMAGE` para que a pipeline injete a imagem
+construída sem alterar o `.env` protegido. O valor padrão continua sendo
+`bookrush/seaweedfs:4.46`. O procedimento, parâmetros e limites estão em
+[`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
+
+Se o container existente estiver parado (`exited`), a pipeline dedicada pode
+recuperá-lo preservando o volume persistente; essa exceção é limitada ao job
+`bookrush-seaweedfs` e não permite substituir um container `unhealthy`.
+
 ### Importação Gutenberg (opt-in)
 
 O estágio **Importação Gutenberg (opt-in)** fica ignorado no fluxo normal. Para
 executá-lo, marque `RUN_GUTENBERG_IMPORT`, informe apenas IDs numéricos em
 `GUTENBERG_EXTERNAL_IDS` e mantenha `GUTENBERG_DRY_RUN` marcado na primeira
 execução. O job usa a credential Jenkins Secret text indicada por
-`INGESTION_CREDENTIAL_ID` como Bearer token; o token nunca é gravado no
-relatório. A chave de idempotência é derivada do commit, IDs, modo e URL, então
-repetir o build não cria uma segunda execução lógica.
+`INGESTION_CREDENTIAL_ID` como segredo do client OIDC
+`bookrush-ingestion-admin`, solicita um access token de curta duração a cada
+execução e nunca grava o segredo ou o token no relatório. A chave de
+idempotência inclui também o identificador da build Jenkins: uma mesma build
+continua idempotente, mas uma nova tentativa deliberada pode reprocessar o
+mesmo livro sem receber o resultado de uma tentativa anterior que falhou.
+
+O estágio declara Bash como o primeiro byte do script do agente, pois usa
+arrays, `[[ ]]` e here-strings para validar os IDs e o JSON.
+O agente Jenkins também inclui `jq` na imagem base; ele é usado para validar a
+resposta OIDC, montar o payload e acompanhar o job Gutenberg.
+
+Na instalação Compose, essa Secret Text é provisionada idempotentemente pelo
+`init.groovy.d/bookrush.groovy`, convertendo o valor para o tipo Secret do
+Jenkins e usando o mesmo segredo protegido do client
+OIDC do Jenkins. O provisionamento ocorre somente no startup do Jenkins e não
+grava o segredo no repositório.
+
+Para reprocessar um livro já importado e atualizar o EPUB, capítulos, TXT e
+thumbnail, desmarque `GUTENBERG_DRY_RUN` e mantenha
+`GUTENBERG_PROCESS_ASSETS` marcado. Esse modo envia `processAssets=true` e
+`reprocess=true`; ele é deliberado e não é executado em deploys normais.
 
 O estágio consulta o job até o limite escolhido em
 `GUTENBERG_TIMEOUT_MINUTES`, arquiva `gutenberg-import-report.json` e falha a
@@ -143,12 +204,38 @@ ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
 deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
-frontend, perfis de leitores e social; isso garante que contratos usados pelo
-frontend sejam implantados na mesma revisão. PostgreSQL, Redis, pgAdmin e
+recommendation-service, reader-bff-service, frontend, perfis de leitores e
+social; isso garante que contratos usados pelo frontend sejam implantados na
+mesma revisão. Alterações no filtro/ranking do feed exigem as imagens de
+recommendation e BFF; deixar esses serviços fora do conjunto mantém um digest
+antigo e pode produzir 502 ou itens sem analytics. PostgreSQL, Redis, pgAdmin e
 Jenkins são preservados.
+
+Antes de aceitar a revisão, o deploy também obtém um token técnico do realm
+administrativo e consulta `/api/v1/admin/users` pelo `admin-service`. Esse smoke
+autenticado valida, em uma única chamada, os papéis do operador técnico, o
+segredo do cliente de gerenciamento e o acesso ao realm de usuários; qualquer
+falha aciona diagnóstico e rollback.
+
+Os smokes aguardam por até um minuto a convergência de DNS, proxy e aplicações
+depois dos healthchecks. A verificação de usuários atravessa o proxy de mesma
+origem empacotado na própria imagem `admin-web` da revisão. Ela não depende do
+`dynamic.yaml` montado no Traefik a partir do checkout estável do host, que pode
+estar temporariamente atrás da branch. O console registra somente o status HTTP
+de tentativas malsucedidas; bearer, secrets e respostas com usuários não são
+expostos. Respostas `401` e `403` encerram as tentativas imediatamente porque
+representam contrato de identidade, não atraso de inicialização.
+
+Um job parametrizado pode carregar o Jenkinsfile da `main` antes de fazer o
+checkout de uma feature. Enquanto a `main` ainda não conhecer as imagens
+administrativas, `deploy-compose.sh` deriva suas tags das imagens de catálogo e
+frontend e constrói localmente somente as que estiverem ausentes. Depois que o
+Jenkinsfile novo estiver na `main`, as imagens são normalmente construídas e
+publicadas no estágio **Imagens**, e esse fallback não executa builds adicionais.
 O deploy combina o Compose estável de `/opt/bookrush/compose.yaml` com
 `deploy-images.compose.yaml` da revisão selecionada, que aponta os serviços de
-perfil e social para as imagens criadas pela construção atual.
+recommendation, BFF, perfil, social, `admin-service` e `admin-web` para as
+imagens criadas pela construção atual.
 Quando a thumbnail é protegida, a imagem do catálogo precisa ser atualizada
 junto com o frontend. O Compose configura `CATALOG_PRODUCT_OIDC_ISSUER`,
 `CATALOG_PRODUCT_OIDC_JWK_SET_URI` e `CATALOG_PRODUCT_OIDC_AUDIENCE` para que
@@ -175,12 +262,63 @@ Kubernetes exige registry e a credencial de kubeconfig descrita em
 
 `Jenkinsfile` é a fonte da pipeline. `bookrush.Jenkinsfile` é sua cópia de
 bootstrap na imagem e precisa permanecer idêntica. O script de inicialização
-não sobrescreve jobs existentes. Para alterar a pipeline de um job existente,
-cole o novo `Jenkinsfile` em **Configure → Pipeline script** (sandbox ativado).
+reconcilia a definição de parâmetros do job existente em cada inicialização do
+Jenkins. Isso evita que parâmetros novos, como `ANALYTICS_GPU`, sejam
+silenciosamente descartados por uma definição persistida antiga. Depois de
+publicar uma alteração desse tipo, reinicie somente o container Jenkins quando
+não houver builds em andamento e confirme na API/UI que o parâmetro aparece
+antes de disparar o deploy. Para alterar a pipeline de um job existente, cole
+o novo `Jenkinsfile` em **Configure → Pipeline script** (sandbox ativado).
 Alternativamente, depois de publicar o arquivo, configure **Pipeline script
 from SCM**, repositório `https://github.com/jvteodoro/BookRush.git`, branch
 `*/main`, Script Path `Jenkinsfile`. Essa branch fornece a definição da pipeline;
 **BRANCH** seleciona o código que será compilado e implantado.
+
+Se a definição carregada pela `main` (ou um script inline antigo) ainda não
+exportar `RECOMMENDATION_IMAGE`, `READER_BFF_IMAGE`, `READER_PROFILE_IMAGE` ou
+`SOCIAL_IMAGE`, o deploy deriva as imagens ausentes do registry, namespace e tag
+de `BACKEND_IMAGE`. As imagens derivadas que não existirem no daemon são
+construídas com os Dockerfiles do checkout selecionado antes de alterar os
+containers. Imagens explicitamente fornecidas pela pipeline são preservadas.
+Esse mecanismo exige o formato `<prefixo>/bookrush/catalog-service:<tag>`;
+nomes personalizados exigem informar as imagens explicitamente. A solução
+preferencial continua sendo carregar a definição atual da pipeline da branch
+desejada no SCM. Não é necessário apagar jobs ou volumes.
+
+Valide essa compatibilidade sem Docker ou credenciais com
+`python3 scripts/test-deploy-compose-images.py` (também executado por
+`bash scripts/validate-pipelines.sh`). O teste cobre variáveis ausentes,
+registry com porta, imagens explícitas, cache, formato inválido e falha de build.
+Quando o agente não possui Python 3, `validate-pipelines.sh` executa esse mesmo
+teste em `python:3.12-slim` pelo Docker. Somente os dois arquivos necessários
+são enviados por stdin, sem montar o workspace ou acessar credenciais. O
+container usa `--rm` e rede desativada; não é preciso instalar Python no Jenkins.
+
+O mesmo preparo cobre `ANALYTICS_RUNTIME_IMAGE` ausente: deriva o nome de
+`ANALYTICS_IMAGE` e constrói o runtime do checkout quando necessário, usando
+`requirements.cuda.txt` se `ANALYTICS_GPU=true`. Apenas derivar o nome não
+garante que a imagem exista. Antes de iniciar ou alterar containers, o deploy
+confere as doze imagens no daemon e valida o Compose; imagem explícita ausente
+interrompe o processo com o nome da variável, sem iniciar recriação ou rollback.
+O override `deploy-images.compose.yaml` fixa as doze imagens da revisão, inclusive
+catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
+Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
+
+O override também repassa as quatro variáveis `KEYCLOAK_ADMIN_*` ao
+`admin-service`. Exportá-las no agente não basta quando `/opt/bookrush/compose.yaml`
+ainda não declara essas variáveis. O segredo vigente continua sendo resolvido
+pelo script de deploy após o reconcile e conferido no container, sem exposição
+nos logs. Não substitua essa verificação apenas pelo healthcheck.
+`bash scripts/test-deploy-compose-config.sh` testa o merge real do Compose atual
+e de um host antigo, usando somente credenciais fictícias; faz parte da etapa
+de contratos do Jenkinsfile atualizado e não inicia a aplicação.
+
+O smoke de usuários solicita o token `client_credentials` do cliente
+`bookrush-ingestion-admin` no realm `bookrush-platform` dentro de
+`python:3.12-slim`, sem exigir `jq` ou Python no agente. Erros mostram somente
+o status HTTP ou a categoria de falha; segredo, token e corpo da resposta não
+são registrados. Um HTTP 400/401 deve ser investigado no cliente/segredo/service
+account; uma falha de conexão indica rede/DNS/disponibilidade do Keycloak.
 
 ## Proxy e visualização de estágios
 
@@ -219,3 +357,77 @@ O deploy Compose exige as imagens `BACKEND_IMAGE`, `INGESTION_IMAGE`,
 constrói/publica todas elas antes de executar o script de deploy. Essa matriz
 também é refletida em `infrastructure/compose.yaml`, evitando que uma imagem
 obrigatória fique apenas com o fallback `:local`.
+
+Quando `FEED_PERSONALIZED_MODE=ON`, `deploy-compose.sh` resolve o segredo
+vigente de `bookrush-recommendation-behavior-s2s` no realm
+`bookrush-platform` e o injeta somente na interpolação protegida do Compose.
+Se o segredo não puder ser resolvido, o deploy falha antes de subir uma
+revisão que cairia silenciosamente no fallback global.
+
+Os jobs de social, publisher, behavior e admin devem executar `mvn verify` e
+construir as imagens correspondentes depois de uma alteração. O admin-web usa
+`VITE_USE_MOCKS=false`; o build falha deliberadamente se o modo mock for
+ativado em produção. O `admin-service` só habilita o ciclo de vida Keycloak
+quando `KEYCLOAK_ADMIN_CLIENT_SECRET` está presente no ambiente protegido e o
+cliente possui `query-users`/`manage-users` no realm-management.
+
+Na primeira ativação do `admin-service`, provisionar e validar o cliente sem
+exibir ou versionar o segredo:
+
+```bash
+infrastructure/keycloak/provision-admin-service-client.sh --env-file .env
+infrastructure/keycloak/reconcile.sh --env-file .env
+bash scripts/test-keycloak-admin-service-client.sh .env
+```
+
+O provisionamento é idempotente, mantém o segredo somente no `.env` protegido
+e concede apenas `query-users` e `manage-users` à conta de serviço. O teste
+valida token, roles e acesso à API de usuários sem imprimir credenciais.
+
+O usuário permanente `codex-jenkins-agent` também permanece nos grupos
+`operators` e `platform-operators`; a associação é reconciliada no realm e é
+necessária para que a sessão OIDC obtenha permissão de disparar jobs Jenkins.
+O cliente `bookrush-jenkins` também publica a audience `bookrush-ingestion`,
+mantendo os tokens emitidos para smoke tests compatíveis com os serviços
+de plataforma. O mapper `jenkins-subject` e o client scope `profile` também
+emitem a claim OIDC `sub`, necessária para associar o actor autenticado às
+ações administrativas; após alterar o realm, gere token novo e valide `iss`,
+`aud`, `sub` e `groups` antes do smoke.
+protegidos.
+
+O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
+Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh
+.env`; o script mantém a URL e um token aleatório no `.env` protegido e nunca
+imprime o token.
+
+O deploy Compose preserva um Keycloak já ativo quando o container persistente
+foi criado por uma instalação anterior e não possui os labels atuais do
+Compose. Isso evita o conflito de nome `bookrush-keycloak-1` durante a
+reconciliação ou rollback; o container continua na rede `bookrush_bookrush` e
+os demais serviços são atualizados normalmente. Se o Keycloak não existir ou
+estiver parado, o deploy volta a incluí-lo na operação.
+
+A planta diária exige a imagem `READER_STATE_IMAGE` da mesma revisão do frontend; o deploy integrado atualiza o reader-state-service e preserva seu schema existente.
+
+## Contrato da busca de pessoas
+
+A etapa de contratos executa `scripts/test-profile-search-e2e.sh`, incluindo
+`mvn verify` e imagem do reader-profile-service, migrations em PostgreSQL16 e
+requisições autenticadas pelo Traefik/Keycloak25 descartáveis. O teste não
+altera `.env`, realms ou volumes de produção e remove recursos da execução.
+O build integrado continua entregando `READER_PROFILE_IMAGE` e `FRONTEND_IMAGE`;
+nenhuma configuração extra do job ou do host é necessária para essa rota.
+
+A integração com a planta diária inclui `READER_STATE_IMAGE` no teste de merge
+Compose: as doze imagens da revisão são verificadas tanto com o Compose atual
+quanto com um host antigo simulado, junto com a configuração administrativa.
+
+### Contrato de avaliações de livros
+
+A etapa de contratos executa `scripts/test-book-ratings-e2e.sh`: testes Java e
+imagens do social/catalog, PostgreSQL 16, upgrade de migration, Keycloak e
+gateway Traefik reais em rede descartável. Não publica portas nem usa volumes
+ou credenciais existentes. O Compose passa `SOCIAL_CATALOG_URL` ao social-service
+como `CATALOG_URL`, default `http://catalog-service:8080`, sem secret adicional.
+Após publicar e implantar a branch, confirme no site a média e o CRUD da própria
+nota com dois leitores. Testes locais não substituem esse smoke do deploy.

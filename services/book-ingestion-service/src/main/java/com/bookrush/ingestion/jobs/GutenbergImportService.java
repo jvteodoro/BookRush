@@ -187,9 +187,10 @@ public class GutenbergImportService {
           sourceResult.get("version") instanceof Map<?, ?> version && version.get("id") != null
               ? UUID.fromString(String.valueOf(version.get("id")))
               : UUID.randomUUID();
+      var extracted = new EpubTextExtractor().extractStructured(epub);
       var normalized =
           processing.process(
-              editionId, UUID.randomUUID(), new EpubTextExtractor().extract(epub), null);
+              editionId, UUID.randomUUID(), extracted.text(), toChapterStructure(extracted.chapters()));
       var normalizedFile = staging.resolve("gutenberg-" + id + ".normalized.txt");
       var chaptersFile = staging.resolve("gutenberg-" + id + ".chapters.json");
       Files.write(normalizedFile, normalized.normalizedTxt());
@@ -206,7 +207,7 @@ public class GutenbergImportService {
               editionId,
               textVersionId,
               new String(normalized.normalizedTxt(), java.nio.charset.StandardCharsets.UTF_8),
-              null);
+              toChapterStructure(extracted.chapters()));
       Files.write(chaptersFile, finalProcessing.chaptersJson());
       var chaptersResult =
           assets.uploadDerived(bookId, editionId, sourceId, chaptersFile, "chapters.json", "JSON");
@@ -214,6 +215,12 @@ public class GutenbergImportService {
           chaptersResult.get("version") instanceof Map<?, ?> version && version.get("id") != null
               ? UUID.fromString(String.valueOf(version.get("id")))
               : UUID.randomUUID();
+
+      // The thumbnail is an independent public projection. Persist it before
+      // the chapter projection so a transient/authorization problem in the
+      // optional chapter materialization cannot discard the cover import.
+      processThumbnailIfRequested(processAssets, id, record, bookId, editionId, sourceId);
+
       lineage.projectChapters(bookId, editionId, textVersionId, finalProcessing.chaptersJson());
       lineage.record(
           sourceVersionId,
@@ -221,23 +228,10 @@ public class GutenbergImportService {
           "EPUB_TO_TEXT_AND_CHAPTERS",
           Map.of("sha256", normalized.sha256()));
     }
-    if (processAssets) {
-      var thumbnail = staging.resolve("gutenberg-" + id + ".cover.medium.jpg");
-      var thumbnailSnapshot =
-          downloader.download(
-              thumbnailUri(id),
-              thumbnail,
-              "gutenberg/" + id + "/thumbnail.jpg",
-              null,
-              raw);
-      var thumbnailResult =
-          assets.uploadThumbnail(
-              bookId, editionId, sourceId, thumbnailSnapshot.localFile(), "gutenberg-" + id + ".jpg");
-      if (isPublicDomain(record.rights())) {
-        var asset = thumbnailResult.get("asset");
-        if (asset instanceof Map<?, ?> value && value.get("id") != null)
-          assets.approve(bookId, UUID.fromString(String.valueOf(value.get("id"))));
-      }
+    if (processAssets && (record.epubUrl() == null || record.epubUrl().isBlank())) {
+      // When there is no EPUB, the chapter branch above is skipped. Keep the
+      // same thumbnail behavior for metadata-only Gutenberg records.
+      processThumbnailIfRequested(processAssets, id, record, bookId, editionId, sourceId);
     }
     jdbc.update(
         "UPDATE catalog.ingestion_item SET source_record_id=(SELECT id FROM catalog.source_record"
@@ -252,6 +246,23 @@ public class GutenbergImportService {
         task.get("ingestion_item_id"));
   }
 
+  private static java.util.List<com.bookrush.ingestion.processing.ChapterStructureWriter.Chapter>
+      toChapterStructure(java.util.List<EpubTextExtractor.Chapter> chapters) {
+    return chapters.stream()
+        .map(
+            chapter ->
+                new com.bookrush.ingestion.processing.ChapterStructureWriter.Chapter(
+                    chapter.key(),
+                    chapter.parent(),
+                    chapter.position(),
+                    chapter.title(),
+                    chapter.start(),
+                    chapter.end(),
+                    chapter.sourceHref(),
+                    chapter.confidence()))
+        .toList();
+  }
+
   private UUID publisherSubmissionId(Object parameters) {
     try {
       var node = mapper.readTree(String.valueOf(parameters)).path("publisherSubmissionId");
@@ -263,6 +274,29 @@ public class GutenbergImportService {
 
   private URI thumbnailUri(String id) {
     return URI.create(gutenberg.baseUrl() + "/cache/epub/" + id + "/pg" + id + ".cover.medium.jpg");
+  }
+
+  private void processThumbnailIfRequested(
+      boolean processAssets,
+      String id,
+      GutenbergRdfParser.GutenbergRecord record,
+      UUID bookId,
+      UUID editionId,
+      UUID sourceId)
+      throws Exception {
+    if (!processAssets) return;
+    var thumbnail = staging.resolve("gutenberg-" + id + ".cover.medium.jpg");
+    var thumbnailSnapshot =
+        downloader.download(
+            thumbnailUri(id), thumbnail, "gutenberg/" + id + "/thumbnail.jpg", null, raw);
+    var thumbnailResult =
+        assets.uploadThumbnail(
+            bookId, editionId, sourceId, thumbnailSnapshot.localFile(), "gutenberg-" + id + ".jpg");
+    if (isPublicDomain(record.rights())) {
+      var asset = thumbnailResult.get("asset");
+      if (asset instanceof Map<?, ?> value && value.get("id") != null)
+        assets.approve(bookId, UUID.fromString(String.valueOf(value.get("id"))));
+    }
   }
 
   private boolean isPublicDomain(String rights) {

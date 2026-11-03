@@ -107,6 +107,32 @@ class ExcerptCandidateGeneratorV2Test {
                 ExcerptCandidateGenerator.V2Config.pilotDefaults("v2")));
   }
 
+  @Test
+  void ignoresWhitespaceOnlyMatchesWithoutCreatingInvertedIntervals() {
+    var config =
+        new ExcerptCandidateGenerator.V2Config(
+            1,
+            List.of(new ExcerptCandidateGenerator.WindowProfile(1, 1)),
+            8,
+            false,
+            "sentence-window-v2");
+
+    String text = "Hello world.   \n\n  Goodbye world!   \n\t  ";
+    var candidates =
+        assertDoesNotThrow(
+            () ->
+                ExcerptCandidateGenerator.generateV2(
+                    text,
+                    List.of(
+                        new ExcerptCandidateGenerator.ChapterBoundary(
+                            UUID.randomUUID(), 0, text.codePointCount(0, text.length()))),
+                    config));
+
+    assertTrue(
+        candidates.stream()
+            .allMatch(candidate -> candidate.startCodepoint() < candidate.endCodepoint()));
+  }
+
   private static String sentences(String prefix, int count) {
     var builder = new StringBuilder();
     for (int index = 1; index <= count; index++) {

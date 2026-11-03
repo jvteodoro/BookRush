@@ -18,7 +18,7 @@ evolução futura.
 | Segurança | OIDC condicional, papéis administrativos e token canônico | Provisionamento é responsabilidade do ambiente | Reutilizar contratos no analytics |
 | Gateway | Traefik e Nginx públicos configurados | Rotas futuras precisam ser registradas | Atualizar catálogo Backstage |
 | Jenkins | Validação de documentação e deploy | Importação automática é opt-in | Adicionar jobs analytics explícitos |
-| Prova | Fixture bibliográfica e analytics offline, lote parcial, dry-run, restart, Gutenberg 1342 e benchmark sintético | Benchmark é baseline de harness, não SLA; storage remoto depende de ambiente | Repetir com volume operacional |
+| Prova | Fixture bibliográfica e analytics offline, lote parcial, dry-run, restart, Gutenberg 1342 e benchmark sintético de 100 mil registros | Benchmark é baseline de harness, não SLA; storage remoto depende de ambiente | Repetir com volume operacional |
 
 ## Estado comprovado do vertical Gutenberg
 

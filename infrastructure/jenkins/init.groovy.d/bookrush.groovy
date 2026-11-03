@@ -2,7 +2,10 @@ import jenkins.model.Jenkins
 import jenkins.model.JenkinsLocationConfiguration
 import hudson.model.*
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
-import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
+import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
+import hudson.plugins.git.GitSCM
+import hudson.plugins.git.UserRemoteConfig
+import hudson.plugins.git.BranchSpec
 
 def instance = Jenkins.get()
 JenkinsLocationConfiguration.get().setUrl('https://jenkins-bookrush.jteodoro.tec.br/')
@@ -22,11 +25,6 @@ def adminWebPipelineFile = new File('/opt/bookrush/admin-web.Jenkinsfile')
 def adminWebJob = instance.getItem('bookrush-admin-web')
 if (adminWebJob == null) {
     adminWebJob = instance.createProject(WorkflowJob, 'bookrush-admin-web')
-}
-def adminWebScript = adminWebPipelineFile.text
-if (!(adminWebJob.getDefinition() instanceof CpsFlowDefinition) || adminWebJob.getDefinition().getScript() != adminWebScript) {
-    adminWebJob.setDefinition(new CpsFlowDefinition(adminWebScript, true))
-    adminWebJob.save()
 }
 def microservicePipelineFile = new File('/opt/bookrush/microservice.Jenkinsfile')
 def verticalPipelineFile = new File('/opt/bookrush/vertical.Jenkinsfile')
@@ -62,9 +60,13 @@ def createOrUpdatePipeline = { String name, File file ->
     if (pipelineJob == null) {
         pipelineJob = instance.createProject(WorkflowJob, name)
     }
-    def script = file.text
-    if (!(pipelineJob.getDefinition() instanceof CpsFlowDefinition) || pipelineJob.getDefinition().getScript() != script) {
-        pipelineJob.setDefinition(new CpsFlowDefinition(script, true))
+    def scm = new GitSCM(
+        [new UserRemoteConfig('https://github.com/jvteodoro/BookRush.git', null, null, null)],
+        [new BranchSpec('*/${BRANCH}')], false, [], null, null, [])
+    def definition = new CpsScmFlowDefinition(scm, file.name)
+    definition.setLightweight(false)
+    if (!(pipelineJob.getDefinition() instanceof CpsScmFlowDefinition)) {
+        pipelineJob.setDefinition(definition)
         pipelineJob.save()
     }
     replaceParameters(pipelineJob, file == microservicePipelineFile ? microserviceParameters : verticalParameters)
@@ -78,14 +80,24 @@ def createOrUpdatePipeline = { String name, File file ->
 ['catalog', 'ingestion', 'reader', 'social', 'analytics', 'publishing', 'platform'].each { vertical ->
     createOrUpdatePipeline("bookrush-vertical-${vertical}", verticalPipelineFile)
 }
-def backstageScript = backstagePipelineFile.text
-if (!(backstageJob.getDefinition() instanceof CpsFlowDefinition) || backstageJob.getDefinition().getScript() != backstageScript) {
-    backstageJob.setDefinition(new CpsFlowDefinition(backstageScript, true))
+def scmFor = { String path ->
+    def scm = new GitSCM(
+        [new UserRemoteConfig('https://github.com/jvteodoro/BookRush.git', null, null, null)],
+        [new BranchSpec('*/${BRANCH}')], false, [], null, null, [])
+    def definition = new CpsScmFlowDefinition(scm, path)
+    definition.setLightweight(false)
+    return definition
+}
+if (!(backstageJob.getDefinition() instanceof CpsScmFlowDefinition)) {
+    backstageJob.setDefinition(scmFor(backstagePipelineFile.name))
     backstageJob.save()
 }
-def pipelineScript = pipelineFile.text
-if (!(job.getDefinition() instanceof CpsFlowDefinition) || job.getDefinition().getScript() != pipelineScript) {
-    job.setDefinition(new CpsFlowDefinition(pipelineScript, true))
+if (!(adminWebJob.getDefinition() instanceof CpsScmFlowDefinition)) {
+    adminWebJob.setDefinition(scmFor(adminWebPipelineFile.name))
+    adminWebJob.save()
+}
+if (!(job.getDefinition() instanceof CpsScmFlowDefinition)) {
+    job.setDefinition(scmFor('Jenkinsfile'))
     job.save()
 }
 def mainParameters = [
@@ -95,6 +107,7 @@ def mainParameters = [
     new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica imagens.'),
     new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação no destino escolhido após o build.'),
+    new ChoiceParameterDefinition('FEED_PERSONALIZED_MODE', ['ON', 'OFF'] as String[], 'Ativar o feed personalizado; ON é o padrão durante a fase de testes.'),
     new StringParameterDefinition('KUBECONFIG_CREDENTIAL_ID', 'bookrush-kubeconfig', 'Credential Jenkins do tipo Secret file.'),
     new BooleanParameterDefinition('RUN_GUTENBERG_IMPORT', false, 'Executar explicitamente a importação Gutenberg.'),
     new BooleanParameterDefinition('GUTENBERG_DRY_RUN', true, 'Executar a importação Gutenberg em modo dry-run.'),

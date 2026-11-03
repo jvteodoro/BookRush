@@ -30,12 +30,20 @@ public final class LanguageValidation {
   public static Result acceptStructural(String declaredLanguage) {
     if (declaredLanguage == null || declaredLanguage.isBlank())
       return new Result(null, 0, Status.INVALID_INPUT, "language is required");
-    return Set.of("en", "pt").contains(declaredLanguage.toLowerCase(Locale.ROOT))
-        ? new Result(declaredLanguage.toLowerCase(Locale.ROOT), 1, Status.VALID, null)
+    String normalized = declaredLanguage.trim().toLowerCase(Locale.ROOT);
+    return Set.of("en", "pt").contains(normalized)
+        ? new Result(normalized, 1, Status.VALID, null)
         : new Result(
-            declaredLanguage.toLowerCase(Locale.ROOT),
+            normalized,
             1,
             Status.UNSUPPORTED,
             "linguistic models are limited to en and pt");
+  }
+
+  /** Rejects empty input before invoking a model, preserving an explicit status instead of zero. */
+  public static Result validateInputText(String text) {
+    return text == null || text.isBlank()
+        ? new Result(null, 0, Status.INVALID_INPUT, "text is required")
+        : null;
   }
 }

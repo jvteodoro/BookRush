@@ -6,6 +6,31 @@ Migrations V2/V3 persist library, progress, bookmarks and reading-day projection
 
 V4 adiciona recentes e sessões; updates são restringidos ao subject autenticado.
 
+V6 adiciona `book_id` nullable à sessão de leitura para manter compatibilidade
+com sessões antigas. Novas sessões podem receber `bookId`; ao encerrá-las,
+`READ_SESSION` é publicado para esse livro e preserva `recommendationItemId` e
+`impressionId` quando os headers de correlação vierem do feed.
+V7 persiste essa origem na própria sessão ao iniciar; o encerramento reutiliza
+os IDs persistidos quando o cliente não repete os headers, sem associar a sessão
+à última recomendação visualizada.
+
+V5 adiciona locators imutáveis para progresso/bookmarks e a projeção persistente
+da planta. `GET /api/v1/reader/plant` materializa a projeção por subject usando
+a fórmula versionada `reading-minutes-v1`: cada 60 minutos acumulados avança um
+estágio, limitado ao estágio 5; o streak atual e a data medida são retornados
+junto com o total de minutos. Encerrar uma sessão atualiza a projeção na mesma
+transação da leitura diária, tornando retries e concorrência de sessões seguros.
+Além da projeção legada, V6 introduz a planta diária
+`daily-reading-v2`, independente do histórico anterior. Intervalos autenticados
+em `POST /api/v1/reader/plant` são idempotentes por eventId e
+somados por dia no fuso America/Sao_Paulo. Ao atingir 900 segundos, a planta
+cresce ou se recupera; cada dia encerrado sem meta alterna tristeza e regressão
+até o estágio 0. O estado é recalculado por usuário e exposto em
+`GET /api/v1/reader/plant`. A contabilização depende do leitor visível e das
+requisições recebidas pelo servidor.
+O preflight da rota aceita apenas as origens explícitas de
+`BOOKRUSH_CORS_ALLOWED_ORIGINS`; autenticação continua obrigatória para GET e POST.
+
 Every mutation requires the authenticated `(iss, sub)` principal. Opening a
 book is an idempotent upsert in `reader_state.recent`, so retries from a mobile
 client do not create duplicate rows. The controller test covers the SQL
@@ -15,3 +40,13 @@ The upsert keeps the service's canonical SQL contract in lowercase compact
 form (`insert into ... on conflict ...`). This representation is covered by
 the unit test so refactors cannot silently change the statement used by the
 reader-state adapter.
+
+Eventos `BOOK_OPEN`, `READ_PROGRESS` e `READ_SESSION` são enviados ao
+behavior-service com o bearer do cliente, chave idempotente e até três
+tentativas; o behavior-service persiste o evento e seu outbox na mesma
+transação.
+
+Ao atingir 100% de progresso, o serviço publica `BOOK_COMPLETE` uma única vez
+por subject/livro usando uma chave idempotente estável, preservando a correlação
+do feed quando aplicável. A origem direta/search continua sem correlação
+inventada.

@@ -1,0 +1,13 @@
+.br-rating-stars { border: 0; padding: 0; margin: 1rem 0; display: flex; flex-wrap: wrap; gap: .6rem; }
+.br-rating-stars legend { padding: 0; margin-bottom: .75rem; font-weight: 700; }
+.br-rating-stars label { position: relative; cursor: pointer; border-radius: var(--br-radius-pill); padding: .2rem; }
+.br-rating-stars input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.br-rating-stars input:focus-visible + span { outline: 3px solid var(--br-teal); outline-offset: 3px; border-radius: .25rem; }
+.br-rating-stars span { display: block; font-size: 2rem; line-height: 1.4; color: var(--br-content-dim); }
+.br-rating-stars span[data-filled='true'] { color: var(--br-content); }
+.br-rating-stars:disabled { opacity: .6; }
+.br-rating-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+.br-book-description { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+  .br-search-result__actions { flex-wrap: wrap; }
+}

@@ -46,4 +46,23 @@ public final class EmbeddingMath {
     }
     return na == 0 || nb == 0 ? 0 : dot / (Math.sqrt(na) * Math.sqrt(nb));
   }
+
+  /** Returns a raw cosine score in [-1, 1]; it is never converted to a probability. */
+  public static double cosine(List<Double> a, List<Double> b) {
+    if (a == null || b == null || a.size() != b.size() || a.isEmpty()) {
+      return 0d;
+    }
+    double dot = 0d;
+    double normA = 0d;
+    double normB = 0d;
+    for (int i = 0; i < a.size(); i++) {
+      double left = a.get(i);
+      double right = b.get(i);
+      dot += left * right;
+      normA += left * left;
+      normB += right * right;
+    }
+    if (normA == 0d || normB == 0d) return 0d;
+    return Math.max(-1d, Math.min(1d, dot / (Math.sqrt(normA) * Math.sqrt(normB))));
+  }
 }

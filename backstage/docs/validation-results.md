@@ -19,6 +19,14 @@ are parsed during catalog validation. Publishing TechDocs to an external
 S3-compatible bucket is a separate operation and requires the credentials in
 [configuration](configuration.md).
 
+The main application pipeline invokes `scripts/test-portal.sh
+--validation-only`. BuildKit executes the complete validation target and keeps
+its cache, but does not export and unpack a large image that this job will not
+deploy. The dedicated Backstage pipeline invokes the script without that flag
+and therefore also creates `bookrush/portal:local`. Its runtime image keeps the
+repository read-only for the `node` user and grants write access only to
+`/app/techdocs`, avoiding a recursive ownership rewrite of the dependency tree.
+
 The runtime smoke test additionally checks local guest authentication, catalog
 entities, five TechDocs sites, registered Scaffolder actions and a real
 Scaffolder dry-run. It deliberately does not create a GitHub pull request.

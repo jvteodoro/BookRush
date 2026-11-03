@@ -1,6 +1,6 @@
 # Modelo de dados de Content Analytics
 
-O schema PostgreSQL `analytics` pertence ao `book-analytics-service`. As migrations V1–V14 estão em `services/book-analytics-service/src/main/resources/db/migration`; Flyway as executa no ciclo do próprio serviço. Este documento descreve o modelo implementado no DDL e no código. Ter uma tabela ou definição de feature não prova que o dado tenha sido calculado em todos os ambientes.
+O schema PostgreSQL `analytics` pertence ao `book-analytics-service`. As migrations V1–V15 estão em `services/book-analytics-service/src/main/resources/db/migration`; Flyway as executa no ciclo do próprio serviço. Este documento descreve o modelo implementado no DDL e no código. Ter uma tabela ou definição de feature não prova que o dado tenha sido calculado em todos os ambientes.
 
 ## Fronteira, ownership e linhagem
 
@@ -66,9 +66,16 @@ erDiagram
     ANNOTATION ||--o{ ANNOTATION_EVENT : audita
 ```
 
-`annotation_campaign` fixa protocolo, política de idioma, configuração e hash de amostragem. Um item é único por campanha/excerpt; uma pessoa pode ter no máximo uma assignment e uma annotation por item. Valores ordinais são 1–5 e distinguem `FIRST_SCREEN` de `FULL_EXCERPT`. A versão de dataset guarda manifest SHA-256 e snapshot de rótulos brutos/adjudicados, de modo que exportações futuras não dependem de mutar uma anotação antiga.
+`annotation_campaign` fixa protocolo, política de idioma, configuração e hash de amostragem. Um item é único por campanha/excerpt; uma pessoa pode ter no máximo uma assignment e uma annotation por item. Valores ordinais são 1–5 e distinguem `FIRST_SCREEN` de `FULL_EXCERPT`. A versão de dataset guarda manifest SHA-256, o hash da configuração de amostragem e o hash ordenado das versões de asset de origem, além do snapshot de rótulos brutos/adjudicados. Assim, exportações futuras carregam a linhagem e não dependem de mutar uma anotação antiga.
 
-As APIs administrativas já suportam criar/amostrar/iniciar campanhas, claim, first-screen lock, submissão, métricas, fila de adjudicação e exportação de versões. A autorização exige papéis de operador, anotador ou revisor; não é uma API pública de leitores.
+As APIs administrativas já suportam criar/amostrar/iniciar campanhas, claim, first-screen lock, submissão, métricas, fila de adjudicação e exportação de versões. A autorização exige papéis de operador, anotador ou revisor; não é uma API pública de leitores. O mapper do serviço concede `ROLE_EXCERPT_REVIEWER` somente aos grupos Keycloak `excerpt-reviewers` e `platform-admins`; `excerpt-annotators` e `developers` recebem apenas o papel de anotador. Assim, a rota de adjudicação permanece separada das rotas de coleta cega.
+
+Na política `quality-v1`, a fila considera uma discordância quando o intervalo ordinal
+(`max - min`) por item/dimensão atinge o `disagreement_threshold` persistido na campanha
+(padrão 2). A métrica exposta como `krippendorffAlphaOrdinal` mantém compatibilidade de
+contrato, mas o método atual é explicitamente uma aproximação de concordância ordinal
+pareada; o código puro e seus testes vivem em `OrdinalAgreement`. Isso evita apresentar a
+aproximação como alpha formal e mantém a substituição futura isolada do controller.
 
 ## Consumidores e isolamento
 
@@ -95,5 +102,6 @@ Telemetria de impressão/abertura vai para `behavior`, não para `analytics`: `b
 | V11–V12 | Definições NLI e similaridade com protótipos. |
 | V13 | Campanhas, anotações, adjudicação e versões de dataset. |
 | V14 | Elegibilidade estrutural persistida para excerpts. |
+| V15 | Threshold/hash de qualidade da campanha e imutabilidade de versões de dataset publicadas e seus itens. |
 
 Para rotas, configuração e evidências de execução controlada, veja o [relatório operacional](report.md). Para a integração com o feed, veja [excerpts no feed](excerpt-feed-integration.md).

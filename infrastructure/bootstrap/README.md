@@ -95,6 +95,14 @@ Jenkins. `reconcile-environment.sh` reaplica configuração alterada sem derruba
 o projeto nem tocar volumes; ambos validam Compose e aguardam healthchecks com
 timeout. `start-jenkins.sh` é o lifecycle isolado do Jenkins.
 
+O `start-environment.sh` faz até três tentativas controladas para o stack
+principal quando um serviço falha durante a janela de inicialização. A primeira
+tentativa usa as opções solicitadas, incluindo `--build` quando aplicável; as
+seguintes reutilizam as imagens já construídas, exibem o estado e os últimos
+logs do `book-analytics-service` e aguardam cinco segundos antes de tentar
+novamente. O limite pode ser ajustado com `BOOKRUSH_START_RETRIES`, sem remover
+volumes ou executar migrations manualmente.
+
 ```bash
 bash infrastructure/bootstrap/start-environment.sh --env-file .env
 bash infrastructure/bootstrap/reconcile-environment.sh --env-file .env

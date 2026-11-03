@@ -13,6 +13,12 @@ cat > /etc/seaweedfs/filer.toml <<'EOF_FILER'
 enabled = true
 dir = "/data/filer"
 EOF_FILER
+cat > /etc/seaweedfs/security.toml <<EOF_SECURITY
+# CORS is limited to the application origins. S3 credentials and presigned
+# URLs remain the authorization mechanism for object reads and writes.
+[cors.allowed_origins]
+values = "${STORAGE_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br}"
+EOF_SECURITY
 # Keep enough volume slots for the per-bucket layouts used by BookRush. The
 # previous limit of 32 was exhausted by the existing raw/processing/ML
 # collections, leaving books-public without a writable volume. Increasing the

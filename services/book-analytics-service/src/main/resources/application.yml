@@ -17,27 +17,47 @@ spring:
     baseline-on-migrate: false
     clean-disabled: true
 management:
-  endpoints.web.exposure.include: health,info,metrics
+  endpoints.web.exposure.include: health,info,metrics,prometheus
   endpoint.health.probes.enabled: true
 springdoc:
   swagger-ui.disable-swagger-default-url: true
   swagger-ui.path: /swagger-ui.html
 bookrush:
+  behavior-outbox-token: ${BEHAVIOR_OUTBOX_SINK_TOKEN:}
   openapi.server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}/analytics
   security.enabled: ${ANALYTICS_SECURITY_ENABLED:false}
   security.issuer: ${ANALYTICS_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
   security.jwk-set-uri: ${ANALYTICS_OIDC_JWK_SET_URI:}
   security.audience: ${ANALYTICS_OIDC_AUDIENCE:bookrush-analytics}
 analytics:
+  recommendation-snapshot:
+    embedding-model: ${ANALYTICS_RECOMMENDATION_EMBEDDING_MODEL:bge-m3-dense-v1}
+    embedding-model-version: ${ANALYTICS_RECOMMENDATION_EMBEDDING_MODEL_VERSION:}
+  book-scores:
+    strategy: ${ANALYTICS_BOOK_SCORES_STRATEGY:CURRENT}
+    jit: ${ANALYTICS_BOOK_SCORES_JIT:DEFAULT}
   models:
     cache-dir: ${ANALYTICS_MODEL_CACHE_DIR:/var/lib/bookrush/models}
     offline: ${ANALYTICS_OFFLINE:true}
+  scorer:
+    enabled: ${ANALYTICS_SUPERVISED_SCORER_ENABLED:false}
+    artifact: ${ANALYTICS_SUPERVISED_SCORER_ARTIFACT:${ANALYTICS_MODEL_CACHE_DIR:/var/lib/bookrush/models}/candidate-scorer.json}
+    allow-experimental: ${ANALYTICS_SUPERVISED_SCORER_ALLOW_EXPERIMENTAL:false}
+  ranker:
+    config: ${ANALYTICS_RANKER_CONFIG:classpath:analytics-ranker-v1.json}
+  nli:
+    hypotheses: ${ANALYTICS_NLI_HYPOTHESES:classpath:nli-hypotheses-v1.json}
   runtime:
     url: ${ANALYTICS_RUNTIME_URL:http://book-analytics-runtime:8092}
     timeout-seconds: ${ANALYTICS_RUNTIME_TIMEOUT_SECONDS:10}
+    language-sample-chars: ${ANALYTICS_RUNTIME_LANGUAGE_SAMPLE_CHARS:90000}
   worker:
     enabled: ${ANALYTICS_WORKER_ENABLED:false}
     poll-delay-ms: ${ANALYTICS_WORKER_POLL_DELAY_MS:1000}
+    concurrency: ${ANALYTICS_WORKER_CONCURRENCY:1}
+    stale-after-seconds: ${ANALYTICS_WORKER_STALE_AFTER_SECONDS:900}
+    max-attempts: ${ANALYTICS_WORKER_MAX_ATTEMPTS:3}
+    retry-delay-seconds: ${ANALYTICS_WORKER_RETRY_DELAY_SECONDS:30}
     v2:
       version: ${ANALYTICS_V2_GENERATOR_VERSION:sentence-window-v2}
       min-words: ${ANALYTICS_V2_MIN_WORDS:60}

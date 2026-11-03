@@ -43,6 +43,41 @@ BOOKRUSH_S3_PORT="$("${compose[@]}" port seaweedfs 8333 | awk -F: '{print $NF}')
 export BOOKRUSH_S3_PORT
 export STORAGE_PUBLIC_ENDPOINT="http://localhost:$BOOKRUSH_S3_PORT"
 "${compose[@]}" up -d --build --wait --wait-timeout 240
+# Prove the published-version guard against the disposable PostgreSQL database.
+# The transaction is rolled back, so this never leaves fixtures in the smoke stack.
+"${compose[@]}" exec -T postgres psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush <<'SQL'
+BEGIN;
+INSERT INTO analytics.annotation_campaign
+  (id,code,name,protocol_version,sampling_config_hash,created_by_subject)
+VALUES
+  ('00000000-0000-0000-0000-000000000001','dataset-lock-smoke','Dataset lock smoke',
+   'annotation-protocol-v1',repeat('a',64),'compose-test');
+INSERT INTO analytics.annotation_dataset_version
+  (id,campaign_id,version_number,manifest_sha256,created_by_subject)
+VALUES
+  ('00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001',
+   1,repeat('b',64),'compose-test');
+DO $$
+BEGIN
+  BEGIN
+    UPDATE analytics.annotation_dataset_version
+       SET manifest_sha256=repeat('c',64)
+     WHERE id='00000000-0000-0000-0000-000000000002';
+    RAISE EXCEPTION 'dataset immutability assertion failed: update was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'published annotation dataset is immutable' THEN RAISE; END IF;
+  END;
+  BEGIN
+    DELETE FROM analytics.annotation_dataset_version
+     WHERE id='00000000-0000-0000-0000-000000000002';
+    RAISE EXCEPTION 'dataset immutability assertion failed: delete was accepted';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'published annotation dataset is immutable' THEN RAISE; END IF;
+  END;
+END $$;
+ROLLBACK;
+SQL
+echo 'Annotation dataset published-version immutability: OK'
 # Test inside frontend, avoiding host port assumptions / Jenkins loopback differences.
 "${compose[@]}" exec -T frontend wget -q -O - http://127.0.0.1:8080/api/status
 echo

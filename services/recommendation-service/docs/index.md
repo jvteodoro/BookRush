@@ -17,6 +17,38 @@ impression only when the authenticated subject owns the originating request.
 The browser calls this after its viewability threshold, so non-visible feed
 items are not treated as negative outcomes. The endpoint is idempotent.
 
+The viewability event includes `viewable=true`, `recommendationItemId` and
+`impressionId`; this is the explicit input consumed by behavior's
+`viewable_impression_count` projection. Personalized ranking obtains candidate
+embeddings in bounded cached batches, computes candidate affinity as cosine
+similarity against `UserTasteProfile.vector()`, and supplies those same
+candidate embeddings to book-level MMR. Exploration uses a request seed stored
+in the ledger; no complete embedding vector is persisted in the ledger.
+The positive ranker component is named `freshness` (`1 - fatiguePenalty`);
+the separate `fatiguePenalty` remains available in provenance.
+The bootstrap formula activates all five components: affinity `.50`, quality
+`.20`, trend `.10`, exploration `.10` and freshness `.10`; these are weights,
+not calibrated probabilities.
+Trending candidates come from behavior's authenticated `trending-v1` serving
+endpoint and are merged with semantic/global candidates; recommendation does
+not query the behavior schema directly.
+Each ledger item also records its contributing candidate sources, union version
+and configuration hash alongside the candidate-set hash for replay.
+The public feed item also exposes the bounded source names, without exposing
+embeddings or private profile vectors.
+Personalized ledger reasons include embedding model/version and source-asset
+version metadata, never the vector itself.
+
+The dataset handoff reads recommendation decisions and behavior outcomes from
+separate read-only database URLs and joins them locally by explicit
+`recommendation_item_id`; recommendation never queries the behavior schema.
+The export requires `BEHAVIOR_DATABASE_URL`, applies a seven-day observation
+window capped by the dataset cutoff, and emits separate outcome labels.
+
+Requests de feed e impressões viewable emitem eventos server-side ao
+behavior-service com o bearer autenticado e retry limitado. O behavior-service
+é responsável pela persistência idempotente e pelo outbox transacional.
+
 ## Analytics excerpts
 
 The optional `excerpt` field is enriched in this service through a technical
@@ -25,6 +57,32 @@ client-credentials token. The user bearer is never sent to analytics. Enable
 reconciling `bookrush-recommendation-s2s` in the administrative realm and
 providing its protected secret in `.env`.
 
-Missing analytics, expired credentials, missing processing and structural
-exclusions degrade to a normal feed item. The BFF passes the nullable field
-through and the browser never calls an analytics endpoint.
+When analytics ranking is enabled and its S2S credentials are configured, the
+feed is fail-closed: a book must have both an eligible analytics score and a
+non-empty persisted excerpt to enter the response. Missing processing,
+expired credentials and structural exclusions therefore remove the book from
+that feed instead of producing a card with a misleading placeholder. If the
+analytics ranking flag is disabled, the legacy heuristic feed remains
+available for controlled development environments.
+
+The reader BFF allows up to 15 seconds for the bounded recommendation batch;
+this avoids converting normal batch latency into a 502 while preserving the
+recommendation service's own bounded analytics clients.
+
+## Personalized Feed V1
+
+The safe default remains `FEED_PERSONALIZED_MODE=OFF`, serving the existing
+analytics-aware/heuristic path. `SHADOW` calculates `PERSONALIZED_V1` without
+changing the control response. `ON` serves it only after behavior, snapshot,
+coverage and confidence gates pass. `FEED_PERSONALIZED_ROLLOUT_PERCENTAGE`
+provides deterministic staged activation and setting the mode back to `OFF` is
+the immediate rollback. See
+`docs/recommendation/personalized-feed-v1-operations.md` for replay, metrics
+and the read-only dataset handoff. In `SHADOW`, the service records a bounded
+timer plus overlap and aggregate rank movement; these measurements never use
+subject or book IDs as metric labels.
+
+The `feed.personalized` properties use Spring's mutable configuration binding
+so the service starts correctly in Docker and in the production profile. The
+binding is covered by a context-property test; invalid rollout values are
+handled by the gate's validation rather than changing the default `OFF` mode.

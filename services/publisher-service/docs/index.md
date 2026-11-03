@@ -9,3 +9,11 @@ Uma submissão pode avançar para `SUBMITTED` usando `POST /api/v1/publisher/sub
 Submission ownership is scoped to the authenticated principal. Anonymous
 requests are rejected before any database write, and retrying a submit only
 changes the caller's own submission.
+
+The service validates the `bookrush-platform` issuer/JWK set and requires the
+`bookrush-ingestion` audience. OAuth scopes and Keycloak groups are converted
+to `SCOPE_*` and `ROLE_*` authorities before publisher/operator actions run.
+
+Criação e submissão de publicação emitem fatos server-side ao behavior-service
+com o bearer autenticado, chave idempotente e retry limitado. A telemetria é
+best effort e não altera o ownership nem o estado transacional da submissão.

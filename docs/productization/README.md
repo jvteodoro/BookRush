@@ -9,10 +9,12 @@ A plataforma foi organizada em bounded contexts independentes. O catálogo conti
 | book-content-service | metadata/content reader boundary | `book_content` |
 | reader-state-service | library, progress, bookmarks | `reader_state` |
 
-As rotas de estado do leitor são protegidas pelo realm de produto (`bookrush`)
-com audience `account`. O gateway envia somente `/api/v1/reader/feed` para o
-`reader-bff-service`; biblioteca, progresso e bookmarks seguem diretamente para
-o `reader-state-service`.
+As rotas do leitor são protegidas pelo realm de produto (`bookrush`) com
+audience `account`. O gateway envia as operações de leitura e composição,
+incluindo `/api/v1/reader/books/*` (publication, capítulos, conteúdo e
+recursos), para o `reader-bff-service`. O `reader-state-service` permanece
+responsável pelas rotas legadas de biblioteca e pela planta; assim, uma
+requisição de capítulos não cai silenciosamente no serviço de estado.
 | reader-profile-service | profile/privacy | `reader_profile` |
 | social-service | likes, comments, follows/report extension | `social` |
 | behavior-service | append-only client/server events | `behavior` |
@@ -29,8 +31,20 @@ Cada serviço tem Dockerfile, health endpoint, Flyway owner, `catalog-info.yaml`
 - `GET /api/v1/recommendations/feed`: feed `heuristic-v1` com `recommendationRequestId`, `impressionId`, `modelVersion` e `rank`.
 - `PUT/DELETE /api/v1/reader/library/{bookId}` e `PUT /api/v1/reader/books/{bookId}/progress`: estado persistente por identidade JWT.
 - `POST /api/v1/behavior/events`: lote idempotente por `eventKey`; não armazena tokens ou texto livre por padrão.
+- `GET /api/v1/behavior/operations/metrics`: métricas operacionais de ingestão, rejeições e outbox; a rotina de manutenção reconstrói projeções diárias e aplica retenção configurável.
 - `PUT /api/v1/social/books/{bookId}/like`, `POST /api/v1/social/books/{bookId}/comments`: interação persistente.
+- `GET /api/v1/social/moderation/reports` e `PUT /api/v1/social/moderation/comments/{commentId}`: fila e decisão de moderação, restritas a operadores.
+- `GET /api/v1/recommendations/feed`: seleciona `COLD_START`, `DIVERSE` ou `LUCKY` e registra request/impression no ledger.
+- `GET /api/v1/publisher/review`, `POST /api/v1/publisher/submissions/{id}/review` e `GET /api/v1/publisher/memberships`: workflow de revisão e membership do publicador.
+- `GET /api/v1/admin/moderation/comments` e `POST /api/v1/admin/moderation/comments`: consulta e decisão administrativa sobre comentários.
 - `GET/PUT /api/v1/profile`: perfil por `(iss, sub)` exposto pela camada de segurança.
+
+As migrations de behavior criam tentativas/reprocessamento de outbox, índices
+de projeção e atribuição de resultados. As migrations de publisher criam a
+membership explícita (`PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`).
+O job agendado de behavior reconstrói as projeções e aplica retenção; o
+watermark local da outbox não representa publicação em broker externo, que
+continua sendo uma etapa operacional separada.
 
 ## Execução
 

@@ -12,16 +12,53 @@ import org.springframework.data.repository.query.Param;
 public interface BookRepository extends JpaRepository<Book, UUID> {
   Page<Book> findByCanonicalTitleContainingIgnoreCase(String title, Pageable pageable);
 
-  @Query(value = "SELECT DISTINCT b.* FROM catalog.book b " +
-      "LEFT JOIN catalog.book_author ba ON ba.book_id=b.id " +
-      "LEFT JOIN catalog.author a ON a.id=ba.author_id " +
-      "LEFT JOIN catalog.book_subject bs ON bs.book_id=b.id " +
-      "LEFT JOIN catalog.subject sub ON sub.id=bs.subject_id " +
-      "WHERE b.canonical_title ILIKE '%' || :q || '%' " +
-      "OR b.original_title ILIKE '%' || :q || '%' " +
-      "OR b.description ILIKE '%' || :q || '%' " +
-      "OR a.name ILIKE '%' || :q || '%' " +
-      "OR sub.canonical_name ILIKE '%' || :q || '%' ORDER BY b.canonical_title", nativeQuery = true)
+  @Query(
+      value =
+          """
+          SELECT b.*
+          FROM catalog.book b
+          WHERE to_tsvector('simple', coalesce(b.canonical_title, '') || ' ' || coalesce(b.original_title, '') || ' ' || coalesce(b.description, ''))
+                    @@ websearch_to_tsquery('simple', :q)
+             OR b.canonical_title ILIKE '%' || :q || '%'
+             OR b.original_title ILIKE '%' || :q || '%'
+             OR b.description ILIKE '%' || :q || '%'
+             OR EXISTS (
+                 SELECT 1 FROM catalog.book_author ba
+                 JOIN catalog.author a ON a.id = ba.author_id
+                 WHERE ba.book_id = b.id AND a.name ILIKE '%' || :q || '%'
+             )
+             OR EXISTS (
+                 SELECT 1 FROM catalog.book_subject bs
+                 JOIN catalog.subject sub ON sub.id = bs.subject_id
+                 WHERE bs.book_id = b.id AND sub.canonical_name ILIKE '%' || :q || '%'
+             )
+          ORDER BY ts_rank_cd(
+                     to_tsvector('simple', coalesce(b.canonical_title, '') || ' ' || coalesce(b.original_title, '') || ' ' || coalesce(b.description, '')),
+                     websearch_to_tsquery('simple', :q)
+                   ) DESC,
+                   lower(b.canonical_title), b.id
+          """,
+      countQuery =
+          """
+          SELECT count(*)
+          FROM catalog.book b
+          WHERE to_tsvector('simple', coalesce(b.canonical_title, '') || ' ' || coalesce(b.original_title, '') || ' ' || coalesce(b.description, ''))
+                    @@ websearch_to_tsquery('simple', :q)
+             OR b.canonical_title ILIKE '%' || :q || '%'
+             OR b.original_title ILIKE '%' || :q || '%'
+             OR b.description ILIKE '%' || :q || '%'
+             OR EXISTS (
+                 SELECT 1 FROM catalog.book_author ba
+                 JOIN catalog.author a ON a.id = ba.author_id
+                 WHERE ba.book_id = b.id AND a.name ILIKE '%' || :q || '%'
+             )
+             OR EXISTS (
+                 SELECT 1 FROM catalog.book_subject bs
+                 JOIN catalog.subject sub ON sub.id = bs.subject_id
+                 WHERE bs.book_id = b.id AND sub.canonical_name ILIKE '%' || :q || '%'
+             )
+          """,
+      nativeQuery = true)
   Page<Book> search(@Param("q") String q, Pageable pageable);
 
   /** Resolves work-level identifiers and edition-level identifiers to their owning work. */

@@ -15,9 +15,15 @@ def main() -> None:
     p.add_argument("--input", required=True)
     p.add_argument("--output", required=True)
     p.add_argument("--taxonomy-version", default="book-subjects-v1")
+    p.add_argument("--taxonomy", default="services/book-analytics-service/config/topic-taxonomy-v1.json")
+    p.add_argument("--threshold", type=float, default=0.5)
     args = p.parse_args()
     rows = [json.loads(line) for line in Path(args.input).read_text(encoding="utf-8").splitlines() if line.strip()]
     if not rows: raise SystemExit("empty classifier dataset")
+    taxonomy = json.loads(Path(args.taxonomy).read_text(encoding="utf-8"))
+    taxonomy_labels = {entry["code"] for entry in taxonomy["labels"]}
+    unknown = sorted({label for row in rows for label in row.get("labels", [])} - taxonomy_labels)
+    if unknown: raise SystemExit(f"labels not present in taxonomy: {', '.join(unknown)}")
     try:
         from sklearn.linear_model import LogisticRegression
         from sklearn.multiclass import OneVsRestClassifier
@@ -33,7 +39,7 @@ def main() -> None:
     label_names = binarizer.classes_.tolist()
     splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=1337)
     train, test = next(splitter.split(X, labels, groups=groups))
-    model = OneVsRestClassifier(LogisticRegression(max_iter=1000, class_weight="balanced", solver="liblinear"))
+    model = OneVsRestClassifier(LogisticRegression(max_iter=1000, class_weight="balanced", solver="liblinear", penalty="l2"))
     model.fit(X[train], labels[train])
     predicted = model.predict(X[test])
     metrics = {"macro_f1": float(f1_score(labels[test], predicted, average="macro", zero_division=0)),
@@ -44,7 +50,9 @@ def main() -> None:
     payload = {"code": "BOOK_TOPIC_CLASSIFIER_V1", "taxonomy_version": args.taxonomy_version,
                "labels": label_names, "metrics": metrics, "work_split": "GroupShuffleSplit/1337",
                "dataset_sha256": hashlib.sha256(Path(args.input).read_bytes()).hexdigest(),
-               "status": "EXPERIMENTAL", "model": model, "binarizer": binarizer}
+               "status": "EXPERIMENTAL", "decision_threshold": args.threshold,
+               "taxonomy_sha256": hashlib.sha256(Path(args.taxonomy).read_bytes()).hexdigest(),
+               "model": model, "binarizer": binarizer}
     # joblib is intentionally optional; the artifact is only produced in the
     # explicit training environment, never downloaded or loaded at startup.
     import joblib

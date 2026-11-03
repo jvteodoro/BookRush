@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { ProgressBar } from '../ui/ProgressBar';
 import { OverflowTitle } from '../ui/OverflowTitle';
 import { AuthenticatedImage } from './AuthenticatedImage';
+import type { FeedExcerpt } from '../../app/types';
 
-export type ReaderBook = { id: string; title: string; author: string; genre: string; progress: number; minutes: number; description: string; coverUrl?: string };
+export type ReaderBook = { id: string; title: string; author: string; genre: string; progress: number; minutes: number; description: string; excerpt?: FeedExcerpt | null; coverUrl?: string };
 export function BookCard({ book, onOpen, disabled = false }: { book: ReaderBook; onOpen: (book: ReaderBook) => void; disabled?: boolean }) {
   const [failedCover, setFailedCover] = useState<string>();
   const palette = [...book.id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 3;

@@ -13,4 +13,12 @@ class EmbeddingMathTest {
     assertEquals(1d, Math.sqrt(v[0] * v[0] + v[1] * v[1]), 1e-6);
     assertTrue(v[1] > v[0]);
   }
+
+  @Test
+  void rawDoubleCosinePreservesSignedSimilarityWithoutProbabilityConversion() {
+    assertEquals(1d, EmbeddingMath.cosine(List.of(1d, 0d), List.of(1d, 0d)), 1e-9);
+    assertEquals(-1d, EmbeddingMath.cosine(List.of(1d, 0d), List.of(-1d, 0d)), 1e-9);
+    assertEquals(0d, EmbeddingMath.cosine(List.of(1d, 0d), List.of(0d, 1d)), 1e-9);
+    assertTrue(EmbeddingMath.cosine(List.of(0.6d, 0.8d), List.of(0.6d, 0.8d)) <= 1d);
+  }
 }

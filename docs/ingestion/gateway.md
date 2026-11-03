@@ -14,8 +14,9 @@ si pela rede `bookrush`:
 | `/ingestion` | `book-ingestion-service:8090` | prefixo removido antes do serviço |
 | `/ingestion-docs/*` | `book-ingestion-service:8090` | prefixo preservado; corresponde ao `springdoc` do serviço |
 | `/swagger-ui/*`, `/v3/api-docs` | `catalog-service:8080` | documentação do catálogo |
-| `/api/v1/reader/feed` | `reader-bff-service:8101` | feed composto |
-| `/api/v1/reader/*` (demais rotas) | `reader-state-service:8094` | biblioteca, progresso e bookmarks |
+| `/api/v1/reader/feed`, `/recommendations`, `/library`, `/recent`, `/streak` | `reader-bff-service:8101` | composição do leitor |
+| `/api/v1/reader/books/*`, `/api/v1/reader/recommendations/impressions/*` | `reader-bff-service:8101` | publicação, capítulos, recursos e impressões |
+| `/api/v1/library/*`, `/api/v1/reader/plant` | `reader-state-service:8094` | compatibilidade legada, progresso e planta |
 
 Ao adicionar um microserviço, publique apenas a porta interna na rede Docker e
 acrescente uma rota e um serviço no provider de arquivo. Não publique a porta do

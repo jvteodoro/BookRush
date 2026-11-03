@@ -5,7 +5,87 @@
 **Escopo:** estado implementado e dados persistidos; este documento não declara
 prontidão para processamento em massa ou validação científica de modelos.
 
+As decisões de arquitetura para processamento de lotes pesados, recuperação de
+leases, persistência em lote e poda de candidatos estão em
+[Arquitetura de processamento em lote](batch-processing-architecture.md).
+
 ## Situação atual
+
+## Operação pelo Admin Web
+
+O painel administrativo de analytics foi organizado para operar com milhares de
+livros sem carregar a biblioteca inteira na tela. A entrada é a tabela compacta
+de **jobs**, que permite filtrar por ID/status e ordenar por data, status ou
+progresso. A lista usa paginação (`limit`/`offset`) e atualização automática.
+
+Ao abrir um job, a tela mostra apenas os itens daquele job, com filtro por
+`PENDING`, `RUNNING`, `COMPLETED` ou `FAILED`, busca por item/asset/livro,
+ordenação por início, tentativas ou status e paginação de 100 itens. Cada item
+abre seu rastreamento individual, que apresenta a fase atual, tentativa,
+horários, duração e status de cada fase persistida, contagens de excerpts,
+features e embeddings e as fases ainda pendentes.
+
+### Retomada segura durante atualização
+
+O worker executa cada item em uma tarefa independente e grava o progresso por
+lote. A persistência de features de documento usa quatro parâmetros e
+`ON CONFLICT DO NOTHING`, portanto uma reinicialização pode repetir o lote sem
+duplicar observações já gravadas. Ao reivindicar uma nova tentativa, o worker
+limpa o erro da tentativa anterior para que a interface não exiba uma exceção
+antiga como se fosse o erro da execução atual. O stale recovery marca fases
+abandonadas e reencaminha itens dentro do limite de tentativas; itens que
+atingiram o limite ficam explicitamente `FAILED`, em vez de permanecerem
+presos como `PENDING`.
+
+Em 18/10/2026 foi corrigido um placeholder extra na inserção de
+`analytics.document_feature`. Esse erro lançava
+`DataIntegrityViolationException` durante `EXCERPT_EMBEDDINGS` depois de
+alguns lotes, sem invalidar os embeddings já persistidos. O teste unitário
+verifica agora que a query possui exatamente quatro placeholders correspondentes
+aos argumentos fornecidos.
+
+Também foi corrigida a consulta paginada de itens do Admin Web: como ela faz
+joins com catálogo, `job_id`, `status`, `created_at` e `id` precisam ser
+qualificados com o alias de `analysis_job_item`. Sem isso, PostgreSQL retornava
+`column reference "created_at" is ambiguous` e a tela recebia HTTP 500.
+
+### Detalhe operacional por fase
+
+O detalhe do item retorna `logs` dentro de cada fase. Cada evento possui
+timestamp, nível, mensagem e, quando aplicável, `progress_completed` e
+`progress_total`. O worker grava eventos de início/fim e atualizações de lote;
+em embeddings, por exemplo, a tela pode mostrar `365/500` e o último lote
+persistido. O Admin Web apresenta cada fase como uma seção expansível com barra
+de progresso e histórico de eventos. Fases antigas sem eventos continuam
+visíveis com sua duração persistida, mas não podem ser retroativamente
+detalhadas.
+
+O número da tentativa é monotônico por item. Durante o claim, o worker usa o
+maior `attempt_count` já persistido nas fases, e não apenas o contador atual do
+item. A migration V24 também renumera execuções históricas quando um requeue
+manual antigo reutilizou números; isso impede que duas execuções sejam
+agrupadas na mesma aba do admin e evita burlar `max-attempts`.
+Fases `RUNNING` de uma tentativa menor que a atual são fechadas como
+`WORKER_RESTART_RECOVERY`, evitando que uma execução antiga continue aparecendo
+como ativa depois que o item avançou.
+
+As estatísticas `excerpts`, `features` e `embeddings` são calculadas pelo
+`analysis_run_id` através das tabelas de features do run. Excerpts são
+reutilizáveis por versão de asset e, por isso, não possuem `analysis_run_id`
+direto; a consulta do detalhe não deve assumir essa coluna em
+`analytics.excerpt`.
+
+Os endpoints administrativos usados nessa navegação são:
+
+- `GET /api/admin/v1/content-analytics/jobs?limit=200&offset=0`
+- `GET /api/admin/v1/content-analytics/jobs/{jobId}`
+- `GET /api/admin/v1/content-analytics/jobs/{jobId}/items?limit=100&offset=0&status=...`
+- `GET /api/admin/v1/content-analytics/jobs/{jobId}/items/{itemId}`
+
+Eles continuam protegidos pelo escopo `bookrush.analytics`; a paginação não
+remove autorização nem expõe dados fora do job solicitado. O detalhe do item é
+observacional: ele lê as fases e métricas persistidas pelo worker e não dispara
+uma nova execução.
 
 A pipeline barata está operacional no ambiente atual. O serviço Spring Boot é o
 único writer do schema `analytics`, o worker persistente está habilitado e o
@@ -186,6 +266,7 @@ criam e controlam jobs; as internas leem dados ligados ao catálogo.
 | Método | Rota | Finalidade |
 | --- | --- | --- |
 | POST | `/api/admin/v1/content-analytics/jobs` | Cria ou recupera job idempotente. |
+| GET | `/api/admin/v1/content-analytics/jobs?limit=100&status=RUNNING` | Lista jobs recentes com estágio e contadores para a operação. |
 | GET | `/api/admin/v1/content-analytics/jobs/{jobId}` | Estado e contadores persistidos. |
 | POST | `/api/admin/v1/content-analytics/jobs/{jobId}/cancel` | Solicita cancelamento cooperativo. |
 | GET | `/api/admin/v1/content-analytics/jobs/{jobId}/items` | Itens, tentativas e erros sanitizados. |
@@ -195,9 +276,19 @@ criam e controlam jobs; as internas leem dados ligados ao catálogo.
 | GET | `/api/internal/v1/content-analytics/excerpts/{excerptId}` | Excerpt, hash e linhagem. |
 
 O namespace administrativo `/api/admin/v1/annotation` implementa campanhas de
-anotação: criação/amostragem, claim, first-screen lock, submissão, métricas,
-adjudicação e exportação de dataset. Ele é reservado a operadores, anotadores e
-revisores; detalhes do modelo estão em [data-model.md](data-model.md).
+anotação: criação/amostragem, claim, progresso por anotador, item cego,
+first-screen lock, contexto anterior/seguinte após o lock, submissão, métricas,
+adjudicação e exportação de dataset. O item cego não expõe scores; o contexto e
+os scores só são liberados após o lock primário. Ele é reservado a operadores,
+anotadores e revisores; detalhes do modelo estão em [data-model.md](data-model.md).
+
+A amostragem de uma campanha usa o `sampling_config` e o
+`sampling_config_hash` persistidos na criação. Para o piloto EQL, a política
+`languages: ["en", "pt"]` com `targetPerLanguage: 50` materializa até 50
+excerpts determinísticos por idioma, ordenados por `md5(excerpt_id || seed)`.
+Cada item registra o estrato (`en:position`/`pt:position`) e a razão com o
+idioma e a seed; a restrição única `(campaign_id, excerpt_id)` impede duplicatas.
+Executar a amostragem novamente é seguro e retorna o mesmo hash da campanha.
 
 `Idempotency-Key`, quando presente, deve ser igual a `operationKey`. A API
 rejeita a mesma chave com corpo diferente. O contrato OpenAPI do serviço é a
@@ -235,6 +326,25 @@ Antes de um lote maior, é necessário:
 5. executar os gates 1–8 de `VALIDATION_PLAN_V1.md` e registrar decisão GO;
 6. medir throughput, storage e memória no piloto antes de iniciar qualquer
    corpus completo.
+
+### Reinício limpo do piloto
+
+Quando um job acumular falhas de uma versão antiga do worker, não se deve
+apagar suas linhas nem reutilizar sua `operation_key`. O procedimento é:
+
+1. preservar o job antigo como evidência e marcá-lo como cancelado/reiniciado;
+2. criar uma nova `operation_key` e copiar somente os
+   `input_asset_version_id` para itens `PENDING`;
+3. acompanhar a nova execução pela listagem administrativa, que consulta
+   `analysis_job` (não apenas `analysis_run`);
+4. comparar falhas e tempos com o job antigo somente depois de o lote novo
+   avançar.
+
+Em 18/10/2026 o lote sujo de 498 itens foi preservado e substituído por uma
+execução limpa. O admin passou a atualizar a lista de jobs a cada três
+segundos, exibindo status, estágio e contadores persistidos. A consulta exige o
+mesmo bearer administrativo e audience/scope `bookrush.analytics` das demais
+rotas de analytics.
 
 O princípio permanece: medições, scores de modelo e scores de produto têm
 semânticas diferentes. Analytics V1 produz observações rastreáveis; não afirma

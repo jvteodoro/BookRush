@@ -2,6 +2,24 @@
 
 Adquire RDF, EPUB e a thumbnail de capa do Gutenberg, persiste snapshots RAW e coordena jobs, normalização TXT e chapters.json.
 
+O EPUB SOURCE continua sendo a fonte estrutural do leitor. Durante o
+processamento, o OPF/spine define a ordem dos documentos e o NCX ou NAV define
+capítulos e relações pai/filho; essa estrutura é materializada em
+`chapters.json` com offsets Unicode para busca, analytics e compatibilidade.
+O TXT normalizado é um artefato auxiliar e não substitui o XHTML original no
+Readium.
+Quando a entrada possui estrutura EPUB, os marcadores textuais de Gutenberg são
+preservados: alguns livros os incluem no capítulo de licença, e removê-los
+alteraria os offsets dos capítulos seguintes. A remoção de delimitadores fica
+restrita ao fluxo TXT sem estrutura.
+
+Os offsets de `chapters.json` são calculados depois da normalização final
+`NFC_LF`. Isso evita que a compactação de espaços e quebras de linha deixe os
+intervalos fora do texto persistido durante o reprocessamento de EPUBs.
+O serviço reaplica essa normalização ao materializar o TXT e remapeia novamente
+os offsets recebidos do extrator antes de escrever `chapters.json`; portanto o
+fluxo de processamento duplo permanece seguro para EPUBs já normalizados.
+
 Quando `processAssets=true`, o job baixa `pg{id}.cover.medium.jpg`, grava o
 snapshot RAW em `gutenberg/{id}/thumbnail.jpg` e registra no catalog-service um
 asset `THUMBNAIL` com papel `COVER`. Para direitos explicitamente identificados

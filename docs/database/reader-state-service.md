@@ -11,3 +11,9 @@ session. Its non-negative `activeSeconds` value contributes whole minutes to
 the current UTC database day. A missing or malformed duration is treated as
 zero. The service does not expose another user's state and does not infer a
 profile or recommendation from this projection.
+
+A projeção `daily-reading-v2` da planta usa as tabelas `daily_plant`,
+`plant_reading_day` e `plant_reading_event` da migration V6. Ela começa no
+estágio zero sem alterar o histórico anterior. Os intervalos autenticados são
+contados em segundos e divididos na virada de dia em America/Sao_Paulo; o
+identificador do evento evita a duplicação em retentativas.

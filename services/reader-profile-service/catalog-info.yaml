@@ -10,3 +10,20 @@ spec:
   lifecycle: experimental
   owner: group:default/book-platform
   system: book-catalog
+  providesApis:
+    - reader-profile-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: reader-profile-api
+  description: Perfis de leitores e preferências granulares de privacidade
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  definition:
+    $text: ./api/openapi.yaml

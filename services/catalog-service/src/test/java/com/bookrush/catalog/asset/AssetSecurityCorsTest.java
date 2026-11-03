@@ -12,7 +12,10 @@ class AssetSecurityCorsTest {
     var source =
         new AssetSecurity()
             .catalogCorsConfigurationSource(
-                new CatalogCorsProperties(List.of("https://docs-bookrush.jteodoro.tec.br")));
+                new CatalogCorsProperties(
+                    List.of(
+                        "https://bookrush.jteodoro.tec.br",
+                        "https://docs-bookrush.jteodoro.tec.br")));
 
     var internal = source.getCorsConfiguration(
         new MockHttpServletRequest("OPTIONS", "/api/internal/v1/catalog/books"));
@@ -22,7 +25,8 @@ class AssetSecurityCorsTest {
     assertThat(internal).isNotNull();
     assertThat(admin).isNotNull();
     assertThat(admin.getAllowedOrigins())
-        .containsExactly("https://docs-bookrush.jteodoro.tec.br");
+        .containsExactly(
+            "https://bookrush.jteodoro.tec.br", "https://docs-bookrush.jteodoro.tec.br");
     assertThat(admin.getAllowedMethods())
         .containsExactly("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
     assertThat(admin.getAllowedHeaders())
