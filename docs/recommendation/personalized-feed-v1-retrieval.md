@@ -45,6 +45,10 @@ Validation is covered by `CatalogCandidateRetrieverTest`, including a book
 returned beyond the former first-page boundary, duplicate IDs, missing
 embeddings, and bounded pagination.
 
+`PersonalizedFeedV1FixtureTest` also builds profiles from valid versioned
+embeddings, computes candidate cosine affinity, and verifies that A/B histories
+rank unseen candidates from their own semantic cluster.
+
 ## Repeat-exposure fatigue
 
 `ExposureFatigue` uses only viewable impressions for the initial signal. A

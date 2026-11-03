@@ -71,7 +71,7 @@ public final class CandidateUnionBuilder {
     return new ScoredCandidate(candidate.book(), Double.isFinite(cosine) ? cosine : candidate.score());
   }
 
-  static double cosine(List<Double> left, List<?> right) {
+  public static double cosine(List<Double> left, List<?> right) {
     if (left == null || right == null || left.isEmpty() || left.size() != right.size()) return 0;
     double dot = 0, leftNorm = 0, rightNorm = 0;
     for (int i = 0; i < left.size(); i++) {
