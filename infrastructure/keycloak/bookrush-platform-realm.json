@@ -120,7 +120,7 @@
       "protocol": "openid-connect",
       "protocolMapper": "oidc-audience-mapper",
       "config": {
-        "included.client.audience": "bookrush-ingestion",
+        "included.client.audience": "bookrush-analytics",
         "access.token.claim": "true",
         "id.token.claim": "false",
         "userinfo.token.claim": "false"
@@ -188,7 +188,7 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.client.audience": "bookrush-analytics",
+            "included.client.audience": "bookrush-ingestion",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "userinfo.token.claim": "false"
@@ -308,7 +308,7 @@
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "config": {
-            "included.client.audience": "bookrush-analytics",
+            "included.client.audience": "bookrush-ingestion",
             "access.token.claim": "true",
             "id.token.claim": "false"
           }

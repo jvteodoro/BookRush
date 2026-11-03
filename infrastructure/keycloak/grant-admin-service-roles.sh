@@ -32,9 +32,10 @@ if [[ -z "$mapper_exists" ]]; then
     -H 'Content-Type: application/json' \
     -d '{"name":"admin-service-management-roles","protocol":"openid-connect","protocolMapper":"oidc-usermodel-client-role-mapper","config":{"usermodel.clientRoleMapping.clientId":"realm-management","claim.name":"resource_access.realm-management.roles","jsonType.label":"String","multivalued":"true","access.token.claim":"true","id.token.claim":"false","userinfo.token.claim":"false"}}' >/dev/null
 else
-  mapper_id="$(curl -fsS "${realm_base}/clients/${client_id}/protocol-mappers/models" "${auth[@]}" | jq -r '.[] | select(.name == "admin-service-management-roles") | .id')"
-  curl -fsS -X PUT "${realm_base}/clients/${client_id}/protocol-mappers/models/${mapper_id}" "${auth[@]}" \
-    -H 'Content-Type: application/json' \
-    -d '{"name":"admin-service-management-roles","protocol":"openid-connect","protocolMapper":"oidc-usermodel-client-role-mapper","config":{"usermodel.clientRoleMapping.clientId":"realm-management","claim.name":"resource_access.realm-management.roles","jsonType.label":"String","multivalued":"true","access.token.claim":"true","id.token.claim":"false","userinfo.token.claim":"false"}}' >/dev/null
+  # Keycloak 25 can return HTTP 500/NPE when updating an existing protocol
+  # mapper through this endpoint, even when its declarative configuration is
+  # already identical. The mapper is created above when absent; preserve the
+  # existing one here and keep reconciling its role mappings.
+  echo 'Mapper de roles do admin-service já existe; atualização omitida.'
 fi
 echo 'Roles do serviço admin reconciliadas.'

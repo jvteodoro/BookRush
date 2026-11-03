@@ -78,3 +78,8 @@ Jenkins e não substitui essa identidade.
 
 Não registrar senha, token, cookie, crumb, authorization code, segredo de
 cliente ou conteúdo de `.env` nas evidências.
+
+Durante a reconciliação, o mapper de roles do `bookrush-admin-service` é criado
+quando ausente. Se já existir, a configuração declarativa preserva o mapper e
+reconcilia apenas as roles do service account; isso evita o erro HTTP 500/NPE
+observado no endpoint de atualização de protocol mappers do Keycloak 25.
