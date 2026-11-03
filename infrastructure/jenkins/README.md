@@ -313,6 +313,10 @@ O override também repassa as quatro variáveis `KEYCLOAK_ADMIN_*` ao
 ainda não declara essas variáveis. O segredo vigente continua sendo resolvido
 pelo script de deploy após o reconcile e conferido no container, sem exposição
 nos logs. Não substitua essa verificação apenas pelo healthcheck.
+O mesmo deploy resolve o segredo vivo do cliente `bookrush-recommendation-s2s`
+no realm `bookrush-platform` e o injeta no ranking/snapshot do analytics. Isso
+evita que o personalized feed caia em `snapshot-unavailable` por causa de um
+segredo antigo ou ausente no `/run/bookrush.env`.
 `bash scripts/test-deploy-compose-config.sh` testa o merge real do Compose atual
 e de um host antigo, usando somente credenciais fictícias; faz parte da etapa
 de contratos do Jenkinsfile atualizado e não inicia a aplicação.
