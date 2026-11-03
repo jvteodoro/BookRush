@@ -16,8 +16,10 @@ reiniciar somente o recommendation-service; não requer migration rollback nem
 remove dados do ledger.
 
 O default operacional é `ON` durante a fase de testes em `application.yml`,
-Compose, `.env.example` e Jenkins. `OFF` continua disponível para rollback
-explícito.
+Compose, `.env.example` e Jenkins. O script de deploy também exporta `ON`
+quando o parâmetro não é fornecido, evitando que um valor histórico no env
+protegido do host desative o teste silenciosamente. `OFF` continua disponível
+para rollback explícito.
 
 No caminho `PERSONALIZED`, a ordem é: candidate retrieval limitado → candidate
 union → score personalizado de todo o pool → quota de exploration → MMR

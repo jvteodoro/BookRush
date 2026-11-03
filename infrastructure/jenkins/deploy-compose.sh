@@ -4,6 +4,10 @@ set -Eeuo pipefail
 : "${FRONTEND_IMAGE:?Imagem frontend ausente}"
 : "${INGESTION_IMAGE:?Imagem ingestion ausente}"
 : "${ANALYTICS_IMAGE:?Imagem analytics ausente}"
+# The protected host env may still carry the historical OFF value. The test
+# phase default must be explicit in the deploy process when Jenkins does not
+# provide the optional parameter; OFF remains an intentional override.
+export FEED_PERSONALIZED_MODE="${FEED_PERSONALIZED_MODE:-ON}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
 
