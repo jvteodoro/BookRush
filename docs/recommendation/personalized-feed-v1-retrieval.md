@@ -11,6 +11,10 @@ candidate universe.
 - `FEED_RETRIEVAL_MAX_PAGES` (default `5`)
 - `FEED_RETRIEVAL_VERSION` (default `catalog-page-v1`)
 
+The live controller requests the configured `FEED_RETRIEVAL_MAX_CANDIDATES`
+through the retriever contract; it does not hard-code the old `limit * 3`
+universe.
+
 The retriever preserves the first occurrence of each book ID, accepts books
 without an embedding, and stops at the configured candidate limit or a short
 catalog page. The resulting `CandidateSet` carries version, configuration hash,

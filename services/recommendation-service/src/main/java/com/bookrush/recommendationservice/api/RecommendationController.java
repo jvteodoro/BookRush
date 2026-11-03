@@ -114,7 +114,7 @@ public class RecommendationController {
     Strategy selectedStrategy = RecommendationHeuristic.strategyFor(previousImpressions);
     String strategy = selectedStrategy.name();
     var retrievedCandidateSet = feedMetrics.time("catalog_fetch", () ->
-        candidateRetriever.retrieve(500));
+        candidateRetriever.retrieve(candidateRetriever.configuredLimit()));
     List<?> retrievedBooks = retrievedCandidateSet.books();
     var retrievedCandidateIds = retrievedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull).toList();
     var scoreById = feedMetrics.time("analytics_scores", () -> analyticsScores.find(retrievedCandidateIds).entrySet().stream()

@@ -58,6 +58,11 @@ public final class CatalogCandidateRetriever implements CandidateRetriever {
     }
   }
 
+  @Override
+  public int configuredLimit() {
+    return properties.maxCandidates();
+  }
+
   private String uri(int page) {
     return "/api/v1/books?page=" + page + "&size=" + properties.pageSize();
   }
