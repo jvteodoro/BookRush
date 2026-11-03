@@ -17,6 +17,14 @@ impression only when the authenticated subject owns the originating request.
 The browser calls this after its viewability threshold, so non-visible feed
 items are not treated as negative outcomes. The endpoint is idempotent.
 
+The viewability event includes `viewable=true`, `recommendationItemId` and
+`impressionId`; this is the explicit input consumed by behavior's
+`viewable_impression_count` projection. Personalized ranking obtains candidate
+embeddings in bounded cached batches, computes candidate affinity as cosine
+similarity against `UserTasteProfile.vector()`, and supplies those same
+candidate embeddings to book-level MMR. Exploration uses a request seed stored
+in the ledger; no complete embedding vector is persisted in the ledger.
+
 Requests de feed e impressões viewable emitem eventos server-side ao
 behavior-service com o bearer autenticado e retry limitado. O behavior-service
 é responsável pela persistência idempotente e pelo outbox transacional.

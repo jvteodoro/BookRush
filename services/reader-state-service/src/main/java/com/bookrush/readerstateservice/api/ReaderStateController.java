@@ -87,10 +87,12 @@ public class ReaderStateController {
   }
 
   @PostMapping("/sessions")
-  public Object startSession(Principal principal) {
+  public Object startSession(@RequestBody(required = false) Map<String, Object> body,
+      Principal principal) {
     UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO reader_state.session(id, subject_key, started_at) VALUES (?, ?, now())",
-        id, subject(principal));
+    UUID bookId = uuidValue(body == null ? null : body.get("bookId"));
+    jdbc.update("INSERT INTO reader_state.session(id, subject_key, book_id, started_at) VALUES (?, ?, ?, now())",
+        id, subject(principal), bookId);
     return Map.of("id", id, "startedAt", Instant.now());
   }
 
@@ -100,6 +102,10 @@ public class ReaderStateController {
       Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
     int seconds = integerValue(body, "activeSeconds");
+    UUID bookId = jdbc.query("SELECT book_id FROM reader_state.session "
+        + "WHERE id = ? AND subject_key = ? AND ended_at IS NULL",
+        rs -> rs.next() && rs.getObject("book_id") != null ? rs.getObject("book_id", UUID.class) : null,
+        id, subject);
     int updated = jdbc.update("UPDATE reader_state.session SET ended_at = now(), active_seconds = ? "
         + "WHERE id = ? AND subject_key = ? AND ended_at IS NULL", seconds, id, subject);
     if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
@@ -109,7 +115,7 @@ public class ReaderStateController {
         + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, seconds / 60);
     Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
     payload.put("activeSeconds", seconds);
-    behavior.publish("READ_SESSION", null, payload, authorization(request));
+    behavior.publish("READ_SESSION", bookId, payload, authorization(request));
     return Map.of("id", id, "activeSeconds", seconds, "plant", refreshPlant(subject));
   }
 
@@ -159,6 +165,12 @@ public class ReaderStateController {
     return current;
   }
 
+  private UUID uuidValue(Object value) {
+    if (value == null || String.valueOf(value).isBlank()) return null;
+    try { return UUID.fromString(String.valueOf(value)); }
+    catch (IllegalArgumentException ignored) { return null; }
+  }
+
   @GetMapping("/library")
   public Object library(Principal principal) {
     return jdbc.queryForList("SELECT book_id, status, created_at FROM reader_state.library "
@@ -183,13 +195,20 @@ public class ReaderStateController {
   @PutMapping("/books/{bookId}/progress")
   public Map<String, Object> progress(@PathVariable UUID bookId, @Valid @RequestBody Progress value,
       Principal principal, HttpServletRequest request) {
+    String subject = subject(principal);
     jdbc.update("INSERT INTO reader_state.progress(subject_key, book_id, position_codepoint, percent) "
         + "VALUES (?, ?, ?, ?) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
         + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, updated_at = now()",
-        subject(principal), bookId, value.positionCodepoint(), value.percent());
+        subject, bookId, value.positionCodepoint(), value.percent());
     Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
     payload.put("percent", value.percent());
     behavior.publish("READ_PROGRESS", bookId, payload, authorization(request));
+    if (value.percent() >= 100) {
+      Map<String, Object> completion = new LinkedHashMap<>(correlation(request));
+      completion.put("percent", 100);
+      behavior.publishWithKey("BOOK_COMPLETE", bookId, completion,
+          authorization(request), "BOOK_COMPLETE:" + subject + ":" + bookId);
+    }
     return Map.of("bookId", bookId, "percent", value.percent());
   }
 

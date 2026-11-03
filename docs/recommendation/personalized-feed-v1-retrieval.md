@@ -16,6 +16,13 @@ without an embedding, and stops at the configured candidate limit or a short
 catalog page. The resulting `CandidateSet` carries version, configuration hash,
 source, and a deterministic list of IDs for replay/provenance.
 
+When personalized serving is eligible, the controller enriches the bounded
+catalog universe with versioned candidate snapshots and passes semantic and
+global sources through `CandidateUnionBuilder`. Candidate snapshots are fetched
+through the analytics S2S cache in explicit batches no larger than
+`FEED_ANALYTICS_RANKING_MAX_CANDIDATES`; candidate embeddings are internal
+ranking data and are removed from the public book response.
+
 The implementation is intentionally catalog-backed and bounded. Future PFV1
 retrievers can combine semantic, global, trending, and exploration sources
 behind `CandidateRetriever` without coupling those changes to the ranker.
@@ -27,6 +34,8 @@ monopolizing the pool, and duplicate books retain all contributing source names.
 The union is deterministic and bounded. The current catalog API has no trending
 or embedding-vector serving endpoint, so the live adapter remains catalog-backed
 until those providers are connected; no fake trending signal is generated.
+Exploration is applied by a request-seeded policy and contributes an explicit
+ranker component; the seed is persisted in the ledger.
 
 Validation is covered by `CatalogCandidateRetrieverTest`, including a book
 returned beyond the former first-page boundary, duplicate IDs, missing
