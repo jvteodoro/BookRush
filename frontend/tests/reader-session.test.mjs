@@ -16,6 +16,20 @@ const bundle = await build({
 const { createReaderSessionLifecycle } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
 );
+const originBundle = await build({
+  entryPoints: [
+    fileURLToPath(
+      new URL("../src/reader/readerSessionOrigin.ts", import.meta.url),
+    ),
+  ],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "browser",
+});
+const { createReaderSessionOriginStore } = await import(
+  `data:text/javascript;base64,${Buffer.from(originBundle.outputFiles[0].text).toString("base64")}`
+);
 
 function harness(responses = [{ id: "session-1" }]) {
   let now = 1_000_000;
@@ -98,4 +112,50 @@ test("direct reader session sends no recommendation attribution and remains plan
   assert.deepEqual(JSON.parse(testCase.calls[1].init.body), {
     activeSeconds: 4,
   });
+});
+
+test("mount interaction keeps feed attribution after old reader unmount and isolates direct next book", () => {
+  const origin = createReaderSessionOriginStore();
+  const feedHeaders = {
+    "X-BookRush-Recommendation-Item": "item-a",
+    "X-BookRush-Impression": "impression-a",
+  };
+
+  origin.request({ bookId: "book-a", headers: feedHeaders });
+  const captured = origin.requestedFor("book-a");
+  origin.clear();
+  origin.activate("book-a", captured);
+  assert.deepEqual(origin.activeFor("book-a"), feedHeaders);
+
+  origin.request(null);
+  const directCaptured = origin.requestedFor("book-b");
+  origin.clear();
+  origin.activate("book-b", directCaptured);
+  assert.deepEqual(origin.activeFor("book-b"), {});
+  assert.deepEqual(origin.activeFor("book-a"), {});
+});
+
+test("two recommendation origins never cross during reader replacement", () => {
+  const origin = createReaderSessionOriginStore();
+  const headersA = {
+    "X-BookRush-Recommendation-Item": "item-a",
+    "X-BookRush-Impression": "impression-a",
+  };
+  const headersB = {
+    "X-BookRush-Recommendation-Item": "item-b",
+    "X-BookRush-Impression": "impression-b",
+  };
+
+  origin.request({ bookId: "book-a", headers: headersA });
+  const capturedA = origin.requestedFor("book-a");
+  origin.clear();
+  origin.activate("book-a", capturedA);
+  assert.deepEqual(origin.activeFor("book-a"), headersA);
+
+  origin.request({ bookId: "book-b", headers: headersB });
+  const capturedB = origin.requestedFor("book-b");
+  origin.clear();
+  origin.activate("book-b", capturedB);
+  assert.deepEqual(origin.activeFor("book-b"), headersB);
+  assert.deepEqual(origin.activeFor("book-a"), {});
 });

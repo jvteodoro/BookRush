@@ -3,6 +3,7 @@ import { WebPubNavigator, WebPubPreferences } from "@readium/navigator";
 import { authClient } from "../auth";
 import { startReadingTimer } from "./readingTimer";
 import { createReaderSessionLifecycle } from "./readerSession";
+import { readerSessionOrigin } from "./readerSessionOrigin";
 import { apiRoutes, readerApiPath } from "../app/apiRoutes";
 import type {
   ReadiumBridge,
@@ -27,14 +28,7 @@ let frameWindow: Window | undefined;
 let preferences = { ...defaults };
 
 function sessionCorrelation(bookId: string): Record<string, string> {
-  const api = (
-    window as Window & {
-      __BOOKRUSH_API__?: {
-        readerSessionCorrelation?: (id: string) => Record<string, string>;
-      };
-    }
-  ).__BOOKRUSH_API__;
-  return api?.readerSessionCorrelation?.(bookId) ?? {};
+  return readerSessionOrigin.requestedFor(bookId);
 }
 
 const readerSession = createReaderSessionLifecycle({
@@ -125,6 +119,7 @@ export const readiumBridge: ReadiumBridge = {
       throw new Error("Este livro ainda não possui conteúdo reader-ready.");
     }
     await readerSession.start(bookId, originHeaders);
+    readerSessionOrigin.activate(bookId, originHeaders);
     const fetcher = new HttpFetcher(
       (input, init) =>
         authClient.fetch(readerApiPath(String(input)), {
@@ -174,12 +169,7 @@ export const readiumBridge: ReadiumBridge = {
     frame = undefined;
     frameWindow = undefined;
     container = undefined;
-    const api = (
-      window as Window & {
-        __BOOKRUSH_API__?: { clearReaderSessionOrigin?: () => void };
-      }
-    ).__BOOKRUSH_API__;
-    api?.clearReaderSessionOrigin?.();
+    readerSessionOrigin.clear();
   },
 
   async chapters() {

@@ -29,6 +29,7 @@ import type { CatalogBook, FeedExcerpt, PageLoopBook } from "./app/types";
 import type { ReadiumBridge } from "./app/types";
 import { useLegacyNavigation } from "./app/useLegacyNavigation";
 import { apiRoutes } from "./app/apiRoutes";
+import { readerSessionOrigin } from "./reader/readerSessionOrigin";
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
@@ -98,10 +99,6 @@ function App() {
             headers["X-BookRush-Impression"] = recommendation.impressionId;
           return headers;
         };
-        let readerOrigin: {
-          bookId: string;
-          headers: Record<string, string>;
-        } | null = null;
         const ordered = recommendations
           .map((item) => item.book)
           .filter((book): book is CatalogBook => Boolean(book));
@@ -244,9 +241,9 @@ function App() {
             .__BOOKRUSH_API__,
           saved,
           readerSessionCorrelation: (bookId: string) =>
-            readerOrigin?.bookId === bookId ? { ...readerOrigin.headers } : {},
+            readerSessionOrigin.activeFor(bookId),
           clearReaderSessionOrigin: () => {
-            readerOrigin = null;
+            readerSessionOrigin.clear();
           },
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(
@@ -534,7 +531,7 @@ function App() {
               method: "PUT",
               headers: {
                 "Content-Type": "application/json",
-                ...(readerOrigin?.bookId === id ? readerOrigin.headers : {}),
+                ...readerSessionOrigin.activeFor(id),
               },
               body: JSON.stringify({ percent, positionCodepoint }),
             });
@@ -547,12 +544,13 @@ function App() {
             });
           },
           open: async (id: string, fromRecommendation = false) => {
-            readerOrigin = fromRecommendation
-              ? { bookId: id, headers: correlationHeaders(id) }
-              : null;
+            const headers = fromRecommendation ? correlationHeaders(id) : {};
+            readerSessionOrigin.request(
+              fromRecommendation ? { bookId: id, headers } : null,
+            );
             await authClient.fetch(apiRoutes.reader.opened(id), {
               method: "POST",
-              headers: readerOrigin?.headers ?? {},
+              headers,
             });
           },
           chapters: async (id: string) => {

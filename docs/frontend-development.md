@@ -105,3 +105,15 @@ define a árvore de capítulos. O Readium recebe XHTML, CSS, imagens e fontes
 pelas rotas autenticadas de recursos do EPUB. TXT e `chapters.json` são usados
 para busca, analytics e fallback, nunca como substitutos da estrutura editorial
 quando o EPUB está disponível.
+
+### Attribution da sessão de leitura
+
+Quando um livro é aberto a partir do feed, `main.tsx` registra temporariamente
+`recommendationItemId` e `impressionId` como origem solicitada. O
+`readerSessionOrigin` compartilhado captura essa origem antes de desmontar o
+reader anterior e a ativa somente depois que a nova sessão for iniciada pelo
+`readiumBridge`. O endpoint de progresso consulta apenas a origem da sessão
+ativa, de modo que `READ_PROGRESS` e `BOOK_COMPLETE` preservem a mesma
+correlation. A abertura por busca, biblioteca ou rota direta não cria
+attribution, e a desmontagem limpa a sessão anterior antes de instalar a
+seguinte.
