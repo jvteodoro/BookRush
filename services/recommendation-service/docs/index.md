@@ -27,6 +27,8 @@ in the ledger; no complete embedding vector is persisted in the ledger.
 Trending candidates come from behavior's authenticated `trending-v1` serving
 endpoint and are merged with semantic/global candidates; recommendation does
 not query the behavior schema directly.
+Each ledger item also records its contributing candidate sources, union version
+and configuration hash alongside the candidate-set hash for replay.
 
 Requests de feed e impressões viewable emitem eventos server-side ao
 behavior-service com o bearer autenticado e retry limitado. O behavior-service

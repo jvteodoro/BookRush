@@ -260,6 +260,9 @@ public class RecommendationController {
         reasonPayload.put("rankerVersion", modelVersion);
         if (item.get("score") != null) reasonPayload.put("score", item.get("score"));
         reasonPayload.put("candidateSetHash", candidateSetHash);
+        reasonPayload.put("candidateSources", candidateSet.sourcesFor(parsedBookId.toString()));
+        reasonPayload.put("candidateSetVersion", candidateSet.version());
+        reasonPayload.put("candidateConfigurationHash", candidateSet.configurationHash());
         if (personalized) {
           var scored = ledgerPersonalizedRanking.scoredById().get(parsedBookId.toString());
           if (scored != null) reasonPayload.put("personalizedComponents", scored.breakdown());
