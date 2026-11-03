@@ -61,6 +61,9 @@ coluna lateral. Os controles de curtir, comentar, salvar e compartilhar
 permanecem no card, assim como a navegação entre trechos.
 A altura acompanha a janela, sem o antigo teto de 740 px, deixando espaço
 para o cabeçalho e, no celular, para a navegação inferior.
+A linha de idioma/gênero e posição no feed foi removida do card. No feed real,
+o trecho usa o espaço vertical restante entre as aspas e os dados do livro,
+em vez de ficar limitado a uma caixa de 15 rem.
 
 As informações de sequência, descoberta e livros salvos ficam na aba Perfil,
 no componente `src/reader/ReadingSummary.tsx`. Os números usam o mesmo estado
