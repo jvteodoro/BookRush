@@ -21,6 +21,7 @@ public class ReportingProjection {
   private static final String PRODUCT_VERSION = "product-activity-v1-untrusted-population";
   private static final String CONTENT_VERSION = "content-supply-v1";
   private static final String INGESTION_VERSION = "ingestion-operations-v1";
+  private static final String PHASE_VERSION = "analytics-phase-v1";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
 
@@ -41,6 +42,7 @@ public class ReportingProjection {
     runProjection("publisher_daily", PRODUCT_VERSION, () -> refreshPublisherDaily(refreshed));
     runProjection("content_supply_snapshot", CONTENT_VERSION, () -> refreshContentSupply(refreshed));
     runProjection("ingestion_daily", INGESTION_VERSION, () -> refreshIngestionDaily(refreshed));
+    runProjection("pipeline_phase_daily", PHASE_VERSION, () -> refreshPipelinePhaseDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -454,6 +456,45 @@ public class ReportingProjection {
         """, INGESTION_VERSION, Timestamp.from(refreshed));
     updateHealth("ingestion_daily", INGESTION_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.ingestion_daily");
+  }
+
+  private void refreshPipelinePhaseDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.pipeline_phase_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        INSERT INTO reporting.pipeline_phase_daily(
+            day, phase, phase_status, error_code, attempts, completed_count,
+            failed_count, stuck_count, p50_duration_ms, p95_duration_ms,
+            p99_duration_ms, calculation_version, refreshed_at, source_watermark)
+        SELECT p.started_at::date, p.phase, p.status,
+            coalesce(p.error_code, 'NONE'), count(*),
+            count(*) FILTER (WHERE p.status = 'COMPLETED'),
+            count(*) FILTER (WHERE p.status = 'FAILED'),
+            count(*) FILTER (WHERE p.status = 'RUNNING'
+              AND p.started_at < clock_timestamp() - INTERVAL '15 minutes'),
+            percentile_cont(0.50) WITHIN GROUP (ORDER BY p.duration_ms)
+              FILTER (WHERE p.duration_ms IS NOT NULL),
+            percentile_cont(0.95) WITHIN GROUP (ORDER BY p.duration_ms)
+              FILTER (WHERE p.duration_ms IS NOT NULL),
+            percentile_cont(0.99) WITHIN GROUP (ORDER BY p.duration_ms)
+              FILTER (WHERE p.duration_ms IS NOT NULL),
+            ?, ?, greatest(max(p.finished_at), max(p.started_at))
+        FROM analytics.analysis_phase_timing p
+        WHERE p.started_at >= current_date - INTERVAL '366 days'
+        GROUP BY p.started_at::date, p.phase, p.status, coalesce(p.error_code, 'NONE')
+        ON CONFLICT (day, phase, phase_status, error_code) DO UPDATE SET
+            attempts = EXCLUDED.attempts,
+            completed_count = EXCLUDED.completed_count,
+            failed_count = EXCLUDED.failed_count,
+            stuck_count = EXCLUDED.stuck_count,
+            p50_duration_ms = EXCLUDED.p50_duration_ms,
+            p95_duration_ms = EXCLUDED.p95_duration_ms,
+            p99_duration_ms = EXCLUDED.p99_duration_ms,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, PHASE_VERSION, Timestamp.from(refreshed));
+    updateHealth("pipeline_phase_daily", PHASE_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.pipeline_phase_daily");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {

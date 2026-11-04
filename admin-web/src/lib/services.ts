@@ -211,8 +211,17 @@ export type ReportingSeries = {
   processed_items?: number;
   succeeded_items?: number;
   failed_items?: number;
+  failed_count?: number;
   item_status?: string;
   item_count?: number;
+  phase_status?: string;
+  error_code?: string;
+  attempts?: number;
+  completed_count?: number;
+  stuck_count?: number;
+  p50_duration_ms?: number | null;
+  p95_duration_ms?: number | null;
+  p99_duration_ms?: number | null;
   active_users?: number;
   newly_active_users?: number;
   weekly_active_users?: number;
@@ -477,6 +486,17 @@ export const services = {
         error,
         "Não foi possível carregar os snapshots do pipeline.",
       );
+    }
+  },
+  async reportingPipelinePhases(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/pipeline-phases",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar as fases do analytics.");
     }
   },
   async reportingAttributionQuality(days = 30): Promise<ReportingResponse> {

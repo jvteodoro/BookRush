@@ -47,3 +47,7 @@ convertida em atividade zero pelo frontend.
 As consultas usam somente contagens agregadas dos bounded contexts catalog e
 analytics, preservam `source_watermark` e `calculation_version`, e não expõem
 IDs, conteúdo ou mensagens de erro brutas no contrato do dashboard.
+
+`V11__reporting_pipeline_phase_daily.sql` agrega `analysis_phase_timing` por
+dia, fase, estado e código de erro, calculando percentis diretamente sobre as
+durações observadas e contando tentativas, falhas e leases presos.

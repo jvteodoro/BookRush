@@ -230,6 +230,67 @@ function PipelineReport({ data }: { data: ReportingResponse }) {
   );
 }
 
+function PipelinePhaseReport({ data }: { data: ReportingResponse }) {
+  if (!data.series.length)
+    return <div className="dashboard-state">NO_DATA</div>;
+  return (
+    <div className="dashboard-scroll-table">
+      <table className="dashboard-table">
+        <caption>
+          PL-04/05/11 · percentis reais de duração, falhas e stuck leases;
+          `NONE` significa ausência de código de erro
+        </caption>
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Fase</th>
+            <th>Estado</th>
+            <th>Erro</th>
+            <th>Tentativas</th>
+            <th>Concluídos</th>
+            <th>Falhas</th>
+            <th>Stuck</th>
+            <th>P50 ms</th>
+            <th>P95 ms</th>
+            <th>P99 ms</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.series.slice(-60).map((row, index) => (
+            <tr
+              key={`${row.day}-${row.phase}-${row.phase_status}-${row.error_code}-${index}`}
+            >
+              <td>{row.day ?? "—"}</td>
+              <td>{row.phase ?? "—"}</td>
+              <td>{row.phase_status ?? "—"}</td>
+              <td>{row.error_code ?? "—"}</td>
+              <td>{row.attempts ?? "—"}</td>
+              <td>{row.completed_count ?? "—"}</td>
+              <td>{row.failed_count ?? "—"}</td>
+              <td>{row.stuck_count ?? "—"}</td>
+              <td>
+                {row.p50_duration_ms == null
+                  ? "—"
+                  : Math.round(row.p50_duration_ms)}
+              </td>
+              <td>
+                {row.p95_duration_ms == null
+                  ? "—"
+                  : Math.round(row.p95_duration_ms)}
+              </td>
+              <td>
+                {row.p99_duration_ms == null
+                  ? "—"
+                  : Math.round(row.p99_duration_ms)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function SupplyReport({
   supply,
   ingestion,
@@ -471,6 +532,8 @@ export function DashboardHub() {
   const [feedReport, setFeedReport] = useState<ReportingResponse | null>(null);
   const [pipelineReport, setPipelineReport] =
     useState<ReportingResponse | null>(null);
+  const [pipelinePhaseReport, setPipelinePhaseReport] =
+    useState<ReportingResponse | null>(null);
   const [attributionReport, setAttributionReport] =
     useState<ReportingResponse | null>(null);
   const [reconciliationReport, setReconciliationReport] =
@@ -499,6 +562,7 @@ export function DashboardHub() {
         projectionHealth,
         feedDaily,
         pipeline,
+        pipelinePhases,
         attribution,
         reconciliation,
         social,
@@ -510,6 +574,7 @@ export function DashboardHub() {
         services.reportingHealth(),
         services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
+        services.reportingPipelinePhases(Math.min(Math.max(days, 1), 366)),
         services.reportingAttributionQuality(Math.min(Math.max(days, 1), 366)),
         services.reportingReconciliationQuality(
           Math.min(Math.max(days, 1), 366),
@@ -523,6 +588,7 @@ export function DashboardHub() {
       setHealth(projectionHealth);
       setFeedReport(feedDaily);
       setPipelineReport(pipeline);
+      setPipelinePhaseReport(pipelinePhases);
       setAttributionReport(attribution);
       setReconciliationReport(reconciliation);
       setSocialReport(social);
@@ -684,6 +750,9 @@ export function DashboardHub() {
                 <AlertTriangle size={18} />
               </div>
               <PipelineReport data={pipelineReport} />
+              {pipelinePhaseReport && (
+                <PipelinePhaseReport data={pipelinePhaseReport} />
+              )}
               <SupplyReport supply={supplyReport} ingestion={ingestionReport} />
             </div>
           ) : area === "quality" &&

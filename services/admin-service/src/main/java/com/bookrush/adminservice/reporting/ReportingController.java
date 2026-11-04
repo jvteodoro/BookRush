@@ -107,6 +107,23 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/pipeline-phases")
+  public Map<String, Object> pipelinePhases(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, phase, phase_status, error_code, attempts, completed_count,
+          failed_count, stuck_count, p50_duration_ms, p95_duration_ms,
+          p99_duration_ms, calculation_version, refreshed_at, source_watermark
+        FROM reporting.pipeline_phase_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, phase, phase_status, error_code
+        """, days);
+    return response("pipeline_phase_daily", "analytics-phase-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/quality/attribution")
   public Map<String, Object> attributionQuality(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {
