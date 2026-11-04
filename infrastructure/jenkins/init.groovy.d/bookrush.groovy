@@ -97,8 +97,10 @@ if (!(backstageJob.getDefinition() instanceof CpsScmFlowDefinition)) {
     backstageJob.setDefinition(scmFor(backstagePipelineFile.name))
     backstageJob.save()
 }
-if (!(adminWebJob.getDefinition() instanceof CpsScmFlowDefinition)) {
-    adminWebJob.setDefinition(scmFor(adminWebPipelineFile.name))
+def adminWebDefinition = adminWebJob.getDefinition()
+if (!(adminWebDefinition instanceof CpsScmFlowDefinition) ||
+    adminWebDefinition.getScriptPath() != 'infrastructure/jenkins/admin-web.Jenkinsfile') {
+    adminWebJob.setDefinition(scmFor('infrastructure/jenkins/admin-web.Jenkinsfile'))
     adminWebJob.save()
 }
 def observabilityDefinition = observabilityJob.getDefinition()

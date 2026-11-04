@@ -31,6 +31,7 @@ test -f infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertica
 test -f infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline do SeaweedFS ausente'
 test -f infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline do admin-web ausente'
 test -f infrastructure/jenkins/observability.Jenkinsfile || fail 'pipeline de observabilidade ausente'
+grep -Fq "scmFor('infrastructure/jenkins/admin-web.Jenkinsfile')" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'job Admin Web sem Script Path SCM válido'
 grep -Fq 'https://grafana-bookrush.jteodoro.tec.br' admin-web/src/lib/config.ts || fail 'Admin Web sem URL Grafana pública segura por padrão'
 
 for file in scripts/test-book-metadata-e2e.sh scripts/test-book-ratings-e2e.sh scripts/test-profile-search-e2e.sh scripts/test-deploy-compose-config.sh scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-keycloak-access-lifecycle.sh scripts/test-keycloak-user-management.sh scripts/test-microservice.sh scripts/test-reader-bff-e2e.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/jenkins/deploy-observability.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do

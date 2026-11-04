@@ -145,6 +145,11 @@ O instalador de vhosts instala o bootstrap HTTP; emita o certificado com
 `certbot --nginx --redirect -d grafana-bookrush.jteodoro.tec.br` antes de
 habilitar a URL pública SSO em produção.
 
+O job `bookrush-admin-web` carrega o script SCM
+`infrastructure/jenkins/admin-web.Jenkinsfile`; o bootstrap reconcilia esse
+caminho em jobs existentes. Para atualizar o link público do Grafana no hub,
+selecione a mesma branch e habilite `DEPLOY`.
+
 Para a pipeline completa de analytics no host com NVIDIA, o deploy deve usar o
 override `infrastructure/compose.analytics-gpu.yaml` e manter
 `ANALYTICS_NLI_ENABLED=true`, `ANALYTICS_NLI_BATCH_SIZE=8` e
