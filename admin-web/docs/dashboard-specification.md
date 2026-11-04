@@ -15,7 +15,7 @@ A rota proposta é **\`/admin/dashboards\`** (na SPA, \`/dashboards\`, respeitan
 - **Grafana OSS**: operações, infraestrutura, serviços, workers, SLO, logs/traces, alertas e exploração avançada; entrada na Admin Web via **links autenticados** e, quando houver UX/SSO testados, painéis incorporados com isolamento de permissões. Não usar iframe anônimo nem credenciais de Grafana expostas no navegador.
 - **Prometheus / Loki / Tempo / Alloy** são **propostos** para infraestrutura, não declarados existentes na \`main\`. PostgreSQL fornece projeções agregadas de negócio; Redis/SeaweedFS/Keycloak/Jenkins têm observabilidade por collectors/exporters compatíveis.
 
-Ver [catálogo completo dos painéis](dashboard-panel-catalog.md), [contratos de métricas e dados](dashboard-data-contracts.md), [plano de entrega e testes](dashboard-implementation-plan.md) e [ADR proposto](../../docs/adr/ADR-012-administration-observability-boundaries.md).
+Ver [catálogo completo dos painéis](dashboard-panel-catalog.md), [contratos de métricas e dados](dashboard-data-contracts.md), [plano de entrega e testes](dashboard-implementation-plan.md) e [ADR proposto](https://github.com/jvteodoro/BookRush/blob/main/docs/adr/ADR-012-administration-observability-boundaries.md).
 
 ## Personas e permissões
 
@@ -119,7 +119,7 @@ behavior / recommendation / reader / catalog / analytics --> projeções do repo
 
 - Admin atual: \`admin-web/src/app/Dashboard.tsx\` só mostra três cards (\`Imported books\`, \`Analytics runs\`, \`Training mode Ready\`) e quick links; \`adminNavigation\` e \`adminRouter\` ainda não possuem \`/dashboards\`.
 - API e pipeline: \`services/behavior-service\` contém \`behavior.events\`, \`daily_book\`, \`user_book_signal\`, \`outcome_attribution\`, outbox. \`recommendation-service\` contém request/item/impression ledger + PFV1 e \`FeedMetrics\`. \`reader-state-service\` persiste sessões, progresso e streak. \`book-analytics-service\` registra job/item e duração de fases.
-- [PFV1 operations](../../docs/recommendation/personalized-feed-v1-operations.md): caminhos \`ON/OFF/SHADOW\`, confidence, fallback, overlap, rollout; labels devem ser interpretados como *counters de execução*, não um resultado causal.
+- [PFV1 operations](https://github.com/jvteodoro/BookRush/blob/main/docs/recommendation/personalized-feed-v1-operations.md): caminhos \`ON/OFF/SHADOW\`, confidence, fallback, overlap, rollout; labels devem ser interpretados como *counters de execução*, não um resultado causal.
 - Métricas já presentes no Java **não** garantem Prometheus disponível em todos os serviços; instrumentação/exportação e acessos serão verificados por serviço no aceite.
 
 ## Não objetivos do primeiro release
@@ -132,5 +132,5 @@ Não criar data warehouse externo, Kafka, ML autorregulado, dados financeiros in
 - [Contratos de dados e atribuição](dashboard-data-contracts.md)
 - [Plano de implementação e testes](dashboard-implementation-plan.md)
 - [Documentação de operação do admin](operations.md)
-- [Owner dos bounded contexts](../../docs/adr/ADR-0034-product-bounded-contexts.md)
-- [Política docs-as-code](../../docs/documentation-policy.md)
+- [Owner dos bounded contexts](https://github.com/jvteodoro/BookRush/blob/main/docs/adr/ADR-0034-product-bounded-contexts.md)
+- [Política docs-as-code](https://github.com/jvteodoro/BookRush/blob/main/docs/documentation-policy.md)
