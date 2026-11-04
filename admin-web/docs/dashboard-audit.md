@@ -45,7 +45,7 @@ fica reservado para dependência externa identificada.
 | PL-06 | Infra ML | Runtime Python | MISSING | Sem métricas de modelo integradas | Disponibilidade/latência por modelo |
 | PL-07 | Produção de excerpts | Analytics excerpts/ranks | PARTIAL | Fonte existe, sem snapshot editorial | Cobertura por idioma/livro |
 | PL-08 | Cobertura de corpus | Analytics + catalog | PARTIAL | Sem projeção de cobertura | Direitos/reader-ready/score |
-| PL-09 | Qualidade editorial | Review/annotations | MISSING | Sem painel consolidado de revisão | Fila, SLA e motivos |
+| PL-09 | Qualidade editorial | `reporting.editorial_quality_daily` + `/reporting/editorial-quality-daily` | PARTIAL | Snapshot agregado, API e tabela de fila/QA implementados; falta fixture/runtime de campanha e SLA aprovado | Fila, SLA e motivos |
 | PL-10 | Qualidade de importação | Catalog/ingestion | PARTIAL | Proveniência existe, sem agregação | Duplicação/direitos/assets |
 | PL-11 | Frescor e backlog | `projection_health` + pipeline snapshots | PARTIAL | Watermarks/freshness existem; backlog/stuck-worker dedicado ainda pendente | Backlog e SLA medidos |
 | GR-01 | Usuários únicos | Behavior events | PARTIAL | Não há identidade analítica/projeção | DAU/WAU/MAU com população |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 62 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 5 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 63 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 4 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma

@@ -261,6 +261,18 @@ export type ReportingSeries = {
   p50_resolution_seconds?: number | null;
   p95_resolution_seconds?: number | null;
   oldest_open_age_seconds?: number | null;
+  campaigns?: number;
+  sampled_items?: number;
+  pending_items?: number;
+  in_progress_items?: number;
+  completed_items?: number;
+  annotations?: number;
+  submitted_annotations?: number;
+  unique_annotators?: number;
+  disputed_items?: number;
+  adjudications?: number;
+  p50_elapsed_ms?: number | null;
+  p95_elapsed_ms?: number | null;
   submissions?: number;
   approved_reviews?: number;
   rejected_reviews?: number;
@@ -648,6 +660,17 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível carregar as fases do analytics.");
+    }
+  },
+  async reportingEditorialQualityDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/editorial-quality-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a qualidade editorial.");
     }
   },
   async reportingAttributionQuality(days = 30): Promise<ReportingResponse> {

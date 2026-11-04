@@ -34,6 +34,7 @@ public class ReportingProjection {
   private static final String BOOK_ENGAGEMENT_VERSION = "book-engagement-v1-untrusted-population";
   private static final String EVENT_SCHEMA_VERSION = "event-schema-v1-untrusted-population";
   private static final String RECOMMENDATION_POSITION_VERSION = "recommendation-position-v1-untrusted-population";
+  private static final String EDITORIAL_QUALITY_VERSION = "editorial-quality-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final MeterRegistry metrics;
@@ -76,6 +77,8 @@ public class ReportingProjection {
         () -> refreshEventSchemaDaily(refreshed));
     runProjection("recommendation_position_daily", RECOMMENDATION_POSITION_VERSION,
         () -> refreshRecommendationPositionDaily(refreshed));
+    runProjection("editorial_quality_daily", EDITORIAL_QUALITY_VERSION,
+        () -> refreshEditorialQualityDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -1088,6 +1091,102 @@ public class ReportingProjection {
     updateHealth("recommendation_position_daily", RECOMMENDATION_POSITION_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
             + "FROM reporting.recommendation_position_daily");
+  }
+
+  private void refreshEditorialQualityDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.editorial_quality_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH campaigns AS (
+          SELECT created_at::date AS day, count(*) AS campaigns, max(created_at) AS source_watermark
+          FROM analytics.annotation_campaign
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        ), items AS (
+          SELECT created_at::date AS day,
+              count(*) AS sampled_items,
+              count(*) FILTER (WHERE state = 'PENDING') AS pending_items,
+              count(*) FILTER (WHERE state = 'IN_PROGRESS') AS in_progress_items,
+              count(*) FILTER (WHERE state = 'COMPLETE') AS completed_items,
+              max(created_at) AS source_watermark
+          FROM analytics.annotation_campaign_item
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        ), annotations AS (
+          SELECT created_at::date AS day,
+              count(*) AS annotations,
+              count(*) FILTER (WHERE status = 'SUBMITTED') AS submitted_annotations,
+              count(DISTINCT annotator_subject) AS unique_annotators,
+              percentile_cont(0.50) WITHIN GROUP (ORDER BY elapsed_ms)
+                FILTER (WHERE elapsed_ms IS NOT NULL) AS p50_elapsed_ms,
+              percentile_cont(0.95) WITHIN GROUP (ORDER BY elapsed_ms)
+                FILTER (WHERE elapsed_ms IS NOT NULL) AS p95_elapsed_ms,
+              max(coalesce(submitted_at, updated_at, created_at)) AS source_watermark
+          FROM analytics.annotation
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        ), disputed AS (
+          SELECT day, count(*) AS disputed_items, max(source_watermark) AS source_watermark
+          FROM (
+            SELECT i.created_at::date AS day, i.id, max(i.created_at) AS source_watermark
+            FROM analytics.annotation_campaign_item i
+            JOIN analytics.annotation_campaign c ON c.id = i.campaign_id
+            JOIN analytics.annotation a ON a.campaign_item_id = i.id
+            JOIN analytics.annotation_dimension_value d ON d.annotation_id = a.id
+            WHERE i.created_at >= current_date - INTERVAL '366 days'
+            GROUP BY i.created_at::date, i.id, c.disagreement_threshold
+            HAVING max(d.ordinal_value) - min(d.ordinal_value) >= c.disagreement_threshold
+          ) q
+          GROUP BY day
+        ), adjudications AS (
+          SELECT created_at::date AS day, count(*) AS adjudications, max(created_at) AS source_watermark
+          FROM analytics.annotation_adjudication
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        ), days AS (
+          SELECT day FROM campaigns UNION SELECT day FROM items UNION SELECT day FROM annotations
+          UNION SELECT day FROM disputed UNION SELECT day FROM adjudications
+        )
+        INSERT INTO reporting.editorial_quality_daily(
+            day, campaigns, sampled_items, pending_items, in_progress_items, completed_items,
+            annotations, submitted_annotations, unique_annotators, disputed_items, adjudications,
+            p50_elapsed_ms, p95_elapsed_ms, calculation_version, refreshed_at, source_watermark)
+        SELECT d.day,
+            coalesce(c.campaigns, 0), coalesce(i.sampled_items, 0), coalesce(i.pending_items, 0),
+            coalesce(i.in_progress_items, 0), coalesce(i.completed_items, 0),
+            coalesce(a.annotations, 0), coalesce(a.submitted_annotations, 0),
+            coalesce(a.unique_annotators, 0), coalesce(x.disputed_items, 0), coalesce(ad.adjudications, 0),
+            a.p50_elapsed_ms, a.p95_elapsed_ms, ?, ?,
+            greatest(coalesce(c.source_watermark, '-infinity'::timestamptz),
+              coalesce(i.source_watermark, '-infinity'::timestamptz),
+              coalesce(a.source_watermark, '-infinity'::timestamptz),
+              coalesce(x.source_watermark, '-infinity'::timestamptz),
+              coalesce(ad.source_watermark, '-infinity'::timestamptz))
+        FROM days d
+        LEFT JOIN campaigns c ON c.day = d.day
+        LEFT JOIN items i ON i.day = d.day
+        LEFT JOIN annotations a ON a.day = d.day
+        LEFT JOIN disputed x ON x.day = d.day
+        LEFT JOIN adjudications ad ON ad.day = d.day
+        ON CONFLICT (day) DO UPDATE SET
+            campaigns = EXCLUDED.campaigns,
+            sampled_items = EXCLUDED.sampled_items,
+            pending_items = EXCLUDED.pending_items,
+            in_progress_items = EXCLUDED.in_progress_items,
+            completed_items = EXCLUDED.completed_items,
+            annotations = EXCLUDED.annotations,
+            submitted_annotations = EXCLUDED.submitted_annotations,
+            unique_annotators = EXCLUDED.unique_annotators,
+            disputed_items = EXCLUDED.disputed_items,
+            adjudications = EXCLUDED.adjudications,
+            p50_elapsed_ms = EXCLUDED.p50_elapsed_ms,
+            p95_elapsed_ms = EXCLUDED.p95_elapsed_ms,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, EDITORIAL_QUALITY_VERSION, Timestamp.from(refreshed));
+    updateHealth("editorial_quality_daily", EDITORIAL_QUALITY_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
+            + "FROM reporting.editorial_quality_daily");
   }
 
   private void refreshRightsDaily(Instant refreshed) {

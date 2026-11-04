@@ -233,6 +233,23 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/editorial-quality-daily")
+  public Map<String, Object> editorialQualityDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, campaigns, sampled_items, pending_items, in_progress_items, completed_items,
+          annotations, submitted_annotations, unique_annotators, disputed_items, adjudications,
+          p50_elapsed_ms, p95_elapsed_ms, calculation_version, refreshed_at, source_watermark
+        FROM reporting.editorial_quality_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("editorial_quality_daily", "editorial-quality-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/quality/attribution")
   public Map<String, Object> attributionQuality(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

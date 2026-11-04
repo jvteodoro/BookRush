@@ -84,6 +84,13 @@ por fase, tentativas, falhas por código e leases presos há mais de 15 minutos.
 Os percentis são calculados sobre durações observadas e permanecem ausentes
 quando não há duração válida.
 
+`GET /api/admin/v1/reporting/editorial-quality-daily?days=30` expõe agregados
+diários das campanhas de anotação: itens amostrados e por estado, anotações
+submetidas, annotators distintos, discordâncias, adjudicações e p50/p95 do
+tempo observado. O contrato não retorna texto, subject ou identificadores de
+excerpt; a população permanece `UNCLASSIFIED` até a governança de amostra ser
+formalmente classificada.
+
 `GET /api/admin/v1/reporting/reading-daily?days=30` expõe sessões, segundos
 ativos, percentis de duração, livros abertos e saves. `GET
 /api/admin/v1/reporting/retention-cohort?days=366` expõe D1/D7/D30 por coorte;

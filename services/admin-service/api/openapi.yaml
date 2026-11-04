@@ -299,6 +299,21 @@ paths:
         '400': { description: Invalid date range }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/editorial-quality-daily:
+    get:
+      summary: Read editorial annotation quality and queue snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Campaigns, queue states, submissions, disagreements and latency percentiles
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/reading-daily:
     get:
       summary: Read daily reading engagement and library snapshots

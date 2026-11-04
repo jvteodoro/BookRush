@@ -677,6 +677,63 @@ function PipelinePhaseReport({ data }: { data: ReportingResponse }) {
   );
 }
 
+function EditorialQualityReport({ data }: { data: ReportingResponse }) {
+  if (!data.series.length)
+    return <div className="dashboard-state">NO_DATA</div>;
+  return (
+    <div className="dashboard-scroll-table">
+      <table className="dashboard-table">
+        <caption>
+          PL-09 · fila editorial, qualidade de anotação e tempos observados; sem
+          texto ou identidade de annotator
+        </caption>
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Campanhas</th>
+            <th>Amostrados</th>
+            <th>Pendentes</th>
+            <th>Em progresso</th>
+            <th>Completos</th>
+            <th>Submissões</th>
+            <th>Annotators</th>
+            <th>Discordâncias</th>
+            <th>Adjudicações</th>
+            <th>P50 ms</th>
+            <th>P95 ms</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.series.slice(-60).map((row, index) => (
+            <tr key={`${row.day}-${index}`}>
+              <td>{row.day ?? "—"}</td>
+              <td>{row.campaigns ?? "—"}</td>
+              <td>{row.sampled_items ?? "—"}</td>
+              <td>{row.pending_items ?? "—"}</td>
+              <td>{row.in_progress_items ?? "—"}</td>
+              <td>{row.completed_items ?? "—"}</td>
+              <td>{row.submitted_annotations ?? "—"}</td>
+              <td>{row.unique_annotators ?? "—"}</td>
+              <td>{row.disputed_items ?? "—"}</td>
+              <td>{row.adjudications ?? "—"}</td>
+              <td>
+                {row.p50_elapsed_ms == null
+                  ? "—"
+                  : Math.round(row.p50_elapsed_ms)}
+              </td>
+              <td>
+                {row.p95_elapsed_ms == null
+                  ? "—"
+                  : Math.round(row.p95_elapsed_ms)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function SupplyReport({
   supply,
   ingestion,
@@ -1185,6 +1242,8 @@ export function DashboardHub() {
     useState<ReportingResponse | null>(null);
   const [pipelinePhaseReport, setPipelinePhaseReport] =
     useState<ReportingResponse | null>(null);
+  const [editorialQualityReport, setEditorialQualityReport] =
+    useState<ReportingResponse | null>(null);
   const [attributionReport, setAttributionReport] =
     useState<ReportingResponse | null>(null);
   const [reconciliationReport, setReconciliationReport] =
@@ -1237,6 +1296,7 @@ export function DashboardHub() {
         bookEngagement,
         pipeline,
         pipelinePhases,
+        editorialQuality,
         attribution,
         reconciliation,
         eventQuality,
@@ -1265,6 +1325,9 @@ export function DashboardHub() {
         services.reportingBookEngagement(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
         services.reportingPipelinePhases(Math.min(Math.max(days, 1), 366)),
+        services.reportingEditorialQualityDaily(
+          Math.min(Math.max(days, 1), 366),
+        ),
         services.reportingAttributionQuality(Math.min(Math.max(days, 1), 366)),
         services.reportingReconciliationQuality(
           Math.min(Math.max(days, 1), 366),
@@ -1293,6 +1356,7 @@ export function DashboardHub() {
       setBookEngagementReport(bookEngagement);
       setPipelineReport(pipeline);
       setPipelinePhaseReport(pipelinePhases);
+      setEditorialQualityReport(editorialQuality);
       setAttributionReport(attribution);
       setReconciliationReport(reconciliation);
       setEventQualityReport(eventQuality);
@@ -1495,6 +1559,9 @@ export function DashboardHub() {
               <PipelineReport data={pipelineReport} />
               {pipelinePhaseReport && (
                 <PipelinePhaseReport data={pipelinePhaseReport} />
+              )}
+              {editorialQualityReport && (
+                <EditorialQualityReport data={editorialQualityReport} />
               )}
               <SupplyReport supply={supplyReport} ingestion={ingestionReport} />
             </div>

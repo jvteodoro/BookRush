@@ -90,4 +90,22 @@ class ReportingControllerTest {
     assertEquals("previous", ((Map<?, ?>) response.get("previous")).get("label"));
     assertEquals(2, ((List<?>) response.get("series")).size());
   }
+
+  @Test
+  void exposesEditorialQualityAsUntrustedAggregate() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    var row = Map.<String, Object>of(
+        "day", java.sql.Date.valueOf("2026-11-01"),
+        "campaigns", 1L, "sampled_items", 4L, "pending_items", 1L,
+        "submitted_annotations", 3L, "unique_annotators", 2L,
+        "disputed_items", 1L, "p50_elapsed_ms", 1200.0,
+        "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")));
+    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(row));
+
+    var response = controller.editorialQualityDaily(7, principal, analyst);
+
+    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNCLASSIFIED", response.get("population"));
+    assertEquals(1, ((List<?>) response.get("series")).size());
+  }
 }

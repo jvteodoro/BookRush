@@ -79,3 +79,9 @@ rejeições de telemetria, preservando apenas dimensões de baixa cardinalidade.
 
 `V19__reporting_recommendation_position_daily.sql` agrega outcomes atribuídos
 por bucket de rank para análise de relevância posicional.
+
+`V20__reporting_editorial_quality_daily.sql` cria o snapshot diário de
+qualidade editorial a partir das tabelas de campanhas de anotação. A projeção
+é limitada a 366 dias, idempotente e preserva watermark/versão; discordâncias
+e tempos são contagens/percentis agregados, sem texto ou identidade de
+annotator.
