@@ -568,6 +568,64 @@ function RecommendationReport({
   );
 }
 
+function ExcerptPerformanceReport({ data }: { data: ReportingResponse }) {
+  if (!data.series.length)
+    return <div className="dashboard-state">NO_DATA</div>;
+  return (
+    <div className="dashboard-scroll-table">
+      <table className="dashboard-table">
+        <caption>
+          FD-13 · desempenho agregado por excerpt; mínimo de 20 impressões, sem
+          texto do trecho e sem inferência causal
+        </caption>
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Livro</th>
+            <th>Idioma</th>
+            <th>Modelo</th>
+            <th>Elegível</th>
+            <th>Impressões</th>
+            <th>Viewable</th>
+            <th>CTR</th>
+            <th>Leituras</th>
+            <th>Conclusões</th>
+            <th>Usuários</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.series.slice(-100).map((row, index) => {
+            const impressions = row.impressions ?? 0;
+            const viewable = row.viewable_count ?? 0;
+            const opens = row.attributed_open_count ?? 0;
+            return (
+              <tr
+                key={`${row.day}-${row.excerpt_id}-${row.model_version}-${index}`}
+              >
+                <td>{row.day ?? "—"}</td>
+                <td>{row.book_title ?? row.book_id ?? "—"}</td>
+                <td>{row.language ?? "—"}</td>
+                <td>{row.model_version ?? "—"}</td>
+                <td>
+                  {row.eligible == null ? "—" : row.eligible ? "SIM" : "NÃO"}
+                </td>
+                <td>{impressions || "—"}</td>
+                <td>{viewable || "—"}</td>
+                <td>
+                  {viewable ? `${((opens / viewable) * 100).toFixed(1)}%` : "—"}
+                </td>
+                <td>{row.attributed_read_count ?? "—"}</td>
+                <td>{row.attributed_complete_count ?? "—"}</td>
+                <td>{row.unique_subjects ?? "—"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PipelineReport({ data }: { data: ReportingResponse }) {
   if (!data.series.length)
     return <div className="dashboard-state">NO_DATA</div>;
@@ -1238,6 +1296,8 @@ export function DashboardHub() {
     useState<ReportingResponse | null>(null);
   const [recommendationPositionReport, setRecommendationPositionReport] =
     useState<ReportingResponse | null>(null);
+  const [excerptPerformanceReport, setExcerptPerformanceReport] =
+    useState<ReportingResponse | null>(null);
   const [pipelineReport, setPipelineReport] =
     useState<ReportingResponse | null>(null);
   const [pipelinePhaseReport, setPipelinePhaseReport] =
@@ -1293,6 +1353,7 @@ export function DashboardHub() {
         recommendationDaily,
         recommendationQualityDaily,
         recommendationPositionDaily,
+        excerptPerformance,
         bookEngagement,
         pipeline,
         pipelinePhases,
@@ -1322,6 +1383,7 @@ export function DashboardHub() {
         services.reportingRecommendationPositionDaily(
           Math.min(Math.max(days, 1), 366),
         ),
+        services.reportingExcerptPerformance(Math.min(Math.max(days, 1), 366)),
         services.reportingBookEngagement(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
         services.reportingPipelinePhases(Math.min(Math.max(days, 1), 366)),
@@ -1353,6 +1415,7 @@ export function DashboardHub() {
       setRecommendationReport(recommendationDaily);
       setRecommendationQualityReport(recommendationQualityDaily);
       setRecommendationPositionReport(recommendationPositionDaily);
+      setExcerptPerformanceReport(excerptPerformance);
       setBookEngagementReport(bookEngagement);
       setPipelineReport(pipeline);
       setPipelinePhaseReport(pipelinePhases);
@@ -1540,6 +1603,9 @@ export function DashboardHub() {
                     position={recommendationPositionReport}
                   />
                 )}
+              {excerptPerformanceReport && (
+                <ExcerptPerformanceReport data={excerptPerformanceReport} />
+              )}
             </div>
           ) : area === "pipelines" &&
             pipelineReport &&

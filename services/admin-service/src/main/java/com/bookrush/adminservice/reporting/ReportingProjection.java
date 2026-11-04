@@ -35,6 +35,7 @@ public class ReportingProjection {
   private static final String EVENT_SCHEMA_VERSION = "event-schema-v1-untrusted-population";
   private static final String RECOMMENDATION_POSITION_VERSION = "recommendation-position-v1-untrusted-population";
   private static final String EDITORIAL_QUALITY_VERSION = "editorial-quality-v1-untrusted-population";
+  private static final String EXCERPT_PERFORMANCE_VERSION = "excerpt-performance-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final MeterRegistry metrics;
@@ -79,6 +80,8 @@ public class ReportingProjection {
         () -> refreshRecommendationPositionDaily(refreshed));
     runProjection("editorial_quality_daily", EDITORIAL_QUALITY_VERSION,
         () -> refreshEditorialQualityDaily(refreshed));
+    runProjection("excerpt_performance_daily", EXCERPT_PERFORMANCE_VERSION,
+        () -> refreshExcerptPerformanceDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -757,6 +760,70 @@ public class ReportingProjection {
     updateHealth("recommendation_quality_daily", RECOMMENDATION_QUALITY_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
             + "FROM reporting.recommendation_quality_daily");
+  }
+
+  private void refreshExcerptPerformanceDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.excerpt_performance_daily "
+        + "WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH exposures AS (
+          SELECT imp.id AS impression_id, imp.shown_at::date AS day,
+              imp.viewable, imp.shown_at, i.id AS item_id, i.excerpt_id,
+              i.book_id, r.model_version, r.strategy, r.subject_key,
+              e.body_eligible AS eligible, b.canonical_title AS book_title,
+              b.original_language AS language
+          FROM recommendation.impression imp
+          JOIN recommendation.request r ON r.id = imp.request_id
+          JOIN recommendation.item i ON i.id = imp.item_id
+          LEFT JOIN analytics.excerpt e ON e.id = i.excerpt_id
+          LEFT JOIN catalog.book_asset_version av ON av.id = e.source_asset_version_id
+          LEFT JOIN catalog.book_asset ba ON ba.id = av.book_asset_id
+          LEFT JOIN catalog.book b ON b.id = ba.book_id
+          WHERE i.excerpt_id IS NOT NULL
+            AND imp.shown_at >= current_date - INTERVAL '366 days'
+        ), outcomes AS (
+          SELECT x.impression_id, x.item_id, x.day, x.excerpt_id, x.book_id,
+              x.book_title, x.language, x.model_version, x.strategy,
+              x.eligible, x.subject_key, x.shown_at, x.viewable,
+              oa.source_event_id, oa.outcome_type, oa.occurred_at
+          FROM exposures x
+          LEFT JOIN behavior.outcome_attribution oa
+            ON (oa.impression_id = x.impression_id OR oa.recommendation_item_id = x.item_id)
+           AND oa.attribution_status = 'ATTRIBUTED'
+           AND oa.subject_key = x.subject_key
+        )
+        INSERT INTO reporting.excerpt_performance_daily(
+            day, excerpt_id, book_id, book_title, language, model_version, strategy,
+            eligible, impressions, viewable_count, attributed_open_count,
+            attributed_read_count, attributed_complete_count, unique_subjects,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT day, excerpt_id, book_id, max(book_title), max(language), model_version, strategy,
+            coalesce(bool_and(coalesce(eligible, false)), false), count(DISTINCT impression_id),
+            count(DISTINCT impression_id) FILTER (WHERE viewable),
+            count(DISTINCT source_event_id) FILTER (WHERE outcome_type = 'BOOK_OPEN'),
+            count(DISTINCT source_event_id) FILTER (WHERE outcome_type IN ('READ_SESSION', 'READ_PROGRESS')),
+            count(DISTINCT source_event_id) FILTER (WHERE outcome_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')),
+            count(DISTINCT subject_key), ?, ?, max(greatest(shown_at, coalesce(occurred_at, shown_at)))
+        FROM outcomes
+        GROUP BY day, excerpt_id, book_id, model_version, strategy
+        ON CONFLICT (day, excerpt_id, model_version, strategy) DO UPDATE SET
+            book_id = EXCLUDED.book_id,
+            book_title = EXCLUDED.book_title,
+            language = EXCLUDED.language,
+            eligible = EXCLUDED.eligible,
+            impressions = EXCLUDED.impressions,
+            viewable_count = EXCLUDED.viewable_count,
+            attributed_open_count = EXCLUDED.attributed_open_count,
+            attributed_read_count = EXCLUDED.attributed_read_count,
+            attributed_complete_count = EXCLUDED.attributed_complete_count,
+            unique_subjects = EXCLUDED.unique_subjects,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, EXCERPT_PERFORMANCE_VERSION, Timestamp.from(refreshed));
+    updateHealth("excerpt_performance_daily", EXCERPT_PERFORMANCE_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
+            + "FROM reporting.excerpt_performance_daily");
   }
 
   private void refreshEventQualityDaily(Instant refreshed) {

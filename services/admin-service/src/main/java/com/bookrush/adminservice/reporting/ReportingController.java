@@ -199,6 +199,33 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/excerpt-performance")
+  public Map<String, Object> excerptPerformance(
+      @RequestParam(defaultValue = "30") int days,
+      @RequestParam(defaultValue = "20") int minImpressions,
+      @RequestParam(defaultValue = "200") int limit,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    if (minImpressions < 1 || minImpressions > 100000 || limit < 1 || limit > 500) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "minImpressions must be 1..100000 and limit must be 1..500");
+    }
+    var rows = jdbc.queryForList("""
+        SELECT day, excerpt_id, book_id, book_title, language, model_version, strategy,
+          eligible, impressions, viewable_count, attributed_open_count,
+          attributed_read_count, attributed_complete_count, unique_subjects,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.excerpt_performance_daily
+        WHERE day >= current_date - (? - 1)
+          AND impressions >= ?
+        ORDER BY day DESC, viewable_count DESC, attributed_open_count DESC, excerpt_id
+        LIMIT ?
+        """, days, minImpressions, limit);
+    return response("excerpt_performance", "excerpt-performance-v1-untrusted-population", days,
+        "SUPPRESSED_BELOW_MIN_SAMPLE", rows);
+  }
+
   @GetMapping("/pipeline")
   public Map<String, Object> pipeline(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

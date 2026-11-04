@@ -174,6 +174,11 @@ export type ReportingSeries = {
   attributed_read_10_count?: number;
   attributed_read_50_count?: number;
   attributed_complete_count?: number;
+  excerpt_id?: string;
+  book_id?: string;
+  book_title?: string;
+  eligible?: boolean;
+  attributed_read_count?: number;
   dwell_observations?: number | null;
   dwell_seconds?: number | null;
   attribution_status?: string;
@@ -233,8 +238,6 @@ export type ReportingSeries = {
   unique_subjects?: number;
   aggregation_level?: string;
   aggregation_key?: string;
-  book_id?: string;
-  book_title?: string;
   language?: string;
   active_minutes?: number;
   interactions?: number;
@@ -619,6 +622,24 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar a relevância por posição.",
+      );
+    }
+  },
+  async reportingExcerptPerformance(
+    days = 30,
+    minImpressions = 20,
+    limit = 200,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/excerpt-performance",
+        { params: { days, minImpressions, limit } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar o desempenho por excerpt.",
       );
     }
   },

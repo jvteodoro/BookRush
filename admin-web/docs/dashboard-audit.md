@@ -70,7 +70,7 @@ fica reservado para dependência externa identificada.
 | FD-10 | Experimentos | Assignment persistido | MISSING | Não há experimento causal implementado | Assignment/guardrails |
 | FD-11 | Shadow overlap | `FeedMetrics` + Grafana | PARTIAL | Overlap, comparação e movimento agora têm séries operacionais; assignment persistido ainda não está no reporting | Comparação e amostra |
 | FD-12 | Qualidade do perfil | `FeedMetrics` + Grafana | PARTIAL | Buckets de confiança e sinais exportados; snapshot histórico do perfil ainda pendente | Coverage/confidence buckets |
-| FD-13 | Livro/excerpt | Excerpt ledger/outcomes | MISSING | Performance por excerpt não autorizada/projetada | Drill-down com controle de acesso |
+| FD-13 | Livro/excerpt | `reporting.excerpt_performance_daily` + `/reporting/excerpt-performance` | PARTIAL | Snapshot agregado, API RBAC e supressão de amostra implementados; falta fixture/runtime com população real | Drill-down sem texto/PII e amostra mínima |
 | SO-01 | Interações sociais | Social/behavior | PARTIAL | Dados existem, sem fatos analíticos | Likes/saves/shares/comments |
 | SO-02 | Engajamento de obras | `reporting.book_engagement` | PARTIAL | Join governado entre catálogo, eventos e agregados; publisher-scope ainda não exposto | n mínimo e deduplicação |
 | SO-03 | Moderação | Admin reports | PARTIAL | Endpoint existe, sem série/SLA | Estados e aging |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 65 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 2 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 66 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 1 painel sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma

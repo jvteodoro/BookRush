@@ -59,6 +59,12 @@ payloads.
 outcomes atribuídos por bucket de posição (`1-3`, `4-10`, `11-24`, `25+`), sem
 identificadores de usuário.
 
+`GET /api/admin/v1/reporting/excerpt-performance?days=30&minImpressions=20&limit=200`
+agrega impressões, viewability, CTR observacional, leituras e conclusões por
+excerpt/livro/modelo. A rota é protegida pelo RBAC de reporting, não retorna o
+texto do trecho e suprime linhas abaixo do limiar de impressões. O valor é
+descritivo e não representa causalidade.
+
 `GET /api/admin/v1/reporting/social-daily?days=30` e
 `GET /api/admin/v1/reporting/publisher-daily?days=30` expõem agregados
 read-only de interações/moderação e métricas de publicação. A resposta mantém

@@ -108,4 +108,24 @@ class ReportingControllerTest {
     assertEquals("UNCLASSIFIED", response.get("population"));
     assertEquals(1, ((List<?>) response.get("series")).size());
   }
+
+  @Test
+  void protectsExcerptPerformanceWithSampleAndPageLimits() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    assertEquals(400, assertThrows(ResponseStatusException.class,
+        () -> controller.excerptPerformance(30, 0, 200, principal, analyst))
+        .getStatusCode().value());
+    when(jdbc.queryForList(anyString(), eq(7), eq(20), eq(50))).thenReturn(List.of(Map.ofEntries(
+        Map.entry("day", java.sql.Date.valueOf("2026-11-01")),
+        Map.entry("excerpt_id", "excerpt-1"), Map.entry("book_id", "book-1"),
+        Map.entry("eligible", true), Map.entry("impressions", 20L),
+        Map.entry("viewable_count", 15L), Map.entry("attributed_open_count", 4L),
+        Map.entry("attributed_read_count", 2L), Map.entry("attributed_complete_count", 1L),
+        Map.entry("unique_subjects", 10L),
+        Map.entry("source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z"))))));
+    var response = controller.excerptPerformance(7, 20, 50, principal, analyst);
+    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("SUPPRESSED_BELOW_MIN_SAMPLE", response.get("population"));
+    assertEquals(1, ((List<?>) response.get("series")).size());
+  }
 }

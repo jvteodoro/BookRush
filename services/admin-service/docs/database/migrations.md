@@ -90,3 +90,9 @@ qualidade editorial a partir das tabelas de campanhas de anotação. A projeçã
 é limitada a 366 dias, idempotente e preserva watermark/versão; discordâncias
 e tempos são contagens/percentis agregados, sem texto ou identidade de
 annotator.
+
+`V21__reporting_excerpt_performance.sql` cria o snapshot diário protegido de
+desempenho por excerpt. A projeção reconcilia o ledger de impressões com
+outcomes `ATTRIBUTED`, preserva elegibilidade/modelo/estratégia e aplica
+supressão de amostras pequenas na API; texto do excerpt e sujeitos nunca são
+materializados no output.
