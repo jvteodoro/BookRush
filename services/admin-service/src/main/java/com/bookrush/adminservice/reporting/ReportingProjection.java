@@ -33,6 +33,7 @@ public class ReportingProjection {
   private static final String GOVERNANCE_VERSION = "governance-activity-v1-untrusted-population";
   private static final String BOOK_ENGAGEMENT_VERSION = "book-engagement-v1-untrusted-population";
   private static final String EVENT_SCHEMA_VERSION = "event-schema-v1-untrusted-population";
+  private static final String RECOMMENDATION_POSITION_VERSION = "recommendation-position-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final MeterRegistry metrics;
@@ -73,6 +74,8 @@ public class ReportingProjection {
         () -> refreshBookEngagementDaily(refreshed));
     runProjection("event_schema_daily", EVENT_SCHEMA_VERSION,
         () -> refreshEventSchemaDaily(refreshed));
+    runProjection("recommendation_position_daily", RECOMMENDATION_POSITION_VERSION,
+        () -> refreshRecommendationPositionDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -1048,6 +1051,43 @@ public class ReportingProjection {
         """, EVENT_SCHEMA_VERSION, Timestamp.from(refreshed));
     updateHealth("event_schema_daily", EVENT_SCHEMA_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.event_schema_daily");
+  }
+
+  private void refreshRecommendationPositionDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.recommendation_position_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH attributed AS (
+          SELECT oa.occurred_at::date AS day, r.model_version, r.strategy,
+              CASE WHEN i.rank <= 3 THEN '1-3'
+                   WHEN i.rank <= 10 THEN '4-10'
+                   WHEN i.rank <= 24 THEN '11-24' ELSE '25+' END AS rank_bucket,
+              oa.outcome_type, oa.subject_key, oa.book_id, oa.occurred_at AS source_watermark
+          FROM behavior.outcome_attribution oa
+          JOIN recommendation.item i ON i.id = oa.recommendation_item_id
+          JOIN recommendation.request r ON r.id = i.request_id
+          WHERE oa.recommendation_item_id IS NOT NULL
+            AND oa.attribution_status = 'ATTRIBUTED'
+            AND oa.occurred_at >= current_date - INTERVAL '366 days'
+        )
+        INSERT INTO reporting.recommendation_position_daily(
+            day, model_version, strategy, rank_bucket, outcome_type,
+            attributed_count, unique_subjects, unique_books,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT day, model_version, strategy, rank_bucket, outcome_type,
+            count(*), count(DISTINCT subject_key), count(DISTINCT book_id), ?, ?, max(source_watermark)
+        FROM attributed
+        GROUP BY day, model_version, strategy, rank_bucket, outcome_type
+        ON CONFLICT (day, model_version, strategy, rank_bucket, outcome_type) DO UPDATE SET
+            attributed_count = EXCLUDED.attributed_count,
+            unique_subjects = EXCLUDED.unique_subjects,
+            unique_books = EXCLUDED.unique_books,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, RECOMMENDATION_POSITION_VERSION, Timestamp.from(refreshed));
+    updateHealth("recommendation_position_daily", RECOMMENDATION_POSITION_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
+            + "FROM reporting.recommendation_position_daily");
   }
 
   private void refreshRightsDaily(Instant refreshed) {

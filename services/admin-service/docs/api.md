@@ -55,6 +55,10 @@ erro não fazem parte da projeção.
 registro, versão de schema, versão do cliente e motivo de rejeição, sem expor
 payloads.
 
+`GET /api/admin/v1/reporting/recommendation-position-daily?days=30` agrega
+outcomes atribuídos por bucket de posição (`1-3`, `4-10`, `11-24`, `25+`), sem
+identificadores de usuário.
+
 `GET /api/admin/v1/reporting/social-daily?days=30` e
 `GET /api/admin/v1/reporting/publisher-daily?days=30` expõem agregados
 read-only de interações/moderação e métricas de publicação. A resposta mantém

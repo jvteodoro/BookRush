@@ -228,6 +228,7 @@ export type ReportingSeries = {
   p50_rank?: number | null;
   p90_rank?: number | null;
   outcome_type?: string;
+  rank_bucket?: string;
   attributed_count?: number;
   unique_subjects?: number;
   aggregation_level?: string;
@@ -590,6 +591,22 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar os outcomes do recomendador.",
+      );
+    }
+  },
+  async reportingRecommendationPositionDaily(
+    days = 30,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/recommendation-position-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar a relevância por posição.",
       );
     }
   },

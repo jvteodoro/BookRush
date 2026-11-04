@@ -182,6 +182,23 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/recommendation-position-daily")
+  public Map<String, Object> recommendationPositionDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, model_version, strategy, rank_bucket, outcome_type,
+          attributed_count, unique_subjects, unique_books,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.recommendation_position_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, strategy, model_version, rank_bucket, outcome_type
+        """, days);
+    return response("recommendation_position_daily", "recommendation-position-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/pipeline")
   public Map<String, Object> pipeline(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

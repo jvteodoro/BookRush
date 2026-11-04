@@ -66,7 +66,7 @@ fica reservado para dependência externa identificada.
 | FD-06 | PFV1 caminhos | `FeedMetrics` + ledger | PARTIAL | Métrica existe, sem Prometheus/dashboard | ON/OFF/SHADOW e fallback |
 | FD-07 | Performance do ranking | `FeedMetrics` timers | PARTIAL | Sem scrape e percentis operacionais | Latência por etapa real |
 | FD-08 | Coverage/diversidade | `FeedMetrics` + Grafana | PARTIAL | Candidatos/itens exportados como métricas; repetição e cobertura histórica ainda não projetadas | Candidatos, repetição e cobertura |
-| FD-09 | Relevância por posição | Impression/item + outcomes | MISSING | Outcome por rank não projetado | Heatmap sem PII |
+| FD-09 | Relevância por posição | `reporting.recommendation_position_daily` | PARTIAL | Outcomes atribuídos por bucket de rank implementados; viewability denominada ainda depende de facts adicionais | Heatmap sem PII |
 | FD-10 | Experimentos | Assignment persistido | MISSING | Não há experimento causal implementado | Assignment/guardrails |
 | FD-11 | Shadow overlap | `FeedMetrics` + Grafana | PARTIAL | Overlap, comparação e movimento agora têm séries operacionais; assignment persistido ainda não está no reporting | Comparação e amostra |
 | FD-12 | Qualidade do perfil | `FeedMetrics` + Grafana | PARTIAL | Buckets de confiança e sinais exportados; snapshot histórico do perfil ainda pendente | Coverage/confidence buckets |

@@ -119,6 +119,21 @@ paths:
         '400': { description: Invalid range or sampling parameters }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/recommendation-position-daily:
+    get:
+      summary: Read attributed recommendation outcomes by rank bucket
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Recommendation position aggregates without user identifiers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/quality/attribution:
     get:
       summary: Read daily outcome attribution quality states

@@ -76,3 +76,6 @@ idioma, com leitores distintos, minutos, aberturas, conclusões e interações.
 
 `V18__reporting_event_schema_daily.sql` cria agregados de schema/cliente e
 rejeições de telemetria, preservando apenas dimensões de baixa cardinalidade.
+
+`V19__reporting_recommendation_position_daily.sql` agrega outcomes atribuídos
+por bucket de rank para análise de relevância posicional.

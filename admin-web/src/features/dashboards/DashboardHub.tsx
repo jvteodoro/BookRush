@@ -448,9 +448,11 @@ function FeedReport({ data }: { data: ReportingResponse }) {
 function RecommendationReport({
   data,
   quality,
+  position,
 }: {
   data: ReportingResponse;
   quality: ReportingResponse;
+  position: ReportingResponse;
 }) {
   if (!data.series.length)
     return <div className="dashboard-state">NO_DATA</div>;
@@ -524,6 +526,39 @@ function RecommendationReport({
                 <td>{row.unique_subjects ?? "—"}</td>
                 <td>{row.unique_books ?? "—"}</td>
                 <td>{row.p50_rank == null ? "—" : Math.round(row.p50_rank)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {position.series.length > 0 && (
+        <table className="dashboard-table">
+          <caption>
+            FD-09 · Outcomes atribuídos por posição; sem inferência causal
+          </caption>
+          <thead>
+            <tr>
+              <th>Dia</th>
+              <th>Estratégia</th>
+              <th>Bucket</th>
+              <th>Outcome</th>
+              <th>Atribuídos</th>
+              <th>Usuários</th>
+              <th>Livros</th>
+            </tr>
+          </thead>
+          <tbody>
+            {position.series.slice(-60).map((row, index) => (
+              <tr
+                key={`${row.day}-${row.strategy}-${row.rank_bucket}-${row.outcome_type}-${index}`}
+              >
+                <td>{row.day ?? "—"}</td>
+                <td>{row.strategy ?? "—"}</td>
+                <td>{row.rank_bucket ?? "—"}</td>
+                <td>{row.outcome_type ?? "—"}</td>
+                <td>{row.attributed_count ?? "—"}</td>
+                <td>{row.unique_subjects ?? "—"}</td>
+                <td>{row.unique_books ?? "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -1144,6 +1179,8 @@ export function DashboardHub() {
     useState<ReportingResponse | null>(null);
   const [recommendationQualityReport, setRecommendationQualityReport] =
     useState<ReportingResponse | null>(null);
+  const [recommendationPositionReport, setRecommendationPositionReport] =
+    useState<ReportingResponse | null>(null);
   const [pipelineReport, setPipelineReport] =
     useState<ReportingResponse | null>(null);
   const [pipelinePhaseReport, setPipelinePhaseReport] =
@@ -1196,6 +1233,7 @@ export function DashboardHub() {
         feedDaily,
         recommendationDaily,
         recommendationQualityDaily,
+        recommendationPositionDaily,
         bookEngagement,
         pipeline,
         pipelinePhases,
@@ -1219,6 +1257,9 @@ export function DashboardHub() {
         services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingRecommendationDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingRecommendationQualityDaily(
+          Math.min(Math.max(days, 1), 366),
+        ),
+        services.reportingRecommendationPositionDaily(
           Math.min(Math.max(days, 1), 366),
         ),
         services.reportingBookEngagement(Math.min(Math.max(days, 1), 366)),
@@ -1248,6 +1289,7 @@ export function DashboardHub() {
       setFeedReport(feedDaily);
       setRecommendationReport(recommendationDaily);
       setRecommendationQualityReport(recommendationQualityDaily);
+      setRecommendationPositionReport(recommendationPositionDaily);
       setBookEngagementReport(bookEngagement);
       setPipelineReport(pipeline);
       setPipelinePhaseReport(pipelinePhases);
@@ -1425,12 +1467,15 @@ export function DashboardHub() {
                 </div>
               )}
               <FeedReport data={feedReport} />
-              {recommendationReport && recommendationQualityReport && (
-                <RecommendationReport
-                  data={recommendationReport}
-                  quality={recommendationQualityReport}
-                />
-              )}
+              {recommendationReport &&
+                recommendationQualityReport &&
+                recommendationPositionReport && (
+                  <RecommendationReport
+                    data={recommendationReport}
+                    quality={recommendationQualityReport}
+                    position={recommendationPositionReport}
+                  />
+                )}
             </div>
           ) : area === "pipelines" &&
             pipelineReport &&
