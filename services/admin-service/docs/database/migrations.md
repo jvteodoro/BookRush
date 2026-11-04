@@ -32,3 +32,7 @@ cálculo, e alimentam os painéis DQ-03 (atribuição) e DQ-04 (reconciliação)
 `V8__reporting_reader_activity_windows.sql` adiciona as colunas de atividade
 semanal/mensal e recorrência ao snapshot diário sem reescrever migrations
 anteriores.
+
+`V9__reporting_social_publisher.sql` cria os agregados diários usados pelas
+áreas Social & Publisher. Ausência de registros retorna `NO_DATA` e não é
+convertida em atividade zero pelo frontend.

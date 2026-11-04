@@ -141,6 +141,39 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/social-daily")
+  public Map<String, Object> socialDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, follow_count, like_count, comment_count, share_count,
+          book_opened_count, book_saved_count, unique_actors, reports_open,
+          moderation_backlog, calculation_version, refreshed_at, source_watermark
+        FROM reporting.social_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("social_daily", "product-activity-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/publisher-daily")
+  public Map<String, Object> publisherDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, published_work_count, impressions, opens, reads, likes, shares, comments,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.publisher_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("publisher_daily", "product-activity-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   private Map<String, Object> response(String metricId, String definitionVersion, int days,
       String population, java.util.List<Map<String, Object>> rows) {
     var response = new LinkedHashMap<String, Object>();

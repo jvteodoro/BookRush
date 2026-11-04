@@ -130,6 +130,34 @@ function QualityReport({ attribution, reconciliation }: {
   </div>;
 }
 
+function SocialReport({ social, publisher }: {
+  social: ReportingResponse;
+  publisher: ReportingResponse;
+}) {
+  return <div className="dashboard-quality-grid">
+    <div>
+      <strong>SO-01/SO-03 · Interações e moderação</strong>
+      {!social.series.length ? <div className="dashboard-state">NO_DATA</div> : <table className="dashboard-table">
+        <thead><tr><th>Dia</th><th>Likes</th><th>Comentários</th><th>Shares</th><th>Atores</th><th>Reports abertos</th><th>Backlog moderação</th></tr></thead>
+        <tbody>{social.series.slice(-30).map((row, index) => <tr key={`${row.day}-${index}`}>
+          <td>{row.day ?? "—"}</td><td>{row.like_count ?? "—"}</td><td>{row.comment_count ?? "—"}</td><td>{row.share_count ?? "—"}</td>
+          <td>{row.unique_actors ?? "—"}</td><td>{row.reports_open ?? "—"}</td><td>{row.moderation_backlog ?? "—"}</td>
+        </tr>)}</tbody>
+      </table>}
+    </div>
+    <div>
+      <strong>SO-05/SO-06 · Publicação</strong>
+      {!publisher.series.length ? <div className="dashboard-state">NO_DATA</div> : <table className="dashboard-table">
+        <thead><tr><th>Dia</th><th>Obras</th><th>Impressões</th><th>Aberturas</th><th>Leituras</th><th>Likes</th><th>Shares</th></tr></thead>
+        <tbody>{publisher.series.slice(-30).map((row, index) => <tr key={`${row.day}-${index}`}>
+          <td>{row.day ?? "—"}</td><td>{row.published_work_count ?? "—"}</td><td>{row.impressions ?? "—"}</td>
+          <td>{row.opens ?? "—"}</td><td>{row.reads ?? "—"}</td><td>{row.likes ?? "—"}</td><td>{row.shares ?? "—"}</td>
+        </tr>)}</tbody>
+      </table>}
+    </div>
+  </div>;
+}
+
 export function DashboardHub() {
   const [params, setParams] = useSearchParams();
   const active = params.get("area") ?? "executive";
@@ -139,6 +167,8 @@ export function DashboardHub() {
   const [pipelineReport, setPipelineReport] = useState<ReportingResponse | null>(null);
   const [attributionReport, setAttributionReport] = useState<ReportingResponse | null>(null);
   const [reconciliationReport, setReconciliationReport] = useState<ReportingResponse | null>(null);
+  const [socialReport, setSocialReport] = useState<ReportingResponse | null>(null);
+  const [publisherReport, setPublisherReport] = useState<ReportingResponse | null>(null);
   const [health, setHealth] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,13 +178,15 @@ export function DashboardHub() {
     setLoading(true);
     setError(null);
     try {
-      const [readerDay, projectionHealth, feedDaily, pipeline, attribution, reconciliation] = await Promise.all([
+      const [readerDay, projectionHealth, feedDaily, pipeline, attribution, reconciliation, social, publisher] = await Promise.all([
         services.reportingReaderDay(Math.min(Math.max(days, 1), 366)),
         services.reportingHealth(),
         services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
         services.reportingAttributionQuality(Math.min(Math.max(days, 1), 366)),
         services.reportingReconciliationQuality(Math.min(Math.max(days, 1), 366)),
+        services.reportingSocialDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingPublisherDaily(Math.min(Math.max(days, 1), 366)),
       ]);
       setReport(readerDay);
       setHealth(projectionHealth);
@@ -162,6 +194,8 @@ export function DashboardHub() {
       setPipelineReport(pipeline);
       setAttributionReport(attribution);
       setReconciliationReport(reconciliation);
+      setSocialReport(social);
+      setPublisherReport(publisher);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Falha ao consultar reporting.");
     } finally {
@@ -175,7 +209,7 @@ export function DashboardHub() {
     () => areas.find(([key]) => key === area)?.[1] ?? "Executive",
     [area],
   );
-  const displayedReport = area === "feed" ? feedReport : area === "pipelines" ? pipelineReport : report;
+  const displayedReport = area === "feed" ? feedReport : area === "pipelines" ? pipelineReport : area === "quality" ? attributionReport : area === "social" ? socialReport : report;
 
   return (
     <section className="dashboard-hub">
@@ -218,6 +252,9 @@ export function DashboardHub() {
           <div className="dashboard-card-heading"><div><strong>DQ-03/04 · Qualidade dos eventos e reconciliação</strong><p>Contagens persistidas para auditoria; duplicidades não são apagadas e qualquer mismatch permanece visível.</p></div><AlertTriangle size={18} /></div>
           {(attributionReport.status === "UNTRUSTED" || reconciliationReport.status === "UNTRUSTED") && <div className="dashboard-alert warning"><AlertTriangle size={18} /><span>{statusText(attributionReport.status)} · população e integridade devem ser interpretadas com a definição de cálculo.</span></div>}
           <QualityReport attribution={attributionReport} reconciliation={reconciliationReport} />
+        </div> : area === "social" && socialReport && publisherReport ? <div className="dashboard-card wide">
+          <div className="dashboard-card-heading"><div><strong>SO-01/SO-03/SO-05/SO-06 · Social e Publisher</strong><p>Agregados reais dos bounded contexts; acesso por obra/editora ainda não é exposto neste snapshot global.</p></div><AlertTriangle size={18} /></div>
+          <SocialReport social={socialReport} publisher={publisherReport} />
         </div> : <div className="dashboard-card dashboard-gap">
           <div className="dashboard-card-heading"><div><strong>{unavailablePanels[area][0]}</strong><p>Esta área está conectada ao hub, mas as fontes específicas ainda não foram materializadas.</p></div><AlertTriangle size={18} /></div>
           <div className="dashboard-alert warning"><AlertTriangle size={18} /><span><strong>NOT_INSTRUMENTED</strong><br />{unavailablePanels[area][1]}. Não exibimos gráficos vazios nem zeros.</span></div>

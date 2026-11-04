@@ -185,6 +185,22 @@ export type ReportingSeries = {
   behavior_unique_impression_count?: number;
   mismatched_impression_count?: number;
   duplicate_event_count?: number;
+  follow_count?: number;
+  like_count?: number;
+  comment_count?: number;
+  share_count?: number;
+  book_opened_count?: number;
+  book_saved_count?: number;
+  unique_actors?: number;
+  reports_open?: number;
+  moderation_backlog?: number;
+  published_work_count?: number;
+  impressions?: number;
+  opens?: number;
+  reads?: number;
+  likes?: number;
+  shares?: number;
+  comments?: number;
   active_users?: number;
   newly_active_users?: number;
   weekly_active_users?: number;
@@ -461,6 +477,26 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível carregar a reconciliação de eventos.");
+    }
+  },
+  async reportingSocialDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/social-daily", { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os indicadores sociais.");
+    }
+  },
+  async reportingPublisherDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/publisher-daily", { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os indicadores publisher.");
     }
   },
   async listBookPage(

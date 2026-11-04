@@ -27,6 +27,11 @@ compara o ledger de impressões com eventos de viewability, destacando
 duplicidades e IDs sem correspondência. Esses endpoints são read-only, limitados
 a 366 dias e protegidos pelo mesmo RBAC de reporting.
 
+`GET /api/admin/v1/reporting/social-daily?days=30` e
+`GET /api/admin/v1/reporting/publisher-daily?days=30` expõem agregados
+read-only de interações/moderação e métricas de publicação. A resposta mantém
+proveniência e permanece `UNTRUSTED` enquanto a população não for classificada.
+
 `POST /api/v1/admin/audit` registra ação de administração sem armazenar tokens; `GET /api/v1/admin/audit` consulta os últimos eventos. O subject vem da identidade autenticada.
 
 ## Usuários

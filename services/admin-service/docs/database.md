@@ -25,3 +25,7 @@ A V8 amplia `reporting.reader_day` com `weekly_active_users`,
 `monthly_active_users` e `returning_users`. Novos leitores são definidos pelo
 primeiro evento significativo observado; WAU/MAU são contagens distintas em
 janelas móveis, nunca somas de DAU.
+
+A V9 adiciona `reporting.social_daily` e `reporting.publisher_daily`, derivados
+respectivamente dos bounded contexts social e publisher. São agregados de
+leitura, com watermark e versão, sem expor subject, texto ou IDs na API.

@@ -18,6 +18,7 @@ public class ReportingProjection {
   private static final String FEED_VERSION = "feed-attribution-v1-untrusted-population";
   private static final String PIPELINE_VERSION = "analytics-pipeline-v1";
   private static final String QUALITY_VERSION = "event-quality-v1";
+  private static final String PRODUCT_VERSION = "product-activity-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
 
@@ -34,6 +35,8 @@ public class ReportingProjection {
     runProjection("pipeline_snapshot", PIPELINE_VERSION, () -> refreshPipelineSnapshot(refreshed));
     runProjection("attribution_daily", QUALITY_VERSION, () -> refreshAttributionDaily(refreshed));
     runProjection("reconciliation_daily", QUALITY_VERSION, () -> refreshReconciliationDaily(refreshed));
+    runProjection("social_daily", PRODUCT_VERSION, () -> refreshSocialDaily(refreshed));
+    runProjection("publisher_daily", PRODUCT_VERSION, () -> refreshPublisherDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -319,6 +322,70 @@ public class ReportingProjection {
         """, QUALITY_VERSION, Timestamp.from(refreshed));
     updateHealth("reconciliation_daily", QUALITY_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.reconciliation_daily");
+  }
+
+  private void refreshSocialDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.social_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH activity AS (
+          SELECT occurred_at::date AS day,
+              count(*) FILTER (WHERE activity_type = 'FOLLOW') AS follow_count,
+              count(*) FILTER (WHERE activity_type = 'LIKE') AS like_count,
+              count(*) FILTER (WHERE activity_type = 'COMMENT') AS comment_count,
+              count(*) FILTER (WHERE activity_type = 'SHARE') AS share_count,
+              count(*) FILTER (WHERE activity_type = 'BOOK_OPENED') AS book_opened_count,
+              count(*) FILTER (WHERE activity_type = 'BOOK_SAVED') AS book_saved_count,
+              count(DISTINCT actor_subject_key) AS unique_actors,
+              max(occurred_at) AS source_watermark
+          FROM social.activity
+          WHERE occurred_at >= current_date - INTERVAL '366 days'
+          GROUP BY occurred_at::date
+        ), reports AS (
+          SELECT created_at::date AS day, count(*) FILTER (WHERE status IN ('OPEN', 'IN_REVIEW')) AS reports_open,
+              max(created_at) AS source_watermark
+          FROM social.reports
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        ), moderation AS (
+          SELECT updated_at::date AS day, count(*) FILTER (WHERE visibility <> 'VISIBLE') AS moderation_backlog,
+              max(updated_at) AS source_watermark
+          FROM social.comment_moderation_state
+          WHERE updated_at >= current_date - INTERVAL '366 days'
+          GROUP BY updated_at::date
+        )
+        INSERT INTO reporting.social_daily(
+            day, follow_count, like_count, comment_count, share_count,
+            book_opened_count, book_saved_count, unique_actors, reports_open,
+            moderation_backlog, calculation_version, refreshed_at, source_watermark)
+        SELECT COALESCE(a.day, r.day, m.day), COALESCE(a.follow_count, 0),
+            COALESCE(a.like_count, 0), COALESCE(a.comment_count, 0), COALESCE(a.share_count, 0),
+            COALESCE(a.book_opened_count, 0), COALESCE(a.book_saved_count, 0),
+            COALESCE(a.unique_actors, 0), COALESCE(r.reports_open, 0),
+            COALESCE(m.moderation_backlog, 0), ?, ?,
+            GREATEST(a.source_watermark, r.source_watermark, m.source_watermark)
+        FROM activity a FULL OUTER JOIN reports r ON r.day = a.day
+          FULL OUTER JOIN moderation m ON m.day = COALESCE(a.day, r.day)
+        """, PRODUCT_VERSION, Timestamp.from(refreshed));
+    updateHealth("social_daily", PRODUCT_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.social_daily");
+  }
+
+  private void refreshPublisherDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.publisher_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        INSERT INTO reporting.publisher_daily(
+            day, published_work_count, impressions, opens, reads, likes, shares, comments,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT m.day, count(DISTINCT m.published_work_id), coalesce(sum(m.impressions), 0),
+            coalesce(sum(m.opens), 0), coalesce(sum(m.reads), 0), coalesce(sum(m.likes), 0),
+            coalesce(sum(m.shares), 0), coalesce(sum(m.comments), 0), ?, ?, max(m.updated_at)
+        FROM publisher.daily_publication_metric m
+        JOIN publisher.published_work w ON w.id = m.published_work_id
+        WHERE m.day >= current_date - INTERVAL '366 days'
+        GROUP BY m.day
+        """, PRODUCT_VERSION, Timestamp.from(refreshed));
+    updateHealth("publisher_daily", PRODUCT_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.publisher_daily");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {
