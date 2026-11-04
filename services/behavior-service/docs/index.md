@@ -69,10 +69,13 @@ Após uma rotação de chaves do Keycloak, o serviço deve ser recriado ou
 reiniciado para recarregar o JWKS antes de validar o smoke S2S.
 
 The ingestion endpoint derives `identity_subject` from the authenticated
-principal and ignores identity fields supplied in the event body. Batches are
-limited to 100 events and payloads to 16 KiB; retries remain idempotent through
-the unique `event_key` constraint. This prevents a browser from attributing an
-event to another user.
+principal and ignores identity fields supplied in the event body. For a
+validated product JWT, the stored key is the same opaque technical identity
+(`issuer` plus `sub`) used by recommendation-service; non-JWT principals keep
+their principal name for local and test adapters. Batches are limited to 100
+events and payloads to 16 KiB; retries remain idempotent through the unique
+`event_key` constraint. This prevents a browser from attributing an event to
+another user and keeps behavior signals joinable with personalized serving.
 
 ## Correlation with recommendation outcomes
 

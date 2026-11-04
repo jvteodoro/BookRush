@@ -2,6 +2,7 @@ package com.bookrush.behaviorservice.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.bookrush.behaviorservice.BehaviorMaintenance;
+import com.bookrush.platform.core.TechnicalIdentity;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 @RestController
 @RequestMapping("/api/v1/behavior")
@@ -44,7 +46,7 @@ public class BehaviorController {
   public ResponseEntity<Map<String,Object>> ingest(@Valid @RequestBody Batch batch, Principal principal) {
     int accepted=0, duplicate=0;
     if (batch.events()==null || batch.events().size()>100) return ResponseEntity.badRequest().body(Map.of("error","batch must contain between 1 and 100 events"));
-    String subject = principal == null ? null : principal.getName();
+    String subject = identitySubject(principal);
     if (subject == null || subject.isBlank()) return ResponseEntity.status(401).body(Map.of("error","authentication required"));
     for (Event e: batch.events()) {
       String payload = e.payload()==null?"{}":e.payload().toString();
@@ -67,6 +69,17 @@ public class BehaviorController {
       } else duplicate++;
     }
     return ResponseEntity.accepted().body(Map.of("accepted",accepted,"duplicates",duplicate));
+  }
+
+  /** Keep behavior projections keyed exactly like recommendation serving. */
+  private String identitySubject(Principal principal) {
+    if (principal instanceof JwtAuthenticationToken authentication
+        && authentication.getToken().getIssuer() != null
+        && authentication.getToken().getSubject() != null) {
+      return new TechnicalIdentity(authentication.getToken().getIssuer().toString(),
+          authentication.getToken().getSubject()).toString();
+    }
+    return principal == null ? null : principal.getName();
   }
   @PostMapping("/aggregates/rebuild")
   public Map<String, Object> rebuild() {
@@ -110,7 +123,7 @@ public class BehaviorController {
         SELECT day, book_id, impressions, opens, likes, reads, active_seconds
         FROM behavior.daily_user_book
         WHERE identity_subject = ? ORDER BY day DESC LIMIT 500
-        """, principal.getName());
+        """, identitySubject(principal));
   }
  @GetMapping("/events/count")
   public Map<String, Object> count() {

@@ -6,7 +6,8 @@ info:
     Behavioral event ingestion and internal recommendation-serving signals.
     Recommendation-originated event payloads may include the optional UUID
     strings recommendationItemId and impressionId; attribution is scoped to the
-    authenticated subject.
+    authenticated subject. Product JWTs are normalized to the opaque technical
+    identity formed from issuer and sub, matching recommendation serving.
 servers:
   - url: /
 paths:
