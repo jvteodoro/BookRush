@@ -40,28 +40,62 @@ public class ReportingProjection {
     jdbc.update("""
           INSERT INTO reporting.reader_day(
               day, population, platform, active_users, newly_active_users, sessions,
+              weekly_active_users, monthly_active_users, returning_users,
               active_seconds, book_opens, meaningful_reads, completions,
               calculation_version, refreshed_at, source_watermark)
-          SELECT occurred_at::date, 'UNCLASSIFIED', 'UNKNOWN',
-              count(DISTINCT identity_subject) FILTER (WHERE identity_subject IS NOT NULL),
-              NULL,
-              count(*) FILTER (WHERE event_type = 'READ_SESSION'),
-              coalesce(sum(CASE WHEN event_type = 'READ_SESSION'
-                  AND payload->>'activeSeconds' ~ '^[0-9]+$'
-                THEN LEAST((payload->>'activeSeconds')::bigint, 86400) ELSE 0 END), 0),
-              count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
-              count(DISTINCT (identity_subject, book_id)) FILTER (
-                WHERE event_type = 'READ_SESSION'
-                  AND payload->>'activeSeconds' ~ '^[0-9]+$'
-                  AND (payload->>'activeSeconds')::bigint >= 60),
-              count(DISTINCT (identity_subject, book_id)) FILTER (
-                WHERE event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')),
-              ?, ?, max(occurred_at)
-          FROM behavior.events e
-          WHERE occurred_at >= current_date - INTERVAL '366 days'
-          GROUP BY occurred_at::date
+          WITH scoped AS (
+            SELECT e.occurred_at, e.identity_subject, e.book_id, e.event_type, e.payload
+            FROM behavior.events e
+            WHERE e.identity_subject IS NOT NULL
+              AND e.event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS',
+                'BOOK_COMPLETE', 'READ_COMPLETE', 'BOOK_LIKE', 'BOOK_UNLIKE',
+                'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
+              AND e.occurred_at >= current_date - INTERVAL '396 days'
+          ), first_seen AS (
+            SELECT e.identity_subject, min(e.occurred_at::date) AS first_day
+            FROM behavior.events e
+            WHERE e.identity_subject IS NOT NULL
+              AND e.event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS',
+                'BOOK_COMPLETE', 'READ_COMPLETE', 'BOOK_LIKE', 'BOOK_UNLIKE',
+                'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
+            GROUP BY e.identity_subject
+          ), daily AS (
+            SELECT s.occurred_at::date AS day,
+                count(DISTINCT s.identity_subject) AS active_users,
+                count(DISTINCT s.identity_subject) FILTER (WHERE f.first_day = s.occurred_at::date) AS newly_active_users,
+                count(DISTINCT s.identity_subject) FILTER (WHERE f.first_day < s.occurred_at::date) AS returning_users,
+                count(*) FILTER (WHERE s.event_type = 'READ_SESSION') AS sessions,
+                coalesce(sum(CASE WHEN s.event_type = 'READ_SESSION'
+                    AND s.payload->>'activeSeconds' ~ '^[0-9]+$'
+                  THEN LEAST((s.payload->>'activeSeconds')::bigint, 86400) ELSE 0 END), 0) AS active_seconds,
+                count(*) FILTER (WHERE s.event_type = 'BOOK_OPEN') AS book_opens,
+                count(DISTINCT (s.identity_subject, s.book_id)) FILTER (
+                  WHERE s.event_type = 'READ_SESSION'
+                    AND s.payload->>'activeSeconds' ~ '^[0-9]+$'
+                    AND (s.payload->>'activeSeconds')::bigint >= 60) AS meaningful_reads,
+                count(DISTINCT (s.identity_subject, s.book_id)) FILTER (
+                  WHERE s.event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')) AS completions,
+                max(s.occurred_at) AS source_watermark
+            FROM scoped s JOIN first_seen f ON f.identity_subject = s.identity_subject
+            GROUP BY s.occurred_at::date
+          )
+          SELECT d.day, 'UNCLASSIFIED', 'UNKNOWN', d.active_users, d.newly_active_users, d.sessions,
+              (SELECT count(DISTINCT w.identity_subject) FROM scoped w
+                WHERE w.occurred_at >= d.day - INTERVAL '6 days'
+                  AND w.occurred_at < d.day + INTERVAL '1 day'),
+              (SELECT count(DISTINCT m.identity_subject) FROM scoped m
+                WHERE m.occurred_at >= d.day - INTERVAL '29 days'
+                  AND m.occurred_at < d.day + INTERVAL '1 day'),
+              d.returning_users, d.active_seconds, d.book_opens,
+              d.meaningful_reads, d.completions, ?, ?, d.source_watermark
+          FROM daily d
+          WHERE d.day >= current_date - INTERVAL '366 days'
           ON CONFLICT (day, population, platform) DO UPDATE SET
               active_users = EXCLUDED.active_users,
+              newly_active_users = EXCLUDED.newly_active_users,
+              weekly_active_users = EXCLUDED.weekly_active_users,
+              monthly_active_users = EXCLUDED.monthly_active_users,
+              returning_users = EXCLUDED.returning_users,
               sessions = EXCLUDED.sessions,
               active_seconds = EXCLUDED.active_seconds,
               book_opens = EXCLUDED.book_opens,

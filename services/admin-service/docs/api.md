@@ -9,6 +9,9 @@ O intervalo é limitado a 366 dias e exige `platform-admins`, `operators` ou
 freshness, watermark, versão e estado da projeção. Quando a origem ainda não
 possui população classificada, a resposta permanece `UNTRUSTED` com
 `population=UNCLASSIFIED`; ausência de linhas é `NO_DATA`, não zero.
+O snapshot `reader_day` inclui DAU, WAU, MAU, novos e recorrentes derivados de
+eventos de leitura significativos; a população continua explicitamente
+`UNTRUSTED` até a proveniência ser classificada.
 
 `GET /api/admin/v1/reporting/feed-daily?days=30` expõe o ledger de entrega do
 feed e outcomes com `attribution-v1`. `GET /api/admin/v1/reporting/pipeline?days=30`

@@ -186,6 +186,10 @@ export type ReportingSeries = {
   mismatched_impression_count?: number;
   duplicate_event_count?: number;
   active_users?: number;
+  newly_active_users?: number;
+  weekly_active_users?: number;
+  monthly_active_users?: number;
+  returning_users?: number;
   sessions?: number;
   active_seconds?: number;
   book_opens?: number;

@@ -33,6 +33,7 @@ public class ReportingController {
     }
     var rows = jdbc.queryForList("""
         SELECT day, population, platform, active_users, newly_active_users, sessions,
+          weekly_active_users, monthly_active_users, returning_users,
           active_seconds, book_opens, meaningful_reads, completions,
           calculation_version, refreshed_at, source_watermark
         FROM reporting.reader_day

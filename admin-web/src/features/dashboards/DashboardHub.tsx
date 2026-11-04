@@ -40,6 +40,8 @@ function ReadingChart({ data }: { data: ReportingResponse }) {
   const chartData = data.series.map((row) => ({
     day: row.day,
     activeUsers: row.active_users ?? null,
+    weeklyActiveUsers: row.weekly_active_users ?? null,
+    monthlyActiveUsers: row.monthly_active_users ?? null,
     sessions: row.sessions ?? null,
     meaningfulReads: row.meaningful_reads ?? null,
   }));
@@ -54,6 +56,8 @@ function ReadingChart({ data }: { data: ReportingResponse }) {
             <YAxis stroke="#8290a8" tick={{ fontSize: 11 }} />
             <Tooltip contentStyle={{ background: "#111828", border: "1px solid #2a3a55" }} />
             <Line type="monotone" dataKey="activeUsers" name="Leitores ativos" stroke="#8cf0d2" dot={false} connectNulls={false} />
+            <Line type="monotone" dataKey="weeklyActiveUsers" name="WAU" stroke="#bb9cff" dot={false} connectNulls={false} />
+            <Line type="monotone" dataKey="monthlyActiveUsers" name="MAU" stroke="#ff9f7f" dot={false} connectNulls={false} />
             <Line type="monotone" dataKey="sessions" name="Sessões" stroke="#7fa8ff" dot={false} connectNulls={false} />
             <Line type="monotone" dataKey="meaningfulReads" name="Leituras significativas" stroke="#f6c76d" dot={false} connectNulls={false} />
           </LineChart>
@@ -61,9 +65,10 @@ function ReadingChart({ data }: { data: ReportingResponse }) {
       </div>
       <table className="dashboard-table">
         <caption>Valores reais do snapshot; população {data.population}</caption>
-        <thead><tr><th>Dia</th><th>Ativos</th><th>Sessões</th><th>Leituras ≥60s</th></tr></thead>
+        <thead><tr><th>Dia</th><th>DAU</th><th>WAU</th><th>MAU</th><th>Novos</th><th>Recorrentes</th><th>Sessões</th><th>Leituras ≥60s</th></tr></thead>
         <tbody>{data.series.slice(-14).map((row) => <tr key={row.day}>
-          <td>{row.day}</td><td>{row.active_users ?? "—"}</td><td>{row.sessions ?? "—"}</td><td>{row.meaningful_reads ?? "—"}</td>
+          <td>{row.day}</td><td>{row.active_users ?? "—"}</td><td>{row.weekly_active_users ?? "—"}</td><td>{row.monthly_active_users ?? "—"}</td>
+          <td>{row.newly_active_users ?? "—"}</td><td>{row.returning_users ?? "—"}</td><td>{row.sessions ?? "—"}</td><td>{row.meaningful_reads ?? "—"}</td>
         </tr>)}</tbody>
       </table>
     </>

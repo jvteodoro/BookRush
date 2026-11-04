@@ -28,3 +28,7 @@ consultas SQL fornecidas pelo frontend.
 `V7__reporting_data_quality.sql` cria as projeções diárias de qualidade. Elas
 são reconstruídas apenas na janela materializada, possuem watermark e versão de
 cálculo, e alimentam os painéis DQ-03 (atribuição) e DQ-04 (reconciliação).
+
+`V8__reporting_reader_activity_windows.sql` adiciona as colunas de atividade
+semanal/mensal e recorrência ao snapshot diário sem reescrever migrations
+anteriores.

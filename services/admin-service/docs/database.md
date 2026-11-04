@@ -20,3 +20,8 @@ A V7 adiciona `reporting.attribution_daily` e
 `reporting.reconciliation_daily`. A primeira conserva a classificação explícita
 dos outcomes; a segunda compara IDs de impressão do ledger com a telemetria de
 viewability e calcula duplicidades sem apagar o histórico bruto.
+
+A V8 amplia `reporting.reader_day` com `weekly_active_users`,
+`monthly_active_users` e `returning_users`. Novos leitores são definidos pelo
+primeiro evento significativo observado; WAU/MAU são contagens distintas em
+janelas móveis, nunca somas de DAU.
