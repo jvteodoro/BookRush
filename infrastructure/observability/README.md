@@ -104,6 +104,9 @@ O client `bookrush-grafana` é reconciliado no realm por
 `infrastructure/keycloak/reconcile.sh`; o segredo e a URI de redirect devem
 vir do ambiente protegido. Não habilite essa opção antes de validar redirect
 URI, grupos e revogação em ambiente descartável.
+Para instalar o vhost HTTP deste domínio sem alterar os demais sites, execute
+`sudo bash infrastructure/nginx/install-bookrush-grafana-vhost.sh` e depois
+rode o Certbot separadamente.
 O smoke `scripts/test-keycloak-reconcile.sh` inicia Keycloak e Grafana
 descartáveis com OAuth habilitado e verifica o redirect para o realm, além do
 mapper de grupos e da configuração do client.

@@ -53,5 +53,18 @@ test -f "$repo_root/infrastructure/nginx/conf.d/bookrush-grafana.conf" || {
   echo "Nginx bootstrap vhost for public Grafana is missing" >&2
   exit 1
 }
+grafana_vhost_installer="$repo_root/infrastructure/nginx/install-bookrush-grafana-vhost.sh"
+test -f "$grafana_vhost_installer" || {
+  echo "targeted Grafana vhost installer is missing" >&2
+  exit 1
+}
+grep -Fq 'install -m 0644 "$source_file" "$target_file"' "$grafana_vhost_installer" || {
+  echo "Grafana vhost installer must only copy the bootstrap file" >&2
+  exit 1
+}
+if grep -Eq '(^|[[:space:]])(nginx|certbot)([[:space:]]|$)' "$grafana_vhost_installer"; then
+  echo "Grafana vhost installer must leave validation/reload/certbot to the operator" >&2
+  exit 1
+fi
 
 echo "Observability Compose: OK"

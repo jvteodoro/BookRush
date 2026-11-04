@@ -141,9 +141,13 @@ postgres-exporter e segredo do client OIDC `bookrush-grafana`. O job gera um env
 com permissão restrita e o remove ao terminar. Grafana usa Keycloak do realm
 `bookrush-platform`; o endpoint público também exige DNS, certificado e proxy
 Nginx configurados para `grafana-bookrush.jteodoro.tec.br`.
-O instalador de vhosts instala o bootstrap HTTP; emita o certificado com
-`certbot --nginx --redirect -d grafana-bookrush.jteodoro.tec.br` antes de
-habilitar a URL pública SSO em produção.
+Para adicionar somente o vhost Grafana ao Nginx, execute
+`sudo bash infrastructure/nginx/install-bookrush-grafana-vhost.sh`. Esse script
+apenas copia o arquivo HTTP para `/etc/nginx/conf.d/`; depois, emita/instale o
+certificado separadamente com
+`sudo certbot --nginx --redirect -d grafana-bookrush.jteodoro.tec.br`. O
+instalador geral `install-bookrush-vhosts.sh` valida todos os vhosts e pode
+depender de certificados de outros domínios.
 
 O job `bookrush-admin-web` carrega o script SCM
 `infrastructure/jenkins/admin-web.Jenkinsfile`; o bootstrap reconcilia esse
