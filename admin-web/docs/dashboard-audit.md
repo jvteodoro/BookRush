@@ -81,7 +81,7 @@ fica reservado para dependência externa identificada.
 | DQ-01 | Qualidade dos eventos | Behavior events/rejects | PARTIAL | Rejeições existem, attempted/duplicates não consolidados | Fixtures duplicadas/rejeitadas |
 | DQ-02 | Outbox | `behavior.outbox` + Micrometer | PARTIAL | Métricas de backlog/idade/tentativas agora exportadas; falta smoke de scrape em produção | Retry, idade e sink |
 | DQ-03 | Atribuição | `outcome_attribution` | PARTIAL | Modelo existe, reconciliação incompleta | Orgânico/feed/inválido |
-| DQ-04 | Reconciliação | Recommendation + behavior | MISSING | Não há snapshot de mismatches | Ledger vs facts |
+| DQ-04 | Reconciliação | `reporting.reconciliation_daily` + `/reporting/quality/reconciliation` | PARTIAL | Snapshot diário/API/UI implementados; falta query viva contra a stack e smoke de autorização | Ledger vs facts e reprocessamento idempotente |
 | DQ-05 | Freshness | `reporting.projection_health` + Micrometer | PARTIAL | Status, timestamp e record count exportados; falta smoke de scrape em produção | Stale guard e alerta |
 | DQ-06 | Schema/telemetria | `reporting.event_schema_daily` | PARTIAL | Tipo/schema/cliente/rejeição agregados; validação de contrato no produtor ainda é limitada | Payload inválido/desconhecido |
 | DQ-07 | Overhead | Prometheus/Loki/Tempo | MISSING | Stack não existe | Cardinalidade, disco e custo |
@@ -91,11 +91,12 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 42 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 25 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 43 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 24 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma
-tabela ou classe. A implementação deve começar por `dash-02`/`dash-03` para
-criar a fundação operacional e por `dash-07`/`dash-08` antes de declarar
-conversão ou retenção confiáveis.
+tabela ou classe. A fundação `dash-02`/`dash-03` e a normalização `dash-07`/
+`dash-08` já têm incrementos implementados; a classificação permanece
+conservadora até existirem queries vivas, smoke autenticado e evidência de
+runtime para cada painel.
