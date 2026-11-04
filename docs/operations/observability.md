@@ -65,10 +65,11 @@ publicarem watermark e progresso. Enquanto a fonte não existir, o painel deve
 exibir `NOT_INSTRUMENTED`, não zero.
 
 Os alertas `BookRushTargetDown`, `BookRushHttpServerErrors`,
-`BookRushHttpLatencyP95High` e `BookRushBehaviorProjectionStale` usam
-thresholds iniciais, não SLOs aprovados. Cada alerta tem owner, duração e
-runbook; outbox, worker e reporting só devem gerar alertas quando suas fontes
-versionadas estiverem instrumentadas.
+`BookRushHttpLatencyP95High`, `BookRushBehaviorProjectionStale`,
+`BookRushOutboxBacklogOld`, `BookRushReportingProjectionStale` e
+`BookRushReportingProjectionError` usam thresholds iniciais, não SLOs
+aprovados. Cada alerta tem owner, duração e runbook; confirme o watermark e o
+erro do projection health antes de reprocessar ou reiniciar um serviço.
 
 ## Backup e restauração
 

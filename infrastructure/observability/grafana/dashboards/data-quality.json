@@ -2,15 +2,146 @@
   "uid": "bookrush-data-quality",
   "title": "BookRush / Data Quality",
   "description": "DQ-01, DQ-02 and DQ-05. Data quality is shown as measured or explicitly not instrumented.",
-  "tags": ["bookrush", "data-quality", "versioned"],
+  "tags": [
+    "bookrush",
+    "data-quality",
+    "versioned"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "60s",
   "panels": [
-    {"id": 31, "title": "DQ-01 Behavior reconciliation", "type": "timeseries", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "bookrush_behavior_data_quality_events", "legendFormat": "events"}, {"refId": "B", "expr": "bookrush_behavior_data_quality_projected_subjects", "legendFormat": "projected subjects"}, {"refId": "C", "expr": "bookrush_behavior_data_quality_attributed", "legendFormat": "attributed"}, {"refId": "D", "expr": "bookrush_behavior_data_quality_orphaned", "legendFormat": "orphaned"}], "fieldConfig": {"defaults": {"unit": "short"}}},
-    {"id": 32, "title": "DQ-02 Outbox", "type": "text", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "options": {"mode": "markdown", "content": "### NOT_INSTRUMENTED\n\nOutbox pending count, delivery lag and sink errors are not currently exported as approved low-cardinality metrics. They must come from behavior-owned projection/metrics (dash-07/08), not a guessed zero."}},
-    {"id": 33, "title": "DQ-05 Projection freshness", "type": "text", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "options": {"mode": "markdown", "content": "### NOT_INSTRUMENTED\n\nReporting watermarks and refresh status are not available until dash-09 creates the versioned projection health contract. A healthy Prometheus scrape does not prove business-data freshness."}},
-    {"id": 34, "title": "Quality interpretation", "type": "text", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "options": {"mode": "markdown", "content": "All business rates require numerator, denominator, population, time window and attribution version. This operational dashboard intentionally does not calculate CTR or conversion."}}
+    {
+      "id": 31,
+      "title": "DQ-01 Behavior reconciliation",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bookrush-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "bookrush_behavior_data_quality_events",
+          "legendFormat": "events"
+        },
+        {
+          "refId": "B",
+          "expr": "bookrush_behavior_data_quality_projected_subjects",
+          "legendFormat": "projected subjects"
+        },
+        {
+          "refId": "C",
+          "expr": "bookrush_behavior_data_quality_attributed",
+          "legendFormat": "attributed"
+        },
+        {
+          "refId": "D",
+          "expr": "bookrush_behavior_data_quality_orphaned",
+          "legendFormat": "orphaned"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "title": "DQ-02 Outbox",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bookrush-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "bookrush_behavior_outbox_pending",
+          "legendFormat": "pending"
+        },
+        {
+          "refId": "B",
+          "expr": "bookrush_behavior_outbox_oldest_pending_age_seconds",
+          "legendFormat": "oldest age"
+        },
+        {
+          "refId": "C",
+          "expr": "bookrush_behavior_outbox_failed_attempts",
+          "legendFormat": "failed attempts"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 33,
+      "title": "DQ-05 Projection freshness",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bookrush-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - bookrush_reporting_projection_last_refresh_timestamp_seconds",
+          "legendFormat": "age {{projection}}"
+        },
+        {
+          "refId": "B",
+          "expr": "bookrush_reporting_projection_status",
+          "legendFormat": "status {{projection}}"
+        },
+        {
+          "refId": "C",
+          "expr": "bookrush_reporting_projection_record_count",
+          "legendFormat": "records {{projection}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 34,
+      "title": "Quality interpretation",
+      "type": "text",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "All business rates require numerator, denominator, population, time window and attribution version. This operational dashboard intentionally does not calculate CTR or conversion."
+      }
+    }
   ]
 }

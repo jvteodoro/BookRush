@@ -1,7 +1,11 @@
 package com.bookrush.adminservice.reporting;
 
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.sql.Timestamp;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,10 +33,16 @@ public class ReportingProjection {
   private static final String GOVERNANCE_VERSION = "governance-activity-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
+  private final MeterRegistry metrics;
+  private final ConcurrentHashMap<String, AtomicLong> projectionFreshness = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, AtomicLong> projectionStatus = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, AtomicLong> projectionRecords = new ConcurrentHashMap<>();
 
-  public ReportingProjection(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+  public ReportingProjection(JdbcTemplate jdbc, PlatformTransactionManager transactionManager,
+      MeterRegistry metrics) {
     this.jdbc = jdbc;
     this.transactions = new TransactionTemplate(transactionManager);
+    this.metrics = metrics;
   }
 
   @Scheduled(fixedDelayString = "${bookrush.reporting.refresh-delay-ms:300000}")
@@ -147,6 +157,13 @@ public class ReportingProjection {
   private void runProjection(String name, String version, Runnable projection) {
     try {
       transactions.executeWithoutResult(status -> projection.run());
+      var health = jdbc.queryForMap("SELECT extract(epoch FROM last_successful_refresh)::bigint AS refreshed, "
+          + "record_count FROM reporting.projection_health WHERE projection_name = ?", name);
+      metric(projectionFreshness, "bookrush.reporting.projection.last_refresh_timestamp_seconds", name,
+          "last refresh timestamp").set(number(health.get("refreshed")));
+      metric(projectionRecords, "bookrush.reporting.projection.record_count", name, "materialized rows")
+          .set(number(health.get("record_count")));
+      metric(projectionStatus, "bookrush.reporting.projection.status", name, "1 on success, 0 on error").set(1);
     } catch (RuntimeException exception) {
       String error = exception.getClass().getSimpleName();
       LOG.warn("reporting projection refresh failed projection={} error={} detail={}",
@@ -159,7 +176,24 @@ public class ReportingProjection {
           ON CONFLICT (projection_name) DO UPDATE SET
               refresh_status = 'ERROR', last_error_code = EXCLUDED.last_error_code
           """, name, version, error);
+      metric(projectionStatus, "bookrush.reporting.projection.status", name, "1 on success, 0 on error").set(0);
     }
+  }
+
+  private long number(Object value) {
+    return value instanceof Number number ? number.longValue() : 0;
+  }
+
+  private AtomicLong metric(ConcurrentHashMap<String, AtomicLong> values, String metricName,
+      String projection, String description) {
+    return values.computeIfAbsent(projection, ignored -> {
+      AtomicLong value = new AtomicLong();
+      Gauge.builder(metricName, value, AtomicLong::get)
+          .description(description)
+          .tag("projection", projection)
+          .register(metrics);
+      return value;
+    });
   }
 
   private String safeDatabaseError(RuntimeException exception) {

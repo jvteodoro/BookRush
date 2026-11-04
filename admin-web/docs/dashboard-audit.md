@@ -79,10 +79,10 @@ fica reservado para dependência externa identificada.
 | SO-06 | Desempenho publisher | Publisher + behavior | MISSING | Escopo por obra e atribuição ausentes | Autorização por publisher |
 | SO-07 | Direitos/licenças | Catalog rights | PARTIAL | Fonte existe, sem painel agregado | Revogação e limitações |
 | DQ-01 | Qualidade dos eventos | Behavior events/rejects | PARTIAL | Rejeições existem, attempted/duplicates não consolidados | Fixtures duplicadas/rejeitadas |
-| DQ-02 | Outbox | `behavior.outbox` | PARTIAL | Fonte existe, sem painel de lag | Retry, idade e sink |
+| DQ-02 | Outbox | `behavior.outbox` + Micrometer | PARTIAL | Métricas de backlog/idade/tentativas agora exportadas; falta smoke de scrape em produção | Retry, idade e sink |
 | DQ-03 | Atribuição | `outcome_attribution` | PARTIAL | Modelo existe, reconciliação incompleta | Orgânico/feed/inválido |
 | DQ-04 | Reconciliação | Recommendation + behavior | MISSING | Não há snapshot de mismatches | Ledger vs facts |
-| DQ-05 | Freshness | Watermarks | MISSING | Reporting ainda não possui watermark | Stale guard e alerta |
+| DQ-05 | Freshness | `reporting.projection_health` + Micrometer | PARTIAL | Status, timestamp e record count exportados; falta smoke de scrape em produção | Stale guard e alerta |
 | DQ-06 | Schema/telemetria | Event registry | MISSING | Registry/version validation ausentes | Payload inválido/desconhecido |
 | DQ-07 | Overhead | Prometheus/Loki/Tempo | MISSING | Stack não existe | Cardinalidade, disco e custo |
 | DQ-08 | Compliance/acesso | Admin audit + gateway | PARTIAL | Auditoria parcial, sem reporting export auditado | RBAC e ausência de PII |

@@ -14,6 +14,11 @@ até a integração SSO do pacote `dash-06`.
 - Alloy: entrada OTLP para traces/logs e encaminhamento privado.
 - node-exporter/cAdvisor: host, containers, CPU, memória, disco e rede.
 - postgres-exporter/redis-exporter: métricas de dependências internas.
+- DQ-02: `bookrush_behavior_outbox_*` mede backlog, idade do item mais antigo,
+  tentativas falhas e publicações recentes a partir de `behavior.outbox`.
+- DQ-05: `bookrush_reporting_projection_*` expõe status, timestamp da última
+  atualização e quantidade materializada por projeção, com a etiqueta de
+  baixa cardinalidade `projection`.
 
 As imagens são fixadas por versão. Os volumes `prometheus_data`,
 `grafana_data`, `loki_data` e `tempo_data` são persistentes e independentes dos

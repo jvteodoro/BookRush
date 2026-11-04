@@ -46,3 +46,36 @@ groups:
           summary: "Behavior projection freshness is outside the initial threshold"
           description: "The behavior-owned projection reports an age above 15 minutes; inspect the projection and outbox runbook."
           runbook: "docs/operations/observability.md#stuck-worker-e-freshness"
+
+      - alert: BookRushOutboxBacklogOld
+        expr: bookrush_behavior_outbox_oldest_pending_age_seconds > 900
+        for: 10m
+        labels:
+          severity: warning
+          owner: behavior
+        annotations:
+          summary: "BookRush behavior outbox has an old pending event"
+          description: "The oldest unpublished behavior event is older than 15 minutes; inspect sink health and dispatcher errors."
+          runbook: "docs/operations/observability.md#stuck-worker-e-freshness"
+
+      - alert: BookRushReportingProjectionStale
+        expr: time() - bookrush_reporting_projection_last_refresh_timestamp_seconds > 900
+        for: 10m
+        labels:
+          severity: warning
+          owner: reporting
+        annotations:
+          summary: "BookRush reporting projection is stale"
+          description: "Projection {{ $labels.projection }} has not refreshed within 15 minutes."
+          runbook: "docs/operations/observability.md#stuck-worker-e-freshness"
+
+      - alert: BookRushReportingProjectionError
+        expr: bookrush_reporting_projection_status == 0
+        for: 5m
+        labels:
+          severity: critical
+          owner: reporting
+        annotations:
+          summary: "BookRush reporting projection is failing"
+          description: "Projection {{ $labels.projection }} reported an error during its last refresh."
+          runbook: "docs/operations/observability.md#stuck-worker-e-freshness"
