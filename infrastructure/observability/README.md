@@ -67,8 +67,17 @@ Prometheus pelo endpoint privado de remote-write. O Loki usa o armazenamento
 filesystem também para `delete_request_store`, requisito quando a retenção
 está habilitada. O Alloy recebe OTLP em rede privada; seu healthcheck valida a
 vida do processo porque a imagem oficial não inclui `wget` ou `curl`.
+O `redis-exporter` também não inclui shell ou cliente HTTP; seu healthcheck usa
+o binário nativo para detectar uma imagem executável, enquanto a disponibilidade
+do Redis é observada pela série de scrape no Prometheus.
 
 Smoke descartável recomendado (use uma rede e um projeto Compose exclusivos):
+
+```bash
+bash scripts/test-observability-stack.sh
+```
+
+Para uma execução manual ligada ao ambiente protegido:
 
 ```bash
 docker compose --env-file /run/bookrush-observability.env \
