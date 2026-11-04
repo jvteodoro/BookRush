@@ -36,6 +36,7 @@ public class ReportingProjection {
   private static final String RECOMMENDATION_POSITION_VERSION = "recommendation-position-v1-untrusted-population";
   private static final String EDITORIAL_QUALITY_VERSION = "editorial-quality-v1-untrusted-population";
   private static final String EXCERPT_PERFORMANCE_VERSION = "excerpt-performance-v1-untrusted-population";
+  private static final String EXPERIMENT_VERSION = "feed-experiment-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final MeterRegistry metrics;
@@ -82,6 +83,8 @@ public class ReportingProjection {
         () -> refreshEditorialQualityDaily(refreshed));
     runProjection("excerpt_performance_daily", EXCERPT_PERFORMANCE_VERSION,
         () -> refreshExcerptPerformanceDaily(refreshed));
+    runProjection("experiment_daily", EXPERIMENT_VERSION,
+        () -> refreshExperimentDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -826,6 +829,75 @@ public class ReportingProjection {
             + "FROM reporting.excerpt_performance_daily");
   }
 
+  private void refreshExperimentDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.experiment_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH assignments AS (
+          SELECT experiment_id, assignment_version, variant, subject_key,
+              assigned_at::date AS assignment_day, assigned_at AS source_watermark
+          FROM recommendation.experiment_assignment
+          WHERE assigned_at >= current_date - INTERVAL '366 days'
+        ), requests AS (
+          SELECT a.experiment_id, a.assignment_version, a.variant, a.subject_key,
+              r.id AS request_id, r.created_at::date AS day, r.created_at AS source_watermark,
+              a.source_watermark AS assignment_watermark
+          FROM assignments a
+          LEFT JOIN recommendation.request r
+            ON r.subject_key = a.subject_key
+           AND r.context->>'experimentId' = a.experiment_id
+           AND r.context->>'experimentVariant' = a.variant
+           AND r.context->>'assignmentVersion' = a.assignment_version
+           AND r.created_at >= a.source_watermark
+        ), facts AS (
+          SELECT r.experiment_id, r.assignment_version, r.variant, r.subject_key,
+              coalesce(r.day, a.assignment_day) AS day, r.request_id,
+              r.source_watermark AS request_watermark, r.assignment_watermark,
+              i.id AS impression_id,
+              i.viewable, oa.source_event_id, oa.outcome_type, oa.occurred_at
+          FROM requests r
+          JOIN assignments a ON a.experiment_id = r.experiment_id
+            AND a.assignment_version = r.assignment_version
+            AND a.variant = r.variant AND a.subject_key = r.subject_key
+          LEFT JOIN recommendation.impression i ON i.request_id = r.request_id
+          LEFT JOIN behavior.outcome_attribution oa
+            ON (oa.impression_id = i.id OR oa.recommendation_item_id = i.item_id)
+           AND oa.attribution_status = 'ATTRIBUTED'
+           AND oa.subject_key = r.subject_key
+        )
+        INSERT INTO reporting.experiment_daily(
+            day, experiment_id, assignment_version, variant, assigned_subjects,
+            request_count, impression_count, viewable_count, attributed_open_count,
+            attributed_read_count, attributed_complete_count, unique_subjects,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT day, experiment_id, assignment_version, variant,
+            count(DISTINCT subject_key), count(DISTINCT request_id),
+            count(DISTINCT impression_id), count(DISTINCT impression_id) FILTER (WHERE viewable),
+            count(DISTINCT source_event_id) FILTER (WHERE outcome_type = 'BOOK_OPEN'),
+            count(DISTINCT source_event_id) FILTER (WHERE outcome_type IN ('READ_SESSION', 'READ_PROGRESS')),
+            count(DISTINCT source_event_id) FILTER (WHERE outcome_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')),
+            count(DISTINCT subject_key) FILTER (WHERE request_id IS NOT NULL),
+            ?, ?, max(greatest(coalesce(request_watermark, assignment_watermark),
+                coalesce(occurred_at, request_watermark, assignment_watermark)))
+        FROM facts
+        GROUP BY day, experiment_id, assignment_version, variant
+        ON CONFLICT (day, experiment_id, assignment_version, variant) DO UPDATE SET
+            assigned_subjects = EXCLUDED.assigned_subjects,
+            request_count = EXCLUDED.request_count,
+            impression_count = EXCLUDED.impression_count,
+            viewable_count = EXCLUDED.viewable_count,
+            attributed_open_count = EXCLUDED.attributed_open_count,
+            attributed_read_count = EXCLUDED.attributed_read_count,
+            attributed_complete_count = EXCLUDED.attributed_complete_count,
+            unique_subjects = EXCLUDED.unique_subjects,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, EXPERIMENT_VERSION, Timestamp.from(refreshed));
+    updateHealth("experiment_daily", EXPERIMENT_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
+            + "FROM reporting.experiment_daily");
+  }
+
   private void refreshEventQualityDaily(Instant refreshed) {
     jdbc.update("DELETE FROM reporting.event_quality_daily WHERE day >= current_date - INTERVAL '366 days'");
     jdbc.update("""
@@ -906,8 +978,8 @@ public class ReportingProjection {
               FILTER (WHERE resolved_at IS NOT NULL),
             percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM resolved_at - created_at))
               FILTER (WHERE resolved_at IS NOT NULL),
-            extract(epoch FROM clock_timestamp() - min(created_at))::bigint
-              FILTER (WHERE status IN ('OPEN', 'IN_REVIEW')),
+            extract(epoch FROM clock_timestamp() - min(created_at)
+              FILTER (WHERE status IN ('OPEN', 'IN_REVIEW')))::bigint,
             ?, ?, max(coalesce(resolved_at, created_at))
         FROM social.reports
         WHERE created_at >= current_date - INTERVAL '366 days'

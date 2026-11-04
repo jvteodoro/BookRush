@@ -24,6 +24,11 @@ bookrush:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
 feed:
+  experiment:
+    enabled: ${FEED_EXPERIMENT_ENABLED:false}
+    id: ${FEED_EXPERIMENT_ID:pfv1-personalized-v1}
+    assignment-version: ${FEED_EXPERIMENT_ASSIGNMENT_VERSION:assignment-v1}
+    treatment-percentage: ${FEED_EXPERIMENT_TREATMENT_PERCENTAGE:50}
   personalized:
     mode: ${FEED_PERSONALIZED_MODE:ON}
     min-coverage: ${FEED_PERSONALIZED_MIN_COVERAGE:0.5}

@@ -41,6 +41,12 @@ tokens ou nomes arbitrários de arquivos. Verifique a disponibilidade do
 target no Prometheus e o endpoint interno do container; não exponha esse
 endpoint no gateway público.
 
+Experimentos de feed são opt-in: `FEED_EXPERIMENT_ENABLED=false` por padrão.
+Quando habilitados, assignments persistidos e guardrails agregados aparecem em
+`reporting.experiment_daily`; a configuração não transforma uma comparação
+observacional em SLO ou efeito causal. O deploy deve registrar a versão do
+assignment e manter a distribuição de tratamento explícita.
+
 O scrape `bookrush-java` aplica `service` a partir do hostname estático de
 cada target (`catalog-service`, `recommendation-service`, etc.). Esse relabel
 é parte do contrato dos painéis OP-01..05: `instance` identifica o endpoint,

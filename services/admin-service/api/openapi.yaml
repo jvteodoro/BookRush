@@ -151,6 +151,21 @@ paths:
         '400': { description: Invalid range or sampling parameters }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/experiment-daily:
+    get:
+      summary: Read persisted experiment assignments and observational guardrails
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Assignment counts and recommendation guardrails without causal claims
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/quality/attribution:
     get:
       summary: Read daily outcome attribution quality states

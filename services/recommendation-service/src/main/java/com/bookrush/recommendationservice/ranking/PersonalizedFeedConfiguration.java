@@ -4,9 +4,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import com.bookrush.recommendationservice.experiment.FeedExperimentAssignment;
 
 @Configuration
-@EnableConfigurationProperties({PersonalizedFeedConfiguration.Properties.class, BehaviorSignalsProperties.class})
+@EnableConfigurationProperties({PersonalizedFeedConfiguration.Properties.class,
+    BehaviorSignalsProperties.class, FeedExperimentAssignment.Properties.class})
 public class PersonalizedFeedConfiguration {
   @Bean
   BehaviorSignalsClient behaviorSignalsClient(org.springframework.web.client.RestClient.Builder builder,

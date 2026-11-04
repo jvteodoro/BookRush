@@ -65,6 +65,12 @@ excerpt/livro/modelo. A rota é protegida pelo RBAC de reporting, não retorna o
 texto do trecho e suprime linhas abaixo do limiar de impressões. O valor é
 descritivo e não representa causalidade.
 
+`GET /api/admin/v1/reporting/experiment-daily?days=30` expõe assignments
+persistidos por variante e guardrails agregados de requests, viewability,
+abertura, leitura e conclusão. A rota não transforma comparação observacional
+em efeito causal; ela só é populada quando um experimento explicitamente
+habilitado no recommendation-service registra sua variante no ledger.
+
 `GET /api/admin/v1/reporting/social-daily?days=30` e
 `GET /api/admin/v1/reporting/publisher-daily?days=30` expõem agregados
 read-only de interações/moderação e métricas de publicação. A resposta mantém

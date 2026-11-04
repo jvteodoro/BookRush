@@ -128,4 +128,22 @@ class ReportingControllerTest {
     assertEquals("SUPPRESSED_BELOW_MIN_SAMPLE", response.get("population"));
     assertEquals(1, ((List<?>) response.get("series")).size());
   }
+
+  @Test
+  void exposesExperimentGuardrailsOnlyAsObservationalAggregates() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.ofEntries(
+        Map.entry("day", java.sql.Date.valueOf("2026-11-01")),
+        Map.entry("experiment_id", "exp-1"), Map.entry("variant", "CONTROL"),
+        Map.entry("assigned_subjects", 10L), Map.entry("request_count", 10L),
+        Map.entry("impression_count", 20L), Map.entry("viewable_count", 15L),
+        Map.entry("attributed_open_count", 3L), Map.entry("attributed_read_count", 2L),
+        Map.entry("attributed_complete_count", 1L), Map.entry("unique_subjects", 10L),
+        Map.entry("source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z"))))));
+
+    var response = controller.experimentDaily(7, principal, analyst);
+
+    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNCLASSIFIED", response.get("population"));
+  }
 }

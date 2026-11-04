@@ -96,3 +96,8 @@ desempenho por excerpt. A projeção reconcilia o ledger de impressões com
 outcomes `ATTRIBUTED`, preserva elegibilidade/modelo/estratégia e aplica
 supressão de amostras pequenas na API; texto do excerpt e sujeitos nunca são
 materializados no output.
+
+`V22__reporting_experiment_daily.sql` cria guardrails agregados por assignment
+persistido, variante e dia. A origem é o ledger de recommendation e a
+atribuição `ATTRIBUTED`; sem assignment ativo a API retorna `NO_DATA`, e os
+resultados continuam explicitamente observacionais.

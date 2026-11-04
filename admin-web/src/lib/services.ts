@@ -161,6 +161,10 @@ export type ReportingSeries = {
   model_version?: string;
   strategy?: string;
   feed_path?: string;
+  experiment_id?: string;
+  assignment_version?: string;
+  variant?: string;
+  assigned_subjects?: number;
   service?: string;
   job_status?: string;
   phase?: string;
@@ -640,6 +644,20 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar o desempenho por excerpt.",
+      );
+    }
+  },
+  async reportingExperimentDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/experiment-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar os guardrails do experimento.",
       );
     }
   },

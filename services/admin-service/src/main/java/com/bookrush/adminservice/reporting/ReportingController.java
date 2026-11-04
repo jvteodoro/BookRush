@@ -226,6 +226,24 @@ public class ReportingController {
         "SUPPRESSED_BELOW_MIN_SAMPLE", rows);
   }
 
+  @GetMapping("/experiment-daily")
+  public Map<String, Object> experimentDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, experiment_id, assignment_version, variant, assigned_subjects,
+          request_count, impression_count, viewable_count, attributed_open_count,
+          attributed_read_count, attributed_complete_count, unique_subjects,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.experiment_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, experiment_id, variant
+        """, days);
+    return response("experiment_daily", "feed-experiment-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/pipeline")
   public Map<String, Object> pipeline(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

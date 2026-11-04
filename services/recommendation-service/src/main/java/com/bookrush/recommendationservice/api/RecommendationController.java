@@ -38,6 +38,7 @@ import com.bookrush.recommendationservice.fatigue.ExposureFatigue;
 import com.bookrush.recommendationservice.retrieval.CandidateRetriever;
 import com.bookrush.recommendationservice.retrieval.CandidateUnionBuilder;
 import com.bookrush.recommendationservice.retrieval.CandidateSet;
+import com.bookrush.recommendationservice.experiment.FeedExperimentAssignment;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
@@ -60,6 +61,7 @@ public class RecommendationController {
   private final ExplorationPolicy explorationPolicy;
   private final PersonalizedFeedSelector personalizedFeedSelector;
   private final PersonalizedDecisionReplay decisionReplay;
+  private final FeedExperimentAssignment experimentAssignment;
 
   public RecommendationController(
       CandidateRetriever candidateRetriever,
@@ -78,7 +80,8 @@ public class RecommendationController {
       BookDiversityMmr bookDiversityMmr,
       ExplorationPolicy explorationPolicy,
       PersonalizedFeedSelector personalizedFeedSelector,
-      PersonalizedDecisionReplay decisionReplay) {
+      PersonalizedDecisionReplay decisionReplay,
+      FeedExperimentAssignment experimentAssignment) {
     this.candidateRetriever = candidateRetriever;
     this.candidateUnionBuilder = candidateUnionBuilder;
     this.jdbc = jdbc;
@@ -96,6 +99,7 @@ public class RecommendationController {
     this.explorationPolicy = explorationPolicy;
     this.personalizedFeedSelector = personalizedFeedSelector;
     this.decisionReplay = decisionReplay;
+    this.experimentAssignment = experimentAssignment;
   }
 
   private String subject(Principal principal) {
@@ -127,8 +131,12 @@ public class RecommendationController {
     var profileResult = personalizedFeedGate.mode() == PersonalizedFeedGate.Mode.OFF
         ? new PersonalizedProfileService.Result(null, false, false, List.of(), Map.of())
         : feedMetrics.time("personalized_profile", () -> personalizedProfiles.load(subject));
-    var personalizationDecision = personalizedFeedGate.decide(profileResult.profile(),
+    var assignment = experimentAssignment.assign(subject);
+    var gateDecision = personalizedFeedGate.decide(profileResult.profile(),
         profileResult.behaviorAvailable(), profileResult.snapshotAvailable(), subject);
+    var personalizationDecision = assignment.control()
+        ? new PersonalizedFeedGate.Decision(PersonalizedFeedGate.Path.FALLBACK, "experiment-control")
+        : gateDecision;
     boolean personalized = personalizationDecision.path() == PersonalizedFeedGate.Path.PERSONALIZED;
     var candidateSnapshots = personalizationDecision.path() == PersonalizedFeedGate.Path.FALLBACK
         ? Map.<UUID, AnalyticsScoreClient.BookFeatureSnapshot>of()
@@ -246,6 +254,9 @@ public class RecommendationController {
                   personalized ? bookDiversityMmr.configurationHash() : "")
               .put("personalizationExplorationPolicy",
                   personalized ? explorationPolicy.policyVersion() : "")
+              .put("experimentId", assignment.experimentId())
+              .put("experimentVariant", assignment.variant())
+              .put("assignmentVersion", assignment.assignmentVersion())
               .toString());
       jdbc.update("UPDATE recommendation.request SET candidate_set_hash=? WHERE id=?",
           candidateSetHash, requestId);
@@ -311,15 +322,24 @@ public class RecommendationController {
         (int) items.stream().filter(FeedEligibility::hasAnalyticsExcerpt).count());
     feedMetrics.recordResult(items.isEmpty() ? "empty" : "success");
     resultRecorded = true;
-    var personalizationMetadata = Map.of(
-        "path", personalizationDecision.path().name(),
-        "reason", personalizationDecision.reason(),
-        "profileVersion", profileResult.profile() == null ? "" : profileResult.profile().profileVersion(),
-        "profileCoverage", profileResult.profile() == null ? 0 : profileResult.profile().coverage(),
-        "profileConfidence", profileResult.profile() == null ? 0 : profileResult.profile().confidence(),
-        "rankerConfigHash", personalized ? personalizedRanker.configurationHash() : "",
-        "mmrConfigHash", personalized ? bookDiversityMmr.configurationHash() : "",
-        "explorationPolicy", personalized ? explorationPolicy.policyVersion() : "");
+    var personalizationMetadata = new java.util.LinkedHashMap<String, Object>();
+    personalizationMetadata.put("path", personalizationDecision.path().name());
+    personalizationMetadata.put("reason", personalizationDecision.reason());
+    personalizationMetadata.put("profileVersion",
+        profileResult.profile() == null ? "" : profileResult.profile().profileVersion());
+    personalizationMetadata.put("profileCoverage",
+        profileResult.profile() == null ? 0 : profileResult.profile().coverage());
+    personalizationMetadata.put("profileConfidence",
+        profileResult.profile() == null ? 0 : profileResult.profile().confidence());
+    personalizationMetadata.put("experimentId", assignment.experimentId());
+    personalizationMetadata.put("experimentVariant", assignment.variant());
+    personalizationMetadata.put("assignmentVersion", assignment.assignmentVersion());
+    personalizationMetadata.put("rankerConfigHash",
+        personalized ? personalizedRanker.configurationHash() : "");
+    personalizationMetadata.put("mmrConfigHash",
+        personalized ? bookDiversityMmr.configurationHash() : "");
+    personalizationMetadata.put("explorationPolicy",
+        personalized ? explorationPolicy.policyVersion() : "");
     return Map.of("requestId", requestId, "modelVersion", modelVersion,
         "rankingVersion", modelVersion, "strategy", strategy,
         "candidateSetHash", candidateSetHash, "personalization", personalizationMetadata,

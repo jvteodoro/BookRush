@@ -67,7 +67,7 @@ fica reservado para dependência externa identificada.
 | FD-07 | Performance do ranking | `FeedMetrics` timers | PARTIAL | Sem scrape e percentis operacionais | Latência por etapa real |
 | FD-08 | Coverage/diversidade | `FeedMetrics` + Grafana | PARTIAL | Candidatos/itens exportados como métricas; repetição e cobertura histórica ainda não projetadas | Candidatos, repetição e cobertura |
 | FD-09 | Relevância por posição | `reporting.recommendation_position_daily` | PARTIAL | Outcomes atribuídos por bucket de rank implementados; viewability denominada ainda depende de facts adicionais | Heatmap sem PII |
-| FD-10 | Experimentos | Assignment persistido | MISSING | Não há experimento causal implementado | Assignment/guardrails |
+| FD-10 | Experimentos | `recommendation.experiment_assignment` + `reporting.experiment_daily` | PARTIAL | Assignment persistido, controle/tratamento e guardrails agregados implementados; falta execução com população real e validação estatística | Assignment/guardrails e amostra suficiente |
 | FD-11 | Shadow overlap | `FeedMetrics` + Grafana | PARTIAL | Overlap, comparação e movimento agora têm séries operacionais; assignment persistido ainda não está no reporting | Comparação e amostra |
 | FD-12 | Qualidade do perfil | `FeedMetrics` + Grafana | PARTIAL | Buckets de confiança e sinais exportados; snapshot histórico do perfil ainda pendente | Coverage/confidence buckets |
 | FD-13 | Livro/excerpt | `reporting.excerpt_performance_daily` + `/reporting/excerpt-performance` | PARTIAL | Snapshot agregado, API RBAC e supressão de amostra implementados; falta fixture/runtime com população real | Drill-down sem texto/PII e amostra mínima |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 66 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 1 painel sem implementação integrada suficiente.
+- `PARTIAL`: 67 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 0 painéis sem implementação integrada suficiente; runtime/população e validação ainda impedem `VALIDATED`.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma

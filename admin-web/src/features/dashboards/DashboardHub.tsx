@@ -626,6 +626,61 @@ function ExcerptPerformanceReport({ data }: { data: ReportingResponse }) {
   );
 }
 
+function ExperimentReport({ data }: { data: ReportingResponse }) {
+  if (!data.series.length)
+    return <div className="dashboard-state">NO_DATA</div>;
+  return (
+    <div className="dashboard-scroll-table">
+      <table className="dashboard-table">
+        <caption>
+          FD-10 · assignments persistidos e guardrails observacionais; sem
+          declaração de efeito causal
+        </caption>
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Experimento</th>
+            <th>Variante</th>
+            <th>Assignment n</th>
+            <th>Requests</th>
+            <th>Impressões</th>
+            <th>Viewable</th>
+            <th>CTR</th>
+            <th>Leituras</th>
+            <th>Conclusões</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.series.slice(-60).map((row, index) => {
+            const viewable = row.viewable_count ?? 0;
+            const opened = row.attributed_open_count ?? 0;
+            return (
+              <tr
+                key={`${row.day}-${row.experiment_id}-${row.variant}-${index}`}
+              >
+                <td>{row.day ?? "—"}</td>
+                <td>{row.experiment_id ?? "—"}</td>
+                <td>{row.variant ?? "—"}</td>
+                <td>{row.assigned_subjects ?? "—"}</td>
+                <td>{row.request_count ?? "—"}</td>
+                <td>{row.impression_count ?? "—"}</td>
+                <td>{viewable || "—"}</td>
+                <td>
+                  {viewable
+                    ? `${((opened / viewable) * 100).toFixed(1)}%`
+                    : "—"}
+                </td>
+                <td>{row.attributed_read_count ?? "—"}</td>
+                <td>{row.attributed_complete_count ?? "—"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PipelineReport({ data }: { data: ReportingResponse }) {
   if (!data.series.length)
     return <div className="dashboard-state">NO_DATA</div>;
@@ -1298,6 +1353,8 @@ export function DashboardHub() {
     useState<ReportingResponse | null>(null);
   const [excerptPerformanceReport, setExcerptPerformanceReport] =
     useState<ReportingResponse | null>(null);
+  const [experimentReport, setExperimentReport] =
+    useState<ReportingResponse | null>(null);
   const [pipelineReport, setPipelineReport] =
     useState<ReportingResponse | null>(null);
   const [pipelinePhaseReport, setPipelinePhaseReport] =
@@ -1354,6 +1411,7 @@ export function DashboardHub() {
         recommendationQualityDaily,
         recommendationPositionDaily,
         excerptPerformance,
+        experimentDaily,
         bookEngagement,
         pipeline,
         pipelinePhases,
@@ -1384,6 +1442,7 @@ export function DashboardHub() {
           Math.min(Math.max(days, 1), 366),
         ),
         services.reportingExcerptPerformance(Math.min(Math.max(days, 1), 366)),
+        services.reportingExperimentDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingBookEngagement(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
         services.reportingPipelinePhases(Math.min(Math.max(days, 1), 366)),
@@ -1416,6 +1475,7 @@ export function DashboardHub() {
       setRecommendationQualityReport(recommendationQualityDaily);
       setRecommendationPositionReport(recommendationPositionDaily);
       setExcerptPerformanceReport(excerptPerformance);
+      setExperimentReport(experimentDaily);
       setBookEngagementReport(bookEngagement);
       setPipelineReport(pipeline);
       setPipelinePhaseReport(pipelinePhases);
@@ -1606,6 +1666,7 @@ export function DashboardHub() {
               {excerptPerformanceReport && (
                 <ExcerptPerformanceReport data={excerptPerformanceReport} />
               )}
+              {experimentReport && <ExperimentReport data={experimentReport} />}
             </div>
           ) : area === "pipelines" &&
             pipelineReport &&
