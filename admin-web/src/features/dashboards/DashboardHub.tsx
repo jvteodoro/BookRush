@@ -10,7 +10,12 @@ import {
   YAxis,
 } from "recharts";
 import { useSearchParams } from "react-router-dom";
-import { services, ReportingResponse } from "../../lib/services";
+import {
+  services,
+  ExecutivePeriod,
+  ExecutiveSummary,
+  ReportingResponse,
+} from "../../lib/services";
 
 const areas = [
   ["executive", "Executive"],
@@ -135,6 +140,107 @@ function ReadingChart({ data }: { data: ReportingResponse }) {
           ))}
         </tbody>
       </table>
+    </>
+  );
+}
+
+function ExecutiveSummaryReport({ data }: { data: ExecutiveSummary }) {
+  const current = data.current;
+  const previous = data.previous;
+  const delta = (key: keyof ExecutivePeriod) => {
+    const now = current[key];
+    const before = previous[key];
+    if (typeof now !== "number" || typeof before !== "number") return "—";
+    return `${now - before >= 0 ? "+" : ""}${now - before}`;
+  };
+  const stages = [
+    ["Servidos", current.served, delta("served")],
+    ["Viewable", current.viewable, delta("viewable")],
+    ["Abertos", current.opened, delta("opened")],
+    ["Read ≥10%", current.meaningful, delta("meaningful")],
+    ["Concluídos", current.complete, delta("complete")],
+  ];
+  return (
+    <>
+      <div className="dashboard-quality-grid">
+        <div>
+          <strong>EX-01/04/06 · KPIs do período</strong>
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>KPI</th>
+                <th>Atual</th>
+                <th>Anterior</th>
+                <th>Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                [
+                  "Pico de leitores",
+                  current.daily_peak_users,
+                  previous.daily_peak_users,
+                  delta("daily_peak_users"),
+                ],
+                [
+                  "Sessões",
+                  current.sessions,
+                  previous.sessions,
+                  delta("sessions"),
+                ],
+                [
+                  "Minutos ativos",
+                  current.active_seconds == null
+                    ? null
+                    : Math.round(current.active_seconds / 60),
+                  previous.active_seconds == null
+                    ? null
+                    : Math.round(previous.active_seconds / 60),
+                  delta("active_seconds"),
+                ],
+                [
+                  "Leituras significativas",
+                  current.meaningful_reads,
+                  previous.meaningful_reads,
+                  delta("meaningful_reads"),
+                ],
+              ].map(([label, now, before, change]) => (
+                <tr key={String(label)}>
+                  <td>{label}</td>
+                  <td>{now ?? "—"}</td>
+                  <td>{before ?? "—"}</td>
+                  <td>{change}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <strong>EX-02 · Funil atribuído</strong>
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Etapa</th>
+                <th>Atual</th>
+                <th>Delta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stages.map(([label, value, change]) => (
+                <tr key={String(label)}>
+                  <td>{label}</td>
+                  <td>{value ?? "—"}</td>
+                  <td>{change}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p className="dashboard-caption">
+        Comparação observacional entre janelas de {data.days} dias; valores sem
+        snapshot permanecem como — e não representam zero.
+      </p>
     </>
   );
 }
@@ -934,6 +1040,8 @@ export function DashboardHub() {
   const active = params.get("area") ?? "executive";
   const days = Number(params.get("days") ?? "30");
   const [report, setReport] = useState<ReportingResponse | null>(null);
+  const [executiveSummaryReport, setExecutiveSummaryReport] =
+    useState<ExecutiveSummary | null>(null);
   const [feedReport, setFeedReport] = useState<ReportingResponse | null>(null);
   const [recommendationReport, setRecommendationReport] =
     useState<ReportingResponse | null>(null);
@@ -983,6 +1091,7 @@ export function DashboardHub() {
     setError(null);
     try {
       const [
+        executiveSummary,
         readerDay,
         projectionHealth,
         feedDaily,
@@ -1004,6 +1113,7 @@ export function DashboardHub() {
         reading,
         retention,
       ] = await Promise.all([
+        services.reportingExecutiveSummary(Math.min(Math.max(days, 1), 366)),
         services.reportingReaderDay(Math.min(Math.max(days, 1), 366)),
         services.reportingHealth(),
         services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
@@ -1032,6 +1142,7 @@ export function DashboardHub() {
         services.reportingRetentionCohort(366),
       ]);
       setReport(readerDay);
+      setExecutiveSummaryReport(executiveSummary);
       setHealth(projectionHealth);
       setFeedReport(feedDaily);
       setRecommendationReport(recommendationDaily);
@@ -1149,7 +1260,7 @@ export function DashboardHub() {
               {statusText(displayedReport?.status ?? "NO_DATA")}
             </span>
           </div>
-          {area === "executive" ? (
+          {area === "executive" && executiveSummaryReport ? (
             <div className="dashboard-card wide">
               <div className="dashboard-card-heading">
                 <div>
@@ -1162,6 +1273,7 @@ export function DashboardHub() {
                 <AlertTriangle size={18} />
               </div>
               {report && <ReadingChart data={report} />}
+              <ExecutiveSummaryReport data={executiveSummaryReport} />
             </div>
           ) : area === "growth" &&
             report &&

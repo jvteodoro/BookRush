@@ -4,6 +4,21 @@ info:
   version: 0.3.0
   description: Administrative user lifecycle and audit operations.
 paths:
+  /api/admin/v1/reporting/executive-summary:
+    get:
+      summary: Read executive KPIs and the previous-period comparison
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Current and previous period aggregates with funnel denominators
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/reader-day:
     get:
       summary: Read versioned reader-day reporting snapshots

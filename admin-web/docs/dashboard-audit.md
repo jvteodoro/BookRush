@@ -20,11 +20,11 @@ fica reservado para dependência externa identificada.
 | ID | Painel | Fonte autoritativa | Estado atual | Lacuna principal | Teste/evidência necessária |
 |---|---|---|---|---|---|
 | EX-01 | Visão geral de atividade | `behavior` + `reader_state` | PARTIAL | Não há projeção de atividade nem API | Fixture de atividade + snapshot |
-| EX-02 | Funil principal | Ledger recommendation + outcomes | MISSING | Atribuição e fatos de conversão não estão expostos | Fixture viewable/open/read/complete |
+| EX-02 | Funil principal | `/reporting/executive-summary` + `feed_daily` | PARTIAL | Funil agregado com denominadores implementado; falta gráfico dedicado e fixture de produção | Fixture viewable/open/read/complete |
 | EX-03 | Saúde do produto | Prometheus + reporting | MISSING | Não existe stack nem facade | Scrape, freshness e autorização |
 | EX-04 | Evolução de engajamento | `reader_state.session` | PARTIAL | Sessões não agregadas para reporting | SQL/projeção com timezone |
 | EX-05 | Conteúdo disponível | Catalog + analytics | PARTIAL | Não há snapshot reader-ready/excerpt-ready | Reconciliação catalog/analytics |
-| EX-06 | Comparação de período | Reporting snapshots | MISSING | Não há endpoint com denominador e janela | Teste de comparação temporal |
+| EX-06 | Comparação de período | `/reporting/executive-summary` | PARTIAL | Endpoint atual/precedente com janela igual implementado; falta delta visual dedicado | Teste de comparação temporal |
 | OP-01 | Mapa de disponibilidade | Actuator health | PARTIAL | Health não é coletado em dashboard | Prometheus targets + gateway smoke |
 | OP-02 | Taxa de requisições | Micrometer HTTP | PARTIAL | Exposição/scrape não uniformes | Série HTTP real por rota |
 | OP-03 | Erros HTTP | Micrometer HTTP | PARTIAL | Sem painel, regras ou error budget | Carga controlada 4xx/5xx |

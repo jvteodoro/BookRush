@@ -3,6 +3,7 @@ package com.bookrush.adminservice.reporting;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -70,5 +71,23 @@ class ReportingControllerTest {
     var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
     assertEquals(403, assertThrows(ResponseStatusException.class,
         () -> controller.feedDaily(7, principal, reader)).getStatusCode().value());
+  }
+
+  @Test
+  void comparesEqualExecutivePeriodsWithoutInferringMissingDataAsZero() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    Map<String, Object> reader = Map.of("has_data", true, "daily_peak_users", 4L,
+        "sessions", 8L, "active_seconds", 600L, "meaningful_reads", 3L);
+    Map<String, Object> feed = Map.of("has_data", true, "served", 10L, "viewable", 8L,
+        "opened", 4L, "meaningful", 2L, "complete", 1L);
+    when(jdbc.queryForMap(anyString(), any(Object[].class)))
+        .thenReturn(reader, feed, reader, feed);
+
+    var response = controller.executiveSummary(7, principal, analyst);
+
+    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("current", ((Map<?, ?>) response.get("current")).get("label"));
+    assertEquals("previous", ((Map<?, ?>) response.get("previous")).get("label"));
+    assertEquals(2, ((List<?>) response.get("series")).size());
   }
 }

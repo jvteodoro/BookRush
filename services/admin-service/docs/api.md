@@ -34,6 +34,12 @@ agrega obras e idiomas a partir de eventos e `behavior.daily_book`, ocultando
 linhas abaixo do limiar mínimo de leitores para evitar exposição de amostras
 pequenas.
 
+`GET /api/admin/v1/reporting/executive-summary?days=30` retorna KPIs agregados
+do período atual e do período anterior de mesma duração, além dos
+denominadores do funil viewable→open→read→complete. A comparação é
+observacional e permanece `UNTRUSTED` enquanto a população não estiver
+classificada.
+
 `GET /api/admin/v1/reporting/quality/attribution?days=30` expõe a distribuição
 de outcomes por `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` e
 `INVALID_REFERENCE`. `GET /api/admin/v1/reporting/quality/reconciliation?days=30`

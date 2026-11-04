@@ -299,6 +299,24 @@ export type ReportingResponse = {
   refreshedAt?: string | null;
   series: ReportingSeries[];
 };
+export type ExecutivePeriod = {
+  label: string;
+  has_data: boolean;
+  daily_peak_users?: number | null;
+  sessions?: number | null;
+  active_seconds?: number | null;
+  meaningful_reads?: number | null;
+  served?: number | null;
+  viewable?: number | null;
+  opened?: number | null;
+  meaningful?: number | null;
+  complete?: number | null;
+};
+export type ExecutiveSummary = ReportingResponse & {
+  current: ExecutivePeriod;
+  previous: ExecutivePeriod;
+  days: number;
+};
 
 const sleep = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 let mutableBooks = [...books];
@@ -504,6 +522,17 @@ export const services = {
         error,
         "Não foi possível carregar os indicadores de leitura.",
       );
+    }
+  },
+  async reportingExecutiveSummary(days = 30): Promise<ExecutiveSummary> {
+    try {
+      const { data } = await adminHttp.get<ExecutiveSummary>(
+        "/api/admin/v1/reporting/executive-summary",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar o resumo executivo.");
     }
   },
   async reportingHealth(): Promise<Record<string, unknown>[]> {

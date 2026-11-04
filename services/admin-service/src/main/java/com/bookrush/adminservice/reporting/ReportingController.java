@@ -55,6 +55,63 @@ public class ReportingController {
     return response;
   }
 
+  @GetMapping("/executive-summary")
+  public Map<String, Object> executiveSummary(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var current = executivePeriod(days, false);
+    var previous = executivePeriod(days, true);
+    var response = new LinkedHashMap<String, Object>();
+    response.put("schemaVersion", "dashboard-response-v1");
+    response.put("metricId", "executive_summary");
+    response.put("definitionVersion", "executive-period-comparison-v1-untrusted-population");
+    response.put("status", Boolean.TRUE.equals(current.get("has_data")) ? "UNTRUSTED" : "NO_DATA");
+    response.put("unit", "period_aggregate");
+    response.put("population", "UNCLASSIFIED");
+    response.put("days", days);
+    response.put("current", current);
+    response.put("previous", previous);
+    response.put("series", java.util.List.of(current, previous));
+    return response;
+  }
+
+  private Map<String, Object> executivePeriod(int days, boolean previous) {
+    String readerWindow = previous
+        ? "day >= current_date - (2 * ? - 1) AND day < current_date - (? - 1)"
+        : "day >= current_date - (? - 1)";
+    String feedWindow = previous
+        ? "day >= current_date - (2 * ? - 1) AND day < current_date - (? - 1)"
+        : "day >= current_date - (? - 1)";
+    var reader = jdbc.queryForMap("""
+        SELECT count(*) > 0 AS has_data, max(active_users) AS daily_peak_users,
+          sum(sessions) AS sessions, sum(active_seconds) AS active_seconds,
+          sum(meaningful_reads) AS meaningful_reads
+        FROM reporting.reader_day WHERE """ + readerWindow,
+        previous ? new Object[] {days, days} : new Object[] {days});
+    var feed = jdbc.queryForMap("""
+        SELECT count(*) > 0 AS has_data,
+          sum(served_count) AS served, sum(viewable_count) AS viewable,
+          sum(attributed_open_count) AS opened,
+          sum(attributed_read_10_count) AS meaningful,
+          sum(attributed_complete_count) AS complete
+        FROM reporting.feed_daily WHERE """ + feedWindow,
+        previous ? new Object[] {days, days} : new Object[] {days});
+    var period = new LinkedHashMap<String, Object>();
+    period.put("label", previous ? "previous" : "current");
+    period.put("has_data", Boolean.TRUE.equals(reader.get("has_data")) || Boolean.TRUE.equals(feed.get("has_data")));
+    period.put("daily_peak_users", reader.get("daily_peak_users"));
+    period.put("sessions", reader.get("sessions"));
+    period.put("active_seconds", reader.get("active_seconds"));
+    period.put("meaningful_reads", reader.get("meaningful_reads"));
+    period.put("served", feed.get("served"));
+    period.put("viewable", feed.get("viewable"));
+    period.put("opened", feed.get("opened"));
+    period.put("meaningful", feed.get("meaningful"));
+    period.put("complete", feed.get("complete"));
+    return period;
+  }
+
   private Instant toInstant(Object value) {
     if (value instanceof Instant instant) return instant;
     if (value instanceof Timestamp timestamp) return timestamp.toInstant();
