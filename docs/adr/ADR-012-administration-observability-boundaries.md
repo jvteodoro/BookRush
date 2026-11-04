@@ -3,7 +3,7 @@
 - **Estado:** Proposed (submetido a revisão pela issue #8)
 - **Data:** 2026-11-04
 - **Owners propostos:** Platform Engineering, Product Analytics, Security
-- **Contexto:** [issue #8](https://github.com/jvteodoro/BookRush/issues/8); [spec admin](../../admin-web/docs/dashboard-specification.md)
+- **Contexto:** [issue #8](https://github.com/jvteodoro/BookRush/issues/8); [spec admin](https://github.com/jvteodoro/BookRush/blob/main/admin-web/docs/dashboard-specification.md)
 
 ## Contexto
 
@@ -16,7 +16,7 @@ O BookRush possui múltiplos bounded contexts proprietários de schemas, métric
 3. **Planos separados mas correlacionados:** Métrica Prometheus não carrega user/book/excerpt IDs; rastreabilidade de pessoa/livro fica no sistema analítico com controles de privacidade. Correlation IDs em traces/logs autorizados; web/app não emite tokens para sistemas de observabilidade.
 4. **Sem dados enganosos:** todo indicador inclui definição, amostra, corte temporal, versão da projeção, status de frescor e domínio. Sem fonte, \`NOT_INSTRUMENTED\`; baixa amostra, \`INSUFFICIENT_SAMPLE\`. Seed, teste e produção segregados.
 5. **Evolução incremental:** integrar nas aplicações existentes antes de um novo serviço; criar serviço dedicado somente se escalabilidade/ownership exigirem, registrada em novo ADR. Não adotar OLAP distribuído nem Kafka sem medições.
-6. **Governança:** definição canônica no [catálogo](../../admin-web/docs/dashboard-panel-catalog.md) e [contratos](../../admin-web/docs/dashboard-data-contracts.md); cada nova métrica exige teste e atualização de TechDocs. Os runbooks e o gate constam no [plano](../../admin-web/docs/dashboard-implementation-plan.md).
+6. **Governança:** definição canônica no [catálogo](https://github.com/jvteodoro/BookRush/blob/main/admin-web/docs/dashboard-panel-catalog.md) e [contratos](https://github.com/jvteodoro/BookRush/blob/main/admin-web/docs/dashboard-data-contracts.md); cada nova métrica exige teste e atualização de TechDocs. Os runbooks e o gate constam no [plano](https://github.com/jvteodoro/BookRush/blob/main/admin-web/docs/dashboard-implementation-plan.md).
 
 ## Alternativas consideradas
 
