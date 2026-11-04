@@ -201,6 +201,18 @@ export type ReportingSeries = {
   likes?: number;
   shares?: number;
   comments?: number;
+  active_books?: number;
+  available_asset_versions?: number;
+  analyzed_asset_versions?: number;
+  eligible_excerpts?: number;
+  ranked_excerpts?: number;
+  job_count?: number;
+  discovered_items?: number;
+  processed_items?: number;
+  succeeded_items?: number;
+  failed_items?: number;
+  item_status?: string;
+  item_count?: number;
   active_users?: number;
   newly_active_users?: number;
   weekly_active_users?: number;
@@ -426,7 +438,10 @@ export const services = {
       );
       return data;
     } catch (error) {
-      throw problem(error, "Não foi possível carregar os indicadores de leitura.");
+      throw problem(
+        error,
+        "Não foi possível carregar os indicadores de leitura.",
+      );
     }
   },
   async reportingHealth(): Promise<Record<string, unknown>[]> {
@@ -442,7 +457,8 @@ export const services = {
   async reportingFeedDaily(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
-        "/api/admin/v1/reporting/feed-daily", { params: { days } },
+        "/api/admin/v1/reporting/feed-daily",
+        { params: { days } },
       );
       return data;
     } catch (error) {
@@ -452,37 +468,50 @@ export const services = {
   async reportingPipeline(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
-        "/api/admin/v1/reporting/pipeline", { params: { days } },
+        "/api/admin/v1/reporting/pipeline",
+        { params: { days } },
       );
       return data;
     } catch (error) {
-      throw problem(error, "Não foi possível carregar os snapshots do pipeline.");
+      throw problem(
+        error,
+        "Não foi possível carregar os snapshots do pipeline.",
+      );
     }
   },
   async reportingAttributionQuality(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
-        "/api/admin/v1/reporting/quality/attribution", { params: { days } },
+        "/api/admin/v1/reporting/quality/attribution",
+        { params: { days } },
       );
       return data;
     } catch (error) {
-      throw problem(error, "Não foi possível carregar a qualidade da atribuição.");
+      throw problem(
+        error,
+        "Não foi possível carregar a qualidade da atribuição.",
+      );
     }
   },
   async reportingReconciliationQuality(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
-        "/api/admin/v1/reporting/quality/reconciliation", { params: { days } },
+        "/api/admin/v1/reporting/quality/reconciliation",
+        { params: { days } },
       );
       return data;
     } catch (error) {
-      throw problem(error, "Não foi possível carregar a reconciliação de eventos.");
+      throw problem(
+        error,
+        "Não foi possível carregar a reconciliação de eventos.",
+      );
     }
   },
   async reportingSocialDaily(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
-        "/api/admin/v1/reporting/social-daily", { params: { days } },
+        "/api/admin/v1/reporting/social-daily",
+        { params: { days } },
       );
       return data;
     } catch (error) {
@@ -492,11 +521,40 @@ export const services = {
   async reportingPublisherDaily(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
-        "/api/admin/v1/reporting/publisher-daily", { params: { days } },
+        "/api/admin/v1/reporting/publisher-daily",
+        { params: { days } },
       );
       return data;
     } catch (error) {
-      throw problem(error, "Não foi possível carregar os indicadores publisher.");
+      throw problem(
+        error,
+        "Não foi possível carregar os indicadores publisher.",
+      );
+    }
+  },
+  async reportingContentSupply(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/content-supply",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a oferta de conteúdo.");
+    }
+  },
+  async reportingIngestionDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/ingestion-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar os snapshots de ingestão.",
+      );
     }
   },
   async listBookPage(

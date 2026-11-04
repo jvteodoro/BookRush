@@ -19,6 +19,8 @@ public class ReportingProjection {
   private static final String PIPELINE_VERSION = "analytics-pipeline-v1";
   private static final String QUALITY_VERSION = "event-quality-v1";
   private static final String PRODUCT_VERSION = "product-activity-v1-untrusted-population";
+  private static final String CONTENT_VERSION = "content-supply-v1";
+  private static final String INGESTION_VERSION = "ingestion-operations-v1";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
 
@@ -37,6 +39,8 @@ public class ReportingProjection {
     runProjection("reconciliation_daily", QUALITY_VERSION, () -> refreshReconciliationDaily(refreshed));
     runProjection("social_daily", PRODUCT_VERSION, () -> refreshSocialDaily(refreshed));
     runProjection("publisher_daily", PRODUCT_VERSION, () -> refreshPublisherDaily(refreshed));
+    runProjection("content_supply_snapshot", CONTENT_VERSION, () -> refreshContentSupply(refreshed));
+    runProjection("ingestion_daily", INGESTION_VERSION, () -> refreshIngestionDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -386,6 +390,70 @@ public class ReportingProjection {
         """, PRODUCT_VERSION, Timestamp.from(refreshed));
     updateHealth("publisher_daily", PRODUCT_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.publisher_daily");
+  }
+
+  private void refreshContentSupply(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.content_supply_snapshot WHERE collected_at < now() - INTERVAL '30 days'");
+    jdbc.update("""
+        INSERT INTO reporting.content_supply_snapshot(
+            collected_at, active_books, available_asset_versions,
+            analyzed_asset_versions, eligible_excerpts, ranked_excerpts,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT date_trunc('minute', ?::timestamptz),
+            (SELECT count(*) FROM catalog.book WHERE status = 'ACTIVE'),
+            (SELECT count(*) FROM catalog.book_asset_version WHERE status = 'AVAILABLE'),
+            (SELECT count(DISTINCT input_asset_version_id)
+               FROM analytics.analysis_run
+              WHERE status IN ('COMPLETED', 'COMPLETED_WITH_ERRORS')),
+            (SELECT count(*) FROM analytics.excerpt WHERE body_eligible),
+            (SELECT count(*) FROM analytics.excerpt_rank), ?, ?,
+            GREATEST(
+              (SELECT max(updated_at) FROM catalog.book),
+              (SELECT max(updated_at) FROM catalog.book_asset_version),
+              (SELECT max(created_at) FROM analytics.excerpt_rank))
+        ON CONFLICT (collected_at) DO UPDATE SET
+            active_books = EXCLUDED.active_books,
+            available_asset_versions = EXCLUDED.available_asset_versions,
+            analyzed_asset_versions = EXCLUDED.analyzed_asset_versions,
+            eligible_excerpts = EXCLUDED.eligible_excerpts,
+            ranked_excerpts = EXCLUDED.ranked_excerpts,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, Timestamp.from(refreshed), CONTENT_VERSION, Timestamp.from(refreshed));
+    updateHealth("content_supply_snapshot", CONTENT_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.content_supply_snapshot");
+  }
+
+  private void refreshIngestionDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.ingestion_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        INSERT INTO reporting.ingestion_daily(
+            day, job_status, job_count, discovered_items, processed_items,
+            succeeded_items, failed_items, item_status, item_count,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT j.created_at::date, j.status, count(DISTINCT j.id),
+            coalesce(sum(j.items_discovered), 0), coalesce(sum(j.items_processed), 0),
+            coalesce(sum(j.items_succeeded), 0), coalesce(sum(j.items_failed), 0),
+            coalesce(i.status, 'NO_ITEMS'), count(i.id), ?, ?,
+            GREATEST(max(j.updated_at), max(i.updated_at))
+        FROM catalog.ingestion_job j
+        LEFT JOIN catalog.ingestion_item i ON i.ingestion_job_id = j.id
+        WHERE j.created_at >= current_date - INTERVAL '366 days'
+        GROUP BY j.created_at::date, j.status, i.status
+        ON CONFLICT (day, job_status, item_status) DO UPDATE SET
+            job_count = EXCLUDED.job_count,
+            discovered_items = EXCLUDED.discovered_items,
+            processed_items = EXCLUDED.processed_items,
+            succeeded_items = EXCLUDED.succeeded_items,
+            failed_items = EXCLUDED.failed_items,
+            item_count = EXCLUDED.item_count,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, INGESTION_VERSION, Timestamp.from(refreshed));
+    updateHealth("ingestion_daily", INGESTION_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.ingestion_daily");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {

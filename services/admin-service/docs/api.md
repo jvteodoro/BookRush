@@ -32,6 +32,14 @@ a 366 dias e protegidos pelo mesmo RBAC de reporting.
 read-only de interações/moderação e métricas de publicação. A resposta mantém
 proveniência e permanece `UNTRUSTED` enquanto a população não for classificada.
 
+`GET /api/admin/v1/reporting/content-supply?days=30` expõe snapshots da oferta
+real de conteúdo: livros ativos, versões de assets disponíveis, assets com run
+de analytics concluído e excerpts elegíveis/rankeados. `GET
+/api/admin/v1/reporting/ingestion-daily?days=30` expõe jobs e itens de ingestão
+por estado, preservando falhas e watermark. Ambos são read-only, versionados,
+protegidos pelo RBAC de reporting e retornam `NO_DATA` quando a origem não tem
+registros; não substituem ausência por zeros.
+
 `POST /api/v1/admin/audit` registra ação de administração sem armazenar tokens; `GET /api/v1/admin/audit` consulta os últimos eventos. O subject vem da identidade autenticada.
 
 ## Usuários

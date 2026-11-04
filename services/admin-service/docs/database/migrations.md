@@ -36,3 +36,14 @@ anteriores.
 `V9__reporting_social_publisher.sql` cria os agregados diários usados pelas
 áreas Social & Publisher. Ausência de registros retorna `NO_DATA` e não é
 convertida em atividade zero pelo frontend.
+
+`V10__reporting_content_supply_and_ingestion.sql` adiciona:
+
+- `reporting.content_supply_snapshot`, um snapshot temporal da oferta de livros
+  ativos, assets disponíveis, assets analisados e excerpts elegíveis/rankeados;
+- `reporting.ingestion_daily`, uma projeção diária de jobs e itens por estado,
+  incluindo descobertos, processados, sucesso e falhas.
+
+As consultas usam somente contagens agregadas dos bounded contexts catalog e
+analytics, preservam `source_watermark` e `calculation_version`, e não expõem
+IDs, conteúdo ou mensagens de erro brutas no contrato do dashboard.

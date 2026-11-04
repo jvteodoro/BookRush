@@ -29,3 +29,10 @@ janelas móveis, nunca somas de DAU.
 A V9 adiciona `reporting.social_daily` e `reporting.publisher_daily`, derivados
 respectivamente dos bounded contexts social e publisher. São agregados de
 leitura, com watermark e versão, sem expor subject, texto ou IDs na API.
+
+A V10 adiciona `reporting.content_supply_snapshot` e
+`reporting.ingestion_daily`. A primeira mede a oferta efetiva para o feed
+(livros ativos, assets disponíveis, assets analisados e excerpts elegíveis ou
+rankeados); a segunda preserva o estado operacional da ingestão por dia. Ambas
+são rebuildáveis, agregadas, versionadas e mantêm `NO_DATA` quando não há fonte,
+sem inventar zeros no frontend.

@@ -117,6 +117,36 @@ paths:
         '400': { description: Invalid date range }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/content-supply:
+    get:
+      summary: Read content supply and analytics eligibility snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Active books, available assets and eligible/ranked excerpts
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/ingestion-daily:
+    get:
+      summary: Read ingestion jobs and item status snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Ingestion counts by day and explicit job/item state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/v1/admin/feed:
     get:
       summary: Read the versioned recommendation ledger for Feed Lab

@@ -174,6 +174,40 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/content-supply")
+  public Map<String, Object> contentSupply(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT collected_at, active_books, available_asset_versions,
+          analyzed_asset_versions, eligible_excerpts, ranked_excerpts,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.content_supply_snapshot
+        WHERE collected_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY collected_at
+        """, days);
+    return response("content_supply_snapshot", "content-supply-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/ingestion-daily")
+  public Map<String, Object> ingestionDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, job_status, job_count, discovered_items, processed_items,
+          succeeded_items, failed_items, item_status, item_count,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.ingestion_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, job_status, item_status
+        """, days);
+    return response("ingestion_daily", "ingestion-operations-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
   private Map<String, Object> response(String metricId, String definitionVersion, int days,
       String population, java.util.List<Map<String, Object>> rows) {
     var response = new LinkedHashMap<String, Object>();
