@@ -36,7 +36,7 @@ fica reservado para dependência externa identificada.
 | OP-09 | Gateway/Keycloak | Traefik + Keycloak | PARTIAL | Sem métricas de auth/gateway agregadas | 401/403/5xx e latência |
 | OP-10 | Jenkins e releases | Jenkins API/build metadata | PARTIAL | Histórico não está em datasource provisionado | Build/deploy/digest real |
 | OP-11 | Dependency tracing | OTel/Tempo | MISSING | Starter só fornece correlation ID | Trace BFF→recommendation→DB |
-| OP-12 | Incidentes/SLO | Prometheus alert rules | MISSING | Sem regras, SLO ou runbooks integrados | Alerta controlado + recuperação |
+| OP-12 | Incidentes/SLO | `ALERTS` + Prometheus alert rules | PARTIAL | Sete regras e painel de alertas ativos provisionados; falta disparo controlado e calibração de SLO | Alerta controlado + recuperação |
 | PL-01 | Ingestão | Ingestion jobs/metrics | PARTIAL | `IngestionMetrics` só conta processado/falho | Estados, throughput e retries |
 | PL-02 | Fila de ingestão | Ingestion jobs | PARTIAL | Não há snapshot de fila/idade | Fixture pending/running/failed |
 | PL-03 | Pipeline de analytics | `analytics.analysis_job/item` | PARTIAL | Dados persistem, sem API/painel | Contagens reais por estado |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 45 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 22 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 46 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 21 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma
