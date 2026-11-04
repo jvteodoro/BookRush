@@ -30,8 +30,8 @@ fica reservado para dependência externa identificada.
 | OP-03 | Erros HTTP | Micrometer HTTP | PARTIAL | Sem painel, regras ou error budget | Carga controlada 4xx/5xx |
 | OP-04 | Latência por serviço | Micrometer timers | PARTIAL | Histogramas e buckets não padronizados | P50/P95/P99 agregáveis |
 | OP-05 | JVM e containers | JVM/ Docker | PARTIAL | Sem cAdvisor/Prometheus provisionado | CPU, RSS, GC, restart e OOM |
-| OP-06 | PostgreSQL | `pg_stat_*` | MISSING | Exporter e consultas controladas ausentes | PostgreSQL real + limites |
-| OP-07 | Redis | Redis | MISSING | Exporter e fonte não encontrados | Hit ratio e eviction em runtime |
+| OP-06 | PostgreSQL | `postgres-exporter` + `pg_stat_*` | PARTIAL | Exporter e painel provisionados; falta query viva e limites calibrados | PostgreSQL real + limites |
+| OP-07 | Redis | `redis-exporter` | PARTIAL | Painel de hit ratio/eviction provisionado; falta query viva e limites calibrados | Hit ratio e eviction em runtime |
 | OP-08 | SeaweedFS/S3 | SeaweedFS + storage metrics | PARTIAL | Health/storage existem, sem painel/exporter | Operação S3 e persistência |
 | OP-09 | Gateway/Keycloak | Traefik + Keycloak | PARTIAL | Sem métricas de auth/gateway agregadas | 401/403/5xx e latência |
 | OP-10 | Jenkins e releases | Jenkins API/build metadata | PARTIAL | Histórico não está em datasource provisionado | Build/deploy/digest real |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 43 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 24 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 45 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 22 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma
