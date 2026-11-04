@@ -1,0 +1,58 @@
+# Observabilidade BookRush
+
+Esta stack é um Compose separado para a observabilidade privada do BookRush.
+Ela não publica exporters, Prometheus, Loki, Tempo ou Alloy na internet. O
+único bind de host é o Grafana em `127.0.0.1`, protegido por credencial local
+até a integração SSO do pacote `dash-06`.
+
+## Componentes
+
+- Prometheus: métricas, recording rules e alertas iniciais.
+- Grafana: datasource provisionado para Prometheus, Loki e Tempo.
+- Loki: logs estruturados com retenção limitada.
+- Tempo: traces OTLP e service graph.
+- Alloy: entrada OTLP para traces/logs e encaminhamento privado.
+- node-exporter/cAdvisor: host, containers, CPU, memória, disco e rede.
+- postgres-exporter/redis-exporter: métricas de dependências internas.
+
+As imagens são fixadas por versão. Os volumes `prometheus_data`,
+`grafana_data`, `loki_data` e `tempo_data` são persistentes e independentes dos
+volumes da aplicação.
+
+## Configuração protegida
+
+Defina no ambiente protegido, sem versionar o arquivo:
+
+```dotenv
+OBS_GRAFANA_ADMIN_PASSWORD=<senha protegida>
+OBS_POSTGRES_EXPORTER_DATA_SOURCE_NAME=postgresql://<usuario>:<senha>@postgres:5432/bookrush?sslmode=disable
+BOOKRUSH_NETWORK_NAME=bookrush_bookrush
+```
+
+O DSN do exporter não deve ser colocado em logs, Beads, argumentos de jobs ou
+no navegador. O valor padrão de rede presume o Compose principal do BookRush;
+para validação isolada, crie uma rede com o mesmo nome ou use um override
+descartável.
+
+## Inicialização e validação
+
+```bash
+docker compose --env-file /run/bookrush-observability.env \
+  -f infrastructure/observability/compose.yaml config --quiet
+docker compose --env-file /run/bookrush-observability.env \
+  -f infrastructure/observability/compose.yaml up -d
+docker compose --env-file /run/bookrush-observability.env \
+  -f infrastructure/observability/compose.yaml ps
+```
+
+Antes de conectar a produção, validar em ambiente descartável a carga das
+configurações, os healthchecks, o provisionamento idempotente, a retenção e o
+backup/restore dos quatro volumes. A integração com o Compose principal e o
+SSO Keycloak permanecem nos pacotes seguintes.
+
+## Limites e segurança
+
+Os limites de CPU/memória estão declarados por serviço. Labels de Prometheus
+devem permanecer em baixa cardinalidade: nunca usar subject, user ID, book ID,
+excerpt ID, token, texto integral ou URL assinada como label. Traces e logs
+devem aplicar o mesmo princípio antes de serem encaminhados ao Alloy.

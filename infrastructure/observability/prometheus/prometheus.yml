@@ -1,0 +1,50 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: production
+    stack: bookrush-observability
+
+rule_files:
+  - /etc/prometheus/recording-rules.yml
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  - job_name: node-exporter
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  - job_name: postgres-exporter
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: redis-exporter
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  # Services expose Actuator only on the private BookRush network. They are
+  # listed explicitly to keep the target set finite and auditable.
+  - job_name: bookrush-java
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - catalog-service:8080
+          - book-ingestion-service:8090
+          - book-analytics-service:8091
+          - admin-service:8093
+          - reader-state-service:8094
+          - social-service:8095
+          - publisher-service:8096
+          - behavior-service:8097
+          - recommendation-service:8098
+          - reader-profile-service:8099
+          - book-content-service:8100
+          - reader-bff-service:8101
