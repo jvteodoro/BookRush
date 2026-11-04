@@ -37,6 +37,7 @@ public class ReportingProjection {
   private static final String EDITORIAL_QUALITY_VERSION = "editorial-quality-v1-untrusted-population";
   private static final String EXCERPT_PERFORMANCE_VERSION = "excerpt-performance-v1-untrusted-population";
   private static final String EXPERIMENT_VERSION = "feed-experiment-v1-untrusted-population";
+  private static final String ACCESS_AUDIT_VERSION = "access-audit-v1";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final MeterRegistry metrics;
@@ -85,6 +86,8 @@ public class ReportingProjection {
         () -> refreshExcerptPerformanceDaily(refreshed));
     runProjection("experiment_daily", EXPERIMENT_VERSION,
         () -> refreshExperimentDaily(refreshed));
+    runProjection("access_audit_daily", ACCESS_AUDIT_VERSION,
+        () -> refreshAccessAuditDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -896,6 +899,30 @@ public class ReportingProjection {
     updateHealth("experiment_daily", EXPERIMENT_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
             + "FROM reporting.experiment_daily");
+  }
+
+  private void refreshAccessAuditDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.access_audit_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        INSERT INTO reporting.access_audit_daily(
+            day, action, event_count, unique_actors, unique_targets,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT created_at::date, action, count(*), count(DISTINCT actor_subject),
+            count(DISTINCT NULLIF(target, '')), ?, ?, max(created_at)
+        FROM admin.audit_log
+        WHERE created_at >= current_date - INTERVAL '366 days'
+        GROUP BY created_at::date, action
+        ON CONFLICT (day, action) DO UPDATE SET
+            event_count = EXCLUDED.event_count,
+            unique_actors = EXCLUDED.unique_actors,
+            unique_targets = EXCLUDED.unique_targets,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, ACCESS_AUDIT_VERSION, Timestamp.from(refreshed));
+    updateHealth("access_audit_daily", ACCESS_AUDIT_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
+            + "FROM reporting.access_audit_daily");
   }
 
   private void refreshEventQualityDaily(Instant refreshed) {

@@ -240,6 +240,7 @@ export type ReportingSeries = {
   rank_bucket?: string;
   attributed_count?: number;
   unique_subjects?: number;
+  unique_targets?: number;
   aggregation_level?: string;
   aggregation_key?: string;
   language?: string;
@@ -247,6 +248,7 @@ export type ReportingSeries = {
   interactions?: number;
   record_kind?: string;
   event_type?: string;
+  event_count?: number;
   schema_version?: string;
   client_version?: string;
   reject_reason?: string;
@@ -659,6 +661,17 @@ export const services = {
         error,
         "Não foi possível carregar os guardrails do experimento.",
       );
+    }
+  },
+  async reportingAccessAudit(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/quality/access-audit",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a auditoria agregada.");
     }
   },
   async reportingBookEngagement(

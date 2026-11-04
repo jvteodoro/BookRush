@@ -101,3 +101,8 @@ materializados no output.
 persistido, variante e dia. A origem é o ledger de recommendation e a
 atribuição `ATTRIBUTED`; sem assignment ativo a API retorna `NO_DATA`, e os
 resultados continuam explicitamente observacionais.
+
+`V23__reporting_access_audit_daily.sql` materializa somente contagens do
+`admin.audit_log` por dia e ação. Subjects, targets e `details` não são
+copiados para a projeção, permitindo o painel DQ-08 sem divulgar valores
+individuais.

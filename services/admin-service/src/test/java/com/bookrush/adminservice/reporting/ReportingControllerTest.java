@@ -146,4 +146,20 @@ class ReportingControllerTest {
     assertEquals("UNTRUSTED", response.get("status"));
     assertEquals("UNCLASSIFIED", response.get("population"));
   }
+
+  @Test
+  void exposesAccessAuditWithoutActorOrTargetValues() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.of(
+        "day", java.sql.Date.valueOf("2026-11-01"), "action", "REPORTING_READ",
+        "event_count", 4L, "unique_actors", 2L, "unique_targets", 1L,
+        "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")))));
+
+    var response = controller.accessAudit(7, principal, analyst);
+
+    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals(1, ((List<?>) response.get("series")).size());
+    org.junit.jupiter.api.Assertions.assertFalse(
+        ((Map<?, ?>) ((List<?>) response.get("series")).get(0)).containsKey("actor_subject"));
+  }
 }

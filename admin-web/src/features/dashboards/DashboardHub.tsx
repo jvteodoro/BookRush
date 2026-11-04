@@ -935,11 +935,13 @@ function QualityReport({
   reconciliation,
   eventQuality,
   eventSchema,
+  accessAudit,
 }: {
   attribution: ReportingResponse;
   reconciliation: ReportingResponse;
   eventQuality: ReportingResponse;
   eventSchema: ReportingResponse;
+  accessAudit: ReportingResponse;
 }) {
   return (
     <div className="dashboard-quality-grid">
@@ -1069,6 +1071,35 @@ function QualityReport({
                   <td>{row.reject_reason ?? "—"}</td>
                   <td>{row.record_count ?? "—"}</td>
                   <td>{row.unknown_event_count ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <div>
+        <strong>DQ-08 · Auditoria de acesso agregada</strong>
+        {!accessAudit.series.length ? (
+          <div className="dashboard-state">NO_DATA</div>
+        ) : (
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Ação</th>
+                <th>Eventos</th>
+                <th>Atores únicos</th>
+                <th>Alvos únicos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accessAudit.series.slice(-40).map((row, index) => (
+                <tr key={`${row.day}-${row.action}-${index}`}>
+                  <td>{row.day ?? "—"}</td>
+                  <td>{row.action ?? "—"}</td>
+                  <td>{row.event_count ?? "—"}</td>
+                  <td>{row.unique_actors ?? "—"}</td>
+                  <td>{row.unique_targets ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1369,6 +1400,8 @@ export function DashboardHub() {
     useState<ReportingResponse | null>(null);
   const [eventSchemaReport, setEventSchemaReport] =
     useState<ReportingResponse | null>(null);
+  const [accessAuditReport, setAccessAuditReport] =
+    useState<ReportingResponse | null>(null);
   const [socialReport, setSocialReport] = useState<ReportingResponse | null>(
     null,
   );
@@ -1420,6 +1453,7 @@ export function DashboardHub() {
         reconciliation,
         eventQuality,
         eventSchema,
+        accessAudit,
         social,
         publisher,
         moderation,
@@ -1455,6 +1489,7 @@ export function DashboardHub() {
         ),
         services.reportingEventQuality(Math.min(Math.max(days, 1), 366)),
         services.reportingEventSchemaQuality(Math.min(Math.max(days, 1), 366)),
+        services.reportingAccessAudit(Math.min(Math.max(days, 1), 366)),
         services.reportingSocialDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPublisherDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingModerationDaily(Math.min(Math.max(days, 1), 366)),
@@ -1484,6 +1519,7 @@ export function DashboardHub() {
       setReconciliationReport(reconciliation);
       setEventQualityReport(eventQuality);
       setEventSchemaReport(eventSchema);
+      setAccessAuditReport(accessAudit);
       setSocialReport(social);
       setPublisherReport(publisher);
       setModerationReport(moderation);
@@ -1696,7 +1732,8 @@ export function DashboardHub() {
             attributionReport &&
             reconciliationReport &&
             eventQualityReport &&
-            eventSchemaReport ? (
+            eventSchemaReport &&
+            accessAuditReport ? (
             <div className="dashboard-card wide">
               <div className="dashboard-card-heading">
                 <div>
@@ -1726,6 +1763,7 @@ export function DashboardHub() {
                 reconciliation={reconciliationReport}
                 eventQuality={eventQualityReport}
                 eventSchema={eventSchemaReport}
+                accessAudit={accessAuditReport}
               />
             </div>
           ) : area === "social" &&

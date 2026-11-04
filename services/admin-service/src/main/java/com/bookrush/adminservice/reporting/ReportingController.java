@@ -244,6 +244,22 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/quality/access-audit")
+  public Map<String, Object> accessAudit(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, action, event_count, unique_actors, unique_targets,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.access_audit_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, action
+        """, days);
+    return response("access_audit_daily", "access-audit-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/pipeline")
   public Map<String, Object> pipeline(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {
