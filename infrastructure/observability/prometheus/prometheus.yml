@@ -48,3 +48,11 @@ scrape_configs:
           - reader-profile-service:8095
           - book-content-service:8093
           - reader-bff-service:8101
+    # Micrometer's service tag is intentionally low-cardinality and is the
+    # dashboard contract. Static targets otherwise expose only `instance`,
+    # which would leave the service selector and all OP-02..05 queries empty.
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '^([^:]+):[0-9]+$'
+        target_label: service
+        replacement: '$1'

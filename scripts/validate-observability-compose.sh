@@ -20,4 +20,9 @@ for service in prometheus grafana loki tempo alloy node-exporter cadvisor postgr
   }
 done
 
+grep -Fq 'target_label: service' "$repo_root/infrastructure/observability/prometheus/prometheus.yml" || {
+  echo "Prometheus Java targets must expose the dashboard service label" >&2
+  exit 1
+}
+
 echo "Observability Compose: OK"

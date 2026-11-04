@@ -32,6 +32,14 @@ user ID, book ID, excerpt ID, token ou texto de livro como tag. Métricas de
 produto/recomendação devem usar contadores já versionados e atributos
 agregados, não criar uma série por entidade.
 
+O scrape `bookrush-java` aplica `service` a partir do hostname estático de
+cada target (`catalog-service`, `recommendation-service`, etc.). Esse relabel
+é parte do contrato dos painéis OP-01..05: `instance` identifica o endpoint,
+enquanto `service` alimenta o seletor e os agrupamentos. Se um novo serviço
+Java for adicionado, ele deve entrar na lista explícita de targets e manter
+esse relabel; não use descoberta ampla do Docker nem labels de container com
+identidade de usuário ou obra.
+
 ## Target down
 
 Verifique `docker compose ps`, o healthcheck do serviço e a conectividade na
