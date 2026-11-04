@@ -4,6 +4,29 @@ info:
   version: 0.3.0
   description: Administrative user lifecycle and audit operations.
 paths:
+  /api/admin/v1/reporting/reader-day:
+    get:
+      summary: Read versioned reader-day reporting snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Reporting response with freshness and explicit data state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/health:
+    get:
+      summary: Read projection freshness and refresh state
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Projection health rows }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/v1/admin/feed:
     get:
       summary: Read the versioned recommendation ledger for Feed Lab
@@ -244,3 +267,18 @@ components:
           items:
             type: object
             additionalProperties: true
+    DashboardResponse:
+      type: object
+      required: [schemaVersion, metricId, definitionVersion, status, unit, population, series]
+      properties:
+        schemaVersion: { type: string, example: dashboard-response-v1 }
+        metricId: { type: string, example: reader_day }
+        definitionVersion: { type: string, example: events-v1-untrusted-population }
+        status: { type: string, enum: [OK, NO_DATA, NOT_INSTRUMENTED, STALE, RESTRICTED, ERROR, INSUFFICIENT_SAMPLE, UNTRUSTED] }
+        unit: { type: string }
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        population: { type: string, example: UNCLASSIFIED }
+        sourceWatermark: { type: string, format: date-time, nullable: true }
+        refreshedAt: { type: string, format: date-time, nullable: true }
+        series: { type: array, items: { type: object, additionalProperties: true } }

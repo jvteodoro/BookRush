@@ -1,5 +1,15 @@
 # API administrativa
 
+## Reporting versionado
+
+`GET /api/admin/v1/reporting/reader-day?days=30` retorna o contrato
+`dashboard-response-v1` a partir de snapshots read-only do schema `reporting`.
+O intervalo é limitado a 366 dias e exige `platform-admins`, `operators` ou
+`analysts` no backend. `GET /api/admin/v1/reporting/health` expõe apenas
+freshness, watermark, versão e estado da projeção. Quando a origem ainda não
+possui população classificada, a resposta permanece `UNTRUSTED` com
+`population=UNCLASSIFIED`; ausência de linhas é `NO_DATA`, não zero.
+
 `POST /api/v1/admin/audit` registra ação de administração sem armazenar tokens; `GET /api/v1/admin/audit` consulta os últimos eventos. O subject vem da identidade autenticada.
 
 ## Usuários
