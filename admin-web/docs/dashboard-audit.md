@@ -21,7 +21,7 @@ fica reservado para dependência externa identificada.
 |---|---|---|---|---|---|
 | EX-01 | Visão geral de atividade | `behavior` + `reader_state` | PARTIAL | Não há projeção de atividade nem API | Fixture de atividade + snapshot |
 | EX-02 | Funil principal | `/reporting/executive-summary` + `feed_daily` | PARTIAL | Funil agregado com denominadores implementado; falta gráfico dedicado e fixture de produção | Fixture viewable/open/read/complete |
-| EX-03 | Saúde do produto | Prometheus + reporting | MISSING | Não existe stack nem facade | Scrape, freshness e autorização |
+| EX-03 | Saúde do produto | Prometheus + `/reporting/projection-health` | PARTIAL | Stack, facade e tabela de freshness existem; falta smoke autenticado de scrape/runtime | Scrape, freshness e autorização |
 | EX-04 | Evolução de engajamento | `reader_state.session` | PARTIAL | Sessões não agregadas para reporting | SQL/projeção com timezone |
 | EX-05 | Conteúdo disponível | Catalog + analytics | PARTIAL | Não há snapshot reader-ready/excerpt-ready | Reconciliação catalog/analytics |
 | EX-06 | Comparação de período | `/reporting/executive-summary` | PARTIAL | Endpoint atual/precedente com janela igual implementado; falta delta visual dedicado | Teste de comparação temporal |
@@ -35,7 +35,7 @@ fica reservado para dependência externa identificada.
 | OP-08 | SeaweedFS/S3 | SeaweedFS + storage metrics | PARTIAL | Health/storage existem, sem painel/exporter | Operação S3 e persistência |
 | OP-09 | Gateway/Keycloak | Traefik + Keycloak | PARTIAL | Sem métricas de auth/gateway agregadas | 401/403/5xx e latência |
 | OP-10 | Jenkins e releases | Jenkins API/build metadata | PARTIAL | Histórico não está em datasource provisionado | Build/deploy/digest real |
-| OP-11 | Dependency tracing | OTel/Tempo | MISSING | Starter só fornece correlation ID | Trace BFF→recommendation→DB |
+| OP-11 | Dependency tracing | OTel/Tempo + starter Micrometer | PARTIAL | Propagação/exportação provisionadas; falta trace vivo BFF→recommendation→DB | Trace BFF→recommendation→DB |
 | OP-12 | Incidentes/SLO | `ALERTS` + Prometheus alert rules | PARTIAL | Sete regras e painel de alertas ativos provisionados; falta disparo controlado e calibração de SLO | Alerta controlado + recuperação |
 | PL-01 | Ingestão | Ingestion jobs/metrics | PARTIAL | `IngestionMetrics` só conta processado/falho | Estados, throughput e retries |
 | PL-02 | Fila de ingestão | Ingestion jobs | PARTIAL | Não há snapshot de fila/idade | Fixture pending/running/failed |
@@ -47,7 +47,7 @@ fica reservado para dependência externa identificada.
 | PL-08 | Cobertura de corpus | Analytics + catalog | PARTIAL | Sem projeção de cobertura | Direitos/reader-ready/score |
 | PL-09 | Qualidade editorial | Review/annotations | MISSING | Sem painel consolidado de revisão | Fila, SLA e motivos |
 | PL-10 | Qualidade de importação | Catalog/ingestion | PARTIAL | Proveniência existe, sem agregação | Duplicação/direitos/assets |
-| PL-11 | Frescor e backlog | Jobs/watermarks | MISSING | Não há watermark de reporting | Backlog e SLA medidos |
+| PL-11 | Frescor e backlog | `projection_health` + pipeline snapshots | PARTIAL | Watermarks/freshness existem; backlog/stuck-worker dedicado ainda pendente | Backlog e SLA medidos |
 | GR-01 | Usuários únicos | Behavior events | PARTIAL | Não há identidade analítica/projeção | DAU/WAU/MAU com população |
 | GR-02 | Novos e recorrentes | `reporting.reader_day` + `/reporting/reader-day` | PARTIAL | Novos/recorrentes projetados; falta fixture temporal e smoke com população real | Fixture de coorte |
 | GR-03 | Retenção cohorts | `reporting.retention_cohort` + `/reporting/retention-cohort` | PARTIAL | D1/D7/D30 e maturidade persistidos; falta coorte madura validada em runtime | D1/D7/D30 maduros |
@@ -74,7 +74,7 @@ fica reservado para dependência externa identificada.
 | SO-01 | Interações sociais | Social/behavior | PARTIAL | Dados existem, sem fatos analíticos | Likes/saves/shares/comments |
 | SO-02 | Engajamento de obras | `reporting.book_engagement` | PARTIAL | Join governado entre catálogo, eventos e agregados; publisher-scope ainda não exposto | n mínimo e deduplicação |
 | SO-03 | Moderação | Admin reports | PARTIAL | Endpoint existe, sem série/SLA | Estados e aging |
-| SO-04 | Tempo de resolução | Admin audit/reports | MISSING | Não há percentis de resolução | Fixture de lifecycle |
+| SO-04 | Tempo de resolução | `reporting.moderation_daily` + `/reporting/moderation-daily` | PARTIAL | P50/P95 e aging projetados e exibidos; falta fixture/runtime de lifecycle | Fixture de lifecycle |
 | SO-05 | Funil editorial | Publisher workflow | PARTIAL | Estados existem, sem projeção | Submission→published |
 | SO-06 | Desempenho publisher | `reporting.book_engagement` + publisher | PARTIAL | Métricas por obra disponíveis globalmente; autorização por publisher ainda pendente | Autorização por publisher |
 | SO-07 | Direitos/licenças | Catalog rights | PARTIAL | Fonte existe, sem painel agregado | Revogação e limitações |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 50 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 17 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 62 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 5 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma
