@@ -95,7 +95,8 @@ docker create --name "$grafana" --network "$network" --network-alias grafana \
   -e GF_AUTH_GENERIC_OAUTH_NAME=Keycloak \
   -e GF_AUTH_GENERIC_OAUTH_CLIENT_ID=bookrush-grafana \
   -e GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=disposable-grafana-secret \
-  -e GF_AUTH_GENERIC_OAUTH_SCOPES='openid profile email groups' \
+  -e GF_AUTH_GENERIC_OAUTH_SCOPES='openid profile email' \
+  -e 'GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH=email || preferred_username' \
   -e GF_AUTH_GENERIC_OAUTH_AUTH_URL="http://${keycloak}:8080/realms/bookrush-platform/protocol/openid-connect/auth" \
   -e GF_AUTH_GENERIC_OAUTH_TOKEN_URL="http://${keycloak}:8080/realms/bookrush-platform/protocol/openid-connect/token" \
   -e GF_AUTH_GENERIC_OAUTH_API_URL="http://${keycloak}:8080/realms/bookrush-platform/protocol/openid-connect/userinfo" \
@@ -137,4 +138,9 @@ grep -q '"publicClient" : false' <<<"$grafana_client"
 docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
   "clients/$grafana_client_id/protocol-mappers/models" -r bookrush-platform \
   --fields name --format csv --noquotes | grep -qx 'grafana-groups'
+for mapper in grafana-preferred-username grafana-email grafana-email-verified; do
+  docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
+    "clients/$grafana_client_id/protocol-mappers/models" -r bookrush-platform \
+    --fields name --format csv --noquotes | grep -qx "$mapper"
+done
 echo 'Keycloak IaC + Grafana OAuth redirect: OK (ambiente descartável)'

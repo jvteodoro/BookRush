@@ -104,6 +104,7 @@ O mapper de grupos do client adiciona `groups` como claim; não solicite um scop
 OIDC chamado `groups`, pois esse scope não está registrado no Keycloak e resulta
 em `invalid_scope`. Para login, o Grafana usa a claim `email` quando presente e
 recorre a `preferred_username` quando o usuário Keycloak não tem email; o
+client Keycloak mapeia explicitamente essas claims para o token e UserInfo. O
 identificador OAuth continua sendo o `sub` estável do provedor.
 O client `bookrush-grafana` é reconciliado no realm por
 `infrastructure/keycloak/reconcile.sh`; o segredo e a URI de redirect devem
