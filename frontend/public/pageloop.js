@@ -786,8 +786,7 @@
     state.route = "reader";
     try {
       await window.__BOOKRUSH_API__?.viewable?.(id);
-      if (recommendationOrigin)
-        await window.__BOOKRUSH_API__?.open?.(id, true);
+      if (recommendationOrigin) await window.__BOOKRUSH_API__?.open?.(id, true);
       window.__BOOKRUSH_CHAPTERS__ =
         (await window.__BOOKRUSH_API__?.chapters?.(id)) || [];
     } catch (e) {
