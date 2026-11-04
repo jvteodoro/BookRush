@@ -6,8 +6,8 @@ global:
     stack: bookrush-observability
 
 rule_files:
-  - /etc/prometheus/recording-rules.yml
-  - /etc/prometheus/alerts.yml
+  - /etc/bookrush-observability/prometheus/recording-rules.yml
+  - /etc/bookrush-observability/prometheus/alerts.yml
 
 scrape_configs:
   - job_name: prometheus

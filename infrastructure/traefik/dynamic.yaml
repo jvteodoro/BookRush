@@ -14,6 +14,12 @@ http:
       priority: 200
       service: keycloak
 
+    grafana:
+      rule: Host(`grafana-bookrush.jteodoro.tec.br`)
+      entryPoints: [web]
+      priority: 200
+      service: grafana
+
     seaweedfs-oauth:
       rule: Host(`seaweedfs-bookrush.jteodoro.tec.br`) && PathPrefix(`/oauth2`)
       entryPoints:
@@ -197,6 +203,10 @@ http:
       loadBalancer:
         servers:
           - url: http://keycloak:8080
+    grafana:
+      loadBalancer:
+        servers:
+          - url: http://grafana:3000
     seaweedfs-oauth:
       loadBalancer:
         servers:

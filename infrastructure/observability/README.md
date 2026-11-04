@@ -96,8 +96,9 @@ Remova os containers e volumes do projeto descartável ao terminar; nunca use
 esses comandos sobre o projeto Compose de produção.
 
 Quando habilitado, o OAuth genérico do Grafana usa o realm
-`bookrush-platform`; `platform-admins` recebe Admin, `operators` recebe Editor
-e os demais usuários autenticados recebem Viewer. O backend de reporting deve
+`bookrush-platform`; `platform-admins` recebe Admin, `platform-operators` ou
+`operators` recebem Editor, e os demais usuários autenticados recebem Viewer.
+O Grafana permite que o mapeamento OAuth atribua a role Admin. O backend de reporting deve
 repetir a autorização: esconder o menu no Admin Web não é controle suficiente.
 O client `bookrush-grafana` é reconciliado no realm por
 `infrastructure/keycloak/reconcile.sh`; o segredo e a URI de redirect devem

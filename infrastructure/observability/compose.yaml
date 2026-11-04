@@ -5,16 +5,14 @@ services:
     image: prom/prometheus:v2.55.1
     restart: unless-stopped
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
+      - --config.file=/etc/bookrush-observability/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=${OBS_PROMETHEUS_RETENTION:-15d}
       - --web.enable-lifecycle
       - --web.enable-remote-write-receiver
     volumes:
       - prometheus_data:/prometheus
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/recording-rules.yml:/etc/prometheus/recording-rules.yml:ro
-      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - observability_config:/etc/bookrush-observability:ro
     networks: [observability, bookrush]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
@@ -37,21 +35,22 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_GENERIC_OAUTH_ENABLED: ${OBS_GRAFANA_OIDC_ENABLED:-false}
       GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
       GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${OBS_GRAFANA_OIDC_CLIENT_ID:-bookrush-grafana}
       GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${OBS_GRAFANA_OIDC_CLIENT_SECRET:-}
       GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email groups
       GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${OBS_GRAFANA_OIDC_AUTH_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/auth}
       GF_AUTH_GENERIC_OAUTH_TOKEN_URL: ${OBS_GRAFANA_OIDC_TOKEN_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/token}
       GF_AUTH_GENERIC_OAUTH_API_URL: ${OBS_GRAFANA_OIDC_API_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/userinfo}
-      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: ${OBS_GRAFANA_OIDC_ROLE_ATTRIBUTE_PATH:-contains(groups[*], 'platform-admins') && 'Admin' || contains(groups[*], 'operators') && 'Editor' || 'Viewer'}
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: ${OBS_GRAFANA_OIDC_ROLE_ATTRIBUTE_PATH:-contains(groups[*], 'platform-admins') && 'Admin' || (contains(groups[*], 'platform-operators') || contains(groups[*], 'operators')) && 'Editor' || 'Viewer'}
       GF_SERVER_ROOT_URL: ${OBS_GRAFANA_ROOT_URL:-http://127.0.0.1:13000}
       GF_METRICS_ENABLED: "true"
+      GF_PATHS_PROVISIONING: /etc/bookrush-observability/grafana/provisioning
     ports:
       - "127.0.0.1:${OBS_GRAFANA_PORT:-13000}:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - observability_config:/etc/bookrush-observability:ro
     depends_on:
       prometheus:
         condition: service_healthy
@@ -59,7 +58,7 @@ services:
         condition: service_healthy
       tempo:
         condition: service_healthy
-    networks: [observability]
+    networks: [observability, bookrush]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
       interval: 10s
@@ -74,10 +73,10 @@ services:
   loki:
     image: grafana/loki:3.2.1
     restart: unless-stopped
-    command: ["-config.file=/etc/loki/config.yaml"]
+    command: ["-config.file=/etc/bookrush-observability/loki/config.yaml"]
     volumes:
       - loki_data:/loki
-      - ./loki/config.yaml:/etc/loki/config.yaml:ro
+      - observability_config:/etc/bookrush-observability:ro
     networks: [observability]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3100/ready"]
@@ -93,10 +92,10 @@ services:
   tempo:
     image: grafana/tempo:2.6.1
     restart: unless-stopped
-    command: ["-config.file=/etc/tempo/config.yaml"]
+    command: ["-config.file=/etc/bookrush-observability/tempo/config.yaml"]
     volumes:
       - tempo_data:/var/tempo
-      - ./tempo/config.yaml:/etc/tempo/config.yaml:ro
+      - observability_config:/etc/bookrush-observability:ro
     networks: [observability]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3200/ready"]
@@ -112,9 +111,9 @@ services:
   alloy:
     image: grafana/alloy:v1.4.2
     restart: unless-stopped
-    command: ["run", "/etc/alloy/config.alloy", "--server.http.listen-addr=0.0.0.0:12345"]
+    command: ["run", "/etc/bookrush-observability/alloy/config.alloy", "--server.http.listen-addr=0.0.0.0:12345"]
     volumes:
-      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - observability_config:/etc/bookrush-observability:ro
     depends_on:
       loki:
         condition: service_healthy
@@ -219,6 +218,8 @@ networks:
     external: true
 
 volumes:
+  observability_config:
+    name: ${OBS_CONFIG_VOLUME:-bookrush-observability-config}
   prometheus_data:
   grafana_data:
   loki_data:

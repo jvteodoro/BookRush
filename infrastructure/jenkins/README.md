@@ -127,6 +127,22 @@ deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+### Pipeline de observabilidade
+
+O job `bookrush-observability` valida o Compose e pode implantar a stack com
+`DEPLOY=true`. O deploy usa o checkout escolhido em `BRANCH` e transmite a
+configuração versionada para um volume Docker nomeado; assim, o daemon não
+precisa acessar o workspace privado do agente. Antes do primeiro deploy,
+cadastre no Jenkins as credentials Secret text indicadas pelos parâmetros do
+job: senha de recuperação do Grafana, DSN read-only do postgres-exporter e
+segredo do client OIDC `bookrush-grafana`. O job gera um env-file temporário
+com permissão restrita e o remove ao terminar. Grafana usa Keycloak do realm
+`bookrush-platform`; o endpoint público também exige DNS, certificado e proxy
+Nginx configurados para `grafana-bookrush.jteodoro.tec.br`.
+O instalador de vhosts instala o bootstrap HTTP; emita o certificado com
+`certbot --nginx --redirect -d grafana-bookrush.jteodoro.tec.br` antes de
+habilitar a URL pública SSO em produção.
+
 Para a pipeline completa de analytics no host com NVIDIA, o deploy deve usar o
 override `infrastructure/compose.analytics-gpu.yaml` e manter
 `ANALYTICS_NLI_ENABLED=true`, `ANALYTICS_NLI_BATCH_SIZE=8` e

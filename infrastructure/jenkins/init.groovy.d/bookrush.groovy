@@ -26,6 +26,11 @@ def adminWebJob = instance.getItem('bookrush-admin-web')
 if (adminWebJob == null) {
     adminWebJob = instance.createProject(WorkflowJob, 'bookrush-admin-web')
 }
+def observabilityPipelineFile = new File('/opt/bookrush/observability.Jenkinsfile')
+def observabilityJob = instance.getItem('bookrush-observability')
+if (observabilityJob == null) {
+    observabilityJob = instance.createProject(WorkflowJob, 'bookrush-observability')
+}
 def microservicePipelineFile = new File('/opt/bookrush/microservice.Jenkinsfile')
 def verticalPipelineFile = new File('/opt/bookrush/vertical.Jenkinsfile')
 def replaceParameters = { WorkflowJob pipelineJob, List definitions ->
@@ -95,6 +100,10 @@ if (!(backstageJob.getDefinition() instanceof CpsScmFlowDefinition)) {
 if (!(adminWebJob.getDefinition() instanceof CpsScmFlowDefinition)) {
     adminWebJob.setDefinition(scmFor(adminWebPipelineFile.name))
     adminWebJob.save()
+}
+if (!(observabilityJob.getDefinition() instanceof CpsScmFlowDefinition)) {
+    observabilityJob.setDefinition(scmFor(observabilityPipelineFile.name))
+    observabilityJob.save()
 }
 if (!(job.getDefinition() instanceof CpsScmFlowDefinition)) {
     job.setDefinition(scmFor('Jenkinsfile'))

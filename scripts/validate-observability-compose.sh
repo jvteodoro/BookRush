@@ -25,4 +25,29 @@ grep -Fq 'target_label: service' "$repo_root/infrastructure/observability/promet
   exit 1
 }
 
+grep -Fq 'observability_config:/etc/bookrush-observability:ro' "$repo_root/infrastructure/observability/compose.yaml" || {
+  echo "observability configuration must be supplied via Docker named volume" >&2
+  exit 1
+}
+grep -Fq 'docker run --rm -i --network none -v "$config_volume:/config"' "$repo_root/infrastructure/jenkins/deploy-observability.sh" || {
+  echo "Jenkins deployment must stream config into the Docker named volume" >&2
+  exit 1
+}
+grep -Fq 'Host(`grafana-bookrush.jteodoro.tec.br`)' "$repo_root/infrastructure/traefik/dynamic.yaml" || {
+  echo "Traefik must route the Grafana public hostname" >&2
+  exit 1
+}
+grep -Fq 'GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"' "$repo_root/infrastructure/observability/compose.yaml" || {
+  echo "Grafana OAuth must explicitly permit the configured platform-admin mapping" >&2
+  exit 1
+}
+grep -Fq "contains(groups[*], 'platform-operators')" "$repo_root/infrastructure/observability/compose.yaml" || {
+  echo "Grafana OAuth must map platform-operators to the operator role" >&2
+  exit 1
+}
+test -f "$repo_root/infrastructure/nginx/conf.d/bookrush-grafana.conf" || {
+  echo "Nginx bootstrap vhost for public Grafana is missing" >&2
+  exit 1
+}
+
 echo "Observability Compose: OK"

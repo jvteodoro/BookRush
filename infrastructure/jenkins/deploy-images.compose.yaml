@@ -57,3 +57,7 @@ services:
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
   admin-web:
     image: ${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}
+    build:
+      context: ../../admin-web
+      args:
+        VITE_GRAFANA_URL: ${ADMIN_WEB_GRAFANA_URL:-https://grafana-bookrush.jteodoro.tec.br}

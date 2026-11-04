@@ -30,7 +30,7 @@ export const config = {
   observability: {
     grafanaUrl: envOr(
       import.meta.env.VITE_GRAFANA_URL,
-      "http://127.0.0.1:13000",
+      "https://grafana-bookrush.jteodoro.tec.br",
     ),
     operationsPath: "/d/bookrush-operations",
   },

@@ -67,7 +67,8 @@ Prometheus e o dashboard correspondente.
 O Grafana fica sem login anônimo e sem cadastro aberto. O OAuth Keycloak é
 opt-in (`OBS_GRAFANA_OIDC_ENABLED=false` por padrão) e usa o realm
 `bookrush-platform`. O client, segredo, redirect URI e grupos devem ser
-provisionados fora do Git; `platform-admins`, `operators` e Viewer precisam
+provisionados fora do Git; `platform-admins`, `platform-operators`/`operators`
+e Viewer precisam
 ser testados em ambiente descartável antes de habilitar o client. O backend de
 reporting mantém sua própria autorização e não confia no menu do Grafana ou do
 Admin Web.

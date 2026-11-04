@@ -91,6 +91,7 @@ docker create --name "$grafana" --network "$network" --network-alias grafana \
   -e GF_AUTH_ANONYMOUS_ENABLED=false \
   -e GF_USERS_ALLOW_SIGN_UP=false \
   -e GF_AUTH_GENERIC_OAUTH_ENABLED=true \
+  -e GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN=true \
   -e GF_AUTH_GENERIC_OAUTH_NAME=Keycloak \
   -e GF_AUTH_GENERIC_OAUTH_CLIENT_ID=bookrush-grafana \
   -e GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET=disposable-grafana-secret \
@@ -98,7 +99,7 @@ docker create --name "$grafana" --network "$network" --network-alias grafana \
   -e GF_AUTH_GENERIC_OAUTH_AUTH_URL="http://${keycloak}:8080/realms/bookrush-platform/protocol/openid-connect/auth" \
   -e GF_AUTH_GENERIC_OAUTH_TOKEN_URL="http://${keycloak}:8080/realms/bookrush-platform/protocol/openid-connect/token" \
   -e GF_AUTH_GENERIC_OAUTH_API_URL="http://${keycloak}:8080/realms/bookrush-platform/protocol/openid-connect/userinfo" \
-  -e GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH="contains(groups[*], 'platform-admins') && 'Admin' || contains(groups[*], 'operators') && 'Editor' || 'Viewer'" \
+  -e GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH="contains(groups[*], 'platform-admins') && 'Admin' || (contains(groups[*], 'platform-operators') || contains(groups[*], 'operators')) && 'Editor' || 'Viewer'" \
   -e GF_SERVER_ROOT_URL=http://grafana:3000 \
   grafana/grafana:11.3.0 >/dev/null
 docker start "$grafana" >/dev/null

@@ -748,6 +748,7 @@ services:
       context: ../admin-web
       args:
         VITE_USE_MOCKS: ${ADMIN_WEB_USE_MOCKS:-false}
+        VITE_GRAFANA_URL: ${ADMIN_WEB_GRAFANA_URL:-https://grafana-bookrush.jteodoro.tec.br}
         VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-https://keycloak-bookrush.jteodoro.tec.br}
         VITE_KEYCLOAK_REALM: ${ADMIN_WEB_KEYCLOAK_REALM:-bookrush-platform}
         VITE_KEYCLOAK_CLIENT_ID: ${ADMIN_WEB_KEYCLOAK_CLIENT_ID:-labsoft-admin-web}
@@ -785,6 +786,7 @@ services:
       - ./jenkins/bookrush.Jenkinsfile:/opt/bookrush/bookrush.Jenkinsfile:ro
       - ./jenkins/backstage.Jenkinsfile:/opt/bookrush/backstage.Jenkinsfile:ro
       - ./jenkins/admin-web.Jenkinsfile:/opt/bookrush/admin-web.Jenkinsfile:ro
+      - ./jenkins/observability.Jenkinsfile:/opt/bookrush/observability.Jenkinsfile:ro
       - ./jenkins/deploy-compose.sh:/opt/bookrush/deploy-compose.sh:ro
       - ./jenkins/casc/jenkins-oidc.yaml:/opt/bookrush/casc/jenkins-oidc.yaml:ro
       - ./jenkins/init.groovy.d/bookrush.groovy:/var/jenkins_home/init.groovy.d/bookrush.groovy:ro
