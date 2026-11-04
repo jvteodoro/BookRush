@@ -35,6 +35,9 @@ docker create --name "$renderer" \
   -e INGESTION_ADMIN_CLIENT_SECRET='disposable-ingestion-secret' \
   -e INGESTION_CANONICAL_CLIENT_SECRET='disposable-canonical-secret' \
   -e INGESTION_ASSET_CLIENT_SECRET='disposable-asset-secret' \
+  -e GRAFANA_OIDC_CLIENT_SECRET='disposable-grafana-secret' \
+  -e GRAFANA_OIDC_REDIRECT_URI='http://127.0.0.1:13000/login/generic_oauth' \
+  -e GRAFANA_OIDC_WEB_ORIGIN='http://127.0.0.1:13000' \
   --entrypoint python python:3.12-alpine \
   /tmp/render-config.py /tmp/source /tmp/rendered >/dev/null
 docker cp "$repo_dir/infrastructure/keycloak/." "$renderer:/tmp/source"
@@ -90,4 +93,15 @@ test -n "$service_account_id"
 docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
   "users/$service_account_id/role-mappings/realm" -r bookrush-platform \
   --fields name --format csv --noquotes | grep -qx 'platform-operator'
+grafana_client_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients \
+  -r bookrush-platform -q clientId=bookrush-grafana \
+  --fields id --format csv --noquotes | awk 'NR == 1 { print; exit }')"
+test -n "$grafana_client_id"
+grafana_client="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
+  "clients/$grafana_client_id" -r bookrush-platform --format json)"
+grep -q 'http://127.0.0.1:13000/login/generic_oauth' <<<"$grafana_client"
+grep -q '"publicClient" : false' <<<"$grafana_client"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
+  "clients/$grafana_client_id/protocol-mappers/models" -r bookrush-platform \
+  --fields name --format csv --noquotes | grep -qx 'grafana-groups'
 echo 'Keycloak IaC render + import + reconcile: OK (ambiente descartável)'

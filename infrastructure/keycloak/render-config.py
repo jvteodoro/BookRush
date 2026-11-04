@@ -17,6 +17,7 @@ SECRETS = {
     "bookrush-recommendation-s2s": "FEED_EXCERPTS_CLIENT_SECRET",
     "bookrush-recommendation-behavior-s2s": "BEHAVIOR_S2S_CLIENT_SECRET",
     "bookrush-admin-service": "KEYCLOAK_ADMIN_CLIENT_SECRET",
+    "bookrush-grafana": "GRAFANA_OIDC_CLIENT_SECRET",
 }
 
 
@@ -32,6 +33,13 @@ def main() -> int:
     for source_file in sorted(source.glob("*.json")):
         data = json.loads(source_file.read_text(encoding="utf-8"))
         for client in data.get("clients", []):
+            if client.get("clientId") == "bookrush-grafana":
+                redirect_uri = os.environ.get("GRAFANA_OIDC_REDIRECT_URI", "")
+                web_origin = os.environ.get("GRAFANA_OIDC_WEB_ORIGIN", "")
+                if redirect_uri:
+                    client["redirectUris"] = [redirect_uri]
+                if web_origin:
+                    client["webOrigins"] = [web_origin]
             env_name = SECRETS.get(client.get("clientId"))
             if not env_name:
                 continue

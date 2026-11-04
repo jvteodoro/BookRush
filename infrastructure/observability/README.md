@@ -38,6 +38,9 @@ BOOKRUSH_NETWORK_NAME=bookrush_bookrush
 OBS_GRAFANA_OIDC_ENABLED=false
 OBS_GRAFANA_OIDC_CLIENT_ID=bookrush-grafana
 # OBS_GRAFANA_OIDC_CLIENT_SECRET=<protected secret>
+# GRAFANA_OIDC_CLIENT_SECRET=<protected secret used by Keycloak reconcile>
+# GRAFANA_OIDC_REDIRECT_URI=https://<grafana-host>/login/generic_oauth
+# GRAFANA_OIDC_WEB_ORIGIN=https://<grafana-host>
 ```
 
 O DSN do exporter não deve ser colocado em logs, Beads, argumentos de jobs ou
@@ -59,7 +62,8 @@ docker compose --env-file /run/bookrush-observability.env \
 Antes de conectar a produção, validar em ambiente descartável a carga das
 configurações, os healthchecks, o provisionamento idempotente, a retenção e o
 backup/restore dos quatro volumes. A integração com o Compose principal e o
-SSO Keycloak permanecem nos pacotes seguintes.
+o login SSO real (redirect público, grupos e revogação) exigem validação
+operacional antes de habilitar a opção em produção.
 
 O Tempo habilita `span-metrics` e `service-graphs` em
 `overrides.defaults.metrics_generator` e envia as séries derivadas ao
@@ -95,8 +99,10 @@ Quando habilitado, o OAuth genérico do Grafana usa o realm
 `bookrush-platform`; `platform-admins` recebe Admin, `operators` recebe Editor
 e os demais usuários autenticados recebem Viewer. O backend de reporting deve
 repetir a autorização: esconder o menu no Admin Web não é controle suficiente.
-Não habilite essa opção antes de validar redirect URI, grupos e revogação em
-ambiente descartável.
+O client `bookrush-grafana` é reconciliado no realm por
+`infrastructure/keycloak/reconcile.sh`; o segredo e a URI de redirect devem
+vir do ambiente protegido. Não habilite essa opção antes de validar redirect
+URI, grupos e revogação em ambiente descartável.
 
 ## Limites e segurança
 
