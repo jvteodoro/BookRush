@@ -326,6 +326,9 @@ export type ReportingResponse = {
   population: string;
   sourceWatermark?: string | null;
   refreshedAt?: string | null;
+  page?: number | null;
+  pageSize?: number | null;
+  hasNext?: boolean | null;
   series: ReportingSeries[];
 };
 export type ExecutivePeriod = {

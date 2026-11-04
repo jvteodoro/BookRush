@@ -204,9 +204,11 @@ public class ReportingController {
       @RequestParam(defaultValue = "30") int days,
       @RequestParam(defaultValue = "20") int minImpressions,
       @RequestParam(defaultValue = "200") int limit,
+      @RequestParam(defaultValue = "0") int page,
       Principal principal, Authentication authentication) {
     requireAnalyst(authentication, principal);
     validateDays(days);
+    validatePage(page);
     if (minImpressions < 1 || minImpressions > 100000 || limit < 1 || limit > 500) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
           "minImpressions must be 1..100000 and limit must be 1..500");
@@ -220,10 +222,10 @@ public class ReportingController {
         WHERE day >= current_date - (? - 1)
           AND impressions >= ?
         ORDER BY day DESC, viewable_count DESC, attributed_open_count DESC, excerpt_id
-        LIMIT ?
-        """, days, minImpressions, limit);
-    return response("excerpt_performance", "excerpt-performance-v1-untrusted-population", days,
-        "SUPPRESSED_BELOW_MIN_SAMPLE", rows);
+        LIMIT ? OFFSET ?
+        """, days, minImpressions, limit + 1, pageOffset(page, limit));
+    return pagedResponse("excerpt_performance", "excerpt-performance-v1-untrusted-population", days,
+        "SUPPRESSED_BELOW_MIN_SAMPLE", rows, page, limit);
   }
 
   @GetMapping("/experiment-daily")
@@ -502,9 +504,11 @@ public class ReportingController {
   public Map<String, Object> bookEngagement(@RequestParam(defaultValue = "30") int days,
       @RequestParam(defaultValue = "5") int minReaders,
       @RequestParam(defaultValue = "50") int limit,
+      @RequestParam(defaultValue = "0") int page,
       Principal principal, Authentication authentication) {
     requireAnalyst(authentication, principal);
     validateDays(days);
+    validatePage(page);
     if (minReaders < 1 || minReaders > 10000 || limit < 1 || limit > 200) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
           "minReaders must be 1..10000 and limit must be 1..200");
@@ -517,10 +521,10 @@ public class ReportingController {
         WHERE day >= current_date - (? - 1)
           AND unique_readers >= ?
         ORDER BY day DESC, aggregation_level, unique_readers DESC, aggregation_key
-        LIMIT ?
-        """, days, minReaders, limit);
-    return response("book_engagement", "book-engagement-v1-untrusted-population", days,
-        "SUPPRESSED_BELOW_MIN_SAMPLE", rows);
+        LIMIT ? OFFSET ?
+        """, days, minReaders, limit + 1, pageOffset(page, limit));
+    return pagedResponse("book_engagement", "book-engagement-v1-untrusted-population", days,
+        "SUPPRESSED_BELOW_MIN_SAMPLE", rows, page, limit);
   }
 
   @GetMapping("/content-supply")
@@ -576,10 +580,36 @@ public class ReportingController {
     return response;
   }
 
+  private Map<String, Object> pagedResponse(String metricId, String definitionVersion, int days,
+      String population, java.util.List<Map<String, Object>> rows, int page, int pageSize) {
+    boolean hasNext = rows.size() > pageSize;
+    var visibleRows = hasNext ? rows.subList(0, pageSize) : rows;
+    var response = response(metricId, definitionVersion, days, population,
+        new java.util.ArrayList<>(visibleRows));
+    response.put("page", page);
+    response.put("pageSize", pageSize);
+    response.put("hasNext", hasNext);
+    return response;
+  }
+
   private void validateDays(int days) {
     if (days < 1 || days > 366) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "days must be between 1 and 366");
     }
+  }
+
+  private void validatePage(int page) {
+    if (page < 0 || page > 10000) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be between 0 and 10000");
+    }
+  }
+
+  private int pageOffset(int page, int pageSize) {
+    long offset = (long) page * pageSize;
+    if (offset > Integer.MAX_VALUE) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page offset is too large");
+    }
+    return (int) offset;
   }
 
   private void requireAnalyst(Authentication authentication, Principal principal) {

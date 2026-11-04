@@ -110,6 +110,7 @@ paths:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
         - { name: minReaders, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 5 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
       responses:
         '200':
           description: Aggregated book/language engagement
@@ -142,6 +143,7 @@ paths:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
         - { name: minImpressions, in: query, schema: { type: integer, minimum: 1, maximum: 100000, default: 20 } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 200 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, maximum: 10000, default: 0 } }
       responses:
         '200':
           description: Excerpt performance aggregates with small-sample suppression
@@ -661,3 +663,6 @@ components:
         sourceWatermark: { type: string, format: date-time, nullable: true }
         refreshedAt: { type: string, format: date-time, nullable: true }
         series: { type: array, items: { type: object, additionalProperties: true } }
+        page: { type: integer, minimum: 0, nullable: true }
+        pageSize: { type: integer, minimum: 1, nullable: true }
+        hasNext: { type: boolean, nullable: true }

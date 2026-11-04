@@ -97,9 +97,9 @@ Isto é **contrato lógico**, não SQL Flyway pronto. Definir tipos, chaves, ret
 
 **Proibidas em métricas/logs indiscriminados**: \`user_id\`, \`subject\`, \`book_id\`, \`excerpt_id\`, \`impression_id\`, \`request_id\`, \`job_id\`, email, IP completo, URL assinada, bearer token, texto/trecho, vetores e payloads sem sanitização. CorrelationId, traceId podem existir como campos de logs com retenção/ACL e como exemplar, **não como label**. Valores arbitrários de \`reason\`, \`error_code\`, path ou user-agent devem ser normalizados.
 
-## Contrato de API reporting (proposto, sem endpoint implementado)
+## Contrato de API reporting (implementado no admin-service)
 
-Prefixo recomendado: \`GET /api/admin/v1/reporting/v1\` protegido por OIDC do realm administrativo, com rate limit e cache seguro; nenhum endpoint recebe SQL/PromQL arbitrário. Corpo canônico por painel:
+Prefixo implementado: \`GET /api/admin/v1/reporting/*\`, protegido por OIDC do realm administrativo e pelas roles de reporting no backend. Nenhum endpoint recebe SQL/PromQL arbitrário. Os endpoints de maior cardinalidade aceitam \`page\` e \`limit\`; a consulta usa \`LIMIT limit + 1\` e \`OFFSET\` para produzir \`hasNext\` sem carregar páginas anteriores.
 
 \`\`\`json
 {
@@ -121,11 +121,14 @@ Prefixo recomendado: \`GET /api/admin/v1/reporting/v1\` protegido por OIDC do re
   "value": 0.152,
   "sampleSize": 1000,
   "series": [],
-  "warnings": []
+  "warnings": [],
+  "page": 0,
+  "pageSize": 50,
+  "hasNext": false
 }
 \`\`\`
 
-**Exemplo sintético de contrato, NÃO dado real.** \`status\`: \`OK|NO_DATA|NOT_INSTRUMENTED|STALE|RESTRICTED|ERROR|INSUFFICIENT_SAMPLE|UNTRUSTED\`. Para status diferente de OK, \`value=null\` e \`numerator/denominator\` podem ser nulos. Registrar \`queryId\`/identificador de request controlado e versão; erros não revelam SQL interno ou PII. Propor rotas por dashboard e \`/definitions\` para não criar chamadas N+1 por painel; aplicar max range (ex. 366d), page size, interval e authZ de filtro. OpenAPI versionado é parte da implementação.
+**Exemplo sintético de contrato, NÃO dado real.** \`status\`: \`OK|NO_DATA|NOT_INSTRUMENTED|STALE|RESTRICTED|ERROR|INSUFFICIENT_SAMPLE|UNTRUSTED\`. Para status diferente de OK, \`value=null\` e \`numerator/denominator\` podem ser nulos. Erros não revelam SQL interno ou PII. A API aplica range máximo de 366 dias, limites de amostra/página e autorização de reporting no backend; OpenAPI versionado é parte da implementação. Cache/rate limit permanecem controles de borda a validar no gateway antes do fechamento do pacote.
 
 ## Integridade, privacidade e qualidade da medição
 

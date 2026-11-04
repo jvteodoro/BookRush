@@ -113,9 +113,9 @@ class ReportingControllerTest {
   void protectsExcerptPerformanceWithSampleAndPageLimits() {
     var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
     assertEquals(400, assertThrows(ResponseStatusException.class,
-        () -> controller.excerptPerformance(30, 0, 200, principal, analyst))
+        () -> controller.excerptPerformance(30, 0, 200, 0, principal, analyst))
         .getStatusCode().value());
-    when(jdbc.queryForList(anyString(), eq(7), eq(20), eq(50))).thenReturn(List.of(Map.ofEntries(
+    when(jdbc.queryForList(anyString(), eq(7), eq(20), eq(51), eq(0))).thenReturn(List.of(Map.ofEntries(
         Map.entry("day", java.sql.Date.valueOf("2026-11-01")),
         Map.entry("excerpt_id", "excerpt-1"), Map.entry("book_id", "book-1"),
         Map.entry("eligible", true), Map.entry("impressions", 20L),
@@ -123,10 +123,26 @@ class ReportingControllerTest {
         Map.entry("attributed_read_count", 2L), Map.entry("attributed_complete_count", 1L),
         Map.entry("unique_subjects", 10L),
         Map.entry("source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z"))))));
-    var response = controller.excerptPerformance(7, 20, 50, principal, analyst);
+    var response = controller.excerptPerformance(7, 20, 50, 0, principal, analyst);
     assertEquals("UNTRUSTED", response.get("status"));
     assertEquals("SUPPRESSED_BELOW_MIN_SAMPLE", response.get("population"));
     assertEquals(1, ((List<?>) response.get("series")).size());
+    assertEquals(false, response.get("hasNext"));
+  }
+
+  @Test
+  void paginatesLargeExcerptQueriesWithStableMetadata() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    when(jdbc.queryForList(anyString(), eq(7), eq(20), eq(3), eq(2))).thenReturn(List.of(
+        Map.of("excerpt_id", "excerpt-3"), Map.of("excerpt_id", "excerpt-4"),
+        Map.of("excerpt_id", "excerpt-5")));
+
+    var response = controller.excerptPerformance(7, 20, 2, 1, principal, analyst);
+
+    assertEquals(1, response.get("page"));
+    assertEquals(2, response.get("pageSize"));
+    assertEquals(true, response.get("hasNext"));
+    assertEquals(2, ((List<?>) response.get("series")).size());
   }
 
   @Test
