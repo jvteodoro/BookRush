@@ -31,6 +31,7 @@ public class ReportingProjection {
   private static final String RECOMMENDATION_QUALITY_VERSION = "recommendation-outcome-v1-untrusted-population";
   private static final String EVENT_QUALITY_VERSION = "event-quality-ingestion-v1";
   private static final String GOVERNANCE_VERSION = "governance-activity-v1-untrusted-population";
+  private static final String BOOK_ENGAGEMENT_VERSION = "book-engagement-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final MeterRegistry metrics;
@@ -67,6 +68,8 @@ public class ReportingProjection {
     runProjection("moderation_daily", GOVERNANCE_VERSION, () -> refreshModerationDaily(refreshed));
     runProjection("publisher_workflow_daily", GOVERNANCE_VERSION, () -> refreshPublisherWorkflowDaily(refreshed));
     runProjection("rights_daily", GOVERNANCE_VERSION, () -> refreshRightsDaily(refreshed));
+    runProjection("book_engagement_daily", BOOK_ENGAGEMENT_VERSION,
+        () -> refreshBookEngagementDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -907,6 +910,88 @@ public class ReportingProjection {
         """, GOVERNANCE_VERSION, Timestamp.from(refreshed));
     updateHealth("publisher_workflow_daily", GOVERNANCE_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.publisher_workflow_daily");
+  }
+
+  private void refreshBookEngagementDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.book_engagement_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH event_facts AS (
+          SELECT occurred_at::date AS day, book_id,
+              count(DISTINCT identity_subject) FILTER (WHERE identity_subject IS NOT NULL) AS unique_readers,
+              count(DISTINCT identity_subject) FILTER (WHERE event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')) AS completions,
+              count(*) FILTER (WHERE event_type IN ('BOOK_LIKE', 'BOOK_UNLIKE', 'BOOK_SAVE', 'BOOK_UNSAVE',
+                'BOOK_SHARE', 'BOOK_COMMENT')) AS interactions,
+              count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION' AND payload->>'viewable' = 'true') AS viewable_count,
+              coalesce(sum(CASE WHEN event_type = 'READ_SESSION'
+                AND payload->>'activeSeconds' ~ '^[0-9]+$'
+                THEN least((payload->>'activeSeconds')::bigint, 86400) ELSE 0 END), 0) / 60 AS active_minutes,
+              max(occurred_at) AS source_watermark
+          FROM behavior.events
+          WHERE book_id IS NOT NULL AND occurred_at >= current_date - INTERVAL '366 days'
+          GROUP BY occurred_at::date, book_id
+        ), books AS (
+          SELECT db.day, db.book_id, b.canonical_title AS book_title,
+              coalesce(b.original_language, 'und') AS language,
+              db.impressions, db.opens, db.reads,
+              coalesce(e.viewable_count, 0) AS viewable_count,
+              coalesce(e.active_minutes, 0) AS active_minutes,
+              coalesce(e.unique_readers, 0) AS unique_readers,
+              coalesce(e.completions, 0) AS completions,
+              coalesce(e.interactions, 0) AS interactions,
+              greatest(db.day::timestamptz, coalesce(e.source_watermark, db.day::timestamptz)) AS source_watermark
+          FROM behavior.daily_book db JOIN catalog.book b ON b.id = db.book_id
+          LEFT JOIN event_facts e ON e.day = db.day AND e.book_id = db.book_id
+          WHERE db.day >= current_date - INTERVAL '366 days' AND b.status = 'ACTIVE'
+        ), language_events AS (
+          SELECT e.occurred_at::date AS day, coalesce(b.original_language, 'und') AS language,
+              count(DISTINCT e.identity_subject) FILTER (WHERE e.identity_subject IS NOT NULL) AS unique_readers,
+              count(DISTINCT e.identity_subject) FILTER (WHERE e.event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')) AS completions,
+              count(*) FILTER (WHERE e.event_type IN ('BOOK_LIKE', 'BOOK_UNLIKE', 'BOOK_SAVE', 'BOOK_UNSAVE',
+                'BOOK_SHARE', 'BOOK_COMMENT')) AS interactions,
+              coalesce(sum(CASE WHEN e.event_type = 'READ_SESSION'
+                AND e.payload->>'activeSeconds' ~ '^[0-9]+$'
+                THEN least((e.payload->>'activeSeconds')::bigint, 86400) ELSE 0 END), 0) / 60 AS active_minutes,
+              max(e.occurred_at) AS source_watermark
+          FROM behavior.events e JOIN catalog.book b ON b.id = e.book_id
+          WHERE e.book_id IS NOT NULL AND b.status = 'ACTIVE'
+            AND e.occurred_at >= current_date - INTERVAL '366 days'
+          GROUP BY e.occurred_at::date, coalesce(b.original_language, 'und')
+        ), language_books AS (
+          SELECT day, language, sum(impressions) AS impressions, sum(viewable_count) AS viewable_count,
+              sum(opens) AS opens, sum(reads) AS reads, max(source_watermark) AS source_watermark
+          FROM books GROUP BY day, language
+        ), aggregated AS (
+          SELECT day, 'BOOK' AS aggregation_level, book_id::text AS aggregation_key,
+              book_id, book_title, language, impressions, viewable_count, opens, reads,
+              active_minutes, unique_readers, completions, interactions, source_watermark
+          FROM books
+          UNION ALL
+          SELECT lb.day, 'LANGUAGE', lb.language, NULL, NULL, lb.language,
+              lb.impressions, lb.viewable_count, lb.opens, lb.reads,
+              coalesce(le.active_minutes, 0), coalesce(le.unique_readers, 0),
+              coalesce(le.completions, 0), coalesce(le.interactions, 0),
+              greatest(lb.source_watermark, coalesce(le.source_watermark, lb.source_watermark))
+          FROM language_books lb LEFT JOIN language_events le
+            ON le.day = lb.day AND le.language = lb.language
+        )
+        INSERT INTO reporting.book_engagement_daily(
+            day, aggregation_level, aggregation_key, book_id, book_title, language,
+            impressions, viewable_count, opens, reads, active_minutes, unique_readers,
+            completions, interactions, calculation_version, refreshed_at, source_watermark)
+        SELECT day, aggregation_level, aggregation_key, book_id, book_title, language,
+            impressions, viewable_count, opens, reads, active_minutes, unique_readers,
+            completions, interactions, ?, ?, source_watermark
+        FROM aggregated
+        ON CONFLICT (day, aggregation_level, aggregation_key) DO UPDATE SET
+            book_id = EXCLUDED.book_id, book_title = EXCLUDED.book_title, language = EXCLUDED.language,
+            impressions = EXCLUDED.impressions, viewable_count = EXCLUDED.viewable_count,
+            opens = EXCLUDED.opens, reads = EXCLUDED.reads, active_minutes = EXCLUDED.active_minutes,
+            unique_readers = EXCLUDED.unique_readers, completions = EXCLUDED.completions,
+            interactions = EXCLUDED.interactions, calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at, source_watermark = EXCLUDED.source_watermark
+        """, BOOK_ENGAGEMENT_VERSION, Timestamp.from(refreshed));
+    updateHealth("book_engagement_daily", BOOK_ENGAGEMENT_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.book_engagement_daily");
   }
 
   private void refreshRightsDaily(Instant refreshed) {

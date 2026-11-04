@@ -230,6 +230,13 @@ export type ReportingSeries = {
   outcome_type?: string;
   attributed_count?: number;
   unique_subjects?: number;
+  aggregation_level?: string;
+  aggregation_key?: string;
+  book_id?: string;
+  book_title?: string;
+  language?: string;
+  active_minutes?: number;
+  interactions?: number;
   accepted_events?: number;
   rejected_events?: number;
   duplicate_rejections?: number;
@@ -548,6 +555,21 @@ export const services = {
         error,
         "Não foi possível carregar os outcomes do recomendador.",
       );
+    }
+  },
+  async reportingBookEngagement(
+    days = 30,
+    minReaders = 5,
+    limit = 50,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/book-engagement",
+        { params: { days, minReaders, limit } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar o engajamento por obra.");
     }
   },
   async reportingPipeline(days = 30): Promise<ReportingResponse> {

@@ -29,6 +29,11 @@ declara causalidade.
 outcomes atribuídos a itens do ledger por estratégia e tipo de outcome,
 incluindo sujeitos/livros únicos e rank mediano.
 
+`GET /api/admin/v1/reporting/book-engagement?days=30&minReaders=5&limit=50`
+agrega obras e idiomas a partir de eventos e `behavior.daily_book`, ocultando
+linhas abaixo do limiar mínimo de leitores para evitar exposição de amostras
+pequenas.
+
 `GET /api/admin/v1/reporting/quality/attribution?days=30` expõe a distribuição
 de outcomes por `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` e
 `INVALID_REFERENCE`. `GET /api/admin/v1/reporting/quality/reconciliation?days=30`

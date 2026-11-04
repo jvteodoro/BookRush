@@ -57,7 +57,7 @@ fica reservado para dependência externa identificada.
 | GR-07 | Biblioteca | `reader_state.library` | PARTIAL | Fonte existe, sem API analítica | Saves/unsaves e leitores únicos |
 | GR-08 | Streaks e hábitos | `reading_day` | PARTIAL | Fonte existe, sem painel/projeção | Calendário e distribuição |
 | GR-09 | Web x Mobile | Client telemetry | MISSING | Plataforma não é dimensão confiável | Telemetria versionada |
-| GR-10 | Top books e idioma | Reading facts + catalog | MISSING | Sem supressão de amostra pequena | Agregação com n mínimo |
+| GR-10 | Top books e idioma | `reporting.book_engagement` | PARTIAL | Projeção por obra/idioma e limiar `minReaders` implementados; falta visualização de tendência dedicada | Agregação com n mínimo |
 | FD-01 | Funil de recomendação | Recommendation ledger + outcomes | PARTIAL | Ledger existe, outcomes não reconciliados | Atribuição versionada |
 | FD-02 | CTR viewable→open | Impressions/behavior | PARTIAL | Viewability e open ainda precisam reconciliação | Numerador/denominador fixture |
 | FD-03 | Dwell de excerpt | Frontend telemetry | PARTIAL | Normalização/deduplicação não comprovadas | Dwell ativo e skip explícito |
@@ -72,11 +72,11 @@ fica reservado para dependência externa identificada.
 | FD-12 | Qualidade do perfil | PFV1 profile/metrics | PARTIAL | Snapshot não exposto a reporting | Coverage/confidence buckets |
 | FD-13 | Livro/excerpt | Excerpt ledger/outcomes | MISSING | Performance por excerpt não autorizada/projetada | Drill-down com controle de acesso |
 | SO-01 | Interações sociais | Social/behavior | PARTIAL | Dados existem, sem fatos analíticos | Likes/saves/shares/comments |
-| SO-02 | Engajamento de obras | Social + reading | MISSING | Sem join de métricas governado | n mínimo e deduplicação |
+| SO-02 | Engajamento de obras | `reporting.book_engagement` | PARTIAL | Join governado entre catálogo, eventos e agregados; publisher-scope ainda não exposto | n mínimo e deduplicação |
 | SO-03 | Moderação | Admin reports | PARTIAL | Endpoint existe, sem série/SLA | Estados e aging |
 | SO-04 | Tempo de resolução | Admin audit/reports | MISSING | Não há percentis de resolução | Fixture de lifecycle |
 | SO-05 | Funil editorial | Publisher workflow | PARTIAL | Estados existem, sem projeção | Submission→published |
-| SO-06 | Desempenho publisher | Publisher + behavior | MISSING | Escopo por obra e atribuição ausentes | Autorização por publisher |
+| SO-06 | Desempenho publisher | `reporting.book_engagement` + publisher | PARTIAL | Métricas por obra disponíveis globalmente; autorização por publisher ainda pendente | Autorização por publisher |
 | SO-07 | Direitos/licenças | Catalog rights | PARTIAL | Fonte existe, sem painel agregado | Revogação e limitações |
 | DQ-01 | Qualidade dos eventos | Behavior events/rejects | PARTIAL | Rejeições existem, attempted/duplicates não consolidados | Fixtures duplicadas/rejeitadas |
 | DQ-02 | Outbox | `behavior.outbox` + Micrometer | PARTIAL | Métricas de backlog/idade/tentativas agora exportadas; falta smoke de scrape em produção | Retry, idade e sink |

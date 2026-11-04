@@ -671,6 +671,86 @@ function QualityReport({
   );
 }
 
+function BookEngagementReport({ data }: { data: ReportingResponse }) {
+  const books = data.series.filter((row) => row.aggregation_level === "BOOK");
+  const languages = data.series.filter(
+    (row) => row.aggregation_level === "LANGUAGE",
+  );
+  if (!data.series.length) {
+    return (
+      <div className="dashboard-state">
+        {data.population === "SUPPRESSED_BELOW_MIN_SAMPLE"
+          ? "INSUFFICIENT_SAMPLE"
+          : "NO_DATA"}
+      </div>
+    );
+  }
+  return (
+    <div className="dashboard-quality-grid">
+      <div>
+        <strong>GR-10/SO-02 · Top obras</strong>
+        <div className="dashboard-scroll-table">
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Obra</th>
+                <th>Idioma</th>
+                <th>Leitores</th>
+                <th>Minutos</th>
+                <th>Aberturas</th>
+                <th>Conclusões</th>
+                <th>Interações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {books.slice(0, 50).map((row, index) => (
+                <tr key={`${row.day}-${row.book_id}-${index}`}>
+                  <td>{row.day ?? "—"}</td>
+                  <td>{row.book_title ?? "—"}</td>
+                  <td>{row.language ?? "—"}</td>
+                  <td>{row.unique_readers ?? "—"}</td>
+                  <td>{row.active_minutes ?? "—"}</td>
+                  <td>{row.opens ?? "—"}</td>
+                  <td>{row.completions ?? "—"}</td>
+                  <td>{row.interactions ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <strong>GR-10 · Idiomas</strong>
+        <div className="dashboard-scroll-table">
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Idioma</th>
+                <th>Leitores</th>
+                <th>Minutos</th>
+                <th>Conclusões</th>
+              </tr>
+            </thead>
+            <tbody>
+              {languages.slice(0, 30).map((row, index) => (
+                <tr key={`${row.day}-${row.language}-${index}`}>
+                  <td>{row.day ?? "—"}</td>
+                  <td>{row.language ?? "—"}</td>
+                  <td>{row.unique_readers ?? "—"}</td>
+                  <td>{row.active_minutes ?? "—"}</td>
+                  <td>{row.completions ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SocialReport({
   social,
   publisher,
@@ -891,6 +971,8 @@ export function DashboardHub() {
   );
   const [retentionReport, setRetentionReport] =
     useState<ReportingResponse | null>(null);
+  const [bookEngagementReport, setBookEngagementReport] =
+    useState<ReportingResponse | null>(null);
   const [health, setHealth] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -906,6 +988,7 @@ export function DashboardHub() {
         feedDaily,
         recommendationDaily,
         recommendationQualityDaily,
+        bookEngagement,
         pipeline,
         pipelinePhases,
         attribution,
@@ -928,6 +1011,7 @@ export function DashboardHub() {
         services.reportingRecommendationQualityDaily(
           Math.min(Math.max(days, 1), 366),
         ),
+        services.reportingBookEngagement(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
         services.reportingPipelinePhases(Math.min(Math.max(days, 1), 366)),
         services.reportingAttributionQuality(Math.min(Math.max(days, 1), 366)),
@@ -952,6 +1036,7 @@ export function DashboardHub() {
       setFeedReport(feedDaily);
       setRecommendationReport(recommendationDaily);
       setRecommendationQualityReport(recommendationQualityDaily);
+      setBookEngagementReport(bookEngagement);
       setPipelineReport(pipeline);
       setPipelinePhaseReport(pipelinePhases);
       setAttributionReport(attribution);
@@ -1098,6 +1183,9 @@ export function DashboardHub() {
                 reading={readingReport}
                 retention={retentionReport}
               />
+              {bookEngagementReport && (
+                <BookEngagementReport data={bookEngagementReport} />
+              )}
             </div>
           ) : area === "feed" && feedReport ? (
             <div className="dashboard-card wide">
@@ -1207,6 +1295,9 @@ export function DashboardHub() {
                 workflow={workflowReport}
                 rights={rightsReport}
               />
+              {bookEngagementReport && (
+                <BookEngagementReport data={bookEngagementReport} />
+              )}
             </div>
           ) : (
             <div className="dashboard-card dashboard-gap">

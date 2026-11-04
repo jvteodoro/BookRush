@@ -70,3 +70,6 @@ aging de moderação, funil editorial/publicação e decisões de direitos/licen
 
 `V16__reporting_recommendation_quality_daily.sql` cria outcomes atribuídos do
 ledger de recomendações, preservando a versão de cálculo e o watermark.
+
+`V17__reporting_book_engagement_daily.sql` cria fatos agregados por obra e por
+idioma, com leitores distintos, minutos, aberturas, conclusões e interações.

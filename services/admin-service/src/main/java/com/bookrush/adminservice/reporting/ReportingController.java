@@ -329,6 +329,31 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/book-engagement")
+  public Map<String, Object> bookEngagement(@RequestParam(defaultValue = "30") int days,
+      @RequestParam(defaultValue = "5") int minReaders,
+      @RequestParam(defaultValue = "50") int limit,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    if (minReaders < 1 || minReaders > 10000 || limit < 1 || limit > 200) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "minReaders must be 1..10000 and limit must be 1..200");
+    }
+    var rows = jdbc.queryForList("""
+        SELECT day, aggregation_level, aggregation_key, book_id, book_title, language,
+          impressions, viewable_count, opens, reads, active_minutes, unique_readers,
+          completions, interactions, calculation_version, refreshed_at, source_watermark
+        FROM reporting.book_engagement_daily
+        WHERE day >= current_date - (? - 1)
+          AND unique_readers >= ?
+        ORDER BY day DESC, aggregation_level, unique_readers DESC, aggregation_key
+        LIMIT ?
+        """, days, minReaders, limit);
+    return response("book_engagement", "book-engagement-v1-untrusted-population", days,
+        "SUPPRESSED_BELOW_MIN_SAMPLE", rows);
+  }
+
   @GetMapping("/content-supply")
   public Map<String, Object> contentSupply(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {
