@@ -107,6 +107,11 @@ http:
       entryPoints: [web]
       priority: 135
       service: admin-api
+    admin-reporting-api:
+      rule: Host(`bookrush.jteodoro.tec.br`) && PathPrefix(`/api/admin`)
+      entryPoints: [web]
+      priority: 135
+      service: admin-api
     content:
       rule: PathPrefix(`/api/v1/content`)
       entryPoints: [web]

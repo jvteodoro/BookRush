@@ -49,6 +49,8 @@ grep -Fq 'bash scripts/test-keycloak-user-management.sh' Jenkinsfile || fail 'pi
 grep -Fq 'bash scripts/test-admin-user-management-e2e.sh' Jenkinsfile || fail 'pipeline principal sem E2E do gerenciamento de usuários'
 grep -Fq 'resolver 127.0.0.11' admin-web/nginx.conf || fail 'admin-web não resolve dinamicamente o admin-service durante deploy'
 grep -Fq 'proxy_pass $admin_service;' admin-web/nginx.conf || fail 'admin-web sem proxy dinâmico para a API administrativa'
+grep -Fq 'location /api/admin/' admin-web/nginx.conf || fail 'admin-web sem proxy para a facade reporting /api/admin'
+grep -Fq 'admin-reporting-api:' infrastructure/traefik/dynamic.yaml || fail 'Traefik sem rota da facade reporting /api/admin'
 grep -Fq 'ADMIN_SERVICE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/admin-service}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-service'
 grep -Fq 'ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-web}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-web'
 test -f infrastructure/keycloak/read-client-secret.py || fail 'resolvedor seguro do segredo admin-service ausente'

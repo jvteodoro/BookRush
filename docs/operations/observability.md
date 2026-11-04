@@ -100,3 +100,11 @@ Faça backup consistente dos volumes Grafana, Prometheus, Loki e Tempo conforme
 a janela de retenção aprovada. Teste restauração em volumes descartáveis antes
 de substituir o volume de produção; nunca remova os volumes da aplicação para
 recuperar a stack de observabilidade.
+## Reporting administrativo pelo gateway
+
+A facade de reporting do `admin-service` usa o namespace público
+`/api/admin/v1/reporting/**`. O Traefik mantém uma rota dedicada
+`admin-reporting-api` para esse prefixo, enquanto o Nginx do `admin-web` o
+encaminha internamente para o mesmo serviço. As operações administrativas
+legadas continuam em `/api/v1/admin/**`; os dois namespaces permanecem
+protegidos pelo bearer token e pelo RBAC do `admin-service`.

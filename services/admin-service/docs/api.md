@@ -2,6 +2,11 @@
 
 ## Reporting versionado
 
+As rotas de reporting usam o namespace público `/api/admin/v1/reporting/**`.
+O Traefik e o Nginx do `admin-web` encaminham esse namespace para o mesmo
+`admin-service` que atende `/api/v1/admin/**`; isso mantém a facade separada
+das operações administrativas legadas sem criar um segundo serviço.
+
 `GET /api/admin/v1/reporting/reader-day?days=30` retorna o contrato
 `dashboard-response-v1` a partir de snapshots read-only do schema `reporting`.
 O intervalo é limitado a 366 dias e exige `platform-admins`, `operators` ou
@@ -32,7 +37,8 @@ incluindo sujeitos/livros únicos e rank mediano.
 `GET /api/admin/v1/reporting/book-engagement?days=30&minReaders=5&limit=50`
 agrega obras e idiomas a partir de eventos e `behavior.daily_book`, ocultando
 linhas abaixo do limiar mínimo de leitores para evitar exposição de amostras
-pequenas.
+pequenas. `page=0..10000` pagina a consulta com `LIMIT limit+1/OFFSET` e o
+response informa `page`, `pageSize` e `hasNext`.
 
 `GET /api/admin/v1/reporting/executive-summary?days=30` retorna KPIs agregados
 do período atual e do período anterior de mesma duração, além dos
@@ -62,8 +68,13 @@ identificadores de usuário.
 `GET /api/admin/v1/reporting/excerpt-performance?days=30&minImpressions=20&limit=200`
 agrega impressões, viewability, CTR observacional, leituras e conclusões por
 excerpt/livro/modelo. A rota é protegida pelo RBAC de reporting, não retorna o
-texto do trecho e suprime linhas abaixo do limiar de impressões. O valor é
-descritivo e não representa causalidade.
+texto do trecho e suprime linhas abaixo do limiar de impressões. `page=0..10000`
+usa a mesma paginação limitada. O valor é descritivo e não representa
+causalidade.
+
+Todos os responses de série normalizam `sourceWatermark`/`refreshedAt` para
+ISO-8601 e informam `freshnessSeconds`, `warnings` e `status=STALE` quando a
+idade ultrapassa `BOOKRUSH_REPORTING_STALE_AFTER_SECONDS` (900 s por padrão).
 
 `GET /api/admin/v1/reporting/experiment-daily?days=30` expõe assignments
 persistidos por variante e guardrails agregados de requests, viewability,
