@@ -54,7 +54,7 @@ public final class ReaderArtifactStore {
       // The manifest is still valid for the current reader session. Artifact
       // persistence is retried by the next content request and must not turn a
       // transient object-store outage into a reader-facing 500.
-      log.warn("reader artifact persistence unavailable bookId={} exception={}", bookId,
+      log.warn("reader artifact persistence unavailable exception={}",
           e.getClass().getSimpleName());
       return null;
     }

@@ -988,8 +988,8 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
       long startedNanos = System.nanoTime();
       var result = linguisticRuntime.embeddings(texts, 8192);
       long durationMs = (System.nanoTime() - startedNanos) / 1_000_000;
-      log.info("analytics embeddings progress itemId={} version={} batch={}-{} total={} durationMs={} status={} vectors={}",
-          item.id(), version, offset + 1, end, total, durationMs, result.status(), result.vectors().size());
+      log.info("analytics embeddings progress version={} batch={}-{} total={} durationMs={} status={} vectors={}",
+          version, offset + 1, end, total, durationMs, result.status(), result.vectors().size());
       if (!"VALID".equals(result.status())
           || result.vectors().size() != texts.size()
           || result.inputHashes().size() != texts.size()) {
@@ -1068,8 +1068,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT (source_asset_version_id,start_co
         node.path("vector").forEach(value -> vector.add(value.asDouble()));
         if (!vector.isEmpty()) result.put(row.excerptId(), List.copyOf(vector));
       } catch (Exception exception) {
-        log.warn("analytics persisted embedding unavailable excerptId={} key={}",
-            row.excerptId(), row.objectKey());
+        log.warn("analytics persisted embedding unavailable");
       }
     }
     return result;

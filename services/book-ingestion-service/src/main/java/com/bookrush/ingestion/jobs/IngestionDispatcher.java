@@ -120,7 +120,7 @@ public class IngestionDispatcher {
                 try {
                   leases.heartbeat(lease.get(), Duration.ofSeconds(properties.leaseSeconds()));
                 } catch (RuntimeException failure) {
-                  log.warn("Ingestion task {} heartbeat failed", lease.get().taskId(), failure);
+                  log.warn("Ingestion heartbeat failed", failure);
                 }
               },
               properties.heartbeatSeconds(),
@@ -131,7 +131,7 @@ public class IngestionDispatcher {
         leases.complete(lease.get(), "SUCCEEDED", "IMPORTED");
         updateCounters(jobId);
       } catch (Exception failure) {
-        log.warn("Ingestion task {} failed: {}", lease.get().taskId(), failureDetail(failure));
+        log.warn("Ingestion task failed: {}", failureDetail(failure));
         var failureClass = FailureClassifier.exception(failure);
         boolean retry = false;
         try {
@@ -192,15 +192,9 @@ UPDATE catalog.ingestion_job j SET
   }
 
   private static String failureDetail(Throwable failure) {
-    String message = failure.getMessage();
-    if (message == null || message.isBlank()) {
-      Throwable root = failure;
-      while (root.getCause() != null && root.getCause() != root) root = root.getCause();
-      message = root.getMessage() == null ? root.getClass().getSimpleName() : root.getMessage();
-    }
-    return (failure.getClass().getSimpleName() + ": " + message)
-        .substring(
-            0, Math.min(1000, failure.getClass().getSimpleName().length() + 2 + message.length()));
+    // Exception messages may contain object keys, URLs or upstream payloads.
+    // Keep the persisted diagnostic bounded and non-sensitive.
+    return failure.getClass().getSimpleName();
   }
 }
 

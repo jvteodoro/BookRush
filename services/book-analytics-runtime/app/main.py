@@ -12,6 +12,27 @@ MAX_CHARS=int(os.getenv('ANALYTICS_RUNTIME_MAX_CHARS','100000'))
 NLI_BATCH_MAX_ITEMS=int(os.getenv('ANALYTICS_NLI_BATCH_MAX_ITEMS','32'))
 RUNTIME_DEVICE=os.getenv('ANALYTICS_RUNTIME_DEVICE','auto').lower()
 app=FastAPI(title='BookRush Analytics Runtime', version='v2')
+
+def _configure_telemetry():
+ try:
+  from opentelemetry import trace
+  from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+  from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+  from opentelemetry.sdk.resources import Resource
+  from opentelemetry.sdk.trace import TracerProvider
+  from opentelemetry.sdk.trace.export import BatchSpanProcessor
+  endpoint=os.getenv('OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', 'http://alloy:4318/v1/traces')
+  provider=TracerProvider(resource=Resource.create({
+   'service.name': os.getenv('OTEL_SERVICE_NAME', 'book-analytics-runtime'),
+   'deployment.environment': os.getenv('BOOKRUSH_ENVIRONMENT', 'unknown')}))
+  provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+  trace.set_tracer_provider(provider)
+  FastAPIInstrumentor.instrument_app(app, tracer_provider=provider)
+ except Exception:
+  # Telemetry must never prevent the model runtime from serving requests.
+  pass
+
+_configure_telemetry()
 _embedding_model = None
 _embedding_tokenizer = None
 _spacy_models = {}

@@ -1,6 +1,8 @@
 server:
   port: ${SERVER_PORT:8098}
 spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
   application:
     name: recommendation-service
   datasource:

@@ -78,11 +78,8 @@ public class AssetSecurity {
                 e.accessDeniedHandler(
                     (request, response, error) -> {
                       log.warn(
-                          "thumbnail authorization denied path={} principal={} authorities={}",
+                          "thumbnail authorization denied path={} authorities={}",
                           request.getRequestURI(),
-                          request.getUserPrincipal() == null
-                              ? "anonymous"
-                              : request.getUserPrincipal().getName(),
                           SecurityContextHolder.getContext().getAuthentication() == null
                               ? List.of()
                               : SecurityContextHolder.getContext().getAuthentication().getAuthorities());
@@ -247,11 +244,8 @@ public class AssetSecurity {
                     .accessDeniedHandler(
                         (req, res, error) -> {
                           log.warn(
-                              "catalog authorization denied path={} principal={} authorities={}",
+                              "catalog authorization denied path={} authorities={}",
                               req.getRequestURI(),
-                              req.getUserPrincipal() == null
-                                  ? "anonymous"
-                                  : req.getUserPrincipal().getName(),
                               SecurityContextHolder.getContext().getAuthentication() == null
                                   ? List.of()
                                   : SecurityContextHolder.getContext().getAuthentication().getAuthorities());

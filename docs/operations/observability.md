@@ -10,6 +10,11 @@ endpoints de Actuator continuam sujeitos à segurança do serviço. As séries H
 iniciais de 100 ms, 250 ms, 500 ms, 1 s, 2 s e 5 s para permitir P50/P95/P99
 agregáveis no Prometheus.
 
+O starter também habilita tracing Micrometer compatível com W3C, exportação
+OTLP HTTP para o Alloy e um encoder JSON no console com correlação e contexto
+de trace. A amostragem e o endpoint são configuráveis por ambiente; falhas de
+telemetria não impedem o serviço de iniciar.
+
 As tags comuns são somente `service` e `environment`. Não adicione subject,
 user ID, book ID, excerpt ID, token ou texto de livro como tag. Métricas de
 produto/recomendação devem usar contadores já versionados e atributos

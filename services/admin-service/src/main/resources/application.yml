@@ -1,6 +1,8 @@
 server:
   port: ${SERVER_PORT:8100}
 spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
   application:
     name: admin-service
   datasource:

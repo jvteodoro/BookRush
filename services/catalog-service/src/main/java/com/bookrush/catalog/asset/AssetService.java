@@ -293,17 +293,11 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
                   return new UploadResult(view(asset(book, r.assetId())), view(v));
                 });
         log.info(
-            "asset upload result=ok bookId={} assetId={} versionId={}",
-            book,
-            r.assetId(),
-            r.versionId());
+            "asset upload result=ok");
         return result;
       } catch (RuntimeException failure) {
         log.warn(
-            "asset upload failed bookId={} assetId={} versionId={} kind={} message={}",
-            book,
-            r.assetId(),
-            r.versionId(),
+            "asset upload failed kind={} message={}",
             failure.getClass().getSimpleName(),
             failure.getMessage());
         collision = failure instanceof StorageFailure s && s.kind() == StorageFailure.Kind.CONFLICT;
@@ -317,10 +311,7 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
               });
         } catch (RuntimeException ignored) {
           log.error(
-              "asset recovery required bookId={} assetId={} versionId={}",
-              book,
-              r.assetId(),
-              r.versionId());
+              "asset recovery required");
         }
         if (jdbc != null)
           jdbc.update(

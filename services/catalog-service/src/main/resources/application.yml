@@ -20,6 +20,8 @@ bookrush:
     jwk-set-uri: ${CATALOG_OIDC_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
     audience: ${CATALOG_OIDC_AUDIENCE:bookrush-catalog-admin}
 spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
   security:
     oauth2:
       resourceserver:
