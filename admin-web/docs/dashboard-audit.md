@@ -83,7 +83,7 @@ fica reservado para dependência externa identificada.
 | DQ-03 | Atribuição | `outcome_attribution` | PARTIAL | Modelo existe, reconciliação incompleta | Orgânico/feed/inválido |
 | DQ-04 | Reconciliação | Recommendation + behavior | MISSING | Não há snapshot de mismatches | Ledger vs facts |
 | DQ-05 | Freshness | `reporting.projection_health` + Micrometer | PARTIAL | Status, timestamp e record count exportados; falta smoke de scrape em produção | Stale guard e alerta |
-| DQ-06 | Schema/telemetria | Event registry | MISSING | Registry/version validation ausentes | Payload inválido/desconhecido |
+| DQ-06 | Schema/telemetria | `reporting.event_schema_daily` | PARTIAL | Tipo/schema/cliente/rejeição agregados; validação de contrato no produtor ainda é limitada | Payload inválido/desconhecido |
 | DQ-07 | Overhead | Prometheus/Loki/Tempo | MISSING | Stack não existe | Cardinalidade, disco e custo |
 | DQ-08 | Compliance/acesso | Admin audit + gateway | PARTIAL | Auditoria parcial, sem reporting export auditado | RBAC e ausência de PII |
 

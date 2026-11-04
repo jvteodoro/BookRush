@@ -251,6 +251,23 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/quality/event-schema")
+  public Map<String, Object> eventSchemaQuality(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, record_kind, event_type, schema_version, client_version,
+          reject_reason, record_count, unknown_event_count,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.event_schema_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, record_kind, event_type, schema_version, client_version
+        """, days);
+    return response("event_schema_daily", "event-schema-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/quality/reconciliation")
   public Map<String, Object> reconciliationQuality(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

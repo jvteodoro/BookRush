@@ -32,6 +32,7 @@ public class ReportingProjection {
   private static final String EVENT_QUALITY_VERSION = "event-quality-ingestion-v1";
   private static final String GOVERNANCE_VERSION = "governance-activity-v1-untrusted-population";
   private static final String BOOK_ENGAGEMENT_VERSION = "book-engagement-v1-untrusted-population";
+  private static final String EVENT_SCHEMA_VERSION = "event-schema-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final MeterRegistry metrics;
@@ -70,6 +71,8 @@ public class ReportingProjection {
     runProjection("rights_daily", GOVERNANCE_VERSION, () -> refreshRightsDaily(refreshed));
     runProjection("book_engagement_daily", BOOK_ENGAGEMENT_VERSION,
         () -> refreshBookEngagementDaily(refreshed));
+    runProjection("event_schema_daily", EVENT_SCHEMA_VERSION,
+        () -> refreshEventSchemaDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -992,6 +995,59 @@ public class ReportingProjection {
         """, BOOK_ENGAGEMENT_VERSION, Timestamp.from(refreshed));
     updateHealth("book_engagement_daily", BOOK_ENGAGEMENT_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.book_engagement_daily");
+  }
+
+  private void refreshEventSchemaDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.event_schema_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH accepted AS (
+          SELECT e.occurred_at::date AS day, e.event_type,
+              coalesce(e.payload->>'schemaVersion', r.schema_version, 'UNVERSIONED') AS schema_version,
+              coalesce(e.payload->>'clientVersion', 'UNKNOWN') AS client_version,
+              count(*) AS record_count,
+              count(*) FILTER (WHERE r.event_type IS NULL) AS unknown_event_count,
+              max(e.received_at) AS source_watermark
+          FROM behavior.events e LEFT JOIN behavior.schema_registry r ON r.event_type = e.event_type
+          WHERE e.occurred_at >= current_date - INTERVAL '366 days'
+          GROUP BY e.occurred_at::date, e.event_type,
+              coalesce(e.payload->>'schemaVersion', r.schema_version, 'UNVERSIONED'),
+              coalesce(e.payload->>'clientVersion', 'UNKNOWN')
+        ), rejected AS (
+          SELECT received_at::date AS day,
+              coalesce(payload->>'eventType', 'UNKNOWN') AS event_type,
+              coalesce(payload->>'schemaVersion', 'UNVERSIONED') AS schema_version,
+              coalesce(payload->>'clientVersion', 'UNKNOWN') AS client_version,
+              reason AS reject_reason, count(*) AS record_count,
+              0::bigint AS unknown_event_count, max(received_at) AS source_watermark
+          FROM behavior.rejects
+          WHERE received_at >= current_date - INTERVAL '366 days'
+          GROUP BY received_at::date, coalesce(payload->>'eventType', 'UNKNOWN'),
+              coalesce(payload->>'schemaVersion', 'UNVERSIONED'),
+              coalesce(payload->>'clientVersion', 'UNKNOWN'), reason
+        ), rows AS (
+          SELECT day, 'ACCEPTED' AS record_kind, event_type, schema_version,
+              client_version, 'NONE'::varchar AS reject_reason, record_count,
+              unknown_event_count, source_watermark FROM accepted
+          UNION ALL
+          SELECT day, 'REJECTED', event_type, schema_version, client_version,
+              reject_reason, record_count, unknown_event_count, source_watermark FROM rejected
+        )
+        INSERT INTO reporting.event_schema_daily(
+            day, record_kind, event_type, schema_version, client_version,
+            reject_reason, record_count, unknown_event_count, calculation_version,
+            refreshed_at, source_watermark)
+        SELECT day, record_kind, event_type, schema_version, client_version,
+            reject_reason, record_count, unknown_event_count, ?, ?, source_watermark
+        FROM rows
+        ON CONFLICT (day, record_kind, event_type, schema_version, client_version, reject_reason)
+        DO UPDATE SET record_count = EXCLUDED.record_count,
+            unknown_event_count = EXCLUDED.unknown_event_count,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, EVENT_SCHEMA_VERSION, Timestamp.from(refreshed));
+    updateHealth("event_schema_daily", EVENT_SCHEMA_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.event_schema_daily");
   }
 
   private void refreshRightsDaily(Instant refreshed) {

@@ -51,6 +51,10 @@ a 366 dias e protegidos pelo mesmo RBAC de reporting.
 rejeitados, duplicidades classificadas e o atraso do outbox. Payloads e textos de
 erro não fazem parte da projeção.
 
+`GET /api/admin/v1/reporting/quality/event-schema?days=30` agrega por tipo de
+registro, versão de schema, versão do cliente e motivo de rejeição, sem expor
+payloads.
+
 `GET /api/admin/v1/reporting/social-daily?days=30` e
 `GET /api/admin/v1/reporting/publisher-daily?days=30` expõem agregados
 read-only de interações/moderação e métricas de publicação. A resposta mantém

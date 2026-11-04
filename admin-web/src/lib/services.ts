@@ -237,6 +237,13 @@ export type ReportingSeries = {
   language?: string;
   active_minutes?: number;
   interactions?: number;
+  record_kind?: string;
+  event_type?: string;
+  schema_version?: string;
+  client_version?: string;
+  reject_reason?: string;
+  record_count?: number;
+  unknown_event_count?: number;
   accepted_events?: number;
   rejected_events?: number;
   duplicate_rejections?: number;
@@ -651,6 +658,20 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar a qualidade dos eventos.",
+      );
+    }
+  },
+  async reportingEventSchemaQuality(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/quality/event-schema",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar os schemas de telemetria.",
       );
     }
   },

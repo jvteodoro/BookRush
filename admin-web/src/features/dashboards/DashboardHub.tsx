@@ -729,10 +729,12 @@ function QualityReport({
   attribution,
   reconciliation,
   eventQuality,
+  eventSchema,
 }: {
   attribution: ReportingResponse;
   reconciliation: ReportingResponse;
   eventQuality: ReportingResponse;
+  eventSchema: ReportingResponse;
 }) {
   return (
     <div className="dashboard-quality-grid">
@@ -825,6 +827,43 @@ function QualityReport({
                       : `${row.outbox_oldest_pending_age_seconds}s`}
                   </td>
                   <td>{row.outbox_failed_attempts ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <div>
+        <strong>DQ-06 · Schema e telemetria</strong>
+        {!eventSchema.series.length ? (
+          <div className="dashboard-state">NO_DATA</div>
+        ) : (
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Tipo</th>
+                <th>Registro</th>
+                <th>Schema</th>
+                <th>Cliente</th>
+                <th>Motivo</th>
+                <th>n</th>
+                <th>Desconhecidos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eventSchema.series.slice(-40).map((row, index) => (
+                <tr
+                  key={`${row.day}-${row.record_kind}-${row.event_type}-${index}`}
+                >
+                  <td>{row.day ?? "—"}</td>
+                  <td>{row.event_type ?? "—"}</td>
+                  <td>{row.record_kind ?? "—"}</td>
+                  <td>{row.schema_version ?? "—"}</td>
+                  <td>{row.client_version ?? "—"}</td>
+                  <td>{row.reject_reason ?? "—"}</td>
+                  <td>{row.record_count ?? "—"}</td>
+                  <td>{row.unknown_event_count ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1115,6 +1154,8 @@ export function DashboardHub() {
     useState<ReportingResponse | null>(null);
   const [eventQualityReport, setEventQualityReport] =
     useState<ReportingResponse | null>(null);
+  const [eventSchemaReport, setEventSchemaReport] =
+    useState<ReportingResponse | null>(null);
   const [socialReport, setSocialReport] = useState<ReportingResponse | null>(
     null,
   );
@@ -1161,6 +1202,7 @@ export function DashboardHub() {
         attribution,
         reconciliation,
         eventQuality,
+        eventSchema,
         social,
         publisher,
         moderation,
@@ -1187,6 +1229,7 @@ export function DashboardHub() {
           Math.min(Math.max(days, 1), 366),
         ),
         services.reportingEventQuality(Math.min(Math.max(days, 1), 366)),
+        services.reportingEventSchemaQuality(Math.min(Math.max(days, 1), 366)),
         services.reportingSocialDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPublisherDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingModerationDaily(Math.min(Math.max(days, 1), 366)),
@@ -1211,6 +1254,7 @@ export function DashboardHub() {
       setAttributionReport(attribution);
       setReconciliationReport(reconciliation);
       setEventQualityReport(eventQuality);
+      setEventSchemaReport(eventSchema);
       setSocialReport(social);
       setPublisherReport(publisher);
       setModerationReport(moderation);
@@ -1412,7 +1456,8 @@ export function DashboardHub() {
           ) : area === "quality" &&
             attributionReport &&
             reconciliationReport &&
-            eventQualityReport ? (
+            eventQualityReport &&
+            eventSchemaReport ? (
             <div className="dashboard-card wide">
               <div className="dashboard-card-heading">
                 <div>
@@ -1441,6 +1486,7 @@ export function DashboardHub() {
                 attribution={attributionReport}
                 reconciliation={reconciliationReport}
                 eventQuality={eventQualityReport}
+                eventSchema={eventSchemaReport}
               />
             </div>
           ) : area === "social" &&

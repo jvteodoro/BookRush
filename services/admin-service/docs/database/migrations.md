@@ -73,3 +73,6 @@ ledger de recomendações, preservando a versão de cálculo e o watermark.
 
 `V17__reporting_book_engagement_daily.sql` cria fatos agregados por obra e por
 idioma, com leitores distintos, minutos, aberturas, conclusões e interações.
+
+`V18__reporting_event_schema_daily.sql` cria agregados de schema/cliente e
+rejeições de telemetria, preservando apenas dimensões de baixa cardinalidade.
