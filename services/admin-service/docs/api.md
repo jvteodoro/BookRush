@@ -19,11 +19,14 @@ eventos de leitura significativos; a população continua explicitamente
 `UNTRUSTED` até a proveniência ser classificada.
 
 `GET /api/admin/v1/reporting/feed-daily?days=30` expõe o ledger de entrega do
-feed e outcomes com `attribution-v1`. `GET /api/admin/v1/reporting/pipeline?days=30`
+feed e outcomes com `feed-attribution-v2-dwell-v1`. Além do funil atribuído, a
+projeção agrega `DWELL`/`EXCERPT_DWELL` por exposição, sujeito, livro e janela
+de 24 horas, retornando `dwell_observations` e `dwell_seconds`. Durações não
+numéricas são excluídas e cada exposição é agregada antes do join com outcomes,
+evitando multiplicação por múltiplas ações. `GET /api/admin/v1/reporting/pipeline?days=30`
 expõe snapshots dos itens e fases do analytics. Essas projeções também ficam
 `UNTRUSTED` enquanto a proveniência de população não for exportada pelos
-bounded contexts. Dwell permanece não instrumentado e não é apresentado como
-zero.
+bounded contexts.
 
 `GET /api/admin/v1/reporting/recommendation-daily?days=30` agrega requests,
 itens, impressões, viewability, livros únicos e distribuição de rank por modelo,

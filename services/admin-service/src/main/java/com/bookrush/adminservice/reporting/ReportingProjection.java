@@ -19,7 +19,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ReportingProjection {
   private static final Logger LOG = LoggerFactory.getLogger(ReportingProjection.class);
   private static final String VERSION = "events-v1-untrusted-population";
-  private static final String FEED_VERSION = "feed-attribution-v1-untrusted-population";
+  private static final String FEED_VERSION = "feed-attribution-v2-dwell-v1-untrusted-population";
   private static final String PIPELINE_VERSION = "analytics-pipeline-v1";
   private static final String QUALITY_VERSION = "event-quality-v1";
   private static final String PRODUCT_VERSION = "product-activity-v1-untrusted-population";
@@ -231,19 +231,72 @@ public class ReportingProjection {
   private void refreshFeedDaily(Instant refreshed) {
     jdbc.update("""
         WITH exposure AS (
-          SELECT i.id AS impression_id, i.item_id, i.shown_at, i.viewable,
+          SELECT i.id AS impression_id, i.item_id, i.book_id, i.shown_at, i.viewable,
               r.model_version, r.strategy,
               COALESCE(r.context->>'personalizationPath', 'UNKNOWN') AS feed_path,
-              COALESCE(r.context->>'platform', 'UNKNOWN') AS platform
+              COALESCE(r.context->>'platform', 'UNKNOWN') AS platform,
+              r.subject_key
           FROM recommendation.impression i
           JOIN recommendation.request r ON r.id = i.request_id
           WHERE i.shown_at >= current_date - INTERVAL '366 days'
         ), outcome AS (
-          SELECT oa.source_event_id, oa.impression_id, oa.recommendation_item_id,
+          SELECT oa.source_event_id, oa.subject_key, oa.impression_id, oa.recommendation_item_id,
               oa.outcome_type, e.payload, e.occurred_at
           FROM behavior.outcome_attribution oa
           JOIN behavior.events e ON e.id = oa.source_event_id
           WHERE oa.attribution_status = 'ATTRIBUTED'
+        ), dwell_by_exposure AS (
+          SELECT x.impression_id, x.item_id,
+              count(DISTINCT d.id) AS dwell_observations,
+              coalesce(round(sum(least((d.payload->>'durationMs')::bigint, 86400000))
+                / 1000.0)::bigint, 0) AS dwell_seconds,
+              max(d.occurred_at) AS dwell_watermark
+          FROM exposure x
+          JOIN behavior.events d
+            ON d.identity_subject = x.subject_key
+            AND d.book_id = x.book_id
+            AND d.event_type IN ('DWELL', 'EXCERPT_DWELL')
+            AND (d.payload->>'impressionId' = x.impression_id::text
+              OR d.payload->>'recommendationItemId' = x.item_id::text)
+            AND d.occurred_at >= x.shown_at
+            AND d.occurred_at < x.shown_at + INTERVAL '1 day'
+            AND d.payload->>'durationMs' ~ '^[0-9]+$'
+          GROUP BY x.impression_id, x.item_id
+        ), funnel AS (
+          SELECT x.day, x.model_version, x.strategy, x.feed_path, x.platform,
+              count(DISTINCT x.impression_id) AS served_count,
+              count(DISTINCT x.impression_id) FILTER (WHERE x.viewable) AS viewable_count,
+              count(DISTINCT x.source_event_id) FILTER (WHERE x.outcome_type = 'BOOK_OPEN') AS attributed_open_count,
+              count(DISTINCT x.source_event_id) FILTER (
+                WHERE x.outcome_type = 'READ_PROGRESS'
+                  AND x.payload->>'percent' ~ '^[0-9]+(\\.[0-9]+)?$'
+                  AND (x.payload->>'percent')::numeric >= 10) AS attributed_read_10_count,
+              count(DISTINCT x.source_event_id) FILTER (
+                WHERE x.outcome_type = 'READ_PROGRESS'
+                  AND x.payload->>'percent' ~ '^[0-9]+(\\.[0-9]+)?$'
+                  AND (x.payload->>'percent')::numeric >= 50) AS attributed_read_50_count,
+              count(DISTINCT x.source_event_id) FILTER (
+                WHERE x.outcome_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')) AS attributed_complete_count,
+              max(x.source_watermark) AS source_watermark
+          FROM (
+            SELECT e.*, o.source_event_id, o.outcome_type, o.payload,
+                GREATEST(e.shown_at, COALESCE(o.occurred_at, e.shown_at)) AS source_watermark,
+                e.shown_at::date AS day
+            FROM exposure e
+            LEFT JOIN outcome o ON o.subject_key = e.subject_key
+                AND (o.impression_id = e.impression_id
+                  OR o.recommendation_item_id = e.item_id)
+          ) x
+          GROUP BY x.day, x.model_version, x.strategy, x.feed_path, x.platform
+        ), dwell_rollup AS (
+          SELECT e.shown_at::date AS day, e.model_version, e.strategy, e.feed_path, e.platform,
+              coalesce(sum(d.dwell_observations), 0)::bigint AS dwell_observations,
+              coalesce(sum(d.dwell_seconds), 0)::bigint AS dwell_seconds,
+              max(d.dwell_watermark) AS source_watermark
+          FROM exposure e
+          LEFT JOIN dwell_by_exposure d ON d.impression_id = e.impression_id
+              AND d.item_id = e.item_id
+          GROUP BY e.shown_at::date, e.model_version, e.strategy, e.feed_path, e.platform
         )
         INSERT INTO reporting.feed_daily(
             day, model_version, strategy, feed_path, population, platform,
@@ -251,30 +304,18 @@ public class ReportingProjection {
             attributed_read_10_count, attributed_read_50_count,
             attributed_complete_count, dwell_observations, dwell_seconds,
             calculation_version, refreshed_at, source_watermark)
-        SELECT x.day, x.model_version, x.strategy, x.feed_path, 'UNCLASSIFIED', x.platform,
-            count(DISTINCT x.impression_id),
-            count(DISTINCT x.impression_id) FILTER (WHERE x.viewable),
-            count(DISTINCT x.source_event_id) FILTER (WHERE x.outcome_type = 'BOOK_OPEN'),
-            count(DISTINCT x.source_event_id) FILTER (
-              WHERE x.outcome_type = 'READ_PROGRESS'
-                AND x.payload->>'percent' ~ '^[0-9]+(\\.[0-9]+)?$'
-                AND (x.payload->>'percent')::numeric >= 10),
-            count(DISTINCT x.source_event_id) FILTER (
-              WHERE x.outcome_type = 'READ_PROGRESS'
-                AND x.payload->>'percent' ~ '^[0-9]+(\\.[0-9]+)?$'
-                AND (x.payload->>'percent')::numeric >= 50),
-            count(DISTINCT x.source_event_id) FILTER (
-              WHERE x.outcome_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')),
-            NULL, NULL, ?, ?, max(x.source_watermark)
-        FROM (
-          SELECT e.*, o.source_event_id, o.outcome_type, o.payload,
-              GREATEST(e.shown_at, COALESCE(o.occurred_at, e.shown_at)) AS source_watermark,
-              e.shown_at::date AS day
-          FROM exposure e
-          LEFT JOIN outcome o ON o.impression_id = e.impression_id
-              OR o.recommendation_item_id = e.item_id
-        ) x
-        GROUP BY x.day, x.model_version, x.strategy, x.feed_path, x.platform
+        SELECT f.day, f.model_version, f.strategy, f.feed_path, 'UNCLASSIFIED', f.platform,
+            f.served_count, f.viewable_count, f.attributed_open_count,
+            f.attributed_read_10_count, f.attributed_read_50_count,
+            f.attributed_complete_count, d.dwell_observations, d.dwell_seconds,
+            ?, ?, GREATEST(f.source_watermark,
+              coalesce(d.source_watermark, f.source_watermark))
+        FROM funnel f
+        LEFT JOIN dwell_rollup d ON d.day = f.day
+            AND d.model_version = f.model_version
+            AND d.strategy = f.strategy
+            AND d.feed_path = f.feed_path
+            AND d.platform = f.platform
         ON CONFLICT (day, model_version, strategy, feed_path, population, platform) DO UPDATE SET
           served_count = EXCLUDED.served_count,
           viewable_count = EXCLUDED.viewable_count,

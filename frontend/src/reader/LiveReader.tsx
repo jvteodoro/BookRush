@@ -338,6 +338,13 @@ export function LiveReader({
       );
     }
   }, []);
+  const onDwell = useCallback((id: string, durationMs: number) => {
+    const book = runtime().__BOOKRUSH_BOOKS__.find((item) => item.id === id);
+    if (!book?.excerpt || durationMs <= 0) return;
+    runtime().__BOOKRUSH_API__.trackExcerpt("EXCERPT_DWELL", id, book.excerpt, {
+      durationMs,
+    });
+  }, []);
   const navigate = (nextTab: ReaderTab) => {
     setMessage("");
     setTab(nextTab);
@@ -484,6 +491,7 @@ export function LiveReader({
             },
             onShare: (id) => runtime().__BOOKRUSH_LEGACY__.openShare(id),
             onViewable,
+            onDwell,
           }}
         />
       )}

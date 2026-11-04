@@ -122,7 +122,9 @@ limitado a 60 segundos. A fila é perdida ao encerrar a sessão ou o processo;
 nenhum token, e-mail ou texto do livro entra nela.
 
 O web registra impressões somente quando o elemento atinge o limiar de
-visibilidade (`IntersectionObserver`) e mede `DWELL` com duração não negativa.
+visibilidade (`IntersectionObserver`) e mede `DWELL` por intervalos ativos do
+card. O intervalo é encerrado ao sair da área visível, ao esconder a aba ou ao
+desmontar o feed; durações menores que 250 ms são descartadas como ruído.
 Para cards originados do feed, a viewability é confirmada pelo endpoint
 server-side do ledger (`/recommendations/impressions/{id}/viewable`); o web não
 envia um segundo `EXCERPT_IMPRESSION` para o mesmo `impressionId`. Impressões

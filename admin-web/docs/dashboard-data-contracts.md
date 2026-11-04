@@ -74,7 +74,7 @@ Isto é **contrato lógico**, não SQL Flyway pronto. Definir tipos, chaves, ret
 | \`feed_ctr_viewable\` | impressões viewable elegíveis com primeiro open atribuído / impressões viewable elegíveis | atribuição 7d **proposta**, mesma coorte/cutoff/popu. |
 | \`feed_meaningful_read_rate\` | viewable impressions com leitura significativa atribuída / viewable impressions elegíveis | mesmo vínculo, threshold versionado |
 | \`feed_completion_rate\` | viewable impressions com conclusão atribuída / viewable impressions elegíveis e maduras | janela de observação >= janela de conclusão, mostrar maturaçao |
-| \`excerpt_dwell_seconds\` | tempo de exposição ativa validada e deduplicada por impression | \`DWELL\` vs \`EXCERPT_DWELL\` normalizar; inicialmente “not instrumented” se inválido |
+| \`excerpt_dwell_seconds\` | tempo de exposição ativa validada e deduplicada por impression | \`DWELL\` e \`EXCERPT_DWELL\` aceitos; durações inválidas são excluídas e a projeção informa o watermark |
 | \`skip_rate\` | impressões elegíveis puladas após exposição mínima / impressões elegíveis | requer evento dedicado / regra versionada, **não inferir de ausência de click** |
 | \`cold_start_rate\` | requests com fallback cold-start / requests de feed elegíveis | \`FeedMetrics\` + ledger, separando indisponibilidade do behavior |
 | \`personalized_serving_rate\` | requests servidos por PFV1 / requests elegíveis | modo ON/SHADOW/OFF e rollout, não contar SHADOW como servido |
