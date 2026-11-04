@@ -113,6 +113,15 @@ classification is rebuildable and does not delete historical events.
 exposure in the seven-day window (timestamp, impression and event ID are stable
 tie-breakers), and retains the selected touch for auditability.
 
+### Integração PostgreSQL
+
+`UserBookSignalPostgresIT` usa Testcontainers por padrão. Em hosts cujo cliente
+Docker embutido não negocia a API mínima do daemon, o teste aceita um banco
+descartável externo por meio de `BOOKRUSH_TEST_POSTGRES_URL`, além de
+`BOOKRUSH_TEST_POSTGRES_USER` e `BOOKRUSH_TEST_POSTGRES_PASSWORD`. O banco deve
+ser criado somente para o teste e removido ao final; nenhum volume produtivo é
+aceito.
+
 ## Outbox downstream
 
 Eventos aceitos entram na outbox e são enviados pelo dispatcher para

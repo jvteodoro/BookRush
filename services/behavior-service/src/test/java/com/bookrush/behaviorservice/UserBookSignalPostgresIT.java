@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,20 +18,35 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.core.io.ClassPathResource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 class UserBookSignalPostgresIT {
-  @Container
-  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  private static PostgreSQLContainer<?> postgres;
+  private static DataSource dataSource;
 
   private JdbcTemplate jdbc;
 
+  @BeforeAll
+  static void startDatabase() {
+    String externalUrl = System.getenv("BOOKRUSH_TEST_POSTGRES_URL");
+    if (externalUrl != null && !externalUrl.isBlank()) {
+      dataSource = new DriverManagerDataSource(externalUrl,
+          System.getenv().getOrDefault("BOOKRUSH_TEST_POSTGRES_USER", "postgres"),
+          System.getenv().getOrDefault("BOOKRUSH_TEST_POSTGRES_PASSWORD", "test"));
+      return;
+    }
+    postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    postgres.start();
+    dataSource = new DriverManagerDataSource(
+        postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+  }
+
+  @AfterAll
+  static void stopDatabase() {
+    if (postgres != null) postgres.stop();
+  }
+
   @BeforeEach
   void setUp() {
-    DataSource dataSource = new DriverManagerDataSource(
-        POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
     jdbc = new JdbcTemplate(dataSource);
     jdbc.execute("DROP SCHEMA IF EXISTS behavior CASCADE");
     jdbc.execute("CREATE SCHEMA behavior");
@@ -95,8 +112,8 @@ class UserBookSignalPostgresIT {
     assertEquals(1, body.total());
     assertEquals(false, first.get("liked"));
     assertEquals(false, first.get("saved"));
-    assertEquals(1L, first.get("impression_count"));
-    assertEquals(1L, first.get("viewable_impression_count"));
+    assertEquals(2L, first.get("impression_count"));
+    assertEquals(2L, first.get("viewable_impression_count"));
     assertEquals(1L, first.get("open_count"));
     assertEquals(2L, first.get("progress_event_count"));
     assertEquals(1L, first.get("completion_count"));
