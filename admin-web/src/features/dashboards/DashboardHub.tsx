@@ -525,9 +525,11 @@ function SupplyReport({
 function QualityReport({
   attribution,
   reconciliation,
+  eventQuality,
 }: {
   attribution: ReportingResponse;
   reconciliation: ReportingResponse;
+  eventQuality: ReportingResponse;
 }) {
   return (
     <div className="dashboard-quality-grid">
@@ -583,6 +585,43 @@ function QualityReport({
                   <td>{row.behavior_impression_event_count ?? "—"}</td>
                   <td>{row.duplicate_event_count ?? "—"}</td>
                   <td>{row.mismatched_impression_count ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <div>
+        <strong>DQ-01/02 · Eventos e outbox</strong>
+        {!eventQuality.series.length ? (
+          <div className="dashboard-state">NO_DATA</div>
+        ) : (
+          <table className="dashboard-table">
+            <thead>
+              <tr>
+                <th>Dia</th>
+                <th>Aceitos</th>
+                <th>Rejeitados</th>
+                <th>Duplicados</th>
+                <th>Pending outbox</th>
+                <th>Idade</th>
+                <th>Tentativas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {eventQuality.series.slice(-30).map((row, index) => (
+                <tr key={`${row.day}-${index}`}>
+                  <td>{row.day ?? "—"}</td>
+                  <td>{row.accepted_events ?? "—"}</td>
+                  <td>{row.rejected_events ?? "—"}</td>
+                  <td>{row.duplicate_rejections ?? "—"}</td>
+                  <td>{row.outbox_pending ?? "—"}</td>
+                  <td>
+                    {row.outbox_oldest_pending_age_seconds == null
+                      ? "—"
+                      : `${row.outbox_oldest_pending_age_seconds}s`}
+                  </td>
+                  <td>{row.outbox_failed_attempts ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -688,6 +727,8 @@ export function DashboardHub() {
     useState<ReportingResponse | null>(null);
   const [reconciliationReport, setReconciliationReport] =
     useState<ReportingResponse | null>(null);
+  const [eventQualityReport, setEventQualityReport] =
+    useState<ReportingResponse | null>(null);
   const [socialReport, setSocialReport] = useState<ReportingResponse | null>(
     null,
   );
@@ -721,6 +762,7 @@ export function DashboardHub() {
         pipelinePhases,
         attribution,
         reconciliation,
+        eventQuality,
         social,
         publisher,
         supply,
@@ -738,6 +780,7 @@ export function DashboardHub() {
         services.reportingReconciliationQuality(
           Math.min(Math.max(days, 1), 366),
         ),
+        services.reportingEventQuality(Math.min(Math.max(days, 1), 366)),
         services.reportingSocialDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPublisherDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingContentSupply(Math.min(Math.max(days, 1), 366)),
@@ -753,6 +796,7 @@ export function DashboardHub() {
       setPipelinePhaseReport(pipelinePhases);
       setAttributionReport(attribution);
       setReconciliationReport(reconciliation);
+      setEventQualityReport(eventQuality);
       setSocialReport(social);
       setPublisherReport(publisher);
       setSupplyReport(supply);
@@ -941,7 +985,8 @@ export function DashboardHub() {
             </div>
           ) : area === "quality" &&
             attributionReport &&
-            reconciliationReport ? (
+            reconciliationReport &&
+            eventQualityReport ? (
             <div className="dashboard-card wide">
               <div className="dashboard-card-heading">
                 <div>
@@ -969,6 +1014,7 @@ export function DashboardHub() {
               <QualityReport
                 attribution={attributionReport}
                 reconciliation={reconciliationReport}
+                eventQuality={eventQualityReport}
               />
             </div>
           ) : area === "social" && socialReport && publisherReport ? (

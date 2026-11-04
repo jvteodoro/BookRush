@@ -24,6 +24,7 @@ public class ReportingProjection {
   private static final String PHASE_VERSION = "analytics-phase-v1";
   private static final String READING_VERSION = "reading-engagement-v1-untrusted-population";
   private static final String RECOMMENDATION_VERSION = "recommendation-ledger-v1-untrusted-population";
+  private static final String EVENT_QUALITY_VERSION = "event-quality-ingestion-v1";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
 
@@ -48,6 +49,7 @@ public class ReportingProjection {
     runProjection("reading_daily", READING_VERSION, () -> refreshReadingDaily(refreshed));
     runProjection("retention_cohort", READING_VERSION, () -> refreshRetentionCohort(refreshed));
     runProjection("recommendation_daily", RECOMMENDATION_VERSION, () -> refreshRecommendationDaily(refreshed));
+    runProjection("event_quality_daily", EVENT_QUALITY_VERSION, () -> refreshEventQualityDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -663,6 +665,70 @@ public class ReportingProjection {
         """, RECOMMENDATION_VERSION, Timestamp.from(refreshed));
     updateHealth("recommendation_daily", RECOMMENDATION_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.recommendation_daily");
+  }
+
+  private void refreshEventQualityDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.event_quality_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH accepted AS (
+          SELECT occurred_at::date AS day, count(*) AS accepted_events,
+              max(received_at) AS source_watermark
+          FROM behavior.events
+          WHERE occurred_at >= current_date - INTERVAL '366 days'
+          GROUP BY occurred_at::date
+        ), rejected AS (
+          SELECT received_at::date AS day, count(*) AS rejected_events,
+              count(*) FILTER (WHERE reason ILIKE '%duplicate%') AS duplicate_rejections,
+              count(*) FILTER (WHERE reason ILIKE '%schema%') AS schema_rejections,
+              count(*) FILTER (WHERE reason ILIKE '%payload%') AS payload_rejections,
+              max(received_at) AS source_watermark
+          FROM behavior.rejects
+          WHERE received_at >= current_date - INTERVAL '366 days'
+          GROUP BY received_at::date
+        ), outbox AS (
+          SELECT created_at::date AS day,
+              count(*) FILTER (WHERE published_at IS NULL) AS outbox_pending,
+              count(*) FILTER (WHERE published_at IS NOT NULL) AS outbox_published,
+              coalesce(sum(attempts) FILTER (WHERE attempts > 0), 0) AS outbox_failed_attempts,
+              extract(epoch FROM clock_timestamp() - min(created_at)
+                FILTER (WHERE published_at IS NULL))::bigint AS outbox_oldest_pending_age_seconds,
+              max(coalesce(published_at, created_at)) AS source_watermark
+          FROM behavior.outbox
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        )
+        INSERT INTO reporting.event_quality_daily(
+            day, accepted_events, rejected_events, duplicate_rejections,
+            schema_rejections, payload_rejections, outbox_pending,
+            outbox_published, outbox_failed_attempts,
+            outbox_oldest_pending_age_seconds, calculation_version,
+            refreshed_at, source_watermark)
+        SELECT coalesce(a.day, r.day, o.day), coalesce(a.accepted_events, 0),
+            coalesce(r.rejected_events, 0), coalesce(r.duplicate_rejections, 0),
+            coalesce(r.schema_rejections, 0), coalesce(r.payload_rejections, 0),
+            coalesce(o.outbox_pending, 0), coalesce(o.outbox_published, 0),
+            coalesce(o.outbox_failed_attempts, 0), o.outbox_oldest_pending_age_seconds,
+            ?, ?, greatest(coalesce(a.source_watermark, '-infinity'::timestamptz),
+              coalesce(r.source_watermark, '-infinity'::timestamptz),
+              coalesce(o.source_watermark, '-infinity'::timestamptz))
+        FROM accepted a FULL OUTER JOIN rejected r ON r.day = a.day
+          FULL OUTER JOIN outbox o ON o.day = coalesce(a.day, r.day)
+        ON CONFLICT (day) DO UPDATE SET
+            accepted_events = EXCLUDED.accepted_events,
+            rejected_events = EXCLUDED.rejected_events,
+            duplicate_rejections = EXCLUDED.duplicate_rejections,
+            schema_rejections = EXCLUDED.schema_rejections,
+            payload_rejections = EXCLUDED.payload_rejections,
+            outbox_pending = EXCLUDED.outbox_pending,
+            outbox_published = EXCLUDED.outbox_published,
+            outbox_failed_attempts = EXCLUDED.outbox_failed_attempts,
+            outbox_oldest_pending_age_seconds = EXCLUDED.outbox_oldest_pending_age_seconds,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, EVENT_QUALITY_VERSION, Timestamp.from(refreshed));
+    updateHealth("event_quality_daily", EVENT_QUALITY_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.event_quality_daily");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {

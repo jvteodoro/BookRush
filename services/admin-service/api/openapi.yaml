@@ -87,6 +87,21 @@ paths:
         '400': { description: Invalid date range }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/quality/events:
+    get:
+      summary: Read accepted/rejected events and outbox lag snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Event quality and outbox counts without raw payloads
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/quality/reconciliation:
     get:
       summary: Reconcile recommendation impressions and behavior viewability events

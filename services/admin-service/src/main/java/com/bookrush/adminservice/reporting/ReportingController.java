@@ -158,6 +158,25 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/quality/events")
+  public Map<String, Object> eventQuality(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, accepted_events, rejected_events, duplicate_rejections,
+          schema_rejections, payload_rejections, outbox_pending,
+          outbox_published, outbox_failed_attempts,
+          outbox_oldest_pending_age_seconds, calculation_version,
+          refreshed_at, source_watermark
+        FROM reporting.event_quality_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("event_quality_daily", "event-quality-ingestion-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/quality/reconciliation")
   public Map<String, Object> reconciliationQuality(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

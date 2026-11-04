@@ -227,6 +227,15 @@ export type ReportingSeries = {
   unique_books?: number;
   p50_rank?: number | null;
   p90_rank?: number | null;
+  accepted_events?: number;
+  rejected_events?: number;
+  duplicate_rejections?: number;
+  schema_rejections?: number;
+  payload_rejections?: number;
+  outbox_pending?: number;
+  outbox_published?: number;
+  outbox_failed_attempts?: number;
+  outbox_oldest_pending_age_seconds?: number | null;
   unique_readers?: number;
   p50_session_seconds?: number | null;
   p90_session_seconds?: number | null;
@@ -541,6 +550,20 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar a qualidade da atribuição.",
+      );
+    }
+  },
+  async reportingEventQuality(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/quality/events",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar a qualidade dos eventos.",
       );
     }
   },

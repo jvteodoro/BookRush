@@ -32,6 +32,10 @@ compara o ledger de impressões com eventos de viewability, destacando
 duplicidades e IDs sem correspondência. Esses endpoints são read-only, limitados
 a 366 dias e protegidos pelo mesmo RBAC de reporting.
 
+`GET /api/admin/v1/reporting/quality/events?days=30` agrega eventos aceitos,
+rejeitados, duplicidades classificadas e o atraso do outbox. Payloads e textos de
+erro não fazem parte da projeção.
+
 `GET /api/admin/v1/reporting/social-daily?days=30` e
 `GET /api/admin/v1/reporting/publisher-daily?days=30` expõem agregados
 read-only de interações/moderação e métricas de publicação. A resposta mantém

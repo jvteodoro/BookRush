@@ -60,3 +60,7 @@ interpretada como retenção zero.
 `V13__reporting_recommendation_daily.sql` agrega o ledger de recommendation por
 modelo, estratégia, caminho e plataforma, preservando contagens de requests,
 itens, impressões, viewability, livros únicos e percentis de rank.
+
+`V14__reporting_event_quality_daily.sql` agrega eventos aceitos/rejeitados e
+estado do outbox por dia, expondo somente contagens, tentativas e idade do item
+pendente.
