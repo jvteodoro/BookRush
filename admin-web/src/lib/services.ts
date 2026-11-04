@@ -222,6 +222,18 @@ export type ReportingSeries = {
   p50_duration_ms?: number | null;
   p95_duration_ms?: number | null;
   p99_duration_ms?: number | null;
+  unique_readers?: number;
+  p50_session_seconds?: number | null;
+  p90_session_seconds?: number | null;
+  books_opened?: number;
+  books_started?: number;
+  saved_books?: number;
+  unique_savers?: number;
+  cohort_day?: string;
+  offset_day?: number;
+  cohort_users?: number;
+  retained_users?: number;
+  mature?: boolean;
   active_users?: number;
   newly_active_users?: number;
   weekly_active_users?: number;
@@ -525,6 +537,31 @@ export const services = {
         error,
         "Não foi possível carregar a reconciliação de eventos.",
       );
+    }
+  },
+  async reportingReadingDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/reading-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar o engajamento de leitura.",
+      );
+    }
+  },
+  async reportingRetentionCohort(days = 366): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/retention-cohort",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a retenção por coorte.");
     }
   },
   async reportingSocialDaily(days = 30): Promise<ReportingResponse> {

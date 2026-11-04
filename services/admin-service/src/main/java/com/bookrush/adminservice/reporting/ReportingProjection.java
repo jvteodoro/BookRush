@@ -22,6 +22,7 @@ public class ReportingProjection {
   private static final String CONTENT_VERSION = "content-supply-v1";
   private static final String INGESTION_VERSION = "ingestion-operations-v1";
   private static final String PHASE_VERSION = "analytics-phase-v1";
+  private static final String READING_VERSION = "reading-engagement-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
 
@@ -43,6 +44,8 @@ public class ReportingProjection {
     runProjection("content_supply_snapshot", CONTENT_VERSION, () -> refreshContentSupply(refreshed));
     runProjection("ingestion_daily", INGESTION_VERSION, () -> refreshIngestionDaily(refreshed));
     runProjection("pipeline_phase_daily", PHASE_VERSION, () -> refreshPipelinePhaseDaily(refreshed));
+    runProjection("reading_daily", READING_VERSION, () -> refreshReadingDaily(refreshed));
+    runProjection("retention_cohort", READING_VERSION, () -> refreshRetentionCohort(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -495,6 +498,115 @@ public class ReportingProjection {
         """, PHASE_VERSION, Timestamp.from(refreshed));
     updateHealth("pipeline_phase_daily", PHASE_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.pipeline_phase_daily");
+  }
+
+  private void refreshReadingDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.reading_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH events AS (
+          SELECT occurred_at::date AS day,
+              count(DISTINCT identity_subject) AS unique_readers,
+              count(DISTINCT (identity_subject, book_id)) FILTER (WHERE event_type = 'BOOK_OPEN') AS books_opened,
+              count(DISTINCT (identity_subject, book_id)) FILTER (WHERE event_type = 'BOOK_OPEN') AS books_started,
+              count(DISTINCT (identity_subject, book_id)) FILTER (WHERE event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')) AS completions,
+              max(occurred_at) AS source_watermark
+          FROM behavior.events
+          WHERE identity_subject IS NOT NULL
+            AND event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS', 'BOOK_COMPLETE', 'READ_COMPLETE')
+            AND occurred_at >= current_date - INTERVAL '366 days'
+          GROUP BY occurred_at::date
+        ), sessions AS (
+          SELECT started_at::date AS day, count(*) AS sessions,
+              coalesce(sum(least(greatest(active_seconds, 0), 86400)), 0) AS active_seconds,
+              percentile_cont(0.50) WITHIN GROUP (ORDER BY least(greatest(active_seconds, 0), 86400)) AS p50_session_seconds,
+              percentile_cont(0.90) WITHIN GROUP (ORDER BY least(greatest(active_seconds, 0), 86400)) AS p90_session_seconds,
+              max(coalesce(ended_at, started_at)) AS source_watermark
+          FROM reader_state.session
+          WHERE started_at >= current_date - INTERVAL '366 days'
+          GROUP BY started_at::date
+        ), library AS (
+          SELECT created_at::date AS day, count(DISTINCT book_id) AS saved_books,
+              count(DISTINCT subject_key) AS unique_savers, max(created_at) AS source_watermark
+          FROM reader_state.library
+          WHERE status = 'SAVED' AND created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        )
+        INSERT INTO reporting.reading_daily(
+            day, unique_readers, sessions, active_seconds, p50_session_seconds,
+            p90_session_seconds, books_opened, books_started, completions,
+            saved_books, unique_savers, calculation_version, refreshed_at, source_watermark)
+        SELECT coalesce(e.day, s.day, l.day), coalesce(e.unique_readers, 0),
+            coalesce(s.sessions, 0), coalesce(s.active_seconds, 0),
+            s.p50_session_seconds, s.p90_session_seconds,
+            coalesce(e.books_opened, 0), coalesce(e.books_started, 0), coalesce(e.completions, 0),
+            coalesce(l.saved_books, 0), coalesce(l.unique_savers, 0), ?, ?,
+            greatest(coalesce(e.source_watermark, '-infinity'::timestamptz),
+              coalesce(s.source_watermark, '-infinity'::timestamptz),
+              coalesce(l.source_watermark, '-infinity'::timestamptz))
+        FROM events e FULL OUTER JOIN sessions s ON s.day = e.day
+          FULL OUTER JOIN library l ON l.day = coalesce(e.day, s.day)
+        ON CONFLICT (day) DO UPDATE SET
+            unique_readers = EXCLUDED.unique_readers,
+            sessions = EXCLUDED.sessions,
+            active_seconds = EXCLUDED.active_seconds,
+            p50_session_seconds = EXCLUDED.p50_session_seconds,
+            p90_session_seconds = EXCLUDED.p90_session_seconds,
+            books_opened = EXCLUDED.books_opened,
+            books_started = EXCLUDED.books_started,
+            completions = EXCLUDED.completions,
+            saved_books = EXCLUDED.saved_books,
+            unique_savers = EXCLUDED.unique_savers,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, READING_VERSION, Timestamp.from(refreshed));
+    updateHealth("reading_daily", READING_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.reading_daily");
+  }
+
+  private void refreshRetentionCohort(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.retention_cohort WHERE cohort_day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH significant AS (
+          SELECT identity_subject, occurred_at::date AS activity_day
+          FROM behavior.events
+          WHERE identity_subject IS NOT NULL
+            AND event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS', 'BOOK_COMPLETE', 'READ_COMPLETE',
+              'BOOK_LIKE', 'BOOK_UNLIKE', 'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
+        ), first_seen AS (
+          SELECT identity_subject, min(activity_day) AS cohort_day
+          FROM significant GROUP BY identity_subject
+        ), cohorts AS (
+          SELECT cohort_day, count(*) AS cohort_users
+          FROM first_seen
+          WHERE cohort_day >= current_date - INTERVAL '366 days'
+          GROUP BY cohort_day
+        ), offsets AS (
+          SELECT c.cohort_day, o.offset_day, c.cohort_users,
+              count(DISTINCT s.identity_subject) AS retained_users
+          FROM cohorts c CROSS JOIN (VALUES (0), (1), (7), (30)) o(offset_day)
+          LEFT JOIN first_seen f ON f.cohort_day = c.cohort_day
+          LEFT JOIN significant s ON s.identity_subject = f.identity_subject
+            AND s.activity_day = c.cohort_day + o.offset_day
+          GROUP BY c.cohort_day, o.offset_day, c.cohort_users
+        )
+        INSERT INTO reporting.retention_cohort(
+            cohort_day, offset_day, cohort_users, retained_users, mature,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT cohort_day, offset_day, cohort_users, retained_users,
+            current_date >= cohort_day + offset_day, ?, ?,
+            (SELECT max(occurred_at) FROM behavior.events)
+        FROM offsets
+        ON CONFLICT (cohort_day, offset_day) DO UPDATE SET
+            cohort_users = EXCLUDED.cohort_users,
+            retained_users = EXCLUDED.retained_users,
+            mature = EXCLUDED.mature,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, READING_VERSION, Timestamp.from(refreshed));
+    updateHealth("retention_cohort", READING_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.retention_cohort");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {

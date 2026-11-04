@@ -139,6 +139,105 @@ function ReadingChart({ data }: { data: ReportingResponse }) {
   );
 }
 
+function ReadingEngagementReport({
+  reading,
+  retention,
+}: {
+  reading: ReportingResponse;
+  retention: ReportingResponse;
+}) {
+  return (
+    <div className="dashboard-quality-grid">
+      <div>
+        <strong>GR-04/05/07 · Sessões, duração e biblioteca</strong>
+        {!reading.series.length ? (
+          <div className="dashboard-state">NO_DATA</div>
+        ) : (
+          <div className="dashboard-scroll-table">
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Leitores</th>
+                  <th>Sessões</th>
+                  <th>Minutos ativos</th>
+                  <th>P50 sessão</th>
+                  <th>P90 sessão</th>
+                  <th>Obras abertas</th>
+                  <th>Salvas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {reading.series.slice(-30).map((row, index) => (
+                  <tr key={`${row.day}-${index}`}>
+                    <td>{row.day ?? "—"}</td>
+                    <td>{row.unique_readers ?? "—"}</td>
+                    <td>{row.sessions ?? "—"}</td>
+                    <td>
+                      {row.active_seconds == null
+                        ? "—"
+                        : Math.round(row.active_seconds / 60)}
+                    </td>
+                    <td>
+                      {row.p50_session_seconds == null
+                        ? "—"
+                        : `${Math.round(row.p50_session_seconds)}s`}
+                    </td>
+                    <td>
+                      {row.p90_session_seconds == null
+                        ? "—"
+                        : `${Math.round(row.p90_session_seconds)}s`}
+                    </td>
+                    <td>{row.books_opened ?? "—"}</td>
+                    <td>{row.saved_books ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <div>
+        <strong>GR-03 · Retenção por coorte</strong>
+        {!retention.series.length ? (
+          <div className="dashboard-state">NO_DATA</div>
+        ) : (
+          <div className="dashboard-scroll-table">
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Coorte</th>
+                  <th>Dia</th>
+                  <th>n</th>
+                  <th>Retidos</th>
+                  <th>Taxa</th>
+                  <th>Madura</th>
+                </tr>
+              </thead>
+              <tbody>
+                {retention.series.slice(-40).map((row, index) => (
+                  <tr key={`${row.cohort_day}-${row.offset_day}-${index}`}>
+                    <td>{row.cohort_day ?? "—"}</td>
+                    <td>D{row.offset_day ?? "—"}</td>
+                    <td>{row.cohort_users ?? "—"}</td>
+                    <td>{row.retained_users ?? "—"}</td>
+                    <td>
+                      {row.mature && row.cohort_users
+                        ? `${(((row.retained_users ?? 0) / row.cohort_users) * 100).toFixed(1)}%`
+                        : "—"}
+                    </td>
+                    <td>{row.mature ? "SIM" : "NÃO"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FeedReport({ data }: { data: ReportingResponse }) {
   if (!data.series.length)
     return <div className="dashboard-state">NO_DATA</div>;
@@ -548,6 +647,11 @@ export function DashboardHub() {
   );
   const [ingestionReport, setIngestionReport] =
     useState<ReportingResponse | null>(null);
+  const [readingReport, setReadingReport] = useState<ReportingResponse | null>(
+    null,
+  );
+  const [retentionReport, setRetentionReport] =
+    useState<ReportingResponse | null>(null);
   const [health, setHealth] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -569,6 +673,8 @@ export function DashboardHub() {
         publisher,
         supply,
         ingestion,
+        reading,
+        retention,
       ] = await Promise.all([
         services.reportingReaderDay(Math.min(Math.max(days, 1), 366)),
         services.reportingHealth(),
@@ -583,6 +689,8 @@ export function DashboardHub() {
         services.reportingPublisherDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingContentSupply(Math.min(Math.max(days, 1), 366)),
         services.reportingIngestionDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingReadingDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingRetentionCohort(366),
       ]);
       setReport(readerDay);
       setHealth(projectionHealth);
@@ -595,6 +703,8 @@ export function DashboardHub() {
       setPublisherReport(publisher);
       setSupplyReport(supply);
       setIngestionReport(ingestion);
+      setReadingReport(reading);
+      setRetentionReport(retention);
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -693,15 +803,11 @@ export function DashboardHub() {
               {statusText(displayedReport?.status ?? "NO_DATA")}
             </span>
           </div>
-          {area === "executive" || area === "growth" ? (
+          {area === "executive" ? (
             <div className="dashboard-card wide">
               <div className="dashboard-card-heading">
                 <div>
-                  <strong>
-                    {area === "growth"
-                      ? "GR-01..GR-07 · Atividade e leitura"
-                      : "EX-01/04 · Atividade geral"}
-                  </strong>
+                  <strong>EX-01/04 · Atividade geral</strong>
                   <p>
                     Agregado diário do behavior-service; ausência de população
                     classificada impede interpretação como produto.
@@ -710,6 +816,27 @@ export function DashboardHub() {
                 <AlertTriangle size={18} />
               </div>
               {report && <ReadingChart data={report} />}
+            </div>
+          ) : area === "growth" &&
+            report &&
+            readingReport &&
+            retentionReport ? (
+            <div className="dashboard-card wide">
+              <div className="dashboard-card-heading">
+                <div>
+                  <strong>GR-01..07 · Crescimento, leitura e retenção</strong>
+                  <p>
+                    Atividade, sessões, biblioteca e coortes; retenção só é
+                    calculada para janelas maduras.
+                  </p>
+                </div>
+                <AlertTriangle size={18} />
+              </div>
+              <ReadingChart data={report} />
+              <ReadingEngagementReport
+                reading={readingReport}
+                retention={retentionReport}
+              />
             </div>
           ) : area === "feed" && feedReport ? (
             <div className="dashboard-card wide">

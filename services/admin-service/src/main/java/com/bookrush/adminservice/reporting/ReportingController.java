@@ -158,6 +158,40 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/reading-daily")
+  public Map<String, Object> readingDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, unique_readers, sessions, active_seconds,
+          p50_session_seconds, p90_session_seconds, books_opened,
+          books_started, completions, saved_books, unique_savers,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.reading_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("reading_daily", "reading-engagement-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/retention-cohort")
+  public Map<String, Object> retentionCohort(@RequestParam(defaultValue = "366") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT cohort_day, offset_day, cohort_users, retained_users, mature,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.retention_cohort
+        WHERE cohort_day >= current_date - (? - 1)
+        ORDER BY cohort_day, offset_day
+        """, days);
+    return response("retention_cohort", "reading-engagement-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/social-daily")
   public Map<String, Object> socialDaily(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

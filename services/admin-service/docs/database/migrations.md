@@ -51,3 +51,8 @@ IDs, conteúdo ou mensagens de erro brutas no contrato do dashboard.
 `V11__reporting_pipeline_phase_daily.sql` agrega `analysis_phase_timing` por
 dia, fase, estado e código de erro, calculando percentis diretamente sobre as
 durações observadas e contando tentativas, falhas e leases presos.
+
+`V12__reporting_reading_and_retention.sql` cria `reporting.reading_daily` para
+sessões, duração, livros e biblioteca, e `reporting.retention_cohort` para
+coortes D1/D7/D30. A coluna `mature` impede que uma coorte incompleta seja
+interpretada como retenção zero.

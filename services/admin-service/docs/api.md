@@ -45,6 +45,11 @@ por fase, tentativas, falhas por código e leases presos há mais de 15 minutos.
 Os percentis são calculados sobre durações observadas e permanecem ausentes
 quando não há duração válida.
 
+`GET /api/admin/v1/reporting/reading-daily?days=30` expõe sessões, segundos
+ativos, percentis de duração, livros abertos e saves. `GET
+/api/admin/v1/reporting/retention-cohort?days=366` expõe D1/D7/D30 por coorte;
+coortes ainda imaturas retornam `mature=false` e não recebem uma taxa.
+
 `POST /api/v1/admin/audit` registra ação de administração sem armazenar tokens; `GET /api/v1/admin/audit` consulta os últimos eventos. O subject vem da identidade autenticada.
 
 ## Usuários
