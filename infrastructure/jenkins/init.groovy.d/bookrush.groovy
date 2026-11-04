@@ -105,6 +105,13 @@ if (!(observabilityJob.getDefinition() instanceof CpsScmFlowDefinition)) {
     observabilityJob.setDefinition(scmFor(observabilityPipelineFile.name))
     observabilityJob.save()
 }
+replaceParameters(observabilityJob, [
+    new StringParameterDefinition('BRANCH', 'main', 'Branch da stack de observabilidade.'),
+    new StringParameterDefinition('GRAFANA_ADMIN_CREDENTIAL_ID', 'observability-grafana-admin-password', 'Credential Jenkins Secret text da senha local de recuperação do Grafana.'),
+    new StringParameterDefinition('POSTGRES_EXPORTER_CREDENTIAL_ID', 'observability-postgres-exporter-dsn', 'Credential Jenkins Secret text do DSN read-only do exporter PostgreSQL.'),
+    new StringParameterDefinition('GRAFANA_OIDC_CREDENTIAL_ID', 'grafana-oidc-client-secret', 'Credential Jenkins Secret text do client OIDC Grafana.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Implantar a stack de observabilidade no Compose de produção.')
+])
 if (!(job.getDefinition() instanceof CpsScmFlowDefinition)) {
     job.setDefinition(scmFor('Jenkinsfile'))
     job.save()
