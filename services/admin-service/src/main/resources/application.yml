@@ -20,6 +20,8 @@ spring:
 management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
 bookrush:
+  reporting:
+    stale-after-seconds: ${BOOKRUSH_REPORTING_STALE_AFTER_SECONDS:900}
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
     audience: ${BOOKRUSH_SECURITY_AUDIENCE:bookrush-ingestion}

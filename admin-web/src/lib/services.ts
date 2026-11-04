@@ -326,6 +326,8 @@ export type ReportingResponse = {
   population: string;
   sourceWatermark?: string | null;
   refreshedAt?: string | null;
+  freshnessSeconds?: number | null;
+  warnings?: string[];
   page?: number | null;
   pageSize?: number | null;
   hasNext?: boolean | null;

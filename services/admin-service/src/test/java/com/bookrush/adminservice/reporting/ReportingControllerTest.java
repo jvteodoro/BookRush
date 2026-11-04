@@ -2,6 +2,7 @@ package com.bookrush.adminservice.reporting;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -39,7 +40,7 @@ class ReportingControllerTest {
         "day", java.sql.Date.valueOf("2026-11-01"),
         "population", "UNCLASSIFIED", "platform", "UNKNOWN",
         "refreshed_at", Timestamp.from(Instant.parse("2026-11-04T12:00:00Z")),
-        "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")),
+        "source_watermark", freshWatermark(),
         "active_users", 2L)));
     var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
 
@@ -56,12 +57,12 @@ class ReportingControllerTest {
         "day", java.sql.Date.valueOf("2026-11-01"),
         "strategy", "PERSONALIZED", "served_count", 4L,
         "viewable_count", 3L, "attributed_open_count", 1L,
-        "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")))))
+        "source_watermark", freshWatermark())))
         .thenReturn(List.of(Map.of(
             "collected_at", Timestamp.from(Instant.parse("2026-11-04T12:00:00Z")),
             "phase", "ITEM", "job_status", "COMPLETED", "status_count", 4L,
             "failure_count", 0L, "throughput", 2L,
-            "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")))));
+            "source_watermark", freshWatermark())));
 
     assertEquals("UNTRUSTED", controller.feedDaily(7, principal, analyst).get("status"));
     assertEquals("UNTRUSTED", controller.pipeline(7, principal, analyst).get("status"));
@@ -99,7 +100,7 @@ class ReportingControllerTest {
         "campaigns", 1L, "sampled_items", 4L, "pending_items", 1L,
         "submitted_annotations", 3L, "unique_annotators", 2L,
         "disputed_items", 1L, "p50_elapsed_ms", 1200.0,
-        "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")));
+        "source_watermark", freshWatermark());
     when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(row));
 
     var response = controller.editorialQualityDaily(7, principal, analyst);
@@ -122,7 +123,7 @@ class ReportingControllerTest {
         Map.entry("viewable_count", 15L), Map.entry("attributed_open_count", 4L),
         Map.entry("attributed_read_count", 2L), Map.entry("attributed_complete_count", 1L),
         Map.entry("unique_subjects", 10L),
-        Map.entry("source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z"))))));
+        Map.entry("source_watermark", freshWatermark()))));
     var response = controller.excerptPerformance(7, 20, 50, 0, principal, analyst);
     assertEquals("UNTRUSTED", response.get("status"));
     assertEquals("SUPPRESSED_BELOW_MIN_SAMPLE", response.get("population"));
@@ -155,7 +156,7 @@ class ReportingControllerTest {
         Map.entry("impression_count", 20L), Map.entry("viewable_count", 15L),
         Map.entry("attributed_open_count", 3L), Map.entry("attributed_read_count", 2L),
         Map.entry("attributed_complete_count", 1L), Map.entry("unique_subjects", 10L),
-        Map.entry("source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z"))))));
+        Map.entry("source_watermark", freshWatermark()))));
 
     var response = controller.experimentDaily(7, principal, analyst);
 
@@ -169,7 +170,7 @@ class ReportingControllerTest {
     when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.of(
         "day", java.sql.Date.valueOf("2026-11-01"), "action", "REPORTING_READ",
         "event_count", 4L, "unique_actors", 2L, "unique_targets", 1L,
-        "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")))));
+        "source_watermark", freshWatermark())));
 
     var response = controller.accessAudit(7, principal, analyst);
 
@@ -177,5 +178,23 @@ class ReportingControllerTest {
     assertEquals(1, ((List<?>) response.get("series")).size());
     org.junit.jupiter.api.Assertions.assertFalse(
         ((Map<?, ?>) ((List<?>) response.get("series")).get(0)).containsKey("actor_subject"));
+  }
+
+  @Test
+  void marksOldProjectionDataAsStale() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.of(
+        "day", java.sql.Date.valueOf("2026-11-01"),
+        "source_watermark", Timestamp.from(Instant.now().minusSeconds(3600)))));
+
+    var response = controller.readerDay(7, principal, analyst);
+
+    assertEquals("STALE", response.get("status"));
+    long freshness = ((Number) response.get("freshnessSeconds")).longValue();
+    assertTrue(freshness >= 3600L && freshness <= 3605L);
+  }
+
+  private static Timestamp freshWatermark() {
+    return Timestamp.from(Instant.now().minusSeconds(60));
   }
 }

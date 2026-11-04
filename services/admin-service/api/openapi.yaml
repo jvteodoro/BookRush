@@ -662,6 +662,8 @@ components:
         population: { type: string, example: UNCLASSIFIED }
         sourceWatermark: { type: string, format: date-time, nullable: true }
         refreshedAt: { type: string, format: date-time, nullable: true }
+        freshnessSeconds: { type: integer, format: int64, nullable: true }
+        warnings: { type: array, items: { type: string } }
         series: { type: array, items: { type: object, additionalProperties: true } }
         page: { type: integer, minimum: 0, nullable: true }
         pageSize: { type: integer, minimum: 1, nullable: true }

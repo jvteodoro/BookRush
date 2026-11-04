@@ -101,6 +101,8 @@ Isto é **contrato lógico**, não SQL Flyway pronto. Definir tipos, chaves, ret
 
 Prefixo implementado: \`GET /api/admin/v1/reporting/*\`, protegido por OIDC do realm administrativo e pelas roles de reporting no backend. Nenhum endpoint recebe SQL/PromQL arbitrário. Os endpoints de maior cardinalidade aceitam \`page\` e \`limit\`; a consulta usa \`LIMIT limit + 1\` e \`OFFSET\` para produzir \`hasNext\` sem carregar páginas anteriores.
 
+O facade calcula \`freshnessSeconds\` a partir do \`sourceWatermark\`. Quando a idade excede \`BOOKRUSH_REPORTING_STALE_AFTER_SECONDS\` (padrão de produção: 900 segundos), o estado é \`STALE\`; timestamps JDBC são normalizados para ISO-8601 e o response inclui \`warnings\` sem ocultar a população não classificada.
+
 \`\`\`json
 {
   "schemaVersion": "dashboard-response-v1",

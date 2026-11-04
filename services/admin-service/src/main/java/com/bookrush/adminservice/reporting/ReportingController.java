@@ -4,8 +4,11 @@ import java.security.Principal;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
@@ -19,6 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/admin/v1/reporting")
 public class ReportingController {
   private final JdbcTemplate jdbc;
+  @Value("${bookrush.reporting.stale-after-seconds:900}")
+  private long staleAfterSeconds = 900;
 
   public ReportingController(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
@@ -40,19 +45,8 @@ public class ReportingController {
         WHERE day >= current_date - (? - 1)
         ORDER BY day
         """, days);
-    var response = new LinkedHashMap<String, Object>();
-    response.put("schemaVersion", "dashboard-response-v1");
-    response.put("metricId", "reader_day");
-    response.put("definitionVersion", "events-v1-untrusted-population");
-    response.put("status", rows.isEmpty() ? "NO_DATA" : "UNTRUSTED");
-    response.put("unit", "aggregate");
-    response.put("from", Instant.now().minusSeconds(days * 86400L).atOffset(ZoneOffset.UTC).toString());
-    response.put("to", Instant.now().atOffset(ZoneOffset.UTC).toString());
-    response.put("population", "UNCLASSIFIED");
-    response.put("sourceWatermark", rows.isEmpty() ? null : rows.getLast().get("source_watermark"));
-    response.put("refreshedAt", rows.isEmpty() ? null : toInstant(rows.getLast().get("refreshed_at")));
-    response.put("series", rows);
-    return response;
+    return response("reader_day", "events-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
   }
 
   @GetMapping("/executive-summary")
@@ -567,17 +561,31 @@ public class ReportingController {
     response.put("schemaVersion", "dashboard-response-v1");
     response.put("metricId", metricId);
     response.put("definitionVersion", definitionVersion);
-    response.put("status", rows.isEmpty() ? "NO_DATA" : "UNTRUSTED");
+    Instant sourceWatermark = latestInstant(rows, "source_watermark");
+    long freshnessSeconds = sourceWatermark == null
+        ? 0
+        : Math.max(0, Instant.now().getEpochSecond() - sourceWatermark.getEpochSecond());
+    boolean stale = sourceWatermark != null && freshnessSeconds > staleAfterSeconds;
+    response.put("status", rows.isEmpty() ? "NO_DATA" : stale ? "STALE" : "UNTRUSTED");
     response.put("unit", "aggregate");
     response.put("from", Instant.now().minusSeconds(days * 86400L).atOffset(ZoneOffset.UTC).toString());
     response.put("to", Instant.now().atOffset(ZoneOffset.UTC).toString());
     response.put("population", population);
-    response.put("sourceWatermark", rows.stream().map(row -> row.get("source_watermark"))
-        .filter(java.util.Objects::nonNull).reduce((first, second) -> second).orElse(null));
-    response.put("refreshedAt", rows.stream().map(row -> row.get("refreshed_at"))
-        .filter(java.util.Objects::nonNull).reduce((first, second) -> second).orElse(null));
+    response.put("sourceWatermark", sourceWatermark == null ? null : sourceWatermark.toString());
+    Instant refreshedAt = latestInstant(rows, "refreshed_at");
+    response.put("refreshedAt", refreshedAt == null ? null : refreshedAt.toString());
+    response.put("freshnessSeconds", sourceWatermark == null ? null : freshnessSeconds);
+    var warnings = new ArrayList<String>();
+    if (!rows.isEmpty()) warnings.add("population is not classified as PRODUCT");
+    if (stale) warnings.add("source watermark is older than the configured freshness threshold");
+    response.put("warnings", warnings);
     response.put("series", rows);
     return response;
+  }
+
+  private Instant latestInstant(List<Map<String, Object>> rows, String key) {
+    return rows.stream().map(row -> toInstant(row.get(key)))
+        .filter(java.util.Objects::nonNull).max(Instant::compareTo).orElse(null);
   }
 
   private Map<String, Object> pagedResponse(String metricId, String definitionVersion, int days,
