@@ -35,6 +35,7 @@ public class AnalyticsSecurityConfiguration {
             auth -> {
               auth.requestMatchers(
                       "/actuator/health/**",
+                      "/actuator/prometheus",
                       "/v3/api-docs/**",
                       "/swagger-ui/**",
                       "/swagger-ui.html")

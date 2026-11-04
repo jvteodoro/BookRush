@@ -24,7 +24,7 @@ public class ReaderBffSecurityConfiguration {
         .cors(cors -> {})
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
+                auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus")
                     .permitAll()
                     .requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()

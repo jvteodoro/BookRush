@@ -1,5 +1,20 @@
 # Runbook de observabilidade
 
+## Métricas Micrometer
+
+Os serviços Spring Boot que usam `bookrush-observability-spring-boot-starter`
+recebem o registry Prometheus e convenções comuns de baixa cardinalidade. O
+endpoint interno é `/actuator/prometheus`; ele é permitido sem bearer somente
+na rede Docker privada e não é publicado pelo reverse proxy. Os demais
+endpoints de Actuator continuam sujeitos à segurança do serviço. As séries HTTP usam histogramas com objetivos
+iniciais de 100 ms, 250 ms, 500 ms, 1 s, 2 s e 5 s para permitir P50/P95/P99
+agregáveis no Prometheus.
+
+As tags comuns são somente `service` e `environment`. Não adicione subject,
+user ID, book ID, excerpt ID, token ou texto de livro como tag. Métricas de
+produto/recomendação devem usar contadores já versionados e atributos
+agregados, não criar uma série por entidade.
+
 ## Target down
 
 Verifique `docker compose ps`, o healthcheck do serviço e a conectividade na

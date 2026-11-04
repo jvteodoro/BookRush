@@ -31,7 +31,7 @@ public class SocialSecurityConfiguration {
   SecurityFilterChain socialSecurity(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
     http.csrf(csrf -> csrf.disable()).cors(cors -> {})
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(groupsConverter())));

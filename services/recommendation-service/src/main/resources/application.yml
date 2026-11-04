@@ -16,7 +16,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}

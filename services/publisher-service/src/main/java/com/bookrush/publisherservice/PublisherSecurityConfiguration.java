@@ -37,7 +37,7 @@ public class PublisherSecurityConfiguration {
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus").permitAll()
                     .requestMatchers("/api/internal/v1/publisher/submissions/**").permitAll()
                     .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(groupsConverter())));

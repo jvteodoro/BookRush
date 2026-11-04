@@ -35,6 +35,7 @@ public class IngestionSecurityConfiguration {
                 auth.requestMatchers(
                         "/actuator/health",
                         "/actuator/health/**",
+                        "/actuator/prometheus",
                         "/swagger-ui.html",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",
@@ -104,6 +105,7 @@ public class IngestionSecurityConfiguration {
                 auth.requestMatchers(
                         "/actuator/health",
                         "/actuator/health/**",
+                        "/actuator/prometheus",
                         "/swagger-ui.html",
                         "/swagger-ui/**",
                         "/v3/api-docs/**",

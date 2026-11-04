@@ -19,6 +19,15 @@ spring:
 management:
   endpoints.web.exposure.include: health,info,metrics,prometheus
   endpoint.health.probes.enabled: true
+  metrics:
+    tags:
+      service: ${spring.application.name:book-analytics-service}
+      environment: ${BOOKRUSH_ENVIRONMENT:unknown}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,250ms,500ms,1s,2s,5s
 springdoc:
   swagger-ui.disable-swagger-default-url: true
   swagger-ui.path: /swagger-ui.html

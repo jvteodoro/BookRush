@@ -226,6 +226,7 @@ public class AssetSecurity {
                         "/api/status",
                         "/actuator/health",
                         "/actuator/health/**",
+                        "/actuator/prometheus",
                         "/api/books/*/assets/*/download-url",
                         "/swagger-ui.html",
                         "/swagger-ui/**",
