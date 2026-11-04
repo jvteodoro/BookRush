@@ -274,8 +274,10 @@ inicie uma nova tentativa a partir de `/`, sem recarregar a URL antiga de
 
 O shell visual é `frontend/public/pageloop.js` e seu CSS de referência.
 `frontend/src/main.tsx` faz a ponte autenticada: injeta os livros retornados
-por `GET /api/v1/books` sem Bearer (leitura pública), carrega a biblioteca em
-`/api/v1/reader/library` e fornece as
+por `GET /api/v1/books` no contexto administrativo, carrega a biblioteca em
+`/api/v1/reader/library` e resolve os metadados dos livros salvos por
+`GET /api/v1/reader/books/{bookId}` através do BFF autenticado. O cliente
+fornece as
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
 fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.

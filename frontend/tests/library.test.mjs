@@ -14,7 +14,7 @@ const bundled = await build({
 });
 const { loadLibrary } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 const response = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
-const loadWithTransport = transport => loadLibrary(undefined, transport, transport);
+const loadWithTransport = transport => loadLibrary(undefined, transport);
 
 test('saved books outside the feed are resolved by ID with real progress; duplicate IDs are fetched once', async () => {
   const requests = [];
@@ -23,7 +23,9 @@ test('saved books outside the feed are resolved by ID with real progress; duplic
     if (url === '/api/v1/reader/library') return response([{ book_id: 'outside-feed' }, { bookId: 'outside-feed' }]);
     if (url === '/api/v1/reader/recent') return response([{ book_id: 'recent-only' }]);
     if (url.endsWith('/progress')) return response([{ percent: url.includes('outside-feed') ? 37 : 8 }]);
-    return response({ canonicalTitle: url.endsWith('outside-feed') ? 'Livro salvo' : 'Livro recente', originalLanguage: 'pt', thumbnailUrl: '/cover.png' });
+    if (url === '/api/v1/reader/books/outside-feed') return response({ book: { canonicalTitle: 'Livro salvo', originalLanguage: 'pt', thumbnailUrl: '/cover.png' } });
+    if (url === '/api/v1/reader/books/recent-only') return response({ book: { canonicalTitle: 'Livro recente', originalLanguage: 'pt', thumbnailUrl: '/cover.png' } });
+    return response({ canonicalTitle: 'Livro inesperado' });
   };
   const result = await loadWithTransport(transport);
   assert.deepEqual(result.saved, ['outside-feed']);
@@ -31,7 +33,7 @@ test('saved books outside the feed are resolved by ID with real progress; duplic
   assert.equal(result.books[0].title, 'Livro salvo');
   assert.equal(result.books[0].progress, 37);
   assert.equal(result.books[0].available, true);
-  assert.equal(requests.filter(url => url === '/api/v1/books/outside-feed').length, 1);
+  assert.equal(requests.filter(url => url === '/api/v1/reader/books/outside-feed').length, 1);
   assert.deepEqual(result.warnings, []);
 });
 
@@ -65,26 +67,19 @@ test('metadata requests use bounded concurrency for a large saved library', asyn
   assert.ok(maximum <= 6);
 });
 
-test('catalog metadata is fetched without the reader bearer while library and progress stay authenticated', async () => {
-  const previousFetch = globalThis.fetch;
-  const publicRequests = [];
-  const protectedRequests = [];
-  globalThis.fetch = async (url, init) => {
-    publicRequests.push(url);
-    assert.equal(init.headers?.Authorization, undefined);
-    assert.equal(init.credentials, 'same-origin');
-    assert.equal(url, '/api/v1/books/saved-book');
-    return response({ canonicalTitle: 'Livro acessível', originalLanguage: 'pt' });
-  };
-  try {
-    const result = await loadLibrary(undefined, async url => {
-      protectedRequests.push(url);
-      assert.ok(url.startsWith('/api/v1/reader/'), 'Product token must never be sent to catalog');
-      return response(url.endsWith('/library') ? [{ book_id: 'saved-book' }] : []);
-    });
-    assert.equal(result.books[0].available, true);
-    assert.equal(result.books[0].title, 'Livro acessível');
-    assert.deepEqual(publicRequests, ['/api/v1/books/saved-book']);
-    assert.ok(protectedRequests.includes('/api/v1/reader/books/saved-book/progress'));
-  } finally { globalThis.fetch = previousFetch; }
+test('book metadata is fetched through the authenticated reader BFF', async () => {
+  const requests = [];
+  const result = await loadLibrary(undefined, async url => {
+    requests.push(url);
+    assert.ok(url.startsWith('/api/v1/reader/'), 'Library requests must stay in the product realm');
+    if (url === '/api/v1/reader/library') return response([{ book_id: 'saved-book' }]);
+    if (url === '/api/v1/reader/recent') return response([]);
+    if (url === '/api/v1/reader/books/saved-book') return response({ book: { canonicalTitle: 'Livro acessível', originalLanguage: 'pt' } });
+    if (url === '/api/v1/reader/books/saved-book/progress') return response([]);
+    return response(null, 404);
+  });
+  assert.equal(result.books[0].available, true);
+  assert.equal(result.books[0].title, 'Livro acessível');
+  assert.ok(requests.includes('/api/v1/reader/books/saved-book'));
+  assert.ok(requests.includes('/api/v1/reader/books/saved-book/progress'));
 });
