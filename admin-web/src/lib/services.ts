@@ -236,6 +236,23 @@ export type ReportingSeries = {
   outbox_published?: number;
   outbox_failed_attempts?: number;
   outbox_oldest_pending_age_seconds?: number | null;
+  open_count?: number;
+  in_review_count?: number;
+  resolved_count?: number;
+  dismissed_count?: number;
+  p50_resolution_seconds?: number | null;
+  p95_resolution_seconds?: number | null;
+  oldest_open_age_seconds?: number | null;
+  submissions?: number;
+  approved_reviews?: number;
+  rejected_reviews?: number;
+  changes_requested?: number;
+  published_works?: number;
+  active_published_works?: number;
+  rights_attestations?: number;
+  action?: string;
+  distribution_status?: string;
+  decision_count?: number;
   unique_readers?: number;
   p50_session_seconds?: number | null;
   p90_session_seconds?: number | null;
@@ -629,6 +646,39 @@ export const services = {
         error,
         "Não foi possível carregar os indicadores publisher.",
       );
+    }
+  },
+  async reportingModerationDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/moderation-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a moderação agregada.");
+    }
+  },
+  async reportingPublisherWorkflowDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/publisher-workflow-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar o funil editorial.");
+    }
+  },
+  async reportingRightsDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/rights-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os direitos agregados.");
     }
   },
   async reportingContentSupply(days = 30): Promise<ReportingResponse> {

@@ -132,6 +132,51 @@ paths:
         '400': { description: Invalid date range }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/moderation-daily:
+    get:
+      summary: Read moderation state and resolution snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Moderation states, aging and resolution percentiles
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/publisher-workflow-daily:
+    get:
+      summary: Read publisher submission and publication workflow snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Submissions, reviews, published works and attestations
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/rights-daily:
+    get:
+      summary: Read aggregated catalog rights decisions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Rights counts by action and distribution status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/publisher-daily:
     get:
       summary: Read publisher publication performance snapshots

@@ -41,6 +41,13 @@ erro não fazem parte da projeção.
 read-only de interações/moderação e métricas de publicação. A resposta mantém
 proveniência e permanece `UNTRUSTED` enquanto a população não for classificada.
 
+`GET /api/admin/v1/reporting/moderation-daily?days=30` expõe estados e percentis
+de resolução sem texto de denúncia. `GET
+/api/admin/v1/reporting/publisher-workflow-daily?days=30` expõe o funil de
+submissões, revisão, publicação e atestados. `GET
+/api/admin/v1/reporting/rights-daily?days=30` agrega decisões de direitos por
+ação/status, sem evidências ou sujeitos.
+
 `GET /api/admin/v1/reporting/content-supply?days=30` expõe snapshots da oferta
 real de conteúdo: livros ativos, versões de assets disponíveis, assets com run
 de analytics concluído e excerpts elegíveis/rankeados. `GET

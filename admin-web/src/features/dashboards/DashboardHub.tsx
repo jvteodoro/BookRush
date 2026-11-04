@@ -635,79 +635,178 @@ function QualityReport({
 function SocialReport({
   social,
   publisher,
+  moderation,
+  workflow,
+  rights,
 }: {
   social: ReportingResponse;
   publisher: ReportingResponse;
+  moderation: ReportingResponse;
+  workflow: ReportingResponse;
+  rights: ReportingResponse;
 }) {
   return (
-    <div className="dashboard-quality-grid">
-      <div>
-        <strong>SO-01/SO-03 · Interações e moderação</strong>
-        {!social.series.length ? (
-          <div className="dashboard-state">NO_DATA</div>
-        ) : (
-          <table className="dashboard-table">
-            <thead>
-              <tr>
-                <th>Dia</th>
-                <th>Likes</th>
-                <th>Comentários</th>
-                <th>Shares</th>
-                <th>Atores</th>
-                <th>Reports abertos</th>
-                <th>Backlog moderação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {social.series.slice(-30).map((row, index) => (
-                <tr key={`${row.day}-${index}`}>
-                  <td>{row.day ?? "—"}</td>
-                  <td>{row.like_count ?? "—"}</td>
-                  <td>{row.comment_count ?? "—"}</td>
-                  <td>{row.share_count ?? "—"}</td>
-                  <td>{row.unique_actors ?? "—"}</td>
-                  <td>{row.reports_open ?? "—"}</td>
-                  <td>{row.moderation_backlog ?? "—"}</td>
+    <>
+      <div className="dashboard-quality-grid">
+        <div>
+          <strong>SO-01/SO-03 · Interações e moderação</strong>
+          {!social.series.length ? (
+            <div className="dashboard-state">NO_DATA</div>
+          ) : (
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Likes</th>
+                  <th>Comentários</th>
+                  <th>Shares</th>
+                  <th>Atores</th>
+                  <th>Reports abertos</th>
+                  <th>Backlog moderação</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-      <div>
-        <strong>SO-05/SO-06 · Publicação</strong>
-        {!publisher.series.length ? (
-          <div className="dashboard-state">NO_DATA</div>
-        ) : (
-          <table className="dashboard-table">
-            <thead>
-              <tr>
-                <th>Dia</th>
-                <th>Obras</th>
-                <th>Impressões</th>
-                <th>Aberturas</th>
-                <th>Leituras</th>
-                <th>Likes</th>
-                <th>Shares</th>
-              </tr>
-            </thead>
-            <tbody>
-              {publisher.series.slice(-30).map((row, index) => (
-                <tr key={`${row.day}-${index}`}>
-                  <td>{row.day ?? "—"}</td>
-                  <td>{row.published_work_count ?? "—"}</td>
-                  <td>{row.impressions ?? "—"}</td>
-                  <td>{row.opens ?? "—"}</td>
-                  <td>{row.reads ?? "—"}</td>
-                  <td>{row.likes ?? "—"}</td>
-                  <td>{row.shares ?? "—"}</td>
+              </thead>
+              <tbody>
+                {social.series.slice(-30).map((row, index) => (
+                  <tr key={`${row.day}-${index}`}>
+                    <td>{row.day ?? "—"}</td>
+                    <td>{row.like_count ?? "—"}</td>
+                    <td>{row.comment_count ?? "—"}</td>
+                    <td>{row.share_count ?? "—"}</td>
+                    <td>{row.unique_actors ?? "—"}</td>
+                    <td>{row.reports_open ?? "—"}</td>
+                    <td>{row.moderation_backlog ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div>
+          <strong>SO-05/SO-06 · Publicação</strong>
+          {!publisher.series.length ? (
+            <div className="dashboard-state">NO_DATA</div>
+          ) : (
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Obras</th>
+                  <th>Impressões</th>
+                  <th>Aberturas</th>
+                  <th>Leituras</th>
+                  <th>Likes</th>
+                  <th>Shares</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {publisher.series.slice(-30).map((row, index) => (
+                  <tr key={`${row.day}-${index}`}>
+                    <td>{row.day ?? "—"}</td>
+                    <td>{row.published_work_count ?? "—"}</td>
+                    <td>{row.impressions ?? "—"}</td>
+                    <td>{row.opens ?? "—"}</td>
+                    <td>{row.reads ?? "—"}</td>
+                    <td>{row.likes ?? "—"}</td>
+                    <td>{row.shares ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-    </div>
+      <div className="dashboard-quality-grid">
+        <div>
+          <strong>SO-04 · Resolução de moderação</strong>
+          {!moderation.series.length ? (
+            <div className="dashboard-state">NO_DATA</div>
+          ) : (
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Abertos</th>
+                  <th>Em análise</th>
+                  <th>Resolvidos</th>
+                  <th>Descartados</th>
+                  <th>P50 resolução</th>
+                  <th>P95 resolução</th>
+                </tr>
+              </thead>
+              <tbody>
+                {moderation.series.slice(-30).map((row, index) => (
+                  <tr key={`${row.day}-${index}`}>
+                    <td>{row.day ?? "—"}</td>
+                    <td>{row.open_count ?? "—"}</td>
+                    <td>{row.in_review_count ?? "—"}</td>
+                    <td>{row.resolved_count ?? "—"}</td>
+                    <td>{row.dismissed_count ?? "—"}</td>
+                    <td>
+                      {row.p50_resolution_seconds == null
+                        ? "—"
+                        : `${Math.round(row.p50_resolution_seconds)}s`}
+                    </td>
+                    <td>
+                      {row.p95_resolution_seconds == null
+                        ? "—"
+                        : `${Math.round(row.p95_resolution_seconds)}s`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div>
+          <strong>SO-05/07 · Funil editorial e direitos</strong>
+          {!workflow.series.length && !rights.series.length ? (
+            <div className="dashboard-state">NO_DATA</div>
+          ) : (
+            <table className="dashboard-table">
+              <thead>
+                <tr>
+                  <th>Dia</th>
+                  <th>Submissões</th>
+                  <th>Aprovadas</th>
+                  <th>Publicadas</th>
+                  <th>Direitos</th>
+                  <th>Ação/status</th>
+                  <th>Decisões</th>
+                </tr>
+              </thead>
+              <tbody>
+                {workflow.series.slice(-30).map((row, index) => (
+                  <tr key={`w-${row.day}-${index}`}>
+                    <td>{row.day ?? "—"}</td>
+                    <td>{row.submissions ?? "—"}</td>
+                    <td>{row.approved_reviews ?? "—"}</td>
+                    <td>{row.published_works ?? "—"}</td>
+                    <td>{row.rights_attestations ?? "—"}</td>
+                    <td>—</td>
+                    <td>—</td>
+                  </tr>
+                ))}
+                {rights.series.slice(-20).map((row, index) => (
+                  <tr
+                    key={`r-${row.day}-${row.action}-${row.distribution_status}-${index}`}
+                  >
+                    <td>{row.day ?? "—"}</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>
+                      {row.action ?? "—"}/{row.distribution_status ?? "—"}
+                    </td>
+                    <td>{row.decision_count ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -734,6 +833,13 @@ export function DashboardHub() {
   );
   const [publisherReport, setPublisherReport] =
     useState<ReportingResponse | null>(null);
+  const [moderationReport, setModerationReport] =
+    useState<ReportingResponse | null>(null);
+  const [workflowReport, setWorkflowReport] =
+    useState<ReportingResponse | null>(null);
+  const [rightsReport, setRightsReport] = useState<ReportingResponse | null>(
+    null,
+  );
   const [supplyReport, setSupplyReport] = useState<ReportingResponse | null>(
     null,
   );
@@ -765,6 +871,9 @@ export function DashboardHub() {
         eventQuality,
         social,
         publisher,
+        moderation,
+        workflow,
+        rights,
         supply,
         ingestion,
         reading,
@@ -783,6 +892,11 @@ export function DashboardHub() {
         services.reportingEventQuality(Math.min(Math.max(days, 1), 366)),
         services.reportingSocialDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPublisherDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingModerationDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingPublisherWorkflowDaily(
+          Math.min(Math.max(days, 1), 366),
+        ),
+        services.reportingRightsDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingContentSupply(Math.min(Math.max(days, 1), 366)),
         services.reportingIngestionDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingReadingDaily(Math.min(Math.max(days, 1), 366)),
@@ -799,6 +913,9 @@ export function DashboardHub() {
       setEventQualityReport(eventQuality);
       setSocialReport(social);
       setPublisherReport(publisher);
+      setModerationReport(moderation);
+      setWorkflowReport(workflow);
+      setRightsReport(rights);
       setSupplyReport(supply);
       setIngestionReport(ingestion);
       setReadingReport(reading);
@@ -1017,7 +1134,12 @@ export function DashboardHub() {
                 eventQuality={eventQualityReport}
               />
             </div>
-          ) : area === "social" && socialReport && publisherReport ? (
+          ) : area === "social" &&
+            socialReport &&
+            publisherReport &&
+            moderationReport &&
+            workflowReport &&
+            rightsReport ? (
             <div className="dashboard-card wide">
               <div className="dashboard-card-heading">
                 <div>
@@ -1029,7 +1151,13 @@ export function DashboardHub() {
                 </div>
                 <AlertTriangle size={18} />
               </div>
-              <SocialReport social={socialReport} publisher={publisherReport} />
+              <SocialReport
+                social={socialReport}
+                publisher={publisherReport}
+                moderation={moderationReport}
+                workflow={workflowReport}
+                rights={rightsReport}
+              />
             </div>
           ) : (
             <div className="dashboard-card dashboard-gap">

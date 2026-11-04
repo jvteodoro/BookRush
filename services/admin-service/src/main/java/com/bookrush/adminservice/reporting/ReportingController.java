@@ -246,6 +246,56 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/moderation-daily")
+  public Map<String, Object> moderationDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, open_count, in_review_count, resolved_count, dismissed_count,
+          p50_resolution_seconds, p95_resolution_seconds, oldest_open_age_seconds,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.moderation_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("moderation_daily", "governance-activity-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/publisher-workflow-daily")
+  public Map<String, Object> publisherWorkflowDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, submissions, approved_reviews, rejected_reviews, changes_requested,
+          published_works, active_published_works, rights_attestations,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.publisher_workflow_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("publisher_workflow_daily", "governance-activity-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/rights-daily")
+  public Map<String, Object> rightsDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, action, distribution_status, decision_count,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.rights_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, action, distribution_status
+        """, days);
+    return response("rights_daily", "governance-activity-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/publisher-daily")
   public Map<String, Object> publisherDaily(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

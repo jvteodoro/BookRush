@@ -25,6 +25,7 @@ public class ReportingProjection {
   private static final String READING_VERSION = "reading-engagement-v1-untrusted-population";
   private static final String RECOMMENDATION_VERSION = "recommendation-ledger-v1-untrusted-population";
   private static final String EVENT_QUALITY_VERSION = "event-quality-ingestion-v1";
+  private static final String GOVERNANCE_VERSION = "governance-activity-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
 
@@ -50,6 +51,9 @@ public class ReportingProjection {
     runProjection("retention_cohort", READING_VERSION, () -> refreshRetentionCohort(refreshed));
     runProjection("recommendation_daily", RECOMMENDATION_VERSION, () -> refreshRecommendationDaily(refreshed));
     runProjection("event_quality_daily", EVENT_QUALITY_VERSION, () -> refreshEventQualityDaily(refreshed));
+    runProjection("moderation_daily", GOVERNANCE_VERSION, () -> refreshModerationDaily(refreshed));
+    runProjection("publisher_workflow_daily", GOVERNANCE_VERSION, () -> refreshPublisherWorkflowDaily(refreshed));
+    runProjection("rights_daily", GOVERNANCE_VERSION, () -> refreshRightsDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -729,6 +733,126 @@ public class ReportingProjection {
         """, EVENT_QUALITY_VERSION, Timestamp.from(refreshed));
     updateHealth("event_quality_daily", EVENT_QUALITY_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.event_quality_daily");
+  }
+
+  private void refreshModerationDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.moderation_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        INSERT INTO reporting.moderation_daily(
+            day, open_count, in_review_count, resolved_count, dismissed_count,
+            p50_resolution_seconds, p95_resolution_seconds, oldest_open_age_seconds,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT created_at::date,
+            count(*) FILTER (WHERE status = 'OPEN'),
+            count(*) FILTER (WHERE status = 'IN_REVIEW'),
+            count(*) FILTER (WHERE status = 'RESOLVED'),
+            count(*) FILTER (WHERE status = 'DISMISSED'),
+            percentile_cont(0.50) WITHIN GROUP (ORDER BY extract(epoch FROM resolved_at - created_at))
+              FILTER (WHERE resolved_at IS NOT NULL),
+            percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM resolved_at - created_at))
+              FILTER (WHERE resolved_at IS NOT NULL),
+            extract(epoch FROM clock_timestamp() - min(created_at))::bigint
+              FILTER (WHERE status IN ('OPEN', 'IN_REVIEW')),
+            ?, ?, max(coalesce(resolved_at, created_at))
+        FROM social.reports
+        WHERE created_at >= current_date - INTERVAL '366 days'
+        GROUP BY created_at::date
+        ON CONFLICT (day) DO UPDATE SET
+            open_count = EXCLUDED.open_count,
+            in_review_count = EXCLUDED.in_review_count,
+            resolved_count = EXCLUDED.resolved_count,
+            dismissed_count = EXCLUDED.dismissed_count,
+            p50_resolution_seconds = EXCLUDED.p50_resolution_seconds,
+            p95_resolution_seconds = EXCLUDED.p95_resolution_seconds,
+            oldest_open_age_seconds = EXCLUDED.oldest_open_age_seconds,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, GOVERNANCE_VERSION, Timestamp.from(refreshed));
+    updateHealth("moderation_daily", GOVERNANCE_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.moderation_daily");
+  }
+
+  private void refreshPublisherWorkflowDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.publisher_workflow_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH submissions AS (
+          SELECT created_at::date AS day, count(*) AS submissions, max(updated_at) AS source_watermark
+          FROM publisher.submission
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        ), reviews AS (
+          SELECT created_at::date AS day,
+              count(*) FILTER (WHERE status = 'APPROVED') AS approved_reviews,
+              count(*) FILTER (WHERE status = 'REJECTED') AS rejected_reviews,
+              count(*) FILTER (WHERE status = 'CHANGES_REQUESTED') AS changes_requested,
+              max(created_at) AS source_watermark
+          FROM publisher.publication_review
+          WHERE created_at >= current_date - INTERVAL '366 days'
+          GROUP BY created_at::date
+        ), works AS (
+          SELECT published_at::date AS day, count(*) AS published_works,
+              count(*) FILTER (WHERE status = 'PUBLISHED') AS active_published_works,
+              max(published_at) AS source_watermark
+          FROM publisher.published_work
+          WHERE published_at >= current_date - INTERVAL '366 days'
+          GROUP BY published_at::date
+        ), rights AS (
+          SELECT affirmed_at::date AS day, count(*) AS rights_attestations,
+              max(affirmed_at) AS source_watermark
+          FROM publisher.rights_attestation
+          WHERE affirmed_at >= current_date - INTERVAL '366 days'
+          GROUP BY affirmed_at::date
+        )
+        INSERT INTO reporting.publisher_workflow_daily(
+            day, submissions, approved_reviews, rejected_reviews, changes_requested,
+            published_works, active_published_works, rights_attestations,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT coalesce(s.day, r.day, w.day, a.day), coalesce(s.submissions, 0),
+            coalesce(r.approved_reviews, 0), coalesce(r.rejected_reviews, 0),
+            coalesce(r.changes_requested, 0), coalesce(w.published_works, 0),
+            coalesce(w.active_published_works, 0), coalesce(a.rights_attestations, 0),
+            ?, ?, greatest(coalesce(s.source_watermark, '-infinity'::timestamptz),
+              coalesce(r.source_watermark, '-infinity'::timestamptz),
+              coalesce(w.source_watermark, '-infinity'::timestamptz),
+              coalesce(a.source_watermark, '-infinity'::timestamptz))
+        FROM submissions s FULL OUTER JOIN reviews r ON r.day = s.day
+          FULL OUTER JOIN works w ON w.day = coalesce(s.day, r.day)
+          FULL OUTER JOIN rights a ON a.day = coalesce(s.day, r.day, w.day)
+        ON CONFLICT (day) DO UPDATE SET
+            submissions = EXCLUDED.submissions,
+            approved_reviews = EXCLUDED.approved_reviews,
+            rejected_reviews = EXCLUDED.rejected_reviews,
+            changes_requested = EXCLUDED.changes_requested,
+            published_works = EXCLUDED.published_works,
+            active_published_works = EXCLUDED.active_published_works,
+            rights_attestations = EXCLUDED.rights_attestations,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, GOVERNANCE_VERSION, Timestamp.from(refreshed));
+    updateHealth("publisher_workflow_daily", GOVERNANCE_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.publisher_workflow_daily");
+  }
+
+  private void refreshRightsDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.rights_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        INSERT INTO reporting.rights_daily(
+            day, action, distribution_status, decision_count,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT created_at::date, action, distribution_status, count(*), ?, ?, max(created_at)
+        FROM catalog.rights_decision
+        WHERE created_at >= current_date - INTERVAL '366 days'
+        GROUP BY created_at::date, action, distribution_status
+        ON CONFLICT (day, action, distribution_status) DO UPDATE SET
+            decision_count = EXCLUDED.decision_count,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, GOVERNANCE_VERSION, Timestamp.from(refreshed));
+    updateHealth("rights_daily", GOVERNANCE_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.rights_daily");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {
