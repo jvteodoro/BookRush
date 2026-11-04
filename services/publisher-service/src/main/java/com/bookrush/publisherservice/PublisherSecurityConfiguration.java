@@ -28,10 +28,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /** Keeps the ingestion callback private to its shared-secret controller check. */
 @Configuration
-@ConditionalOnProperty(prefix = "bookrush.security", name = "enabled", havingValue = "true")
 public class PublisherSecurityConfiguration {
   @Bean
   @Order(1)
+  @ConditionalOnProperty(prefix = "bookrush.security", name = "enabled", havingValue = "true")
   SecurityFilterChain publisherSecurity(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
     http.csrf(csrf -> csrf.disable()).cors(cors -> {})
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -45,6 +45,16 @@ public class PublisherSecurityConfiguration {
   }
 
   @Bean
+  @ConditionalOnProperty(
+      prefix = "bookrush.security", name = "enabled", havingValue = "false", matchIfMissing = true)
+  SecurityFilterChain localSecurity(HttpSecurity http) throws Exception {
+    return http.csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(prefix = "bookrush.security", name = "enabled", havingValue = "true")
   JwtDecoder jwtDecoder(
       @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}") String jwkSetUri,
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,

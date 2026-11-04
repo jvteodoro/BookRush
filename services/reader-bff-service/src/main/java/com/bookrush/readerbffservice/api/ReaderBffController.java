@@ -7,6 +7,7 @@ import java.security.Principal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -32,6 +33,7 @@ public class ReaderBffController {
     this(recommendationUrl, stateUrl, contentUrl, ObservationRegistry.create());
   }
 
+  @Autowired
   public ReaderBffController(
       @Value("${bookrush.recommendation-url:http://recommendation-service:8098}") String recommendationUrl,
       @Value("${bookrush.reader-state-url:http://reader-state-service:8094}") String stateUrl,

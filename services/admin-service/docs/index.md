@@ -51,3 +51,9 @@ The service validates the `bookrush-platform` issuer/JWK set and requires the
 `groups` claim to `SCOPE_*`/`ROLE_*` authorities before enforcing operator
 actions. This explicit decoder prevents a token issued for another platform
 client from being accepted accidentally.
+
+## Perfil local e healthcheck
+
+Com `BOOKRUSH_SECURITY_ENABLED=false`, o serviço usa uma cadeia local explícita
+que libera o endpoint de health para o Compose; com segurança habilitada, as
+rotas administrativas continuam exigindo JWT e as permissões documentadas.

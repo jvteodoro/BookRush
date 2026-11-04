@@ -25,9 +25,9 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@ConditionalOnProperty(name = "bookrush.security.enabled", havingValue = "true")
 public class SocialSecurityConfiguration {
   @Bean
+  @ConditionalOnProperty(name = "bookrush.security.enabled", havingValue = "true")
   SecurityFilterChain socialSecurity(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
     http.csrf(csrf -> csrf.disable()).cors(cors -> {})
         .authorizeHttpRequests(auth -> auth
@@ -39,6 +39,16 @@ public class SocialSecurityConfiguration {
   }
 
   @Bean
+  @ConditionalOnProperty(
+      name = "bookrush.security.enabled", havingValue = "false", matchIfMissing = true)
+  SecurityFilterChain localSecurity(HttpSecurity http) throws Exception {
+    return http.csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "bookrush.security.enabled", havingValue = "true")
   JwtDecoder jwtDecoder(
       @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}") String jwkSetUri,
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,

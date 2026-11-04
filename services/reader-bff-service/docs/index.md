@@ -40,3 +40,9 @@ com items, 400 para lote inválido, 401 para token ausente/inválido, 403 por or
 CORS indevida e 502 se o reader-state estiver indisponível.
 Não há retorno silencioso de lista vazia em caso de falha da dependência.
 O gateway Traefik existente já roteia `/api/v1/reader` para este BFF.
+
+## Inicialização e healthcheck
+
+O construtor de produção do controller é selecionado explicitamente pelo
+Spring para manter as URLs upstream injetadas no container. O endpoint
+`/actuator/health` permanece disponível para o healthcheck do Compose.

@@ -52,6 +52,12 @@ Em rollout parcial, implante primeiro o social-service para aplicar V8 e depois
 o admin-service/admin-web, que exibem a remoção pelo autor e bloqueiam restauração.
 A pipeline integrada já constrói e implanta esses serviços.
 
+## Perfil local e healthcheck
+
+Com `BOOKRUSH_SECURITY_ENABLED=false`, o serviço usa uma cadeia local explícita
+que permite o healthcheck do Compose; quando habilitada, a cadeia JWT e as
+permissões de moderação permanecem ativas.
+
 ## Contagem de seguidores
 
 `GET /api/v1/social/followers` usa o subject do token para consultar a própria

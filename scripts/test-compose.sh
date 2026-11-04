@@ -15,7 +15,7 @@ export BOOKRUSH_JENKINS_PORT=0
 export POSTGRES_DB=bookrush POSTGRES_USER=bookrush POSTGRES_PASSWORD=bookrush
 # This smoke intentionally exercises the application stack without the optional
 # Keycloak profile. OIDC is covered by the dedicated Keycloak test profile.
-export CATALOG_OIDC_ENABLED=false INGESTION_SECURITY_ENABLED=false
+export CATALOG_OIDC_ENABLED=false INGESTION_SECURITY_ENABLED=false BOOKRUSH_SECURITY_ENABLED=false
 # The compose file still interpolates the optional SeaweedFS OIDC sidecar
 # command even when its profile is not started.  Supply a disposable value so
 # this isolated smoke test never reads a developer/production secret.
