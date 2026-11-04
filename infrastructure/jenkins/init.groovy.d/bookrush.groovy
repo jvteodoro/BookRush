@@ -101,8 +101,10 @@ if (!(adminWebJob.getDefinition() instanceof CpsScmFlowDefinition)) {
     adminWebJob.setDefinition(scmFor(adminWebPipelineFile.name))
     adminWebJob.save()
 }
-if (!(observabilityJob.getDefinition() instanceof CpsScmFlowDefinition)) {
-    observabilityJob.setDefinition(scmFor(observabilityPipelineFile.name))
+def observabilityDefinition = observabilityJob.getDefinition()
+if (!(observabilityDefinition instanceof CpsScmFlowDefinition) ||
+    observabilityDefinition.getScriptPath() != 'infrastructure/jenkins/observability.Jenkinsfile') {
+    observabilityJob.setDefinition(scmFor('infrastructure/jenkins/observability.Jenkinsfile'))
     observabilityJob.save()
 }
 replaceParameters(observabilityJob, [

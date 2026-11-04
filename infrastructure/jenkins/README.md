@@ -133,8 +133,9 @@ O job `bookrush-observability` valida o Compose e pode implantar a stack com
 `DEPLOY=true`. O deploy usa o checkout escolhido em `BRANCH` e transmite a
 configuração versionada para um volume Docker nomeado; assim, o daemon não
 precisa acessar o workspace privado do agente. Antes do primeiro deploy,
-o bootstrap materializa `BRANCH`, `DEPLOY` e os IDs das três credentials antes
-do primeiro build. Cadastre no Jenkins as credentials Secret text indicadas
+o bootstrap reconcilia o script SCM `infrastructure/jenkins/observability.Jenkinsfile`
+e materializa `BRANCH`, `DEPLOY` e os IDs das três credentials antes do primeiro
+build. Cadastre no Jenkins as credentials Secret text indicadas
 pelos parâmetros do job: senha de recuperação do Grafana, DSN read-only do
 postgres-exporter e segredo do client OIDC `bookrush-grafana`. O job gera um env-file temporário
 com permissão restrita e o remove ao terminar. Grafana usa Keycloak do realm

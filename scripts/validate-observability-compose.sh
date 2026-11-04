@@ -33,6 +33,10 @@ grep -Fq 'docker run --rm -i --network none -v "$config_volume:/config"' "$repo_
   echo "Jenkins deployment must stream config into the Docker named volume" >&2
   exit 1
 }
+grep -Fq "scmFor('infrastructure/jenkins/observability.Jenkinsfile')" "$repo_root/infrastructure/jenkins/init.groovy.d/bookrush.groovy" || {
+  echo "Jenkins observability job must load its Jenkinsfile from the repository path" >&2
+  exit 1
+}
 grep -Fq 'Host(`grafana-bookrush.jteodoro.tec.br`)' "$repo_root/infrastructure/traefik/dynamic.yaml" || {
   echo "Traefik must route the Grafana public hostname" >&2
   exit 1
