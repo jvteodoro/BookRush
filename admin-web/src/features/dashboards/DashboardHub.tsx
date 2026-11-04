@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { useSearchParams } from "react-router-dom";
+import { config } from "../../lib/config";
 import {
   services,
   ExecutivePeriod,
@@ -242,6 +243,63 @@ function ExecutiveSummaryReport({ data }: { data: ExecutiveSummary }) {
         snapshot permanecem como — e não representam zero.
       </p>
     </>
+  );
+}
+
+function OperationsReport({ health }: { health: Record<string, unknown>[] }) {
+  const grafanaUrl = `${config.observability.grafanaUrl}${config.observability.operationsPath}`;
+  return (
+    <div className="dashboard-card wide">
+      <div className="dashboard-card-heading">
+        <div>
+          <strong>OP-01..OP-12 · Saúde operacional</strong>
+          <p>
+            Métricas de infraestrutura, HTTP, JVM, PostgreSQL, tracing e alertas
+            permanecem no Grafana autenticado; o Admin Web exibe a saúde das
+            projeções sem transportar credenciais.
+          </p>
+        </div>
+        <a
+          className="button secondary"
+          href={grafanaUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Abrir Grafana
+        </a>
+      </div>
+      {!health.length ? (
+        <div className="dashboard-state">NO_DATA</div>
+      ) : (
+        <div className="dashboard-scroll-table">
+          <table className="dashboard-table">
+            <caption>
+              Reporting projection health · fonte administrativa
+            </caption>
+            <thead>
+              <tr>
+                <th>Projeção</th>
+                <th>Status</th>
+                <th>Última atualização</th>
+                <th>Registros</th>
+                <th>Versão</th>
+              </tr>
+            </thead>
+            <tbody>
+              {health.map((row, index) => (
+                <tr key={`${String(row.projection_name)}-${index}`}>
+                  <td>{String(row.projection_name ?? "—")}</td>
+                  <td>{String(row.refresh_status ?? "—")}</td>
+                  <td>{String(row.last_successful_refresh ?? "—")}</td>
+                  <td>{String(row.record_count ?? "—")}</td>
+                  <td>{String(row.definition_version ?? "—")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1260,7 +1318,9 @@ export function DashboardHub() {
               {statusText(displayedReport?.status ?? "NO_DATA")}
             </span>
           </div>
-          {area === "executive" && executiveSummaryReport ? (
+          {area === "operations" ? (
+            <OperationsReport health={health} />
+          ) : area === "executive" && executiveSummaryReport ? (
             <div className="dashboard-card wide">
               <div className="dashboard-card-heading">
                 <div>

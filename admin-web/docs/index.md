@@ -35,6 +35,10 @@ permitindo desenvolvimento offline. Em produção, use os caminhos do gateway
 
 Em produção `VITE_USE_MOCKS=false` é obrigatório; os dados são consultados pelas APIs autenticadas. Mocks só podem ser habilitados explicitamente em desenvolvimento local.
 
+`VITE_GRAFANA_URL` configura somente o link autenticado para o dashboard
+operacional. O navegador não recebe tokens ou credenciais do Grafana; o SSO do
+Grafana aplica a autorização de seus painéis.
+
 ## Dashboards administrativos — especificação (#8)
 
 A área `/dashboards` já possui o hub React inicial com sete áreas, filtros de

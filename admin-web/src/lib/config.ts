@@ -27,4 +27,11 @@ export const config = {
     feed: envOr(import.meta.env.VITE_FEED_API_URL, "/api/v1"),
     admin: envOr(import.meta.env.VITE_ADMIN_API_URL, "/"),
   },
+  observability: {
+    grafanaUrl: envOr(
+      import.meta.env.VITE_GRAFANA_URL,
+      "http://127.0.0.1:13000",
+    ),
+    operationsPath: "/d/bookrush-operations",
+  },
 };

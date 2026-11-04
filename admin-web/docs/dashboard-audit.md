@@ -25,7 +25,7 @@ fica reservado para dependência externa identificada.
 | EX-04 | Evolução de engajamento | `reader_state.session` | PARTIAL | Sessões não agregadas para reporting | SQL/projeção com timezone |
 | EX-05 | Conteúdo disponível | Catalog + analytics | PARTIAL | Não há snapshot reader-ready/excerpt-ready | Reconciliação catalog/analytics |
 | EX-06 | Comparação de período | `/reporting/executive-summary` | PARTIAL | Endpoint atual/precedente com janela igual implementado; falta delta visual dedicado | Teste de comparação temporal |
-| OP-01 | Mapa de disponibilidade | Actuator health | PARTIAL | Health não é coletado em dashboard | Prometheus targets + gateway smoke |
+| OP-01 | Mapa de disponibilidade | Grafana `bookrush-operations` + projection health | PARTIAL | Link autenticado e tabela de freshness integrados no Admin Web; falta smoke do Grafana público | Prometheus targets + gateway smoke |
 | OP-02 | Taxa de requisições | Micrometer HTTP | PARTIAL | Exposição/scrape não uniformes | Série HTTP real por rota |
 | OP-03 | Erros HTTP | Micrometer HTTP | PARTIAL | Sem painel, regras ou error budget | Carga controlada 4xx/5xx |
 | OP-04 | Latência por serviço | Micrometer timers | PARTIAL | Histogramas e buckets não padronizados | P50/P95/P99 agregáveis |
