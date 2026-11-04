@@ -22,6 +22,9 @@ export const apiRoutes = {
     progress: (bookId: string) => `${apiRoutes.reader.book(bookId)}/progress`,
     bookmarks: (bookId: string) => `${apiRoutes.reader.book(bookId)}/bookmarks`,
     opened: (bookId: string) => `${apiRoutes.reader.book(bookId)}/opened`,
+    sessions: () => "/api/v1/reader/sessions",
+    endSession: (sessionId: string) =>
+      `/api/v1/reader/sessions/${id(sessionId)}/end`,
     chapters: (bookId: string) => `${apiRoutes.reader.book(bookId)}/chapters`,
     publication: (bookId: string) =>
       `${apiRoutes.reader.book(bookId)}/publication.json`,

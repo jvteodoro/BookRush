@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 import com.bookrush.behaviorservice.BehaviorMaintenance;
 import java.util.List;
@@ -14,6 +15,9 @@ import java.security.Principal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.mockito.ArgumentCaptor;
 
 class BehaviorControllerTest {
   @Test
@@ -74,5 +78,30 @@ class BehaviorControllerTest {
     verify(jdbc).update(eq("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)"),
         org.mockito.ArgumentMatchers.any(), eq("event-1"), eq("INVALID_CORRELATION"),
         org.mockito.ArgumentMatchers.anyString());
+  }
+
+  @Test
+  void storesJwtEventsWithTheTechnicalIdentityUsedByRecommendationServing() {
+    JdbcTemplate jdbc = org.mockito.Mockito.mock(JdbcTemplate.class);
+    BehaviorController controller = new BehaviorController(jdbc,
+        org.mockito.Mockito.mock(BehaviorMaintenance.class));
+    Jwt jwt = Jwt.withTokenValue("test-token")
+        .header("alg", "RS256")
+        .issuer("https://issuer.example/realms/bookrush")
+        .subject("user-a")
+        .issuedAt(Instant.now().minusSeconds(5))
+        .expiresAt(Instant.now().plusSeconds(300))
+        .build();
+    var event = new BehaviorController.Event("event-technical-identity", "BOOK_OPEN", null, null,
+        UUID.randomUUID(), Instant.now(), new ObjectMapper().createObjectNode());
+
+    controller.ingest(new BehaviorController.Batch(List.of(event)), new JwtAuthenticationToken(jwt));
+
+    ArgumentCaptor<Object[]> values = ArgumentCaptor.forClass(Object[].class);
+    verify(jdbc, times(1)).update(
+        eq("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING"),
+        values.capture());
+    assertEquals("TechnicalIdentity[issuer=https://issuer.example/realms/bookrush, subject=user-a]",
+        values.getValue()[4]);
   }
 }

@@ -4,6 +4,13 @@ set -Eeuo pipefail
 : "${FRONTEND_IMAGE:?Imagem frontend ausente}"
 : "${INGESTION_IMAGE:?Imagem ingestion ausente}"
 : "${ANALYTICS_IMAGE:?Imagem analytics ausente}"
+# The protected host env may still carry the historical OFF value. The test
+# phase default must be explicit in the deploy process when Jenkins does not
+# provide the optional parameter; OFF remains an intentional override.
+export FEED_PERSONALIZED_MODE="${FEED_PERSONALIZED_MODE:-ON}"
+mode_env_file="$(mktemp /tmp/bookrush-deploy-mode.XXXXXX)"
+trap 'rm -f "$mode_env_file"' EXIT
+printf 'FEED_PERSONALIZED_MODE=%s\n' "$FEED_PERSONALIZED_MODE" > "$mode_env_file"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
 
@@ -32,6 +39,7 @@ resolve_service_image() {
   compatibility_services+=("$service|$image")
 }
 resolve_service_image RECOMMENDATION_IMAGE recommendation-service
+resolve_service_image BEHAVIOR_IMAGE behavior-service
 resolve_service_image READER_BFF_IMAGE reader-bff-service
 resolve_service_image READER_STATE_IMAGE reader-state-service
 resolve_service_image READER_PROFILE_IMAGE reader-profile-service
@@ -53,7 +61,8 @@ if [[ -z "${ADMIN_WEB_IMAGE:-}" ]]; then
 fi
 : "${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}"
 : "${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}"
-compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --profile auth)
+: "${BEHAVIOR_IMAGE:?Imagem behavior ausente}"
+compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --env-file "$mode_env_file" --profile auth)
 if [[ "${ANALYTICS_GPU:-false}" == "true" ]]; then
   compose+=( -f "${script_dir}/../compose.analytics-gpu.yaml" )
   export ANALYTICS_NLI_ENABLED=true
@@ -97,7 +106,7 @@ fi
 # Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
 # Este preflight também detecta builds feitos em um daemon diferente do deploy.
 missing_images=false
-for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE BEHAVIOR_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
   if ! docker image inspect "${!variable}" >/dev/null 2>&1; then
     echo "Imagem de deploy ausente no daemon: $variable=${!variable}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
     missing_images=true
@@ -111,6 +120,7 @@ old_ingestion="$(docker inspect --format '{{.Config.Image}}' bookrush-book-inges
 old_analytics="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analytics-service-1 2>/dev/null || true)"
 old_analytics_runtime="$(docker inspect --format '{{.Config.Image}}' bookrush-book-analytics-runtime-1 2>/dev/null || true)"
 old_recommendation="$(docker inspect --format '{{.Config.Image}}' bookrush-recommendation-service-1 2>/dev/null || true)"
+old_behavior="$(docker inspect --format '{{.Config.Image}}' bookrush-behavior-service-1 2>/dev/null || true)"
 old_reader_bff="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-bff-service-1 2>/dev/null || true)"
 old_reader_state="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-state-service-1 2>/dev/null || true)"
 old_reader_profile="$(docker inspect --format '{{.Config.Image}}' bookrush-reader-profile-service-1 2>/dev/null || true)"
@@ -119,7 +129,7 @@ old_admin_service="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-
 old_admin_web="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-web-1 2>/dev/null || true)"
 keycloak_state="$(docker inspect --format '{{.State.Status}}' bookrush-keycloak-1 2>/dev/null || true)"
 diagnose() {
-  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-recommendation-service-1 bookrush-reader-bff-service-1 bookrush-reader-state-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-frontend-1; do
+  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-behavior-service-1 bookrush-recommendation-service-1 bookrush-reader-bff-service-1 bookrush-reader-state-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-frontend-1; do
     echo "--- diagnóstico $service ---" >&2
     docker inspect --format 'state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} image={{.Config.Image}}' "$service" >&2 || true
     if [[ "$service" == bookrush-admin-service-1 ]]; then
@@ -131,7 +141,7 @@ diagnose() {
     fi
   done
 }
-compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
+compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
 if [[ -n "$keycloak_state" ]]; then
   if [[ "$keycloak_state" != running ]]; then
     docker start bookrush-keycloak-1 >/dev/null
@@ -162,6 +172,10 @@ configured_behavior_s2s_client_secret="${BEHAVIOR_S2S_CLIENT_SECRET:-}"
 if [[ -z "$configured_behavior_s2s_client_secret" ]]; then
   configured_behavior_s2s_client_secret="$(awk -F= '$1 == "BEHAVIOR_S2S_CLIENT_SECRET" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 fi
+configured_analytics_s2s_client_secret="${FEED_ANALYTICS_RANKING_CLIENT_SECRET:-${FEED_EXCERPTS_CLIENT_SECRET:-}}"
+if [[ -z "$configured_analytics_s2s_client_secret" ]]; then
+  configured_analytics_s2s_client_secret="$(awk -F= '$1 == "FEED_EXCERPTS_CLIENT_SECRET" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
+fi
 keycloak_admin_user="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_USER" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_password="$(awk -F= '$1 == "KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD" {sub(/^[^=]*=/, ""); print; exit}' /run/bookrush.env 2>/dev/null || true)"
 keycloak_admin_user="${keycloak_admin_user:-admin}"
@@ -177,6 +191,7 @@ KEYCLOAK_ADMIN_CLIENT_ID=bookrush-admin-service
 export KEYCLOAK_ADMIN_TOKEN_URI KEYCLOAK_ADMIN_BASE KEYCLOAK_ADMIN_CLIENT_ID
 live_admin_client_secret=""
 live_behavior_s2s_client_secret=""
+live_analytics_s2s_client_secret=""
 if [[ -n "$keycloak_admin_password" ]]; then
   # config-cli can leave role mappings unchanged for an existing service
   # account. Reapply the minimum product-realm roles immediately before this
@@ -206,17 +221,32 @@ if [[ -n "$keycloak_admin_password" ]]; then
     -e KEYCLOAK_USER="$keycloak_admin_user" \
     -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
     python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py" 2>/dev/null || true)"
+  live_analytics_s2s_client_secret="$(docker run --rm -i --network bookrush_bookrush \
+    -e KEYCLOAK_URL=http://keycloak:8080 \
+    -e KEYCLOAK_REALM=bookrush-platform \
+    -e KEYCLOAK_CLIENT_ID=bookrush-recommendation-s2s \
+    -e KEYCLOAK_USER="$keycloak_admin_user" \
+    -e KEYCLOAK_PASSWORD="$keycloak_admin_password" \
+    python:3.12-slim python3 - < "$repo_dir/infrastructure/keycloak/read-client-secret.py" 2>/dev/null || true)"
 fi
 KEYCLOAK_ADMIN_CLIENT_SECRET="${live_admin_client_secret:-$configured_admin_client_secret}"
 BEHAVIOR_S2S_CLIENT_SECRET="${live_behavior_s2s_client_secret:-$configured_behavior_s2s_client_secret}"
-if [[ "${FEED_PERSONALIZED_MODE:-OFF}" == ON && -z "$BEHAVIOR_S2S_CLIENT_SECRET" ]]; then
+FEED_EXCERPTS_CLIENT_SECRET="${live_analytics_s2s_client_secret:-$configured_analytics_s2s_client_secret}"
+FEED_ANALYTICS_RANKING_CLIENT_SECRET="$FEED_EXCERPTS_CLIENT_SECRET"
+if [[ "${FEED_PERSONALIZED_MODE:-ON}" == ON && -z "$BEHAVIOR_S2S_CLIENT_SECRET" ]]; then
   echo 'Não foi possível resolver o segredo vigente do cliente S2S do behavior-service.' >&2
   exit 1
 fi
-unset keycloak_admin_password admin_web_admin_username live_admin_client_secret live_behavior_s2s_client_secret configured_admin_client_secret configured_behavior_s2s_client_secret
+if [[ "${FEED_PERSONALIZED_MODE:-ON}" == ON && "${FEED_ANALYTICS_RANKING_ENABLED:-true}" == true \
+    && -z "$FEED_ANALYTICS_RANKING_CLIENT_SECRET" ]]; then
+  echo 'Não foi possível resolver o segredo vigente do cliente S2S do analytics ranking.' >&2
+  exit 1
+fi
+unset keycloak_admin_password admin_web_admin_username live_admin_client_secret live_behavior_s2s_client_secret live_analytics_s2s_client_secret configured_admin_client_secret configured_behavior_s2s_client_secret configured_analytics_s2s_client_secret
 [[ -n "$KEYCLOAK_ADMIN_CLIENT_SECRET" ]] || { echo 'Não foi possível resolver o segredo vigente do admin-service no Keycloak.' >&2; exit 1; }
 export KEYCLOAK_ADMIN_CLIENT_SECRET
 export BEHAVIOR_S2S_CLIENT_SECRET
+export FEED_EXCERPTS_CLIENT_SECRET FEED_ANALYTICS_RANKING_CLIENT_SECRET
 if $xtrace_was_enabled; then set -x; fi
 
 probe_user_management() {
@@ -319,8 +349,8 @@ probe_catalog() {
 
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
-  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
+  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
   else
@@ -330,7 +360,7 @@ rollback() {
 }
 
 echo "Iniciando deploy das imagens:" >&2
-printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${RECOMMENDATION_IMAGE}" "${READER_BFF_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${ADMIN_SERVICE_IMAGE}" "${ADMIN_WEB_IMAGE}" "${FRONTEND_IMAGE}" >&2
+printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMAGE}" "${ANALYTICS_IMAGE}" "${BEHAVIOR_IMAGE}" "${RECOMMENDATION_IMAGE}" "${READER_BFF_IMAGE}" "${READER_PROFILE_IMAGE}" "${SOCIAL_IMAGE}" "${ADMIN_SERVICE_IMAGE}" "${ADMIN_WEB_IMAGE}" "${FRONTEND_IMAGE}" >&2
 
 # Não usar somente trap ERR: docker compose pode falhar durante --wait e o
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.

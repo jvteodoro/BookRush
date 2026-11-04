@@ -73,7 +73,7 @@ http:
       # O frontend usa o BFF como fronteira única para leitura, estado e
       # conteúdo. O reader-state continua atendendo apenas a rota legada de
       # plant e o prefixo /api/v1/library.
-      rule: Path(`/api/v1/reader/feed`) || Path(`/api/v1/reader/recommendations`) || Path(`/api/v1/reader/library`) || Path(`/api/v1/reader/recent`) || Path(`/api/v1/reader/streak`) || PathPrefix(`/api/v1/reader/books`) || PathPrefix(`/api/v1/reader/recommendations/impressions`)
+      rule: Path(`/api/v1/reader/feed`) || Path(`/api/v1/reader/recommendations`) || Path(`/api/v1/reader/library`) || Path(`/api/v1/reader/recent`) || Path(`/api/v1/reader/streak`) || Path(`/api/v1/reader/sessions`) || PathPrefix(`/api/v1/reader/sessions/`) || PathPrefix(`/api/v1/reader/books`) || PathPrefix(`/api/v1/reader/recommendations/impressions`)
       entryPoints: [web]
       priority: 140
       service: reader-bff

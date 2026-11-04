@@ -6,6 +6,67 @@ info:
 servers:
   - url: https://bookrush.jteodoro.tec.br
 paths:
+  /api/v1/reader/sessions:
+    post:
+      operationId: startReaderSession
+      summary: Iniciar uma sessão de leitura
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: X-BookRush-Recommendation-Item, in: header, schema: { type: string, format: uuid } }
+        - { name: X-BookRush-Impression, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bookId: { type: string, format: uuid, nullable: true }
+      responses:
+        '200': { description: Sessão criada }
+        '401': { description: Token ausente ou inválido }
+  /api/v1/reader/sessions/{id}/end:
+    post:
+      operationId: endReaderSession
+      summary: Encerrar uma sessão de leitura
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [activeSeconds]
+              properties:
+                activeSeconds: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: Sessão encerrada e READ_SESSION publicado }
+        '401': { description: Token ausente ou inválido }
+        '404': { description: Sessão inexistente ou não pertencente ao leitor }
+  /api/v1/reader/books/{bookId}/progress:
+    put:
+      operationId: updateReaderProgress
+      summary: Atualizar progresso e publicar outcomes de leitura
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: X-BookRush-Recommendation-Item, in: header, schema: { type: string, format: uuid } }
+        - { name: X-BookRush-Impression, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [positionCodepoint, percent]
+              properties:
+                positionCodepoint: { type: integer, minimum: 0 }
+                percent: { type: number, minimum: 0, maximum: 100 }
+      responses:
+        '200': { description: Progresso persistido }
+        '401': { description: Token ausente ou inválido }
   /api/v1/reader/books/{bookId}/opened:
     post:
       summary: Record a successfully loaded reading and mark the book as seen

@@ -75,6 +75,20 @@ public class ReaderBffController {
     return get(state, "/api/v1/reader/streak", request, Map.of());
   }
 
+  @PostMapping("/sessions")
+  public Object startSession(@RequestBody(required = false) Object body, Principal principal,
+      HttpServletRequest request) {
+    requireReader(principal);
+    return mutate(state, HttpMethod.POST, "/api/v1/reader/sessions", request, body);
+  }
+
+  @PostMapping("/sessions/{id}/end")
+  public Object endSession(@PathVariable UUID id, @RequestBody Object body, Principal principal,
+      HttpServletRequest request) {
+    requireReader(principal);
+    return mutate(state, HttpMethod.POST, "/api/v1/reader/sessions/" + id + "/end", request, body);
+  }
+
   @GetMapping("/books/{bookId}/progress")
   public Object progress(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     requireReader(principal);
@@ -196,6 +210,7 @@ public class ReaderBffController {
       return requestSpec
           .headers(headers -> {
             if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
+            copyReaderCorrelation(request, headers);
           })
           .retrieve()
           .body(Object.class);
@@ -211,6 +226,7 @@ public class ReaderBffController {
     try {
       var requestSpec = client.method(method).uri(path).headers(headers -> {
         if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
+        copyReaderCorrelation(request, headers);
         if (body != null) headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
       });
       return body == null ? requestSpec.retrieve().body(Object.class) : requestSpec.body(body).retrieve().body(Object.class);
@@ -226,11 +242,19 @@ public class ReaderBffController {
     try {
       return client.get().uri(path).headers(headers -> {
         if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
+        copyReaderCorrelation(request, headers);
       }).retrieve().toEntity(byte[].class);
     } catch (HttpStatusCodeException exception) {
       throw translateUpstreamFailure("content dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "content dependency unavailable", exception);
+    }
+  }
+
+  private void copyReaderCorrelation(HttpServletRequest request, HttpHeaders headers) {
+    for (String name : new String[] {"X-BookRush-Recommendation-Item", "X-BookRush-Impression"}) {
+      String value = request.getHeader(name);
+      if (value != null && !value.isBlank()) headers.set(name, value);
     }
   }
 

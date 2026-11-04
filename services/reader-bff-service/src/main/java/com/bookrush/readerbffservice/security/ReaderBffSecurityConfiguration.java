@@ -52,7 +52,8 @@ public class ReaderBffSecurityConfiguration {
             HttpMethod.DELETE.name(),
             HttpMethod.OPTIONS.name()));
     configuration.setAllowedHeaders(
-        List.of("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client"));
+        List.of("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client",
+            "X-BookRush-Recommendation-Item", "X-BookRush-Impression"));
     configuration.setAllowCredentials(false);
     configuration.setMaxAge(3600L);
 

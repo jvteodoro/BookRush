@@ -38,6 +38,10 @@ The public feed item also exposes the bounded source names, without exposing
 embeddings or private profile vectors.
 Personalized ledger reasons include embedding model/version and source-asset
 version metadata, never the vector itself.
+Candidate objects keep optional catalog fields, including null values, while
+remaining immutable. This is important on the personalized path because
+enrichment adds embeddings to the full catalog candidate union; a missing
+optional field must not turn a valid candidate into a server error.
 
 The dataset handoff reads recommendation decisions and behavior outcomes from
 separate read-only database URLs and joins them locally by explicit
@@ -71,8 +75,9 @@ recommendation service's own bounded analytics clients.
 
 ## Personalized Feed V1
 
-The safe default remains `FEED_PERSONALIZED_MODE=OFF`, serving the existing
-analytics-aware/heuristic path. `SHADOW` calculates `PERSONALIZED_V1` without
+The test-phase default is `FEED_PERSONALIZED_MODE=ON` in application.yml,
+Compose, `.env.example` and Jenkins. Setting it explicitly to `OFF` serves the
+existing analytics-aware/heuristic path. `SHADOW` calculates `PERSONALIZED_V1` without
 changing the control response. `ON` serves it only after behavior, snapshot,
 coverage and confidence gates pass. `FEED_PERSONALIZED_ROLLOUT_PERCENTAGE`
 provides deterministic staged activation and setting the mode back to `OFF` is
@@ -81,8 +86,11 @@ the immediate rollback. See
 and the read-only dataset handoff. In `SHADOW`, the service records a bounded
 timer plus overlap and aggregate rank movement; these measurements never use
 subject or book IDs as metric labels.
+Usuários sem sinais permanecem no fallback `cold-start` sem exigir snapshot
+semântico; o snapshot só é requisito quando já existe um perfil pronto para
+personalização.
 
 The `feed.personalized` properties use Spring's mutable configuration binding
 so the service starts correctly in Docker and in the production profile. The
 binding is covered by a context-property test; invalid rollout values are
-handled by the gate's validation rather than changing the default `OFF` mode.
+handled by the gate's validation rather than changing the default `ON` mode.

@@ -18,6 +18,7 @@ class PersonalizedFeedGateTest {
         PersonalizedFeedGate.Mode.ON, .5, .5));
     assertEquals(PersonalizedFeedGate.Path.PERSONALIZED, gate.decide(READY, true, true).path());
     assertEquals("cold-start", gate.decide(null, true, true).reason());
+    assertEquals("cold-start", gate.decide(null, true, false).reason());
     assertEquals("behavior-unavailable", gate.decide(READY, false, true).reason());
     assertEquals("snapshot-unavailable", gate.decide(READY, true, false).reason());
   }

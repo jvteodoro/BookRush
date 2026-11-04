@@ -4,7 +4,8 @@
 
 O caminho personalizado é controlado por `FEED_PERSONALIZED_MODE`:
 
-* `OFF` (padrão): mantém `analytics-aware-v1`/heurística existente.
+* `ON` (padrão durante a fase de testes): ativa o serving personalizado com fallback controlado quando as gates não passam.
+* `OFF`: mantém `analytics-aware-v1`/heurística existente.
 * `SHADOW`: calcula `PERSONALIZED_V1`, mas entrega a ordenação do controle.
 * `ON`: entrega o ranking personalizado apenas quando behavior, snapshot,
   cobertura e confiança passam o gate.
@@ -13,6 +14,22 @@ O caminho personalizado é controlado por `FEED_PERSONALIZED_MODE`:
 subject para ativação gradual. O rollback operacional é definir `MODE=OFF` e
 reiniciar somente o recommendation-service; não requer migration rollback nem
 remove dados do ledger.
+
+O default operacional é `ON` durante a fase de testes em `application.yml`,
+Compose, `.env.example` e Jenkins. O script e o override de imagens do deploy
+também carregam a configuração PFV1 completa do recommendation service,
+incluindo o cliente S2S de behavior. O deploy recria o behavior service junto
+com o recommendation service e fixa explicitamente issuer, JWKS, audience e
+scope S2S do serving, mesmo quando o Compose persistente do host estiver
+defasado; `OFF` continua disponível para rollback explícito.
+
+No caminho `PERSONALIZED`, a ordem é: candidate retrieval limitado → candidate
+union → score personalizado de todo o pool → quota de exploration → MMR
+book-level nos slots de exploitation → inserção determinística dos slots de
+exploration → top-N final. O score pode renormalizar features analíticas
+ausentes; a ausência de quality não remove automaticamente um candidato
+semântico válido. No caminho `OFF`/fallback, a política analytics-aware antiga
+continua valendo.
 
 ## Observabilidade
 
@@ -91,3 +108,8 @@ complementares, não para descartar candidatos válidos.
 O carregamento inicial do feed não depende de uma chamada separada à primeira
 página do catálogo; os metadados necessários devem vir do contrato de
 recomendação autenticado.
+
+O caminho de feedback do leitor faz parte da validação controlada: o leitor web
+abre e encerra uma única sessão persistida, enquanto os intervalos da planta
+continuam sendo um agregado independente de streak. A imagem frontend só deve
+ser promovida após `format:check`, testes, lint e build concluírem com sucesso.

@@ -18,10 +18,10 @@ public final class PersonalizedFeedGate {
     if (properties.mode() == Mode.OFF) return new Decision(Path.FALLBACK, "disabled");
     if (properties.mode() == Mode.SHADOW) return new Decision(Path.SHADOW, "shadow");
     if (!behaviorAvailable) return new Decision(Path.FALLBACK, "behavior-unavailable");
-    if (!snapshotAvailable) return new Decision(Path.FALLBACK, "snapshot-unavailable");
     if (profile == null || profile.status() != UserTasteProfile.Status.READY) {
       return new Decision(Path.FALLBACK, "cold-start");
     }
+    if (!snapshotAvailable) return new Decision(Path.FALLBACK, "snapshot-unavailable");
     if (profile.coverage() < properties.minCoverage()) return new Decision(Path.FALLBACK, "coverage-low");
     if (profile.confidence() < properties.minConfidence()) return new Decision(Path.FALLBACK, "confidence-low");
     if (!inRollout(subject)) return new Decision(Path.FALLBACK, "rollout-excluded");

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import jakarta.servlet.http.HttpServletRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +31,7 @@ import com.bookrush.recommendationservice.ranking.PersonalizedProfileService;
 import com.bookrush.recommendationservice.ranking.PersonalizedRankerV1;
 import com.bookrush.recommendationservice.ranking.BookDiversityMmr;
 import com.bookrush.recommendationservice.ranking.ExplorationPolicy;
+import com.bookrush.recommendationservice.ranking.PersonalizedFeedSelector;
 import com.bookrush.recommendationservice.ranking.BehaviorSignalsClient;
 import com.bookrush.recommendationservice.observability.FeedMetrics;
 import com.bookrush.recommendationservice.fatigue.ExposureFatigue;
@@ -56,6 +58,7 @@ public class RecommendationController {
   private final PersonalizedRankerV1 personalizedRanker;
   private final BookDiversityMmr bookDiversityMmr;
   private final ExplorationPolicy explorationPolicy;
+  private final PersonalizedFeedSelector personalizedFeedSelector;
   private final PersonalizedDecisionReplay decisionReplay;
 
   public RecommendationController(
@@ -74,6 +77,7 @@ public class RecommendationController {
       PersonalizedRankerV1 personalizedRanker,
       BookDiversityMmr bookDiversityMmr,
       ExplorationPolicy explorationPolicy,
+      PersonalizedFeedSelector personalizedFeedSelector,
       PersonalizedDecisionReplay decisionReplay) {
     this.candidateRetriever = candidateRetriever;
     this.candidateUnionBuilder = candidateUnionBuilder;
@@ -90,6 +94,7 @@ public class RecommendationController {
     this.personalizedRanker = personalizedRanker;
     this.bookDiversityMmr = bookDiversityMmr;
     this.explorationPolicy = explorationPolicy;
+    this.personalizedFeedSelector = personalizedFeedSelector;
     this.decisionReplay = decisionReplay;
   }
 
@@ -142,19 +147,19 @@ public class RecommendationController {
     UUID requestId = UUID.randomUUID();
     var fatigueById = loadFatigue(subject, candidateIds);
     boolean analyticsRequired = rankingProperties.enabled() && rankingProperties.configured();
-    List<?> rankedBooks = feedMetrics.time("ranking",
-        () -> RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById,
-            fatigueById, Instant.now(), fatiguePolicy));
-    var explorationIds = personalized ? explorationIds(rankedBooks, requestId.getLeastSignificantBits(), limit)
-        : java.util.Set.<String>of();
-    PersonalizedRankingResult personalizedRanking = new PersonalizedRankingResult(rankedBooks,
-        Map.of(), Map.of());
+    List<?> rankedBooks;
+    PersonalizedRankingResult personalizedRanking = new PersonalizedRankingResult(List.of(), Map.of(), Map.of(), Set.of());
     if (personalized) {
-      personalizedRanking = personalizedRank(rankedBooks, scoreById, fatigueById, profileResult,
-          candidateSnapshots, trending, explorationIds, subject, limit);
+      personalizedRanking = feedMetrics.time("ranking", () -> personalizedRank(books, scoreById, fatigueById,
+          profileResult, candidateSnapshots, trending, requestId.getLeastSignificantBits(), limit));
       rankedBooks = personalizedRanking.books();
+    } else {
+      rankedBooks = feedMetrics.time("ranking",
+          () -> RecommendationHeuristic.rank(books, subject, limit, selectedStrategy, scoreById,
+              fatigueById, Instant.now(), fatiguePolicy));
     }
-    if (analyticsRequired) {
+    var explorationIds = personalizedRanking.explorationIds();
+    if (analyticsRequired && !personalized) {
       rankedBooks = rankedBooks.stream()
           .filter(book -> scoreById.containsKey(String.valueOf(bookId(book))))
           .toList();
@@ -165,8 +170,9 @@ public class RecommendationController {
     String candidateSetHash = RecommendationProvenance.candidateSetHash(candidateSet, scoreById, modelVersion);
     if (personalizationDecision.path() == PersonalizedFeedGate.Path.SHADOW) {
       final var shadowInput = rankedBooks;
-      var shadowRanking = feedMetrics.time("personalized_shadow", () -> personalizedRank(shadowInput,
-          scoreById, fatigueById, profileResult, candidateSnapshots, trending, explorationIds, subject, limit));
+      var shadowRanking = feedMetrics.time("personalized_shadow", () -> personalizedRank(books,
+          scoreById, fatigueById, profileResult, candidateSnapshots, trending,
+          requestId.getLeastSignificantBits(), limit));
       var baselineIds = rankedBooks.stream().map(this::bookId).filter(java.util.Objects::nonNull)
           .map(UUID::toString).limit(limit).toList();
       var shadowIds = shadowRanking.books().stream().map(this::bookId).filter(java.util.Objects::nonNull)
@@ -220,7 +226,7 @@ public class RecommendationController {
       excerptEnrichment.enrich(candidates);
       return null;
     });
-    List<Map<String, Object>> items = analyticsRequired
+    List<Map<String, Object>> items = analyticsRequired && !personalized
         ? new ArrayList<>(FeedEligibility.retainAnalyticsReady(candidates))
         : candidates;
     final var ledgerPersonalizedRanking = personalizedRanking;
@@ -337,7 +343,7 @@ public class RecommendationController {
       Map<String, ExposureFatigue.Signal> fatigueById, PersonalizedProfileService.Result profile,
       Map<UUID, AnalyticsScoreClient.BookFeatureSnapshot> candidateSnapshots,
       List<BehaviorSignalsClient.Trending> trending,
-      java.util.Set<String> explorationIds, String subject, int limit) {
+      long seed, int limit) {
     var originals = new java.util.LinkedHashMap<String, Object>();
     var candidates = new ArrayList<PersonalizedRankerV1.Candidate>();
     var embeddings = new java.util.HashMap<String, List<Double>>();
@@ -354,12 +360,12 @@ public class RecommendationController {
           ? 0 : cosine(profile.profile() == null ? null : profile.profile().vector(),
               candidateSnapshot.embedding().vector());
       var score = scoreById.get(key);
-      double quality = score == null ? 0 : Math.max(0, Math.min(1, score.score()));
+      Double quality = score == null ? null : Math.max(0, Math.min(1, score.score()));
       double freshness = fatiguePolicy.freshness(fatigueById.get(key), now);
       double trend = trendById.getOrDefault(id, 0d);
       candidates.add(new PersonalizedRankerV1.Candidate(key,
           new PersonalizedRankerV1.Components(affinity, quality, trend,
-              explorationIds.contains(key) ? 1d : 0d, freshness)));
+              null, freshness)));
       originals.putIfAbsent(key, book);
       var embeddingSnapshot = candidateSnapshots.get(id);
       if (embeddingSnapshot != null && embeddingSnapshot.embedding() != null
@@ -367,15 +373,11 @@ public class RecommendationController {
         embeddings.put(key, embeddingSnapshot.embedding().vector());
       }
     }
-    var ranked = personalizedRanker.rank(candidates, subject.hashCode());
-    var scoredById = ranked.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
-        candidate -> candidate.candidate().id(), candidate -> candidate));
-    var selections = bookDiversityMmr.select(ranked, embeddings, limit);
-    var selectionsById = selections.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(
-        selection -> selection.candidate().candidate().id(), selection -> selection));
-    var selectedBooks = selections.stream()
+    var selected = personalizedFeedSelector.select(candidates, embeddings, limit, seed);
+    var selectedBooks = selected.selections().stream()
         .map(selection -> originals.get(selection.candidate().candidate().id())).toList();
-    return new PersonalizedRankingResult(selectedBooks, scoredById, selectionsById);
+    return new PersonalizedRankingResult(selectedBooks, selected.scoredById(),
+        selected.mmrSelectionsById(), selected.explorationIds());
   }
 
   private static double cosine(List<Double> left, List<Double> right) {
@@ -448,14 +450,8 @@ public class RecommendationController {
 
   private record PersonalizedRankingResult(List<?> books,
       Map<String, PersonalizedRankerV1.ScoredCandidate> scoredById,
-      Map<String, BookDiversityMmr.Selection> selectionsById) { }
-
-  private java.util.Set<String> explorationIds(List<?> books, long seed, int limit) {
-    var ids = books.stream().map(this::bookId).filter(java.util.Objects::nonNull)
-        .map(UUID::toString).toList();
-    return explorationPolicy.choose(ids, java.util.Set.of(), seed, limit).stream()
-        .map(ExplorationPolicy.Choice::bookId).collect(java.util.stream.Collectors.toUnmodifiableSet());
-  }
+      Map<String, BookDiversityMmr.Selection> selectionsById,
+      Set<String> explorationIds) { }
 
   private Map<String, ExposureFatigue.Signal> loadFatigue(String subject, List<UUID> bookIds) {
     if (bookIds.isEmpty()) return Map.of();

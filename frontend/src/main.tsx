@@ -31,6 +31,7 @@ import type { CatalogBook, FeedExcerpt, PageLoopBook } from "./app/types";
 import type { ReadiumBridge } from "./app/types";
 import { useLegacyNavigation } from "./app/useLegacyNavigation";
 import { apiRoutes } from "./app/apiRoutes";
+import { readerSessionOrigin } from "./reader/readerSessionOrigin";
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
@@ -243,6 +244,11 @@ function App() {
           ...(window as Window & { __BOOKRUSH_API__?: Record<string, unknown> })
             .__BOOKRUSH_API__,
           saved,
+          readerSessionCorrelation: (bookId: string) =>
+            readerSessionOrigin.activeFor(bookId),
+          clearReaderSessionOrigin: () => {
+            readerSessionOrigin.clear();
+          },
           save: async (id: string, enabled: boolean) => {
             const response = await authClient.fetch(
               apiRoutes.reader.libraryBook(id),
@@ -527,7 +533,10 @@ function App() {
           ) => {
             await authClient.fetch(apiRoutes.reader.progress(id), {
               method: "PUT",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                ...readerSessionOrigin.activeFor(id),
+              },
               body: JSON.stringify({ percent, positionCodepoint }),
             });
           },
@@ -538,8 +547,13 @@ function App() {
               body: JSON.stringify({ positionCodepoint }),
             });
           },
-          open: async (id: string) => {
-            await recordOpenedBook(id, correlationHeaders(id));
+          open: async (id: string, fromRecommendation = false) => {
+            const headers = fromRecommendation ? correlationHeaders(id) : {};
+            if (fromRecommendation) {
+              readerSessionOrigin.request({ bookId: id, headers });
+              return;
+            }
+            await recordOpenedBook(id, readerSessionOrigin.activeFor(id));
           },
           chapters: async (id: string) => {
             const response = await authClient.fetch(

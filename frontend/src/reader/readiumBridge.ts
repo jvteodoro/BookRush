@@ -2,6 +2,8 @@ import { HttpFetcher, Manifest, Publication } from "@readium/shared";
 import { WebPubNavigator, WebPubPreferences } from "@readium/navigator";
 import { authClient } from "../auth";
 import { startReadingTimer } from "./readingTimer";
+import { createReaderSessionLifecycle } from "./readerSession";
+import { readerSessionOrigin } from "./readerSessionOrigin";
 import { apiRoutes, readerApiPath } from "../app/apiRoutes";
 import type {
   ReadiumBridge,
@@ -24,6 +26,16 @@ let container: HTMLElement | undefined;
 let frame: HTMLIFrameElement | undefined;
 let frameWindow: Window | undefined;
 let preferences = { ...defaults };
+
+function sessionCorrelation(bookId: string): Record<string, string> {
+  return readerSessionOrigin.requestedFor(bookId);
+}
+
+const readerSession = createReaderSessionLifecycle({
+  fetcher: (input, init) => authClient.fetch(input, init),
+  sessionsPath: apiRoutes.reader.sessions(),
+  endSessionPath: apiRoutes.reader.endSession,
+});
 
 function toChapters(links: any[] = [], depth = 0): ReaderChapter[] {
   return links.flatMap((link, index) => {
@@ -91,6 +103,7 @@ function applyPreferences(next: ReaderPreferences) {
 
 export const readiumBridge: ReadiumBridge = {
   async mount(bookId, nextContainer, onLocatorChanged) {
+    const originHeaders = sessionCorrelation(bookId);
     await this.unmount();
     container = nextContainer;
     const response = await authClient.fetch(
@@ -105,6 +118,8 @@ export const readiumBridge: ReadiumBridge = {
     if (!parsedManifest?.readingOrder?.items?.length) {
       throw new Error("Este livro ainda não possui conteúdo reader-ready.");
     }
+    await readerSession.start(bookId, originHeaders);
+    readerSessionOrigin.activate(bookId, originHeaders);
     const fetcher = new HttpFetcher(
       (input, init) =>
         authClient.fetch(readerApiPath(String(input)), {
@@ -146,6 +161,7 @@ export const readiumBridge: ReadiumBridge = {
   async unmount() {
     stopReadingTimer?.();
     stopReadingTimer = undefined;
+    await readerSession.end();
     if (navigator) await navigator.destroy();
     navigator = undefined;
     manifest = undefined;
@@ -153,6 +169,7 @@ export const readiumBridge: ReadiumBridge = {
     frame = undefined;
     frameWindow = undefined;
     container = undefined;
+    readerSessionOrigin.clear();
   },
 
   async chapters() {

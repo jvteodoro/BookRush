@@ -15,11 +15,10 @@ isoladas no bootstrap da instância.
 ## Ativação do feed personalizado
 
 O job `bookrush-deploy` expõe o parâmetro `FEED_PERSONALIZED_MODE`, com as
-opções `OFF` e `ON`. `OFF` é o padrão seguro e preserva o caminho legado;
-`ON` injeta `FEED_PERSONALIZED_MODE=ON` no deploy Compose e ativa o fluxo novo
-de serving personalizado da revisão implantada. A opção deve ser informada
-explicitamente em cada deploy que pretenda ativar esse comportamento. O
-rollback consiste em executar o mesmo job com `FEED_PERSONALIZED_MODE=OFF`.
+opções `ON` e `OFF`. `ON` é o padrão durante a fase de testes e ativa o fluxo
+novo de serving; `OFF` preserva o caminho legado. `ON` injeta
+`FEED_PERSONALIZED_MODE=ON` no deploy Compose. O rollback consiste em executar
+o mesmo job com `FEED_PERSONALIZED_MODE=OFF`.
 
 ## Feed Lab administrativo
 

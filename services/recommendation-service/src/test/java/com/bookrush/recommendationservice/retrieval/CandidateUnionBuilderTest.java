@@ -1,6 +1,7 @@
 package com.bookrush.recommendationservice.retrieval;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.bookrush.recommendationservice.taste.UserTasteProfile;
@@ -49,5 +50,17 @@ class CandidateUnionBuilderTest {
 
     assertEquals(1, result.books().size());
     assertEquals(first.toString(), result.canonicalBookIds().getFirst());
+  }
+
+  @Test
+  void candidatePreservesNullOptionalCatalogFields() {
+    var book = new java.util.LinkedHashMap<String, Object>();
+    book.put("id", UUID.randomUUID());
+    book.put("excerpt", null);
+
+    var candidate = new CandidateUnionBuilder.Candidate(book, .5);
+
+    assertTrue(candidate.book().containsKey("excerpt"));
+    assertNull(candidate.book().get("excerpt"));
   }
 }
