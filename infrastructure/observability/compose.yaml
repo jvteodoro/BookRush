@@ -34,6 +34,15 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${OBS_GRAFANA_ADMIN_PASSWORD:?Set OBS_GRAFANA_ADMIN_PASSWORD in the protected environment}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_GENERIC_OAUTH_ENABLED: ${OBS_GRAFANA_OIDC_ENABLED:-false}
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: ${OBS_GRAFANA_OIDC_CLIENT_ID:-bookrush-grafana}
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${OBS_GRAFANA_OIDC_CLIENT_SECRET:-}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email groups
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: ${OBS_GRAFANA_OIDC_AUTH_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/auth}
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: ${OBS_GRAFANA_OIDC_TOKEN_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/token}
+      GF_AUTH_GENERIC_OAUTH_API_URL: ${OBS_GRAFANA_OIDC_API_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/protocol/openid-connect/userinfo}
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: ${OBS_GRAFANA_OIDC_ROLE_ATTRIBUTE_PATH:-contains(groups[*], 'platform-admins') && 'Admin' || contains(groups[*], 'operators') && 'Editor' || 'Viewer'}
       GF_SERVER_ROOT_URL: ${OBS_GRAFANA_ROOT_URL:-http://127.0.0.1:13000}
       GF_METRICS_ENABLED: "true"
     ports:

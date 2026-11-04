@@ -39,12 +39,12 @@ scrape_configs:
           - catalog-service:8080
           - book-ingestion-service:8090
           - book-analytics-service:8091
-          - admin-service:8093
+          - admin-service:8100
           - reader-state-service:8094
-          - social-service:8095
-          - publisher-service:8096
+          - social-service:8096
+          - publisher-service:8099
           - behavior-service:8097
           - recommendation-service:8098
-          - reader-profile-service:8099
-          - book-content-service:8100
+          - reader-profile-service:8095
+          - book-content-service:8093
           - reader-bff-service:8101

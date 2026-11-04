@@ -22,3 +22,27 @@ groups:
           summary: "BookRush HTTP 5xx rate is elevated"
           description: "The aggregate 5xx ratio is above 1% for ten minutes."
           runbook: "docs/operations/observability.md#http-errors"
+
+      - alert: BookRushHttpLatencyP95High
+        expr: bookrush:http_latency:p95_5m > 2.5
+        for: 15m
+        labels:
+          severity: warning
+          owner: service
+        annotations:
+          summary: "BookRush HTTP p95 latency is elevated"
+          description: "Aggregated p95 latency is above the initial 2.5 second threshold for fifteen minutes; calibrate against traffic volume and the service dashboard."
+          runbook: "docs/operations/observability.md#http-errors"
+
+  - name: bookrush-data-freshness
+    rules:
+      - alert: BookRushBehaviorProjectionStale
+        expr: bookrush_behavior_data_quality_projection_age_seconds > 900
+        for: 10m
+        labels:
+          severity: warning
+          owner: behavior
+        annotations:
+          summary: "Behavior projection freshness is outside the initial threshold"
+          description: "The behavior-owned projection reports an age above 15 minutes; inspect the projection and outbox runbook."
+          runbook: "docs/operations/observability.md#stuck-worker-e-freshness"

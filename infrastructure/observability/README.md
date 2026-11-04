@@ -27,6 +27,9 @@ Defina no ambiente protegido, sem versionar o arquivo:
 OBS_GRAFANA_ADMIN_PASSWORD=<senha protegida>
 OBS_POSTGRES_EXPORTER_DATA_SOURCE_NAME=postgresql://<usuario>:<senha>@postgres:5432/bookrush?sslmode=disable
 BOOKRUSH_NETWORK_NAME=bookrush_bookrush
+OBS_GRAFANA_OIDC_ENABLED=false
+OBS_GRAFANA_OIDC_CLIENT_ID=bookrush-grafana
+# OBS_GRAFANA_OIDC_CLIENT_SECRET=<protected secret>
 ```
 
 O DSN do exporter não deve ser colocado em logs, Beads, argumentos de jobs ou
@@ -49,6 +52,13 @@ Antes de conectar a produção, validar em ambiente descartável a carga das
 configurações, os healthchecks, o provisionamento idempotente, a retenção e o
 backup/restore dos quatro volumes. A integração com o Compose principal e o
 SSO Keycloak permanecem nos pacotes seguintes.
+
+Quando habilitado, o OAuth genérico do Grafana usa o realm
+`bookrush-platform`; `platform-admins` recebe Admin, `operators` recebe Editor
+e os demais usuários autenticados recebem Viewer. O backend de reporting deve
+repetir a autorização: esconder o menu no Admin Web não é controle suficiente.
+Não habilite essa opção antes de validar redirect URI, grupos e revogação em
+ambiente descartável.
 
 ## Limites e segurança
 

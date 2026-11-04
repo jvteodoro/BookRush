@@ -39,6 +39,16 @@ rede privada `bookrush_bookrush`. Não exponha o endpoint do exporter para
 contornar uma falha de rede. Depois de corrigir a causa, confirme `up == 1` no
 Prometheus e o dashboard correspondente.
 
+## SSO e RBAC do Grafana
+
+O Grafana fica sem login anônimo e sem cadastro aberto. O OAuth Keycloak é
+opt-in (`OBS_GRAFANA_OIDC_ENABLED=false` por padrão) e usa o realm
+`bookrush-platform`. O client, segredo, redirect URI e grupos devem ser
+provisionados fora do Git; `platform-admins`, `operators` e Viewer precisam
+ser testados em ambiente descartável antes de habilitar o client. O backend de
+reporting mantém sua própria autorização e não confia no menu do Grafana ou do
+Admin Web.
+
 ## HTTP errors
 
 Use as recording rules `bookrush:http_server_errors:rate5m` e
@@ -53,6 +63,12 @@ A stack de observabilidade não inventa estado de jobs. O alerta só deve ser
 ativado quando os exporters/projeções dos pacotes de analytics e reporting
 publicarem watermark e progresso. Enquanto a fonte não existir, o painel deve
 exibir `NOT_INSTRUMENTED`, não zero.
+
+Os alertas `BookRushTargetDown`, `BookRushHttpServerErrors`,
+`BookRushHttpLatencyP95High` e `BookRushBehaviorProjectionStale` usam
+thresholds iniciais, não SLOs aprovados. Cada alerta tem owner, duração e
+runbook; outbox, worker e reporting só devem gerar alertas quando suas fontes
+versionadas estiverem instrumentadas.
 
 ## Backup e restauração
 
