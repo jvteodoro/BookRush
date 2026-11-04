@@ -15,3 +15,8 @@ recomendações e de `behavior.outcome_attribution`, e
 analytics. Ambos são reprocessáveis por janela e preservam `calculation_version`
 e `source_watermark`. Dwell permanece nulo até existir fato validado; o painel
 deve mostrá-lo como `NOT_INSTRUMENTED`.
+
+A V7 adiciona `reporting.attribution_daily` e
+`reporting.reconciliation_daily`. A primeira conserva a classificação explícita
+dos outcomes; a segunda compara IDs de impressão do ledger com a telemetria de
+viewability e calcula duplicidades sem apagar o histórico bruto.

@@ -64,6 +64,8 @@ class ReportingControllerTest {
 
     assertEquals("UNTRUSTED", controller.feedDaily(7, principal, analyst).get("status"));
     assertEquals("UNTRUSTED", controller.pipeline(7, principal, analyst).get("status"));
+    assertEquals("UNTRUSTED", controller.attributionQuality(7, principal, analyst).get("status"));
+    assertEquals("UNTRUSTED", controller.reconciliationQuality(7, principal, analyst).get("status"));
 
     var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
     assertEquals(403, assertThrows(ResponseStatusException.class,

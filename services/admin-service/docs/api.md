@@ -17,6 +17,13 @@ expõe snapshots dos itens e fases do analytics. Essas projeções também ficam
 bounded contexts. Dwell permanece não instrumentado e não é apresentado como
 zero.
 
+`GET /api/admin/v1/reporting/quality/attribution?days=30` expõe a distribuição
+de outcomes por `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` e
+`INVALID_REFERENCE`. `GET /api/admin/v1/reporting/quality/reconciliation?days=30`
+compara o ledger de impressões com eventos de viewability, destacando
+duplicidades e IDs sem correspondência. Esses endpoints são read-only, limitados
+a 366 dias e protegidos pelo mesmo RBAC de reporting.
+
 `POST /api/v1/admin/audit` registra ação de administração sem armazenar tokens; `GET /api/v1/admin/audit` consulta os últimos eventos. O subject vem da identidade autenticada.
 
 ## Usuários

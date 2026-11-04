@@ -24,3 +24,7 @@ payload bruto, subject ou texto de livro no snapshot.
 A projeção utiliza somente agregações limitadas aos últimos 366 dias e atualiza
 as linhas existentes por chave. Não há exclusão de fatos operacionais nem
 consultas SQL fornecidas pelo frontend.
+
+`V7__reporting_data_quality.sql` cria as projeções diárias de qualidade. Elas
+são reconstruídas apenas na janela materializada, possuem watermark e versão de
+cálculo, e alimentam os painéis DQ-03 (atribuição) e DQ-04 (reconciliação).

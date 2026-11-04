@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Builds bounded, rebuildable reporting facts from the behavior export boundary. */
 @Component
@@ -15,10 +17,13 @@ public class ReportingProjection {
   private static final String VERSION = "events-v1-untrusted-population";
   private static final String FEED_VERSION = "feed-attribution-v1-untrusted-population";
   private static final String PIPELINE_VERSION = "analytics-pipeline-v1";
+  private static final String QUALITY_VERSION = "event-quality-v1";
   private final JdbcTemplate jdbc;
+  private final TransactionTemplate transactions;
 
-  public ReportingProjection(JdbcTemplate jdbc) {
+  public ReportingProjection(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
     this.jdbc = jdbc;
+    this.transactions = new TransactionTemplate(transactionManager);
   }
 
   @Scheduled(fixedDelayString = "${bookrush.reporting.refresh-delay-ms:300000}")
@@ -27,6 +32,8 @@ public class ReportingProjection {
     runProjection("reader_day", VERSION, () -> refreshReaderDay(refreshed));
     runProjection("feed_daily", FEED_VERSION, () -> refreshFeedDaily(refreshed));
     runProjection("pipeline_snapshot", PIPELINE_VERSION, () -> refreshPipelineSnapshot(refreshed));
+    runProjection("attribution_daily", QUALITY_VERSION, () -> refreshAttributionDaily(refreshed));
+    runProjection("reconciliation_daily", QUALITY_VERSION, () -> refreshReconciliationDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -50,7 +57,7 @@ public class ReportingProjection {
               count(DISTINCT (identity_subject, book_id)) FILTER (
                 WHERE event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')),
               ?, ?, max(occurred_at)
-          FROM behavior.events
+          FROM behavior.events e
           WHERE occurred_at >= current_date - INTERVAL '366 days'
           GROUP BY occurred_at::date
           ON CONFLICT (day, population, platform) DO UPDATE SET
@@ -82,7 +89,7 @@ public class ReportingProjection {
 
   private void runProjection(String name, String version, Runnable projection) {
     try {
-      projection.run();
+      transactions.executeWithoutResult(status -> projection.run());
     } catch (RuntimeException exception) {
       String error = exception.getClass().getSimpleName();
       LOG.warn("reporting projection refresh failed projection={} error={} detail={}",
@@ -218,6 +225,66 @@ public class ReportingProjection {
         """, Timestamp.from(refreshed), PIPELINE_VERSION);
     updateHealth("pipeline_snapshot", PIPELINE_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.pipeline_snapshot");
+  }
+
+  private void refreshAttributionDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.attribution_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        INSERT INTO reporting.attribution_daily(
+            day, attribution_status, outcome_count, unique_events,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT occurred_at::date, attribution_status, count(*), count(DISTINCT source_event_id),
+            ?, ?, max(occurred_at)
+        FROM behavior.outcome_attribution
+        WHERE occurred_at >= current_date - INTERVAL '366 days'
+        GROUP BY occurred_at::date, attribution_status
+        """, QUALITY_VERSION, Timestamp.from(refreshed));
+    updateHealth("attribution_daily", QUALITY_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.attribution_daily");
+  }
+
+  private void refreshReconciliationDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.reconciliation_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH ledger AS (
+          SELECT shown_at::date AS day, count(DISTINCT id) AS impression_count,
+              count(DISTINCT id) FILTER (WHERE viewable) AS viewable_count,
+              max(shown_at) AS source_watermark
+          FROM recommendation.impression
+          WHERE shown_at >= current_date - INTERVAL '366 days'
+          GROUP BY shown_at::date
+        ), events AS (
+          SELECT e.occurred_at::date AS day,
+              count(*) FILTER (WHERE e.event_type = 'EXCERPT_IMPRESSION'
+                AND e.payload->>'impressionId' IS NOT NULL) AS event_count,
+              count(DISTINCT e.payload->>'impressionId') FILTER (
+                WHERE e.event_type = 'EXCERPT_IMPRESSION'
+                  AND e.payload->>'impressionId' IS NOT NULL) AS unique_count,
+              count(DISTINCT e.payload->>'impressionId') FILTER (
+                WHERE e.event_type = 'EXCERPT_IMPRESSION'
+                  AND e.payload->>'impressionId' IS NOT NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM recommendation.impression i
+                    WHERE i.id::text = e.payload->>'impressionId')) AS mismatch_count,
+              max(e.occurred_at) AS source_watermark
+          FROM behavior.events e
+          WHERE e.occurred_at >= current_date - INTERVAL '366 days'
+          GROUP BY e.occurred_at::date
+        )
+        INSERT INTO reporting.reconciliation_daily(
+            day, ledger_impression_count, ledger_viewable_count,
+            behavior_impression_event_count, behavior_unique_impression_count,
+            mismatched_impression_count, duplicate_event_count,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT COALESCE(l.day, e.day), COALESCE(l.impression_count, 0),
+            COALESCE(l.viewable_count, 0), COALESCE(e.event_count, 0),
+            COALESCE(e.unique_count, 0), COALESCE(e.mismatch_count, 0),
+            GREATEST(COALESCE(e.event_count, 0) - COALESCE(e.unique_count, 0), 0),
+            ?, ?, GREATEST(l.source_watermark, e.source_watermark)
+        FROM ledger l FULL OUTER JOIN events e ON e.day = l.day
+        """, QUALITY_VERSION, Timestamp.from(refreshed));
+    updateHealth("reconciliation_daily", QUALITY_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.reconciliation_daily");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {

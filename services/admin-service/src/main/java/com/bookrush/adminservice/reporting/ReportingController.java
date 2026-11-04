@@ -106,6 +106,40 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/quality/attribution")
+  public Map<String, Object> attributionQuality(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, attribution_status, outcome_count, unique_events,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.attribution_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, attribution_status
+        """, days);
+    return response("attribution_daily", "event-quality-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/quality/reconciliation")
+  public Map<String, Object> reconciliationQuality(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, ledger_impression_count, ledger_viewable_count,
+          behavior_impression_event_count, behavior_unique_impression_count,
+          mismatched_impression_count, duplicate_event_count,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.reconciliation_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("reconciliation_daily", "event-quality-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
   private Map<String, Object> response(String metricId, String definitionVersion, int days,
       String population, java.util.List<Map<String, Object>> rows) {
     var response = new LinkedHashMap<String, Object>();

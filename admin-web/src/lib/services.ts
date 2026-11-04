@@ -176,6 +176,15 @@ export type ReportingSeries = {
   attributed_complete_count?: number;
   dwell_observations?: number | null;
   dwell_seconds?: number | null;
+  attribution_status?: string;
+  outcome_count?: number;
+  unique_events?: number;
+  ledger_impression_count?: number;
+  ledger_viewable_count?: number;
+  behavior_impression_event_count?: number;
+  behavior_unique_impression_count?: number;
+  mismatched_impression_count?: number;
+  duplicate_event_count?: number;
   active_users?: number;
   sessions?: number;
   active_seconds?: number;
@@ -428,6 +437,26 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível carregar os snapshots do pipeline.");
+    }
+  },
+  async reportingAttributionQuality(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/quality/attribution", { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a qualidade da atribuição.");
+    }
+  },
+  async reportingReconciliationQuality(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/quality/reconciliation", { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a reconciliação de eventos.");
     }
   },
   async listBookPage(

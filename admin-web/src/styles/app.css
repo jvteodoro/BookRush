@@ -199,6 +199,10 @@ input {
 .dashboard-table th, .dashboard-table td { text-align: left; padding: 8px; border-bottom: 1px solid #20283a; }
 .dashboard-table th { color: #aebbd0; }
 .dashboard-table td { color: #d6deec; }
+.dashboard-scroll-table { overflow-x: auto; }
+.dashboard-quality-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 20px; }
+.dashboard-quality-grid > div { min-width: 0; }
+.dashboard-quality-grid strong { color: #d6deec; font: 600 15px "Space Grotesk"; }
 .projection-list { display: grid; gap: 10px; margin-top: 18px; }
 .projection-list > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px; background: #0b1220; border-radius: 10px; color: #aebbd0; }
 .projection-list b { color: #8cf0d2; font-size: 12px; }
@@ -211,6 +215,7 @@ input {
   .main { padding: 26px 18px 56px; }
   .dashboard-filters, .dashboard-heading { align-items: flex-start; flex-direction: column; }
   .dashboard-table { display: block; overflow-x: auto; }
+  .dashboard-quality-grid { grid-template-columns: 1fr; }
 }
 .pagehead {
   display: flex;

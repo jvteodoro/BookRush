@@ -98,6 +98,33 @@ function PipelineReport({ data }: { data: ReportingResponse }) {
   </table></div>;
 }
 
+function QualityReport({ attribution, reconciliation }: {
+  attribution: ReportingResponse;
+  reconciliation: ReportingResponse;
+}) {
+  return <div className="dashboard-quality-grid">
+    <div>
+      <strong>DQ-03 · Atribuição</strong>
+      {!attribution.series.length ? <div className="dashboard-state">NO_DATA</div> : <table className="dashboard-table">
+        <thead><tr><th>Dia</th><th>Estado</th><th>Outcomes</th><th>Eventos únicos</th></tr></thead>
+        <tbody>{attribution.series.slice(-30).map((row, index) => <tr key={`${row.day}-${row.attribution_status}-${index}`}>
+          <td>{row.day ?? "—"}</td><td>{row.attribution_status ?? "—"}</td><td>{row.outcome_count ?? "—"}</td><td>{row.unique_events ?? "—"}</td>
+        </tr>)}</tbody>
+      </table>}
+    </div>
+    <div>
+      <strong>DQ-04 · Reconciliação de impressões</strong>
+      {!reconciliation.series.length ? <div className="dashboard-state">NO_DATA</div> : <table className="dashboard-table">
+        <thead><tr><th>Dia</th><th>Ledger</th><th>Viewable</th><th>Eventos</th><th>Duplicados</th><th>Sem match</th></tr></thead>
+        <tbody>{reconciliation.series.slice(-30).map((row, index) => <tr key={`${row.day}-${index}`}>
+          <td>{row.day ?? "—"}</td><td>{row.ledger_impression_count ?? "—"}</td><td>{row.ledger_viewable_count ?? "—"}</td>
+          <td>{row.behavior_impression_event_count ?? "—"}</td><td>{row.duplicate_event_count ?? "—"}</td><td>{row.mismatched_impression_count ?? "—"}</td>
+        </tr>)}</tbody>
+      </table>}
+    </div>
+  </div>;
+}
+
 export function DashboardHub() {
   const [params, setParams] = useSearchParams();
   const active = params.get("area") ?? "executive";
@@ -105,6 +132,8 @@ export function DashboardHub() {
   const [report, setReport] = useState<ReportingResponse | null>(null);
   const [feedReport, setFeedReport] = useState<ReportingResponse | null>(null);
   const [pipelineReport, setPipelineReport] = useState<ReportingResponse | null>(null);
+  const [attributionReport, setAttributionReport] = useState<ReportingResponse | null>(null);
+  const [reconciliationReport, setReconciliationReport] = useState<ReportingResponse | null>(null);
   const [health, setHealth] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,16 +143,20 @@ export function DashboardHub() {
     setLoading(true);
     setError(null);
     try {
-      const [readerDay, projectionHealth, feedDaily, pipeline] = await Promise.all([
+      const [readerDay, projectionHealth, feedDaily, pipeline, attribution, reconciliation] = await Promise.all([
         services.reportingReaderDay(Math.min(Math.max(days, 1), 366)),
         services.reportingHealth(),
         services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
+        services.reportingAttributionQuality(Math.min(Math.max(days, 1), 366)),
+        services.reportingReconciliationQuality(Math.min(Math.max(days, 1), 366)),
       ]);
       setReport(readerDay);
       setHealth(projectionHealth);
       setFeedReport(feedDaily);
       setPipelineReport(pipeline);
+      setAttributionReport(attribution);
+      setReconciliationReport(reconciliation);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Falha ao consultar reporting.");
     } finally {
@@ -176,6 +209,10 @@ export function DashboardHub() {
         </div> : area === "pipelines" && pipelineReport ? <div className="dashboard-card wide">
           <div className="dashboard-card-heading"><div><strong>PL-03..05 · Jobs, itens e fases de analytics</strong><p>Snapshots persistidos pelo reporting; throughput considera itens concluídos na última hora de cada coleta.</p></div><AlertTriangle size={18} /></div>
           <PipelineReport data={pipelineReport} />
+        </div> : area === "quality" && attributionReport && reconciliationReport ? <div className="dashboard-card wide">
+          <div className="dashboard-card-heading"><div><strong>DQ-03/04 · Qualidade dos eventos e reconciliação</strong><p>Contagens persistidas para auditoria; duplicidades não são apagadas e qualquer mismatch permanece visível.</p></div><AlertTriangle size={18} /></div>
+          {(attributionReport.status === "UNTRUSTED" || reconciliationReport.status === "UNTRUSTED") && <div className="dashboard-alert warning"><AlertTriangle size={18} /><span>{statusText(attributionReport.status)} · população e integridade devem ser interpretadas com a definição de cálculo.</span></div>}
+          <QualityReport attribution={attributionReport} reconciliation={reconciliationReport} />
         </div> : <div className="dashboard-card dashboard-gap">
           <div className="dashboard-card-heading"><div><strong>{unavailablePanels[area][0]}</strong><p>Esta área está conectada ao hub, mas as fontes específicas ainda não foram materializadas.</p></div><AlertTriangle size={18} /></div>
           <div className="dashboard-alert warning"><AlertTriangle size={18} /><span><strong>NOT_INSTRUMENTED</strong><br />{unavailablePanels[area][1]}. Não exibimos gráficos vazios nem zeros.</span></div>
