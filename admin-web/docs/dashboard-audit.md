@@ -49,10 +49,10 @@ fica reservado para dependência externa identificada.
 | PL-10 | Qualidade de importação | Catalog/ingestion | PARTIAL | Proveniência existe, sem agregação | Duplicação/direitos/assets |
 | PL-11 | Frescor e backlog | Jobs/watermarks | MISSING | Não há watermark de reporting | Backlog e SLA medidos |
 | GR-01 | Usuários únicos | Behavior events | PARTIAL | Não há identidade analítica/projeção | DAU/WAU/MAU com população |
-| GR-02 | Novos e recorrentes | Behavior events | MISSING | Primeiro uso não projetado | Fixture de coorte |
-| GR-03 | Retenção cohorts | Activity facts | MISSING | Coortes e maturidade ausentes | D1/D7/D30 maduros |
+| GR-02 | Novos e recorrentes | `reporting.reader_day` + `/reporting/reader-day` | PARTIAL | Novos/recorrentes projetados; falta fixture temporal e smoke com população real | Fixture de coorte |
+| GR-03 | Retenção cohorts | `reporting.retention_cohort` + `/reporting/retention-cohort` | PARTIAL | D1/D7/D30 e maturidade persistidos; falta coorte madura validada em runtime | D1/D7/D30 maduros |
 | GR-04 | Engajamento de leitores | Reader sessions/events | PARTIAL | Tempo ativo ainda não consolidado | Sessões com cap/background |
-| GR-05 | Distribuição de leitura | Reader sessions | MISSING | Sem agregação de duração | Histograma e percentis |
+| GR-05 | Distribuição de leitura | `reporting.reading_daily` + `/reporting/reading-daily` | PARTIAL | p50/p90 e duração agregados; falta distribuição detalhada e query viva | Histograma e percentis |
 | GR-06 | Progresso | `reader_state.progress` | PARTIAL | Marcos e primeira passagem não projetados | 10/50/100 por leitor-livro |
 | GR-07 | Biblioteca | `reader_state.library` | PARTIAL | Fonte existe, sem API analítica | Saves/unsaves e leitores únicos |
 | GR-08 | Streaks e hábitos | `reading_day` | PARTIAL | Fonte existe, sem painel/projeção | Calendário e distribuição |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 47 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 20 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 50 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 17 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma
