@@ -84,15 +84,15 @@ fica reservado para dependência externa identificada.
 | DQ-04 | Reconciliação | `reporting.reconciliation_daily` + `/reporting/quality/reconciliation` | PARTIAL | Snapshot diário/API/UI implementados; falta query viva contra a stack e smoke de autorização | Ledger vs facts e reprocessamento idempotente |
 | DQ-05 | Freshness | `reporting.projection_health` + Micrometer | PARTIAL | Status, timestamp e record count exportados; falta smoke de scrape em produção | Stale guard e alerta |
 | DQ-06 | Schema/telemetria | `reporting.event_schema_daily` | PARTIAL | Tipo/schema/cliente/rejeição agregados; validação de contrato no produtor ainda é limitada | Payload inválido/desconhecido |
-| DQ-07 | Overhead | Prometheus/Loki/Tempo | MISSING | Stack não existe | Cardinalidade, disco e custo |
+| DQ-07 | Overhead | `prometheus_*` + limites da stack | PARTIAL | Painel de séries, armazenamento e consultas provisionado; Loki/Tempo e custo medido ainda pendentes | Cardinalidade, disco e custo |
 | DQ-08 | Compliance/acesso | Admin audit + gateway | PARTIAL | Auditoria parcial, sem reporting export auditado | RBAC e ausência de PII |
 
 ## Resultado da auditoria
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 46 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 21 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 47 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 20 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma

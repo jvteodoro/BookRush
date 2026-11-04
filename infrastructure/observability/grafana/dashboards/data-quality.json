@@ -1,7 +1,7 @@
 {
   "uid": "bookrush-data-quality",
   "title": "BookRush / Data Quality",
-  "description": "DQ-01, DQ-02 and DQ-05. Data quality is shown as measured or explicitly not instrumented.",
+  "description": "DQ-01, DQ-02, DQ-05 and DQ-07. Data quality is shown as measured or explicitly not instrumented.",
   "tags": [
     "bookrush",
     "data-quality",
@@ -120,6 +120,43 @@
           "refId": "C",
           "expr": "bookrush_reporting_projection_record_count",
           "legendFormat": "records {{projection}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 35,
+      "title": "DQ-07 Observability overhead",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bookrush-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "prometheus_tsdb_head_series",
+          "legendFormat": "head series"
+        },
+        {
+          "refId": "B",
+          "expr": "prometheus_tsdb_storage_blocks_bytes",
+          "legendFormat": "blocks bytes"
+        },
+        {
+          "refId": "C",
+          "expr": "rate(prometheus_engine_query_duration_seconds_count[5m])",
+          "legendFormat": "queries/s"
         }
       ],
       "fieldConfig": {

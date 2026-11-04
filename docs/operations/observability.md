@@ -20,7 +20,7 @@ telemetria não impedem o serviço de iniciar.
 Os dashboards versionados ficam em
 `infrastructure/observability/grafana/dashboards/` e são carregados pelo
 provider `BookRush versioned dashboards`. A primeira entrega cobre OP-01..06,
-PL-01..05, FD-06/07/11, OP-07/12 e DQ-01/02/05. As consultas usam Prometheus, e os
+PL-01..05, FD-06/07/11, OP-07/12 e DQ-01/02/05/07. As consultas usam Prometheus, e os
 datasources Loki/Tempo permanecem disponíveis para drill-down operacional.
 
 Quando a origem de negócio ainda não existe, o painel mostra
