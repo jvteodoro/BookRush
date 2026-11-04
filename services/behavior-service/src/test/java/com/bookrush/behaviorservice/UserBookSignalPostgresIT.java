@@ -50,6 +50,8 @@ class UserBookSignalPostgresIT {
         .execute(dataSource);
     new ResourceDatabasePopulator(new ClassPathResource("db/migration/V11__versioned_outcome_attribution.sql"))
         .execute(dataSource);
+    new ResourceDatabasePopulator(new ClassPathResource("db/migration/V12__attribution_exposure_touch.sql"))
+        .execute(dataSource);
   }
 
   @Test
@@ -58,6 +60,7 @@ class UserBookSignalPostgresIT {
     UUID bookB = UUID.randomUUID();
     UUID recommendationItem = UUID.randomUUID();
     UUID impression = UUID.randomUUID();
+    UUID itemOnly = UUID.randomUUID();
     Instant base = Instant.parse("2026-10-20T10:00:00Z");
     insert("user-a", bookA, "BOOK_LIKE", "{}", base.plusSeconds(1));
     insert("user-a", bookA, "BOOK_UNLIKE", "{}", base.plusSeconds(2));
@@ -71,8 +74,10 @@ class UserBookSignalPostgresIT {
     insert("user-a", bookA, "READ_PROGRESS", "{\"percent\":42.5}", base.plusSeconds(7));
     insert("user-a", bookA, "READ_SESSION", "{\"activeSeconds\":120}", base.plusSeconds(8));
     insert("user-a", bookA, "BOOK_COMPLETE", "{}", base.plusSeconds(9));
+    insert("user-a", bookA, "EXCERPT_IMPRESSION", itemOnlyPayload(itemOnly), base.plusSeconds(10));
+    insert("user-a", bookA, "READ_PROGRESS", itemOnlyPayload(itemOnly), base.plusSeconds(11));
     insert("user-b", bookB, "BOOK_LIKE", "{}", base.plusSeconds(10));
-    insert("user-b", bookB, "BOOK_OPEN", "{}", base.plusSeconds(11));
+    insert("user-b", bookB, "BOOK_OPEN", "{}", base.plusSeconds(12));
 
     BehaviorMaintenance maintenance = new BehaviorMaintenance(jdbc, true, 30);
     maintenance.rebuildNow();
@@ -93,13 +98,15 @@ class UserBookSignalPostgresIT {
     assertEquals(1L, first.get("impression_count"));
     assertEquals(1L, first.get("viewable_impression_count"));
     assertEquals(1L, first.get("open_count"));
-    assertEquals(1L, first.get("progress_event_count"));
+    assertEquals(2L, first.get("progress_event_count"));
     assertEquals(1L, first.get("completion_count"));
     assertEquals(120L, first.get("active_seconds"));
     assertEquals("42.50", first.get("max_progress").toString());
     assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM behavior.user_book_signal", Integer.class));
     assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND recommendation_item_id = ? AND impression_id = ?", Integer.class, recommendationItem, impression));
     assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND outcome_type = 'BOOK_OPEN' AND recommendation_item_id = ?", Integer.class, recommendationItem));
+    assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND outcome_type = 'READ_PROGRESS' AND recommendation_item_id = ? AND attribution_status = 'ATTRIBUTED' AND exposure_event_id IS NOT NULL", Integer.class, itemOnly));
+    assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND outcome_type = 'BOOK_OPEN' AND exposure_event_id IS NOT NULL", Integer.class));
     assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-b' AND outcome_type = 'BOOK_OPEN' AND recommendation_item_id IS NULL AND impression_id IS NULL", Integer.class));
 
     insert("user-b", bookB, "BOOK_LIKE", correlationPayload(recommendationItem, impression), base.plusSeconds(12));
@@ -114,6 +121,10 @@ class UserBookSignalPostgresIT {
 
   private String viewableCorrelationPayload(UUID itemId, UUID impressionId) {
     return "{\"recommendationItemId\":\"" + itemId + "\",\"impressionId\":\"" + impressionId + "\",\"viewable\":true}";
+  }
+
+  private String itemOnlyPayload(UUID itemId) {
+    return "{\"recommendationItemId\":\"" + itemId + "\",\"viewable\":true}";
   }
 
   private void insert(String subject, UUID bookId, String type, String payload, Instant occurredAt) {

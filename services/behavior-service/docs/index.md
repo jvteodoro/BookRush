@@ -46,6 +46,10 @@ unidas. O frontend não envia mais um evento paralelo quando o ledger do feed j�
 confirma a viewability server-side. O teste PostgreSQL cobre a combinação de
 reenvio, viewability e idempotência.
 
+`BOOK_OPEN` correlacionado também usa `impressionId` ou `recommendationItemId`
+como chave lógica nos agregados; aberturas orgânicas permanecem separadas pelo
+ID do evento. O log append-only mantém todas as tentativas para reconciliação.
+
 ## API interna de sinais
 
 `POST /api/internal/v1/recommendation/signals` é uma API somente S2S para o
@@ -102,6 +106,12 @@ outcomes as `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` or
 `INVALID_REFERENCE`; only an authenticated subject/book/impression match to a
 viewable exposure in the seven-day `attribution-v1` window is attributed. The
 classification is rebuildable and does not delete historical events.
+
+`V12__attribution_exposure_touch.sql` persists `exposure_event_id` and
+`attributed_exposure_at`. The attribution rebuild accepts either
+`impressionId` or `recommendationItemId`, chooses the latest eligible viewable
+exposure in the seven-day window (timestamp, impression and event ID are stable
+tie-breakers), and retains the selected touch for auditability.
 
 ## Outbox downstream
 

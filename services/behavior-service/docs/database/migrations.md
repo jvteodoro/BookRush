@@ -17,3 +17,10 @@ A reconstrução recalcula esses campos a partir do log append-only. A migration
 é compatível com linhas existentes por meio de defaults e cria apenas um índice
 para consultas por status e tempo. Eventos históricos não são apagados nem
 alterados retroativamente no log bruto.
+`V12__attribution_exposure_touch.sql` adiciona a exposição escolhida pela
+reconstrução (`exposure_event_id`, `attributed_exposure_at`). A migration é
+append-only; o job continua reconstruível e aceita correlação por
+`impressionId` ou `recommendationItemId`.
+
+Os agregados de `BOOK_OPEN` deduplicam somente eventos correlacionados pela
+mesma impressão/item; eventos orgânicos não são unidos por heurística temporal.
