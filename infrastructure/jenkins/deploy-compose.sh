@@ -141,7 +141,7 @@ diagnose() {
     fi
   done
 }
-compose_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
+compose_services=(reverse-proxy catalog-service book-ingestion-service book-content-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
 if [[ -n "$keycloak_state" ]]; then
   if [[ "$keycloak_state" != running ]]; then
     docker start bookrush-keycloak-1 >/dev/null

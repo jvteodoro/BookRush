@@ -208,8 +208,9 @@ ativado e o Keycloak é iniciado/aguardado junto com o proxy, catálogo,
 ingestion-service e frontend. Atualiza as imagens dos serviços da aplicação,
 faz um teste HTTP em `/api/status` e tenta restaurar as imagens anteriores se o
 deploy falhar. O conjunto atualizado inclui catálogo, ingestão, analytics,
-recommendation-service, reader-bff-service, frontend, perfis de leitores e
-social; isso garante que contratos usados pelo frontend sejam implantados na
+recommendation-service, book-content-service, reader-bff-service, frontend,
+perfis de leitores e social; isso garante que contratos usados pelo frontend
+sejam implantados na
 mesma revisão. Alterações no filtro/ranking do feed exigem as imagens de
 recommendation e BFF; deixar esses serviços fora do conjunto mantém um digest
 antigo e pode produzir 502 ou itens sem analytics. PostgreSQL, Redis, pgAdmin e
