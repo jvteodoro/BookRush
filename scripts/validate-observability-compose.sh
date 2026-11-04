@@ -49,6 +49,10 @@ grep -Fq "contains(groups[*], 'platform-operators')" "$repo_root/infrastructure/
   echo "Grafana OAuth must map platform-operators to the operator role" >&2
   exit 1
 }
+grep -Fq 'GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email' "$repo_root/infrastructure/observability/compose.yaml" || {
+  echo "Grafana OAuth must request only Keycloak scopes configured for its client" >&2
+  exit 1
+}
 test -f "$repo_root/infrastructure/nginx/conf.d/bookrush-grafana.conf" || {
   echo "Nginx bootstrap vhost for public Grafana is missing" >&2
   exit 1

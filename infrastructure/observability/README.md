@@ -100,6 +100,9 @@ Quando habilitado, o OAuth genérico do Grafana usa o realm
 `operators` recebem Editor, e os demais usuários autenticados recebem Viewer.
 O Grafana permite que o mapeamento OAuth atribua a role Admin. O backend de reporting deve
 repetir a autorização: esconder o menu no Admin Web não é controle suficiente.
+O mapper de grupos do client adiciona `groups` como claim; não solicite um scope
+OIDC chamado `groups`, pois esse scope não está registrado no Keycloak e resulta
+em `invalid_scope`.
 O client `bookrush-grafana` é reconciliado no realm por
 `infrastructure/keycloak/reconcile.sh`; o segredo e a URI de redirect devem
 vir do ambiente protegido. Não habilite essa opção antes de validar redirect
