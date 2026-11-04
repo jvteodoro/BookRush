@@ -10,6 +10,7 @@ import { OperationsPage } from "../features/operations/OperationsPage";
 import { Layout } from "../components/Layout";
 import { config } from "../lib/config";
 import { Dashboard } from "./Dashboard";
+import { DashboardHub } from "../features/dashboards/DashboardHub";
 
 export function createAdminRouter() {
   return createBrowserRouter(
@@ -30,6 +31,7 @@ export function createAdminRouter() {
           { path: "feed-lab", element: <FeedLabPage /> },
           { path: "training", element: <TrainingPage /> },
           { path: "operations", element: <OperationsPage /> },
+          { path: "dashboards", element: <DashboardHub /> },
         ],
       },
     ],

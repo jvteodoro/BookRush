@@ -6,6 +6,7 @@ export const adminNavigation = [
   { to: "/feed-lab", label: "Feed Lab" },
   { to: "/training", label: "Training" },
   { to: "/operations", label: "Users & moderation" },
+  { to: "/dashboards", label: "Dashboards" },
 ] as const;
 
 export function isAdminRoute(pathname: string) {

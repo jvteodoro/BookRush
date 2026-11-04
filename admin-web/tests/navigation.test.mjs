@@ -18,7 +18,7 @@ const navigation = await import(
 test("admin navigation exposes every routed console area", () => {
   assert.deepEqual(
     navigation.adminNavigation.map((item) => item.to),
-    ["/", "/catalog", "/review", "/analytics", "/feed-lab", "/training", "/operations"],
+    ["/", "/catalog", "/review", "/analytics", "/feed-lab", "/training", "/operations", "/dashboards"],
   );
   assert.equal(navigation.isAdminRoute("/review"), true);
   assert.equal(navigation.isAdminRoute("/missing"), false);

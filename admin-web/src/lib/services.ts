@@ -153,6 +153,30 @@ export type CommentHistory = {
   visibility: string;
   reason: string;
 };
+export type ReportingSeries = {
+  day: string;
+  population: string;
+  platform: string;
+  active_users?: number;
+  sessions?: number;
+  active_seconds?: number;
+  book_opens?: number;
+  meaningful_reads?: number;
+  completions?: number;
+  refreshed_at?: string;
+  source_watermark?: string;
+};
+export type ReportingResponse = {
+  schemaVersion: string;
+  metricId: string;
+  definitionVersion: string;
+  status: string;
+  unit: string;
+  population: string;
+  sourceWatermark?: string | null;
+  refreshedAt?: string | null;
+  series: ReportingSeries[];
+};
 
 const sleep = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 let mutableBooks = [...books];
@@ -345,6 +369,27 @@ export const services = {
   async adminKpis() {
     const { data } = await adminHttp.get("/api/v1/admin/kpis");
     return data;
+  },
+  async reportingReaderDay(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/reader-day",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os indicadores de leitura.");
+    }
+  },
+  async reportingHealth(): Promise<Record<string, unknown>[]> {
+    try {
+      const { data } = await adminHttp.get<Record<string, unknown>[]>(
+        "/api/admin/v1/reporting/health",
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a saúde das projeções.");
+    }
   },
   async listBookPage(
     query = "",

@@ -37,7 +37,12 @@ Em produção `VITE_USE_MOCKS=false` é obrigatório; os dados são consultados 
 
 ## Dashboards administrativos — especificação (#8)
 
-A área `/dashboards` **ainda é proposta**, não implementada. Sua definição detalhada inclui interface React e integração Grafana, todos os 67 painéis operacionais e de negócio, regras de cálculo, matrizes de fontes e permissões, plano de Beads e aceites:
+A área `/dashboards` já possui o hub React inicial com sete áreas, filtros de
+período sincronizados na URL, estados acessíveis e integração read-only com
+`/api/admin/v1/reporting/reader-day` e `/health`. A primeira fonte retorna
+`UNTRUSTED` enquanto a população não estiver classificada; as demais áreas
+mostram `NOT_INSTRUMENTED` até suas projeções existirem. A definição detalhada
+dos 67 painéis, regras de cálculo, matrizes de fontes e permissões permanece:
 
 - [Especificação funcional e arquitetura](dashboard-specification.md)
 - [Catálogo dos 67 painéis](dashboard-panel-catalog.md)
@@ -45,4 +50,5 @@ A área `/dashboards` **ainda é proposta**, não implementada. Sua definição 
 - [Sequenciamento, critérios de aceite e testes](dashboard-implementation-plan.md)
 - [Issue GitHub #8](https://github.com/jvteodoro/BookRush/issues/8)
 
-O Overview existente não deve ser confundido com esses painéis; métricas `NOT_INSTRUMENTED` permanecem sem valor real até serem implementadas e validadas.
+O Overview existente não deve ser confundido com esses painéis; estados
+`NOT_INSTRUMENTED`, `NO_DATA` e `UNTRUSTED` não são convertidos em zeros.

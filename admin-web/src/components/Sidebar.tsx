@@ -21,6 +21,7 @@ const icons = {
   "/feed-lab": FlaskConical,
   "/training": GraduationCap,
   "/operations": Users,
+  "/dashboards": LayoutDashboard,
 } as const;
 
 export function Sidebar() {
