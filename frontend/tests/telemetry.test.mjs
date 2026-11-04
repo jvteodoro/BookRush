@@ -15,6 +15,10 @@ globalThis.window = {
   setTimeout: globalThis.setTimeout,
   clearTimeout: globalThis.clearTimeout,
 };
+Object.defineProperty(globalThis, "navigator", {
+  configurable: true,
+  value: { userAgent: "Mozilla/5.0" },
+});
 globalThis.IntersectionObserver = class {
   constructor(callback) {
     this.callback = callback;
@@ -43,6 +47,7 @@ test("telemetry batches events and sanitizes payloads", async () => {
   await telemetry.flush();
   assert.equal(batches.length, 1);
   assert.equal(batches[0][0].payload.ok, "yes");
+  assert.equal(batches[0][0].payload.platform, "web");
   assert.equal(batches[0][0].payload.undefinedValue, undefined);
   assert.equal(batches[0][0].payload.oversized, undefined);
 });

@@ -56,7 +56,7 @@ fica reservado para dependência externa identificada.
 | GR-06 | Progresso | `reader_state.progress` | PARTIAL | Marcos e primeira passagem não projetados | 10/50/100 por leitor-livro |
 | GR-07 | Biblioteca | `reader_state.library` | PARTIAL | Fonte existe, sem API analítica | Saves/unsaves e leitores únicos |
 | GR-08 | Streaks e hábitos | `reading_day` | PARTIAL | Fonte existe, sem painel/projeção | Calendário e distribuição |
-| GR-09 | Web x Mobile | Client telemetry | MISSING | Plataforma não é dimensão confiável | Telemetria versionada |
+| GR-09 | Web x Mobile | `behavior.events.payload.platform` + `reporting.reader_day` | PARTIAL | Telemetria coarse web/mobile e projeção por plataforma implementadas; falta fixture mobile/runtime e amostra suficiente | Telemetria versionada |
 | GR-10 | Top books e idioma | `reporting.book_engagement` | PARTIAL | Projeção por obra/idioma e limiar `minReaders` implementados; falta visualização de tendência dedicada | Agregação com n mínimo |
 | FD-01 | Funil de recomendação | Recommendation ledger + outcomes | PARTIAL | Ledger existe, outcomes não reconciliados | Atribuição versionada |
 | FD-02 | CTR viewable→open | Impressions/behavior | PARTIAL | Viewability e open ainda precisam reconciliação | Numerador/denominador fixture |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 63 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 4 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 64 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 3 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma

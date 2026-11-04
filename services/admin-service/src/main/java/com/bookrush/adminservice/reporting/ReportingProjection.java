@@ -89,7 +89,9 @@ public class ReportingProjection {
               active_seconds, book_opens, meaningful_reads, completions,
               calculation_version, refreshed_at, source_watermark)
           WITH scoped AS (
-            SELECT e.occurred_at, e.identity_subject, e.book_id, e.event_type, e.payload
+            SELECT e.occurred_at, e.identity_subject, e.book_id, e.event_type, e.payload,
+              CASE WHEN lower(e.payload->>'platform') IN ('web', 'mobile')
+                THEN lower(e.payload->>'platform') ELSE 'UNKNOWN' END AS platform
             FROM behavior.events e
             WHERE e.identity_subject IS NOT NULL
               AND e.event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS',
@@ -105,7 +107,7 @@ public class ReportingProjection {
                 'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
             GROUP BY e.identity_subject
           ), daily AS (
-            SELECT s.occurred_at::date AS day,
+            SELECT s.occurred_at::date AS day, s.platform,
                 count(DISTINCT s.identity_subject) AS active_users,
                 count(DISTINCT s.identity_subject) FILTER (WHERE f.first_day = s.occurred_at::date) AS newly_active_users,
                 count(DISTINCT s.identity_subject) FILTER (WHERE f.first_day < s.occurred_at::date) AS returning_users,
@@ -122,9 +124,9 @@ public class ReportingProjection {
                   WHERE s.event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')) AS completions,
                 max(s.occurred_at) AS source_watermark
             FROM scoped s JOIN first_seen f ON f.identity_subject = s.identity_subject
-            GROUP BY s.occurred_at::date
+            GROUP BY s.occurred_at::date, s.platform
           )
-          SELECT d.day, 'UNCLASSIFIED', 'UNKNOWN', d.active_users, d.newly_active_users, d.sessions,
+          SELECT d.day, 'UNCLASSIFIED', d.platform, d.active_users, d.newly_active_users, d.sessions,
               (SELECT count(DISTINCT w.identity_subject) FROM scoped w
                 WHERE w.occurred_at >= d.day - INTERVAL '6 days'
                   AND w.occurred_at < d.day + INTERVAL '1 day'),

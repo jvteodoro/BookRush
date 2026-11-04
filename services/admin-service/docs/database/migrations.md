@@ -33,6 +33,11 @@ cálculo, e alimentam os painéis DQ-03 (atribuição) e DQ-04 (reconciliação)
 semanal/mensal e recorrência ao snapshot diário sem reescrever migrations
 anteriores.
 
+Os eventos de comportamento com `payload.platform` validado (`web` ou
+`mobile`) alimentam linhas separadas de `reporting.reader_day`; valores
+ausentes ou não permitidos permanecem `UNKNOWN`. A dimensão é coarse e não
+contém user-agent, identidade ou identificador de dispositivo.
+
 `V9__reporting_social_publisher.sql` cria os agregados diários usados pelas
 áreas Social & Publisher. Ausência de registros retorna `NO_DATA` e não é
 convertida em atividade zero pelo frontend.

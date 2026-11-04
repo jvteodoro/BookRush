@@ -92,7 +92,9 @@ excerpt; a população permanece `UNCLASSIFIED` até a governança de amostra se
 formalmente classificada.
 
 `GET /api/admin/v1/reporting/reading-daily?days=30` expõe sessões, segundos
-ativos, percentis de duração, livros abertos e saves. `GET
+ativos, percentis de duração, livros abertos e saves; `reader-day` mantém a
+dimensão coarse `platform` (`web`, `mobile` ou `UNKNOWN`) sem user-agent bruto.
+`GET
 /api/admin/v1/reporting/retention-cohort?days=366` expõe D1/D7/D30 por coorte;
 coortes ainda imaturas retornam `mature=false` e não recebem uma taxa.
 

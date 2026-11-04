@@ -25,6 +25,17 @@ function safePayload(
   );
 }
 
+function clientPlatform(): "web" | "mobile" {
+  if (typeof navigator === "undefined") return "web";
+  const mobileHint = (
+    navigator as Navigator & { userAgentData?: { mobile?: boolean } }
+  ).userAgentData?.mobile;
+  if (mobileHint === true) return "mobile";
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    ? "mobile"
+    : "web";
+}
+
 export function createTelemetry(send: Sender, flushMs = 3000) {
   let queue: BehaviorEvent[] = [];
   let timer: number | undefined;
@@ -68,7 +79,12 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
       eventType,
       bookId,
       occurredAt: new Date().toISOString(),
-      payload: safePayload(payload),
+      payload: safePayload({
+        platform: clientPlatform(),
+        ...Object.fromEntries(
+          Object.entries(payload).filter(([key]) => key !== "platform"),
+        ),
+      }),
     };
     queue.push(event);
     if (queue.length >= MAX_BATCH) void flush();
