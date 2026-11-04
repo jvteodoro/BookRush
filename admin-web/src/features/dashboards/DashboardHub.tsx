@@ -281,7 +281,13 @@ function FeedReport({ data }: { data: ReportingResponse }) {
   );
 }
 
-function RecommendationReport({ data }: { data: ReportingResponse }) {
+function RecommendationReport({
+  data,
+  quality,
+}: {
+  data: ReportingResponse;
+  quality: ReportingResponse;
+}) {
   if (!data.series.length)
     return <div className="dashboard-state">NO_DATA</div>;
   return (
@@ -326,6 +332,39 @@ function RecommendationReport({ data }: { data: ReportingResponse }) {
           ))}
         </tbody>
       </table>
+      {quality.series.length > 0 && (
+        <table className="dashboard-table">
+          <caption>
+            Outcomes atribuídos ao item recomendado; sem inferência causal
+          </caption>
+          <thead>
+            <tr>
+              <th>Dia</th>
+              <th>Estratégia</th>
+              <th>Outcome</th>
+              <th>Atribuídos</th>
+              <th>Usuários</th>
+              <th>Livros</th>
+              <th>P50 rank</th>
+            </tr>
+          </thead>
+          <tbody>
+            {quality.series.slice(-60).map((row, index) => (
+              <tr
+                key={`${row.day}-${row.strategy}-${row.outcome_type}-${index}`}
+              >
+                <td>{row.day ?? "—"}</td>
+                <td>{row.strategy ?? "—"}</td>
+                <td>{row.outcome_type ?? "—"}</td>
+                <td>{row.attributed_count ?? "—"}</td>
+                <td>{row.unique_subjects ?? "—"}</td>
+                <td>{row.unique_books ?? "—"}</td>
+                <td>{row.p50_rank == null ? "—" : Math.round(row.p50_rank)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -818,6 +857,8 @@ export function DashboardHub() {
   const [feedReport, setFeedReport] = useState<ReportingResponse | null>(null);
   const [recommendationReport, setRecommendationReport] =
     useState<ReportingResponse | null>(null);
+  const [recommendationQualityReport, setRecommendationQualityReport] =
+    useState<ReportingResponse | null>(null);
   const [pipelineReport, setPipelineReport] =
     useState<ReportingResponse | null>(null);
   const [pipelinePhaseReport, setPipelinePhaseReport] =
@@ -864,6 +905,7 @@ export function DashboardHub() {
         projectionHealth,
         feedDaily,
         recommendationDaily,
+        recommendationQualityDaily,
         pipeline,
         pipelinePhases,
         attribution,
@@ -883,6 +925,9 @@ export function DashboardHub() {
         services.reportingHealth(),
         services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingRecommendationDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingRecommendationQualityDaily(
+          Math.min(Math.max(days, 1), 366),
+        ),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
         services.reportingPipelinePhases(Math.min(Math.max(days, 1), 366)),
         services.reportingAttributionQuality(Math.min(Math.max(days, 1), 366)),
@@ -906,6 +951,7 @@ export function DashboardHub() {
       setHealth(projectionHealth);
       setFeedReport(feedDaily);
       setRecommendationReport(recommendationDaily);
+      setRecommendationQualityReport(recommendationQualityDaily);
       setPipelineReport(pipeline);
       setPipelinePhaseReport(pipelinePhases);
       setAttributionReport(attribution);
@@ -1075,8 +1121,11 @@ export function DashboardHub() {
                 </div>
               )}
               <FeedReport data={feedReport} />
-              {recommendationReport && (
-                <RecommendationReport data={recommendationReport} />
+              {recommendationReport && recommendationQualityReport && (
+                <RecommendationReport
+                  data={recommendationReport}
+                  quality={recommendationQualityReport}
+                />
               )}
             </div>
           ) : area === "pipelines" &&

@@ -25,6 +25,10 @@ itens, impressões, viewability, livros únicos e distribuição de rank por mod
 estratégia e caminho de personalização. A comparação é observacional e não
 declara causalidade.
 
+`GET /api/admin/v1/reporting/recommendation-quality-daily?days=30` agrega
+outcomes atribuídos a itens do ledger por estratégia e tipo de outcome,
+incluindo sujeitos/livros únicos e rank mediano.
+
 `GET /api/admin/v1/reporting/quality/attribution?days=30` expõe a distribuição
 de outcomes por `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` e
 `INVALID_REFERENCE`. `GET /api/admin/v1/reporting/quality/reconciliation?days=30`

@@ -227,6 +227,9 @@ export type ReportingSeries = {
   unique_books?: number;
   p50_rank?: number | null;
   p90_rank?: number | null;
+  outcome_type?: string;
+  attributed_count?: number;
+  unique_subjects?: number;
   accepted_events?: number;
   rejected_events?: number;
   duplicate_rejections?: number;
@@ -528,6 +531,22 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar a instrumentação do recomendador.",
+      );
+    }
+  },
+  async reportingRecommendationQualityDaily(
+    days = 30,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/recommendation-quality-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar os outcomes do recomendador.",
       );
     }
   },

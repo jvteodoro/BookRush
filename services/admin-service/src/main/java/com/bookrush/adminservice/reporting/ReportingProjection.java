@@ -24,6 +24,7 @@ public class ReportingProjection {
   private static final String PHASE_VERSION = "analytics-phase-v1";
   private static final String READING_VERSION = "reading-engagement-v1-untrusted-population";
   private static final String RECOMMENDATION_VERSION = "recommendation-ledger-v1-untrusted-population";
+  private static final String RECOMMENDATION_QUALITY_VERSION = "recommendation-outcome-v1-untrusted-population";
   private static final String EVENT_QUALITY_VERSION = "event-quality-ingestion-v1";
   private static final String GOVERNANCE_VERSION = "governance-activity-v1-untrusted-population";
   private final JdbcTemplate jdbc;
@@ -50,6 +51,8 @@ public class ReportingProjection {
     runProjection("reading_daily", READING_VERSION, () -> refreshReadingDaily(refreshed));
     runProjection("retention_cohort", READING_VERSION, () -> refreshRetentionCohort(refreshed));
     runProjection("recommendation_daily", RECOMMENDATION_VERSION, () -> refreshRecommendationDaily(refreshed));
+    runProjection("recommendation_quality_daily", RECOMMENDATION_QUALITY_VERSION,
+        () -> refreshRecommendationQualityDaily(refreshed));
     runProjection("event_quality_daily", EVENT_QUALITY_VERSION, () -> refreshEventQualityDaily(refreshed));
     runProjection("moderation_daily", GOVERNANCE_VERSION, () -> refreshModerationDaily(refreshed));
     runProjection("publisher_workflow_daily", GOVERNANCE_VERSION, () -> refreshPublisherWorkflowDaily(refreshed));
@@ -669,6 +672,43 @@ public class ReportingProjection {
         """, RECOMMENDATION_VERSION, Timestamp.from(refreshed));
     updateHealth("recommendation_daily", RECOMMENDATION_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.recommendation_daily");
+  }
+
+  private void refreshRecommendationQualityDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.recommendation_quality_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH attributed AS (
+          SELECT oa.occurred_at::date AS day, r.model_version, r.strategy,
+              oa.outcome_type, oa.subject_key, oa.book_id, i.rank,
+              oa.occurred_at AS source_watermark
+          FROM behavior.outcome_attribution oa
+          JOIN recommendation.item i ON i.id = oa.recommendation_item_id
+          JOIN recommendation.request r ON r.id = i.request_id
+          WHERE oa.recommendation_item_id IS NOT NULL
+            AND oa.attribution_status = 'ATTRIBUTED'
+            AND oa.occurred_at >= current_date - INTERVAL '366 days'
+        )
+        INSERT INTO reporting.recommendation_quality_daily(
+            day, model_version, strategy, outcome_type, attributed_count,
+            unique_subjects, unique_books, p50_rank, calculation_version,
+            refreshed_at, source_watermark)
+        SELECT day, model_version, strategy, outcome_type, count(*),
+            count(DISTINCT subject_key), count(DISTINCT book_id),
+            percentile_cont(0.50) WITHIN GROUP (ORDER BY rank), ?, ?, max(source_watermark)
+        FROM attributed
+        GROUP BY day, model_version, strategy, outcome_type
+        ON CONFLICT (day, model_version, strategy, outcome_type) DO UPDATE SET
+            attributed_count = EXCLUDED.attributed_count,
+            unique_subjects = EXCLUDED.unique_subjects,
+            unique_books = EXCLUDED.unique_books,
+            p50_rank = EXCLUDED.p50_rank,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, RECOMMENDATION_QUALITY_VERSION, Timestamp.from(refreshed));
+    updateHealth("recommendation_quality_daily", RECOMMENDATION_QUALITY_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count "
+            + "FROM reporting.recommendation_quality_daily");
   }
 
   private void refreshEventQualityDaily(Instant refreshed) {

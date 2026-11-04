@@ -67,3 +67,6 @@ pendente.
 
 `V15__reporting_moderation_publisher_rights.sql` cria snapshots agregados para
 aging de moderação, funil editorial/publicação e decisões de direitos/licenças.
+
+`V16__reporting_recommendation_quality_daily.sql` cria outcomes atribuídos do
+ledger de recomendações, preservando a versão de cálculo e o watermark.
