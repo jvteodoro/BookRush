@@ -53,6 +53,10 @@ grep -Fq 'GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email' "$repo_root/infras
   echo "Grafana OAuth must request only Keycloak scopes configured for its client" >&2
   exit 1
 }
+grep -Fq 'GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: ${OBS_GRAFANA_OIDC_EMAIL_ATTRIBUTE_PATH:-email || preferred_username}' "$repo_root/infrastructure/observability/compose.yaml" || {
+  echo "Grafana OAuth must use the username claim when Keycloak has no email" >&2
+  exit 1
+}
 test -f "$repo_root/infrastructure/nginx/conf.d/bookrush-grafana.conf" || {
   echo "Nginx bootstrap vhost for public Grafana is missing" >&2
   exit 1
