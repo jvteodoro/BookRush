@@ -42,7 +42,7 @@ fica reservado para dependência externa identificada.
 | PL-03 | Pipeline de analytics | `analytics.analysis_job/item` | PARTIAL | Dados persistem, sem API/painel | Contagens reais por estado |
 | PL-04 | Tempo por fase | `analysis_phase_timing` | PARTIAL | Sem reporting de percentis por tentativa | P50/P95/P99 e retries |
 | PL-05 | Erros de analytics | Phase log/error fields | PARTIAL | Sem projeção de stuck leases | Error code + recuperação |
-| PL-06 | Infra ML | Runtime Python | MISSING | Sem métricas de modelo integradas | Disponibilidade/latência por modelo |
+| PL-06 | Infra ML | `bookrush_analytics_runtime_*` + `/metrics` | PARTIAL | Métricas privadas de latência, estado de modelo e CUDA provisionadas; falta scrape/runtime com modelos carregados | Disponibilidade/latência por modelo |
 | PL-07 | Produção de excerpts | Analytics excerpts/ranks | PARTIAL | Fonte existe, sem snapshot editorial | Cobertura por idioma/livro |
 | PL-08 | Cobertura de corpus | Analytics + catalog | PARTIAL | Sem projeção de cobertura | Direitos/reader-ready/score |
 | PL-09 | Qualidade editorial | `reporting.editorial_quality_daily` + `/reporting/editorial-quality-daily` | PARTIAL | Snapshot agregado, API e tabela de fila/QA implementados; falta fixture/runtime de campanha e SLA aprovado | Fila, SLA e motivos |
@@ -91,8 +91,8 @@ fica reservado para dependência externa identificada.
 
 - `VALIDATED`: 0 painéis.
 - `EXISTING`: 0 painéis completos; existem fontes e componentes parciais.
-- `PARTIAL`: 64 painéis com dados, métricas ou endpoints reutilizáveis.
-- `MISSING`: 3 painéis sem implementação integrada suficiente.
+- `PARTIAL`: 65 painéis com dados, métricas ou endpoints reutilizáveis.
+- `MISSING`: 2 painéis sem implementação integrada suficiente.
 - `BLOCKED`: 0 por dependência externa neste momento.
 
 Os números acima classificam a capacidade do painel, não a existência de uma

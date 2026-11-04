@@ -30,6 +30,11 @@ scrape_configs:
     static_configs:
       - targets: ["redis-exporter:9121"]
 
+  - job_name: bookrush-analytics-runtime
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["book-analytics-runtime:8092"]
+
   # Services expose Actuator only on the private BookRush network. They are
   # listed explicitly to keep the target set finite and auditable.
   - job_name: bookrush-java

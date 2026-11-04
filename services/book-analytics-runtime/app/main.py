@@ -2,16 +2,73 @@ import os
 import hashlib
 import math
 import zipfile
+import time
 from collections import Counter
 from pathlib import Path
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from prometheus_client import CONTENT_TYPE_LATEST, Counter as PromCounter, Gauge, Histogram, generate_latest
 
 CACHE=Path(os.getenv('ANALYTICS_MODEL_CACHE_DIR','/var/lib/bookrush/models'))
 MAX_CHARS=int(os.getenv('ANALYTICS_RUNTIME_MAX_CHARS','100000'))
 NLI_BATCH_MAX_ITEMS=int(os.getenv('ANALYTICS_NLI_BATCH_MAX_ITEMS','32'))
 RUNTIME_DEVICE=os.getenv('ANALYTICS_RUNTIME_DEVICE','auto').lower()
 app=FastAPI(title='BookRush Analytics Runtime', version='v2')
+
+runtime_requests = PromCounter(
+ 'bookrush_analytics_runtime_requests_total',
+ 'Analytics runtime requests by bounded operation and outcome',
+ ['operation', 'outcome'])
+runtime_latency = Histogram(
+ 'bookrush_analytics_runtime_request_duration_seconds',
+ 'Analytics runtime request latency by bounded operation',
+ ['operation'])
+runtime_model_state = Gauge(
+ 'bookrush_analytics_runtime_model_state',
+ 'Current availability state for a pinned model (one for the current state)',
+ ['model', 'state'])
+runtime_cuda = Gauge(
+ 'bookrush_analytics_runtime_cuda_available',
+ 'Whether CUDA is available to the runtime',
+ ['device'])
+
+_MODEL_STATES = ('VALID', 'MODEL_UNAVAILABLE', 'ERROR')
+
+def _operation(path):
+ if path == '/health': return 'health'
+ if path == '/v1/embeddings': return 'embeddings'
+ if path == '/v1/nli' or path == '/v1/nli/batch': return 'nli'
+ if path == '/v1/language': return 'language'
+ if path == '/v1/linguistic': return 'linguistic'
+ return 'other'
+
+def _set_model_state(model, state):
+ state = state if state in _MODEL_STATES else 'ERROR'
+ for candidate in _MODEL_STATES:
+  runtime_model_state.labels(model=model, state=candidate).set(1 if candidate == state else 0)
+
+@app.middleware('http')
+async def observe_requests(request, call_next):
+ operation = _operation(request.url.path)
+ if operation == 'other' and request.url.path == '/metrics':
+  return await call_next(request)
+ started = time.perf_counter()
+ try:
+  response = await call_next(request)
+  outcome = 'success' if response.status_code < 400 else 'error'
+  return response
+ except Exception:
+  outcome = 'exception'
+  raise
+ finally:
+  elapsed = time.perf_counter() - started
+  runtime_requests.labels(operation=operation, outcome=outcome).inc()
+  runtime_latency.labels(operation=operation).observe(elapsed)
+
+@app.get('/metrics')
+def metrics():
+ return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 def _configure_telemetry():
  try:
@@ -98,6 +155,7 @@ def health():
   import torch
   cuda = bool(torch.cuda.is_available())
   device = str(_torch_device(torch))
+  runtime_cuda.labels(device=device).set(1 if cuda else 0)
   details = {'cuda': cuda, 'device': device}
   if cuda:
    details['device_name'] = torch.cuda.get_device_name(0)
@@ -106,22 +164,30 @@ def health():
    details['memory_total_bytes'] = int(torch.cuda.get_device_properties(0).total_memory)
   return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true', **details}
  except Exception as exc:
+  runtime_cuda.labels(device='cpu').set(0)
   return {'status':'up','offline':os.getenv('ANALYTICS_OFFLINE','true').lower()=='true',
           'cuda': False, 'device': 'cpu', 'warning': type(exc).__name__}
 
 def _load_embedding_model():
  global _embedding_model, _embedding_tokenizer
- if _embedding_model is not None: return _embedding_tokenizer, _embedding_model
+ if _embedding_model is not None:
+  _set_model_state('bge-m3-dense-v1', 'VALID')
+  return _embedding_tokenizer, _embedding_model
  model_dir=CACHE/'bge-m3-dense-v1'
- if not model_dir.is_dir(): return None
+ if not model_dir.is_dir():
+  _set_model_state('bge-m3-dense-v1', 'MODEL_UNAVAILABLE')
+  return None
  try:
   import torch
   from transformers import AutoModel, AutoTokenizer
   _embedding_tokenizer=AutoTokenizer.from_pretrained(model_dir, local_files_only=True)
   _embedding_model=AutoModel.from_pretrained(model_dir, local_files_only=True).to(_torch_device(torch))
   _embedding_model.eval()
+  _set_model_state('bge-m3-dense-v1', 'VALID')
   return _embedding_tokenizer, _embedding_model
- except Exception: return None
+ except Exception:
+  _set_model_state('bge-m3-dense-v1', 'ERROR')
+  return None
 
 @app.post('/v1/embeddings', response_model=EmbeddingResponse)
 def embeddings(request: EmbeddingRequest):
@@ -147,16 +213,23 @@ def embeddings(request: EmbeddingRequest):
 
 def _load_nli():
  global _nli_pipeline
- if _nli_pipeline is not None: return _nli_pipeline
+ if _nli_pipeline is not None:
+  _set_model_state('mdeberta-nli-v1', 'VALID')
+  return _nli_pipeline
  model_dir=CACHE/'mdeberta-nli-v1'
- if not model_dir.is_dir(): return None
+ if not model_dir.is_dir():
+  _set_model_state('mdeberta-nli-v1', 'MODEL_UNAVAILABLE')
+  return None
  try:
   import torch
   from transformers import pipeline
   device=0 if _torch_device(torch).type == 'cuda' else -1
   _nli_pipeline=pipeline('text-classification',model=str(model_dir),tokenizer=str(model_dir),top_k=None,device=device)
+  _set_model_state('mdeberta-nli-v1', 'VALID')
   return _nli_pipeline
- except Exception: return None
+ except Exception:
+  _set_model_state('mdeberta-nli-v1', 'ERROR')
+  return None
 
 def _torch_device(torch):
  if RUNTIME_DEVICE == 'cpu': return torch.device('cpu')
@@ -166,14 +239,21 @@ def _torch_device(torch):
 
 def _load_language_model():
  global _language_model
- if _language_model is not None: return _language_model
+ if _language_model is not None:
+  _set_model_state('fasttext-lid176-v1', 'VALID')
+  return _language_model
  model_path=CACHE/'fasttext-lid176-v1'/'lid.176.bin'
- if not model_path.is_file(): return None
+ if not model_path.is_file():
+  _set_model_state('fasttext-lid176-v1', 'MODEL_UNAVAILABLE')
+  return None
  try:
   import fasttext
   _language_model=fasttext.load_model(str(model_path))
+  _set_model_state('fasttext-lid176-v1', 'VALID')
   return _language_model
- except Exception: return None
+ except Exception:
+  _set_model_state('fasttext-lid176-v1', 'ERROR')
+  return None
 
 @app.post('/v1/language', response_model=LanguageResponse)
 def language(request: LanguageRequest):
@@ -239,7 +319,9 @@ def linguistic(request: AnalyzeRequest):
  if request.language not in MODELS: return AnalyzeResponse(status='UNSUPPORTED',language=request.language,warning='spaCy V2 supports only en and pt')
  if len(request.text)>MAX_CHARS: raise HTTPException(413,'text exceeds configured runtime limit')
  wheel=CACHE/MODELS[request.language]
- if not wheel.is_file(): return unavailable(request.language, f'missing prepared model artifact: {wheel.name}')
+ if not wheel.is_file():
+  _set_model_state(f'spacy-{request.language}', 'MODEL_UNAVAILABLE')
+  return unavailable(request.language, f'missing prepared model artifact: {wheel.name}')
  try:
   import spacy
   if request.language not in _spacy_models:
@@ -257,7 +339,9 @@ def linguistic(request: AnalyzeRequest):
    if nested: model_path=nested[0]
    _spacy_models[request.language]=spacy.load(model_path)
   nlp=_spacy_models[request.language]
+  _set_model_state(f'spacy-{request.language}', 'VALID')
  except Exception as exc:
+  _set_model_state(f'spacy-{request.language}', 'ERROR')
   return unavailable(request.language, f'prepared wheel is not installed in runtime: {type(exc).__name__}')
  try:
   doc=nlp(request.text)

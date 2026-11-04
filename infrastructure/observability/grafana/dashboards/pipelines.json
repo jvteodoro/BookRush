@@ -1,7 +1,7 @@
 {
   "uid": "bookrush-pipelines",
   "title": "BookRush / Pipelines & Content",
-  "description": "PL-01..PL-05. Uses application metrics only; job projections are not represented as zero.",
+  "description": "PL-01..PL-06. Uses application/runtime metrics; job projections are not represented as zero.",
   "tags": ["bookrush", "pipelines", "versioned"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -13,6 +13,7 @@
     {"id": 13, "title": "PL-03 Analytics outcomes", "type": "timeseries", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_analytics_jobs_total[5m]))", "legendFormat": "jobs {{outcome}}"}, {"refId": "B", "expr": "sum by (operation) (rate(bookrush_analytics_excerpts_total[5m]))", "legendFormat": "excerpts {{operation}}"}], "fieldConfig": {"defaults": {"unit": "ops"}}},
     {"id": 14, "title": "PL-04 Analytics phase latency", "type": "timeseries", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (phase, le) (rate(bookrush_analytics_phase_duration_seconds_bucket[15m])))", "legendFormat": "p95 {{phase}}"}], "fieldConfig": {"defaults": {"unit": "s"}}},
     {"id": 15, "title": "PL-05 Analytics failures", "type": "timeseries", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (stage) (rate(bookrush_analytics_failures_total[15m]))", "legendFormat": "{{stage}}"}], "fieldConfig": {"defaults": {"unit": "ops"}}},
-    {"id": 16, "title": "Data-source state", "type": "text", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}, "options": {"mode": "markdown", "content": "Counters above are measured Micrometer series. Historical job/item states, storage failures and model availability require the reporting projection package (dash-09/10); they are not inferred from container health."}}
+    {"id": 16, "title": "Data-source state", "type": "text", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}, "options": {"mode": "markdown", "content": "Counters above are measured Micrometer series. Historical job/item states and storage failures require reporting projections; they are not inferred from container health."}},
+    {"id": 17, "title": "PL-06 ML runtime availability and latency", "type": "timeseries", "gridPos": {"x": 0, "y": 24, "w": 24, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (operation, le) (rate(bookrush_analytics_runtime_request_duration_seconds_bucket[15m])))", "legendFormat": "p95 {{operation}}"}, {"refId": "B", "expr": "sum by (model, state) (bookrush_analytics_runtime_model_state)", "legendFormat": "{{model}} {{state}}"}, {"refId": "C", "expr": "bookrush_analytics_runtime_cuda_available", "legendFormat": "cuda {{device}}"}], "fieldConfig": {"defaults": {"unit": "short"}}}
   ]
 }

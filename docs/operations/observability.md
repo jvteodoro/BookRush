@@ -32,6 +32,15 @@ user ID, book ID, excerpt ID, token ou texto de livro como tag. Métricas de
 produto/recomendação devem usar contadores já versionados e atributos
 agregados, não criar uma série por entidade.
 
+O runtime Python de analytics é coletado pelo target privado
+`bookrush-analytics-runtime` em `/metrics`. O dashboard PL-06 acompanha a
+latência por operação, o estado explícito dos modelos e a disponibilidade
+CUDA pelas séries `bookrush_analytics_runtime_*`. Essas métricas mantêm a
+mesma regra de baixa cardinalidade: não incluem texto, IDs de usuário/obra,
+tokens ou nomes arbitrários de arquivos. Verifique a disponibilidade do
+target no Prometheus e o endpoint interno do container; não exponha esse
+endpoint no gateway público.
+
 O scrape `bookrush-java` aplica `service` a partir do hostname estático de
 cada target (`catalog-service`, `recommendation-service`, etc.). Esse relabel
 é parte do contrato dos painéis OP-01..05: `instance` identifica o endpoint,
