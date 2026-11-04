@@ -108,3 +108,8 @@ A facade de reporting do `admin-service` usa o namespace público
 encaminha internamente para o mesmo serviço. As operações administrativas
 legadas continuam em `/api/v1/admin/**`; os dois namespaces permanecem
 protegidos pelo bearer token e pelo RBAC do `admin-service`.
+
+O gateway aplica ao namespace uma média inicial de 30 requisições/s por
+cliente, burst 60. O serviço adiciona cache privado de 30 s com variação por
+`Authorization`; erros nunca são armazenados. Ajuste os valores somente após
+medir custo de consulta e taxa de atualização das projeções.

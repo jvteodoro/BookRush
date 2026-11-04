@@ -22,6 +22,7 @@ management:
 bookrush:
   reporting:
     stale-after-seconds: ${BOOKRUSH_REPORTING_STALE_AFTER_SECONDS:900}
+    cache-max-age-seconds: ${BOOKRUSH_REPORTING_CACHE_MAX_AGE_SECONDS:30}
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
     audience: ${BOOKRUSH_SECURITY_AUDIENCE:bookrush-ingestion}

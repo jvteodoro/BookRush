@@ -75,6 +75,10 @@ causalidade.
 Todos os responses de série normalizam `sourceWatermark`/`refreshedAt` para
 ISO-8601 e informam `freshnessSeconds`, `warnings` e `status=STALE` quando a
 idade ultrapassa `BOOKRUSH_REPORTING_STALE_AFTER_SECONDS` (900 s por padrão).
+Leituras GET recebem cache privado de 30 s por padrão, sempre com
+`Vary: Authorization`; respostas 4xx/5xx recebem `Cache-Control: no-store`.
+No gateway, o namespace possui rate limit inicial de 30 requisições/s por
+cliente, burst 60. Esses valores são operacionais e calibráveis, não SLOs.
 
 `GET /api/admin/v1/reporting/experiment-daily?days=30` expõe assignments
 persistidos por variante e guardrails agregados de requests, viewability,

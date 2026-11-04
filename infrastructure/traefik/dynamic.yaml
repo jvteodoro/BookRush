@@ -111,6 +111,7 @@ http:
       rule: Host(`bookrush.jteodoro.tec.br`) && PathPrefix(`/api/admin`)
       entryPoints: [web]
       priority: 135
+      middlewares: [admin-reporting-rate-limit]
       service: admin-api
     content:
       rule: PathPrefix(`/api/v1/content`)
@@ -132,6 +133,11 @@ http:
       service: admin-web
 
   middlewares:
+    admin-reporting-rate-limit:
+      rateLimit:
+        average: 30
+        period: 1s
+        burst: 60
     ingestion-strip:
       stripPrefix:
         prefixes:

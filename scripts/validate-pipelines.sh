@@ -51,6 +51,7 @@ grep -Fq 'resolver 127.0.0.11' admin-web/nginx.conf || fail 'admin-web não reso
 grep -Fq 'proxy_pass $admin_service;' admin-web/nginx.conf || fail 'admin-web sem proxy dinâmico para a API administrativa'
 grep -Fq 'location /api/admin/' admin-web/nginx.conf || fail 'admin-web sem proxy para a facade reporting /api/admin'
 grep -Fq 'admin-reporting-api:' infrastructure/traefik/dynamic.yaml || fail 'Traefik sem rota da facade reporting /api/admin'
+grep -Fq 'admin-reporting-rate-limit:' infrastructure/traefik/dynamic.yaml || fail 'reporting sem rate limit no gateway'
 grep -Fq 'ADMIN_SERVICE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/admin-service}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-service'
 grep -Fq 'ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-web}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-web'
 test -f infrastructure/keycloak/read-client-secret.py || fail 'resolvedor seguro do segredo admin-service ausente'
