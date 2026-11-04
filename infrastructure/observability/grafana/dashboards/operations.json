@@ -1,0 +1,19 @@
+{
+  "uid": "bookrush-operations",
+  "title": "BookRush / Operations",
+  "description": "OP-01..OP-06. Prometheus-backed operational health; missing sources are explicitly marked.",
+  "tags": ["bookrush", "operations", "versioned"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "templating": {"list": [{"name": "service", "label": "Service", "type": "query", "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "query": "label_values(up, service)", "includeAll": true, "allValue": ".*", "multi": true, "current": {"text": "All", "value": ["$__all"]}}]},
+  "panels": [
+    {"id": 1, "title": "OP-01 Availability", "type": "stat", "gridPos": {"x": 0, "y": 0, "w": 8, "h": 5}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "min by (service) (up{service=~\"$service\"})", "legendFormat": "{{service}}"}], "fieldConfig": {"defaults": {"unit": "short", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}},
+    {"id": 2, "title": "OP-02 Request throughput", "type": "timeseries", "gridPos": {"x": 8, "y": 0, "w": 16, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (service) (rate(http_server_requests_seconds_count{service=~\"$service\"}[5m]))", "legendFormat": "{{service}} req/s"}], "fieldConfig": {"defaults": {"unit": "reqps"}}},
+    {"id": 3, "title": "OP-03 HTTP errors", "type": "timeseries", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (service, status) (rate(http_server_requests_seconds_count{service=~\"$service\",status=~\"4..|5..\"}[5m]))", "legendFormat": "{{service}} {{status}}"}], "fieldConfig": {"defaults": {"unit": "reqps"}}},
+    {"id": 4, "title": "OP-04 Latency p50/p95/p99", "type": "timeseries", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.50, sum by (service, le) (rate(http_server_requests_seconds_bucket{service=~\"$service\"}[5m])))", "legendFormat": "p50 {{service}}"}, {"refId": "B", "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_server_requests_seconds_bucket{service=~\"$service\"}[5m])))", "legendFormat": "p95 {{service}}"}, {"refId": "C", "expr": "histogram_quantile(0.99, sum by (service, le) (rate(http_server_requests_seconds_bucket{service=~\"$service\"}[5m])))", "legendFormat": "p99 {{service}}"}], "fieldConfig": {"defaults": {"unit": "s"}}},
+    {"id": 5, "title": "OP-05 JVM and process resources", "type": "timeseries", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (service) (jvm_memory_used_bytes{service=~\"$service\"})", "legendFormat": "heap {{service}}"}, {"refId": "B", "expr": "sum by (service) (rate(process_cpu_seconds_total{service=~\"$service\"}[5m]))", "legendFormat": "cpu {{service}}"}], "fieldConfig": {"defaults": {"unit": "bytes"}}},
+    {"id": 6, "title": "OP-06 PostgreSQL connections", "type": "timeseries", "gridPos": {"x": 12, "y": 16, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "pg_stat_database_numbackends", "legendFormat": "{{datname}}"}, {"refId": "B", "expr": "pg_stat_database_deadlocks", "legendFormat": "deadlocks {{datname}}"}], "fieldConfig": {"defaults": {"unit": "short"}}}
+  ]
+}

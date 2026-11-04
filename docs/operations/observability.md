@@ -15,6 +15,18 @@ OTLP HTTP para o Alloy e um encoder JSON no console com correlação e contexto
 de trace. A amostragem e o endpoint são configuráveis por ambiente; falhas de
 telemetria não impedem o serviço de iniciar.
 
+## Dashboards Grafana provisionados
+
+Os dashboards versionados ficam em
+`infrastructure/observability/grafana/dashboards/` e são carregados pelo
+provider `BookRush versioned dashboards`. A primeira entrega cobre OP-01..06,
+PL-01..05, FD-06/07/11 e DQ-01/02/05. As consultas usam Prometheus, e os
+datasources Loki/Tempo permanecem disponíveis para drill-down operacional.
+
+Quando a origem de negócio ainda não existe, o painel mostra
+`NOT_INSTRUMENTED`; nenhum zero é fabricado. Attribution, outbox, shadow
+overlap e freshness dependem das projeções dos pacotes dash-07..10.
+
 As tags comuns são somente `service` e `environment`. Não adicione subject,
 user ID, book ID, excerpt ID, token ou texto de livro como tag. Métricas de
 produto/recomendação devem usar contadores já versionados e atributos
