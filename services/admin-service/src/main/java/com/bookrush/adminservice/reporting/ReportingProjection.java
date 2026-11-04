@@ -1,18 +1,20 @@
 package com.bookrush.adminservice.reporting;
 
 import java.time.Instant;
+import java.sql.Timestamp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 /** Builds bounded, rebuildable reporting facts from the behavior export boundary. */
 @Component
 public class ReportingProjection {
   private static final Logger LOG = LoggerFactory.getLogger(ReportingProjection.class);
   private static final String VERSION = "events-v1-untrusted-population";
+  private static final String FEED_VERSION = "feed-attribution-v1-untrusted-population";
+  private static final String PIPELINE_VERSION = "analytics-pipeline-v1";
   private final JdbcTemplate jdbc;
 
   public ReportingProjection(JdbcTemplate jdbc) {
@@ -20,11 +22,15 @@ public class ReportingProjection {
   }
 
   @Scheduled(fixedDelayString = "${bookrush.reporting.refresh-delay-ms:300000}")
-  @Transactional
   public void refresh() {
     Instant refreshed = Instant.now();
-    try {
-      jdbc.update("""
+    runProjection("reader_day", VERSION, () -> refreshReaderDay(refreshed));
+    runProjection("feed_daily", FEED_VERSION, () -> refreshFeedDaily(refreshed));
+    runProjection("pipeline_snapshot", PIPELINE_VERSION, () -> refreshPipelineSnapshot(refreshed));
+  }
+
+  private void refreshReaderDay(Instant refreshed) {
+    jdbc.update("""
           INSERT INTO reporting.reader_day(
               day, population, platform, active_users, newly_active_users, sessions,
               active_seconds, book_opens, meaningful_reads, completions,
@@ -57,8 +63,8 @@ public class ReportingProjection {
               calculation_version = EXCLUDED.calculation_version,
               refreshed_at = EXCLUDED.refreshed_at,
               source_watermark = EXCLUDED.source_watermark
-          """, VERSION, refreshed);
-      jdbc.update("""
+          """, VERSION, Timestamp.from(refreshed));
+    jdbc.update("""
           INSERT INTO reporting.projection_health(
               projection_name, last_successful_refresh, source_watermark,
               record_count, definition_version, refresh_status, last_error_code)
@@ -71,17 +77,163 @@ public class ReportingProjection {
               definition_version = EXCLUDED.definition_version,
               refresh_status = EXCLUDED.refresh_status,
               last_error_code = NULL
-          """, refreshed, VERSION);
+          """, Timestamp.from(refreshed), VERSION);
+  }
+
+  private void runProjection(String name, String version, Runnable projection) {
+    try {
+      projection.run();
     } catch (RuntimeException exception) {
-      LOG.warn("reporting projection refresh failed error={}", exception.getClass().getSimpleName());
+      String error = exception.getClass().getSimpleName();
+      LOG.warn("reporting projection refresh failed projection={} error={} detail={}",
+          name, error, safeDatabaseError(exception));
       jdbc.update("""
           INSERT INTO reporting.projection_health(
               projection_name, last_successful_refresh, source_watermark,
               record_count, definition_version, refresh_status, last_error_code)
-          VALUES ('reader_day', NULL, NULL, 0, ?, 'ERROR', ?)
+          VALUES (?, NULL, NULL, 0, ?, 'ERROR', ?)
           ON CONFLICT (projection_name) DO UPDATE SET
               refresh_status = 'ERROR', last_error_code = EXCLUDED.last_error_code
-          """, VERSION, exception.getClass().getSimpleName());
+          """, name, version, error);
     }
+  }
+
+  private String safeDatabaseError(RuntimeException exception) {
+    Throwable root = exception;
+    while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+    String detail = root.getMessage();
+    if (detail == null || detail.isBlank()) return "unspecified";
+    String normalized = detail.replaceAll("\\s+", " ");
+    return normalized.substring(0, Math.min(normalized.length(), 240));
+  }
+
+  private void refreshFeedDaily(Instant refreshed) {
+    jdbc.update("""
+        WITH exposure AS (
+          SELECT i.id AS impression_id, i.item_id, i.shown_at, i.viewable,
+              r.model_version, r.strategy,
+              COALESCE(r.context->>'personalizationPath', 'UNKNOWN') AS feed_path,
+              COALESCE(r.context->>'platform', 'UNKNOWN') AS platform
+          FROM recommendation.impression i
+          JOIN recommendation.request r ON r.id = i.request_id
+          WHERE i.shown_at >= current_date - INTERVAL '366 days'
+        ), outcome AS (
+          SELECT oa.source_event_id, oa.impression_id, oa.recommendation_item_id,
+              oa.outcome_type, e.payload, e.occurred_at
+          FROM behavior.outcome_attribution oa
+          JOIN behavior.events e ON e.id = oa.source_event_id
+          WHERE oa.attribution_status = 'ATTRIBUTED'
+        )
+        INSERT INTO reporting.feed_daily(
+            day, model_version, strategy, feed_path, population, platform,
+            served_count, viewable_count, attributed_open_count,
+            attributed_read_10_count, attributed_read_50_count,
+            attributed_complete_count, dwell_observations, dwell_seconds,
+            calculation_version, refreshed_at, source_watermark)
+        SELECT x.day, x.model_version, x.strategy, x.feed_path, 'UNCLASSIFIED', x.platform,
+            count(DISTINCT x.impression_id),
+            count(DISTINCT x.impression_id) FILTER (WHERE x.viewable),
+            count(DISTINCT x.source_event_id) FILTER (WHERE x.outcome_type = 'BOOK_OPEN'),
+            count(DISTINCT x.source_event_id) FILTER (
+              WHERE x.outcome_type = 'READ_PROGRESS'
+                AND x.payload->>'percent' ~ '^[0-9]+(\\.[0-9]+)?$'
+                AND (x.payload->>'percent')::numeric >= 10),
+            count(DISTINCT x.source_event_id) FILTER (
+              WHERE x.outcome_type = 'READ_PROGRESS'
+                AND x.payload->>'percent' ~ '^[0-9]+(\\.[0-9]+)?$'
+                AND (x.payload->>'percent')::numeric >= 50),
+            count(DISTINCT x.source_event_id) FILTER (
+              WHERE x.outcome_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')),
+            NULL, NULL, ?, ?, max(x.source_watermark)
+        FROM (
+          SELECT e.*, o.source_event_id, o.outcome_type, o.payload,
+              GREATEST(e.shown_at, COALESCE(o.occurred_at, e.shown_at)) AS source_watermark,
+              e.shown_at::date AS day
+          FROM exposure e
+          LEFT JOIN outcome o ON o.impression_id = e.impression_id
+              OR o.recommendation_item_id = e.item_id
+        ) x
+        GROUP BY x.day, x.model_version, x.strategy, x.feed_path, x.platform
+        ON CONFLICT (day, model_version, strategy, feed_path, population, platform) DO UPDATE SET
+          served_count = EXCLUDED.served_count,
+          viewable_count = EXCLUDED.viewable_count,
+          attributed_open_count = EXCLUDED.attributed_open_count,
+          attributed_read_10_count = EXCLUDED.attributed_read_10_count,
+          attributed_read_50_count = EXCLUDED.attributed_read_50_count,
+          attributed_complete_count = EXCLUDED.attributed_complete_count,
+          dwell_observations = EXCLUDED.dwell_observations,
+          dwell_seconds = EXCLUDED.dwell_seconds,
+          calculation_version = EXCLUDED.calculation_version,
+          refreshed_at = EXCLUDED.refreshed_at,
+          source_watermark = EXCLUDED.source_watermark
+        """, FEED_VERSION, Timestamp.from(refreshed));
+    updateHealth("feed_daily", FEED_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.feed_daily");
+  }
+
+  private void refreshPipelineSnapshot(Instant refreshed) {
+    jdbc.update("""
+        INSERT INTO reporting.pipeline_snapshot(
+            collected_at, service, job_status, phase, status_count,
+            oldest_pending_age_seconds, failure_count, throughput,
+            calculation_version, source_watermark)
+        SELECT date_trunc('minute', ?::timestamptz), 'book-analytics-service', i.status, 'ITEM',
+            count(*),
+            CASE WHEN i.status IN ('PENDING', 'RUNNING')
+              THEN EXTRACT(EPOCH FROM (clock_timestamp() - min(i.created_at)))::bigint
+              ELSE NULL END,
+            count(*) FILTER (WHERE i.status = 'FAILED'),
+            count(*) FILTER (WHERE i.status = 'COMPLETED'
+                AND i.finished_at >= clock_timestamp() - INTERVAL '1 hour'),
+            ?, max(coalesce(i.finished_at, i.started_at, i.created_at))
+        FROM analytics.analysis_job_item i
+        GROUP BY i.status
+        ON CONFLICT (collected_at, service, job_status, phase) DO UPDATE SET
+            status_count = EXCLUDED.status_count,
+            oldest_pending_age_seconds = EXCLUDED.oldest_pending_age_seconds,
+            failure_count = EXCLUDED.failure_count,
+            throughput = EXCLUDED.throughput,
+            calculation_version = EXCLUDED.calculation_version,
+            source_watermark = EXCLUDED.source_watermark
+        """, Timestamp.from(refreshed), PIPELINE_VERSION);
+    jdbc.update("""
+        INSERT INTO reporting.pipeline_snapshot(
+            collected_at, service, job_status, phase, status_count,
+            oldest_pending_age_seconds, failure_count, throughput,
+            calculation_version, source_watermark)
+        SELECT date_trunc('minute', ?::timestamptz), 'book-analytics-service', p.status, p.phase,
+            count(*), NULL,
+            count(*) FILTER (WHERE p.status = 'FAILED'),
+            count(*) FILTER (WHERE p.status = 'COMPLETED'
+                AND p.finished_at >= clock_timestamp() - INTERVAL '1 hour'),
+            ?, max(coalesce(p.finished_at, p.started_at))
+        FROM analytics.analysis_phase_timing p
+        GROUP BY p.status, p.phase
+        ON CONFLICT (collected_at, service, job_status, phase) DO UPDATE SET
+            status_count = EXCLUDED.status_count,
+            failure_count = EXCLUDED.failure_count,
+            throughput = EXCLUDED.throughput,
+            calculation_version = EXCLUDED.calculation_version,
+            source_watermark = EXCLUDED.source_watermark
+        """, Timestamp.from(refreshed), PIPELINE_VERSION);
+    updateHealth("pipeline_snapshot", PIPELINE_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.pipeline_snapshot");
+  }
+
+  private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {
+    jdbc.update("""
+        INSERT INTO reporting.projection_health(
+            projection_name, last_successful_refresh, source_watermark,
+            record_count, definition_version, refresh_status, last_error_code)
+        SELECT ?, ?, q.source_watermark, q.record_count, ?, 'SUCCESS', NULL
+        FROM (%s) q
+        ON CONFLICT (projection_name) DO UPDATE SET
+            last_successful_refresh = EXCLUDED.last_successful_refresh,
+            source_watermark = EXCLUDED.source_watermark,
+            record_count = EXCLUDED.record_count,
+            definition_version = EXCLUDED.definition_version,
+            refresh_status = EXCLUDED.refresh_status,
+            last_error_code = NULL
+        """.formatted(sourceQuery), name, Timestamp.from(refreshed), version);
   }
 }

@@ -154,9 +154,28 @@ export type CommentHistory = {
   reason: string;
 };
 export type ReportingSeries = {
-  day: string;
-  population: string;
-  platform: string;
+  day?: string;
+  collected_at?: string;
+  population?: string;
+  platform?: string;
+  model_version?: string;
+  strategy?: string;
+  feed_path?: string;
+  service?: string;
+  job_status?: string;
+  phase?: string;
+  status_count?: number;
+  oldest_pending_age_seconds?: number | null;
+  failure_count?: number;
+  throughput?: number;
+  served_count?: number;
+  viewable_count?: number;
+  attributed_open_count?: number;
+  attributed_read_10_count?: number;
+  attributed_read_50_count?: number;
+  attributed_complete_count?: number;
+  dwell_observations?: number | null;
+  dwell_seconds?: number | null;
   active_users?: number;
   sessions?: number;
   active_seconds?: number;
@@ -389,6 +408,26 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível carregar a saúde das projeções.");
+    }
+  },
+  async reportingFeedDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/feed-daily", { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os indicadores do feed.");
+    }
+  },
+  async reportingPipeline(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/pipeline", { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os snapshots do pipeline.");
     }
   },
   async listBookPage(

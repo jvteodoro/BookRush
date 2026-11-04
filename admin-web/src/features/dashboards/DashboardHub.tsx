@@ -70,11 +70,41 @@ function ReadingChart({ data }: { data: ReportingResponse }) {
   );
 }
 
+function FeedReport({ data }: { data: ReportingResponse }) {
+  if (!data.series.length) return <div className="dashboard-state">NO_DATA</div>;
+  return <div className="dashboard-scroll-table"><table className="dashboard-table">
+    <caption>Entrega e conversão atribuída; população {data.population}; versão {data.definitionVersion}</caption>
+    <thead><tr><th>Dia</th><th>Estratégia</th><th>Servidos</th><th>Viewable</th><th>Aberturas</th><th>Read 10%</th><th>Read 50%</th><th>Conclusões</th></tr></thead>
+    <tbody>{data.series.slice(-50).map((row, index) => <tr key={`${row.day}-${row.strategy}-${row.model_version}-${index}`}>
+      <td>{row.day ?? "—"}</td><td>{row.strategy ?? "—"}</td><td>{row.served_count ?? "—"}</td>
+      <td>{row.viewable_count ?? "—"}</td><td>{row.attributed_open_count ?? "—"}</td>
+      <td>{row.attributed_read_10_count ?? "—"}</td><td>{row.attributed_read_50_count ?? "—"}</td>
+      <td>{row.attributed_complete_count ?? "—"}</td>
+    </tr>)}</tbody>
+  </table></div>;
+}
+
+function PipelineReport({ data }: { data: ReportingResponse }) {
+  if (!data.series.length) return <div className="dashboard-state">NO_DATA</div>;
+  return <div className="dashboard-scroll-table"><table className="dashboard-table">
+    <caption>Snapshots reais de jobs e fases; estado de população {data.population}</caption>
+    <thead><tr><th>Coletado</th><th>Fase</th><th>Estado</th><th>Itens</th><th>Falhas</th><th>Throughput/h</th><th>Fila mais antiga</th></tr></thead>
+    <tbody>{data.series.slice(-50).map((row, index) => <tr key={`${row.collected_at}-${row.phase}-${row.job_status}-${index}`}>
+      <td>{row.collected_at ? new Date(row.collected_at).toLocaleString() : "—"}</td>
+      <td>{row.phase ?? "—"}</td><td>{row.job_status ?? "—"}</td><td>{row.status_count ?? "—"}</td>
+      <td>{row.failure_count ?? "—"}</td><td>{row.throughput ?? "—"}</td>
+      <td>{row.oldest_pending_age_seconds == null ? "—" : `${row.oldest_pending_age_seconds}s`}</td>
+    </tr>)}</tbody>
+  </table></div>;
+}
+
 export function DashboardHub() {
   const [params, setParams] = useSearchParams();
   const active = params.get("area") ?? "executive";
   const days = Number(params.get("days") ?? "30");
   const [report, setReport] = useState<ReportingResponse | null>(null);
+  const [feedReport, setFeedReport] = useState<ReportingResponse | null>(null);
+  const [pipelineReport, setPipelineReport] = useState<ReportingResponse | null>(null);
   const [health, setHealth] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,12 +114,16 @@ export function DashboardHub() {
     setLoading(true);
     setError(null);
     try {
-      const [readerDay, projectionHealth] = await Promise.all([
+      const [readerDay, projectionHealth, feedDaily, pipeline] = await Promise.all([
         services.reportingReaderDay(Math.min(Math.max(days, 1), 366)),
         services.reportingHealth(),
+        services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
       ]);
       setReport(readerDay);
       setHealth(projectionHealth);
+      setFeedReport(feedDaily);
+      setPipelineReport(pipeline);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Falha ao consultar reporting.");
     } finally {
@@ -103,6 +137,7 @@ export function DashboardHub() {
     () => areas.find(([key]) => key === area)?.[1] ?? "Executive",
     [area],
   );
+  const displayedReport = area === "feed" ? feedReport : area === "pipelines" ? pipelineReport : report;
 
   return (
     <section className="dashboard-hub">
@@ -130,10 +165,17 @@ export function DashboardHub() {
       {error && <div className="dashboard-alert error" role="alert"><ShieldAlert size={18} />{error}</div>}
       {loading ? <div className="dashboard-state">Carregando snapshots…</div> : <>
         <div className="dashboard-heading"><div><span className="eyebrow">ÁREA</span><h2>{currentLabel}</h2></div>
-          <span className={`data-badge ${report?.status === "UNTRUSTED" ? "warning" : ""}`}>{statusText(report?.status ?? "NO_DATA")}</span></div>
+          <span className={`data-badge ${displayedReport?.status === "UNTRUSTED" ? "warning" : ""}`}>{statusText(displayedReport?.status ?? "NO_DATA")}</span></div>
         {area === "executive" || area === "growth" ? <div className="dashboard-card wide">
           <div className="dashboard-card-heading"><div><strong>{area === "growth" ? "GR-01..GR-07 · Atividade e leitura" : "EX-01/04 · Atividade geral"}</strong><p>Agregado diário do behavior-service; ausência de população classificada impede interpretação como produto.</p></div><AlertTriangle size={18} /></div>
           {report && <ReadingChart data={report} />}
+        </div> : area === "feed" && feedReport ? <div className="dashboard-card wide">
+          <div className="dashboard-card-heading"><div><strong>FD-01..FD-05 · Entrega e conversão atribuída</strong><p>Somente outcomes com vínculo válido ao ledger e status ATTRIBUTED; não é inferência causal.</p></div><AlertTriangle size={18} /></div>
+          {feedReport.status === "UNTRUSTED" && <div className="dashboard-alert warning"><AlertTriangle size={18} /><span>{statusText(feedReport.status)} · definição {feedReport.definitionVersion}</span></div>}
+          <FeedReport data={feedReport} />
+        </div> : area === "pipelines" && pipelineReport ? <div className="dashboard-card wide">
+          <div className="dashboard-card-heading"><div><strong>PL-03..05 · Jobs, itens e fases de analytics</strong><p>Snapshots persistidos pelo reporting; throughput considera itens concluídos na última hora de cada coleta.</p></div><AlertTriangle size={18} /></div>
+          <PipelineReport data={pipelineReport} />
         </div> : <div className="dashboard-card dashboard-gap">
           <div className="dashboard-card-heading"><div><strong>{unavailablePanels[area][0]}</strong><p>Esta área está conectada ao hub, mas as fontes específicas ainda não foram materializadas.</p></div><AlertTriangle size={18} /></div>
           <div className="dashboard-alert warning"><AlertTriangle size={18} /><span><strong>NOT_INSTRUMENTED</strong><br />{unavailablePanels[area][1]}. Não exibimos gráficos vazios nem zeros.</span></div>

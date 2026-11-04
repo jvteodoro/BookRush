@@ -70,6 +70,67 @@ public class ReportingController {
         """);
   }
 
+  @GetMapping("/feed-daily")
+  public Map<String, Object> feedDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, model_version, strategy, feed_path, population, platform,
+          served_count, viewable_count, attributed_open_count,
+          attributed_read_10_count, attributed_read_50_count,
+          attributed_complete_count, dwell_observations, dwell_seconds,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.feed_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, strategy, model_version, feed_path
+        """, days);
+    return response("feed_daily", "feed-attribution-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/pipeline")
+  public Map<String, Object> pipeline(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT collected_at, service, job_status, phase, status_count,
+          oldest_pending_age_seconds, failure_count, throughput,
+          calculation_version, source_watermark
+        FROM reporting.pipeline_snapshot
+        WHERE collected_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY collected_at, service, phase, job_status
+        """, days);
+    return response("pipeline_snapshot", "analytics-pipeline-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  private Map<String, Object> response(String metricId, String definitionVersion, int days,
+      String population, java.util.List<Map<String, Object>> rows) {
+    var response = new LinkedHashMap<String, Object>();
+    response.put("schemaVersion", "dashboard-response-v1");
+    response.put("metricId", metricId);
+    response.put("definitionVersion", definitionVersion);
+    response.put("status", rows.isEmpty() ? "NO_DATA" : "UNTRUSTED");
+    response.put("unit", "aggregate");
+    response.put("from", Instant.now().minusSeconds(days * 86400L).atOffset(ZoneOffset.UTC).toString());
+    response.put("to", Instant.now().atOffset(ZoneOffset.UTC).toString());
+    response.put("population", population);
+    response.put("sourceWatermark", rows.stream().map(row -> row.get("source_watermark"))
+        .filter(java.util.Objects::nonNull).reduce((first, second) -> second).orElse(null));
+    response.put("refreshedAt", rows.stream().map(row -> row.get("refreshed_at"))
+        .filter(java.util.Objects::nonNull).reduce((first, second) -> second).orElse(null));
+    response.put("series", rows);
+    return response;
+  }
+
+  private void validateDays(int days) {
+    if (days < 1 || days > 366) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "days must be between 1 and 366");
+    }
+  }
+
   private void requireAnalyst(Authentication authentication, Principal principal) {
     if (principal == null || authentication == null || authentication.getAuthorities().stream()
         .noneMatch(a -> a.getAuthority().equals("ROLE_platform-admins")

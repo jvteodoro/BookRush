@@ -10,6 +10,13 @@ freshness, watermark, versão e estado da projeção. Quando a origem ainda não
 possui população classificada, a resposta permanece `UNTRUSTED` com
 `population=UNCLASSIFIED`; ausência de linhas é `NO_DATA`, não zero.
 
+`GET /api/admin/v1/reporting/feed-daily?days=30` expõe o ledger de entrega do
+feed e outcomes com `attribution-v1`. `GET /api/admin/v1/reporting/pipeline?days=30`
+expõe snapshots dos itens e fases do analytics. Essas projeções também ficam
+`UNTRUSTED` enquanto a proveniência de população não for exportada pelos
+bounded contexts. Dwell permanece não instrumentado e não é apresentado como
+zero.
+
 `POST /api/v1/admin/audit` registra ação de administração sem armazenar tokens; `GET /api/v1/admin/audit` consulta os últimos eventos. O subject vem da identidade autenticada.
 
 ## Usuários

@@ -47,4 +47,26 @@ class ReportingControllerTest {
     assertEquals("UNTRUSTED", response.get("status"));
     assertEquals("UNCLASSIFIED", response.get("population"));
   }
+
+  @Test
+  void exposesFeedAndPipelineSnapshotsOnlyToReportingRoles() {
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.of(
+        "day", java.sql.Date.valueOf("2026-11-01"),
+        "strategy", "PERSONALIZED", "served_count", 4L,
+        "viewable_count", 3L, "attributed_open_count", 1L,
+        "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")))))
+        .thenReturn(List.of(Map.of(
+            "collected_at", Timestamp.from(Instant.parse("2026-11-04T12:00:00Z")),
+            "phase", "ITEM", "job_status", "COMPLETED", "status_count", 4L,
+            "failure_count", 0L, "throughput", 2L,
+            "source_watermark", Timestamp.from(Instant.parse("2026-11-04T11:59:00Z")))));
+
+    assertEquals("UNTRUSTED", controller.feedDaily(7, principal, analyst).get("status"));
+    assertEquals("UNTRUSTED", controller.pipeline(7, principal, analyst).get("status"));
+
+    var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
+    assertEquals(403, assertThrows(ResponseStatusException.class,
+        () -> controller.feedDaily(7, principal, reader)).getStatusCode().value());
+  }
 }

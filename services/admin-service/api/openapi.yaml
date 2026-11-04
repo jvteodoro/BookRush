@@ -27,6 +27,36 @@ paths:
         '200': { description: Projection health rows }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/feed-daily:
+    get:
+      summary: Read feed delivery and attributed outcome snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Feed reporting response with explicit attribution and population state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/pipeline:
+    get:
+      summary: Read analytics pipeline status snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Pipeline reporting response with job and phase states
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/v1/admin/feed:
     get:
       summary: Read the versioned recommendation ledger for Feed Lab
