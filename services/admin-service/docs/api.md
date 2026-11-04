@@ -20,6 +20,11 @@ expõe snapshots dos itens e fases do analytics. Essas projeções também ficam
 bounded contexts. Dwell permanece não instrumentado e não é apresentado como
 zero.
 
+`GET /api/admin/v1/reporting/recommendation-daily?days=30` agrega requests,
+itens, impressões, viewability, livros únicos e distribuição de rank por modelo,
+estratégia e caminho de personalização. A comparação é observacional e não
+declara causalidade.
+
 `GET /api/admin/v1/reporting/quality/attribution?days=30` expõe a distribuição
 de outcomes por `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` e
 `INVALID_REFERENCE`. `GET /api/admin/v1/reporting/quality/reconciliation?days=30`

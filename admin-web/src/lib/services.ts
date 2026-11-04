@@ -222,6 +222,11 @@ export type ReportingSeries = {
   p50_duration_ms?: number | null;
   p95_duration_ms?: number | null;
   p99_duration_ms?: number | null;
+  request_count?: number;
+  impression_count?: number;
+  unique_books?: number;
+  p50_rank?: number | null;
+  p90_rank?: number | null;
   unique_readers?: number;
   p50_session_seconds?: number | null;
   p90_session_seconds?: number | null;
@@ -484,6 +489,20 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível carregar os indicadores do feed.");
+    }
+  },
+  async reportingRecommendationDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/recommendation-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar a instrumentação do recomendador.",
+      );
     }
   },
   async reportingPipeline(days = 30): Promise<ReportingResponse> {

@@ -56,3 +56,7 @@ durações observadas e contando tentativas, falhas e leases presos.
 sessões, duração, livros e biblioteca, e `reporting.retention_cohort` para
 coortes D1/D7/D30. A coluna `mature` impede que uma coorte incompleta seja
 interpretada como retenção zero.
+
+`V13__reporting_recommendation_daily.sql` agrega o ledger de recommendation por
+modelo, estratégia, caminho e plataforma, preservando contagens de requests,
+itens, impressões, viewability, livros únicos e percentis de rank.

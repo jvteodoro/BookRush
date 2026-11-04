@@ -90,6 +90,24 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/recommendation-daily")
+  public Map<String, Object> recommendationDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, model_version, strategy, feed_path, population, platform,
+          request_count, item_count, impression_count, viewable_count,
+          unique_books, p50_rank, p90_rank, calculation_version,
+          refreshed_at, source_watermark
+        FROM reporting.recommendation_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, strategy, model_version, feed_path
+        """, days);
+    return response("recommendation_daily", "recommendation-ledger-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/pipeline")
   public Map<String, Object> pipeline(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {

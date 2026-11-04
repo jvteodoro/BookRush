@@ -23,6 +23,7 @@ public class ReportingProjection {
   private static final String INGESTION_VERSION = "ingestion-operations-v1";
   private static final String PHASE_VERSION = "analytics-phase-v1";
   private static final String READING_VERSION = "reading-engagement-v1-untrusted-population";
+  private static final String RECOMMENDATION_VERSION = "recommendation-ledger-v1-untrusted-population";
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
 
@@ -46,6 +47,7 @@ public class ReportingProjection {
     runProjection("pipeline_phase_daily", PHASE_VERSION, () -> refreshPipelinePhaseDaily(refreshed));
     runProjection("reading_daily", READING_VERSION, () -> refreshReadingDaily(refreshed));
     runProjection("retention_cohort", READING_VERSION, () -> refreshRetentionCohort(refreshed));
+    runProjection("recommendation_daily", RECOMMENDATION_VERSION, () -> refreshRecommendationDaily(refreshed));
   }
 
   private void refreshReaderDay(Instant refreshed) {
@@ -607,6 +609,60 @@ public class ReportingProjection {
         """, READING_VERSION, Timestamp.from(refreshed));
     updateHealth("retention_cohort", READING_VERSION, refreshed,
         "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.retention_cohort");
+  }
+
+  private void refreshRecommendationDaily(Instant refreshed) {
+    jdbc.update("DELETE FROM reporting.recommendation_daily WHERE day >= current_date - INTERVAL '366 days'");
+    jdbc.update("""
+        WITH requests AS (
+          SELECT r.id, r.created_at::date AS day, r.model_version, r.strategy,
+              coalesce(r.context->>'personalizationPath', 'UNKNOWN') AS feed_path,
+              coalesce(r.context->>'platform', 'UNKNOWN') AS platform,
+              r.created_at AS source_watermark
+          FROM recommendation.request r
+          WHERE r.created_at >= current_date - INTERVAL '366 days'
+        ), items AS (
+          SELECT i.request_id, count(*) AS item_count, count(DISTINCT i.book_id) AS unique_books,
+              percentile_cont(0.50) WITHIN GROUP (ORDER BY i.rank) AS p50_rank,
+              percentile_cont(0.90) WITHIN GROUP (ORDER BY i.rank) AS p90_rank,
+              max(i.created_at) AS source_watermark
+          FROM recommendation.item i JOIN requests r ON r.id = i.request_id
+          GROUP BY i.request_id
+        ), impressions AS (
+          SELECT i.request_id, count(*) AS impression_count,
+              count(*) FILTER (WHERE i.viewable) AS viewable_count,
+              max(i.shown_at) AS source_watermark
+          FROM recommendation.impression i JOIN requests r ON r.id = i.request_id
+          GROUP BY i.request_id
+        )
+        INSERT INTO reporting.recommendation_daily(
+            day, model_version, strategy, feed_path, population, platform,
+            request_count, item_count, impression_count, viewable_count,
+            unique_books, p50_rank, p90_rank, calculation_version, refreshed_at,
+            source_watermark)
+        SELECT r.day, r.model_version, r.strategy, r.feed_path, 'UNCLASSIFIED', r.platform,
+            count(*), coalesce(sum(i.item_count), 0), coalesce(sum(m.impression_count), 0),
+            coalesce(sum(m.viewable_count), 0), coalesce(sum(i.unique_books), 0),
+            percentile_cont(0.50) WITHIN GROUP (ORDER BY i.p50_rank) FILTER (WHERE i.p50_rank IS NOT NULL),
+            percentile_cont(0.90) WITHIN GROUP (ORDER BY i.p90_rank) FILTER (WHERE i.p90_rank IS NOT NULL),
+            ?, ?, greatest(max(r.source_watermark), max(i.source_watermark), max(m.source_watermark))
+        FROM requests r LEFT JOIN items i ON i.request_id = r.id
+          LEFT JOIN impressions m ON m.request_id = r.id
+        GROUP BY r.day, r.model_version, r.strategy, r.feed_path, r.platform
+        ON CONFLICT (day, model_version, strategy, feed_path, population, platform) DO UPDATE SET
+            request_count = EXCLUDED.request_count,
+            item_count = EXCLUDED.item_count,
+            impression_count = EXCLUDED.impression_count,
+            viewable_count = EXCLUDED.viewable_count,
+            unique_books = EXCLUDED.unique_books,
+            p50_rank = EXCLUDED.p50_rank,
+            p90_rank = EXCLUDED.p90_rank,
+            calculation_version = EXCLUDED.calculation_version,
+            refreshed_at = EXCLUDED.refreshed_at,
+            source_watermark = EXCLUDED.source_watermark
+        """, RECOMMENDATION_VERSION, Timestamp.from(refreshed));
+    updateHealth("recommendation_daily", RECOMMENDATION_VERSION, refreshed,
+        "SELECT max(source_watermark) AS source_watermark, count(*) AS record_count FROM reporting.recommendation_daily");
   }
 
   private void updateHealth(String name, String version, Instant refreshed, String sourceQuery) {

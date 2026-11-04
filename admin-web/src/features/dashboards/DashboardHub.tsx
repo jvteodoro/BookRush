@@ -281,6 +281,55 @@ function FeedReport({ data }: { data: ReportingResponse }) {
   );
 }
 
+function RecommendationReport({ data }: { data: ReportingResponse }) {
+  if (!data.series.length)
+    return <div className="dashboard-state">NO_DATA</div>;
+  return (
+    <div className="dashboard-scroll-table">
+      <table className="dashboard-table">
+        <caption>
+          FD-05/08/09 · ledger por estratégia e caminho; comparação
+          observacional, sem inferência causal
+        </caption>
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Modelo</th>
+            <th>Estratégia</th>
+            <th>Caminho</th>
+            <th>Requests</th>
+            <th>Itens</th>
+            <th>Impressões</th>
+            <th>Viewable</th>
+            <th>Livros</th>
+            <th>P50 rank</th>
+            <th>P90 rank</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.series.slice(-60).map((row, index) => (
+            <tr
+              key={`${row.day}-${row.strategy}-${row.model_version}-${row.feed_path}-${index}`}
+            >
+              <td>{row.day ?? "—"}</td>
+              <td>{row.model_version ?? "—"}</td>
+              <td>{row.strategy ?? "—"}</td>
+              <td>{row.feed_path ?? "—"}</td>
+              <td>{row.request_count ?? "—"}</td>
+              <td>{row.item_count ?? "—"}</td>
+              <td>{row.impression_count ?? "—"}</td>
+              <td>{row.viewable_count ?? "—"}</td>
+              <td>{row.unique_books ?? "—"}</td>
+              <td>{row.p50_rank == null ? "—" : Math.round(row.p50_rank)}</td>
+              <td>{row.p90_rank == null ? "—" : Math.round(row.p90_rank)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function PipelineReport({ data }: { data: ReportingResponse }) {
   if (!data.series.length)
     return <div className="dashboard-state">NO_DATA</div>;
@@ -629,6 +678,8 @@ export function DashboardHub() {
   const days = Number(params.get("days") ?? "30");
   const [report, setReport] = useState<ReportingResponse | null>(null);
   const [feedReport, setFeedReport] = useState<ReportingResponse | null>(null);
+  const [recommendationReport, setRecommendationReport] =
+    useState<ReportingResponse | null>(null);
   const [pipelineReport, setPipelineReport] =
     useState<ReportingResponse | null>(null);
   const [pipelinePhaseReport, setPipelinePhaseReport] =
@@ -665,6 +716,7 @@ export function DashboardHub() {
         readerDay,
         projectionHealth,
         feedDaily,
+        recommendationDaily,
         pipeline,
         pipelinePhases,
         attribution,
@@ -679,6 +731,7 @@ export function DashboardHub() {
         services.reportingReaderDay(Math.min(Math.max(days, 1), 366)),
         services.reportingHealth(),
         services.reportingFeedDaily(Math.min(Math.max(days, 1), 366)),
+        services.reportingRecommendationDaily(Math.min(Math.max(days, 1), 366)),
         services.reportingPipeline(Math.min(Math.max(days, 1), 366)),
         services.reportingPipelinePhases(Math.min(Math.max(days, 1), 366)),
         services.reportingAttributionQuality(Math.min(Math.max(days, 1), 366)),
@@ -695,6 +748,7 @@ export function DashboardHub() {
       setReport(readerDay);
       setHealth(projectionHealth);
       setFeedReport(feedDaily);
+      setRecommendationReport(recommendationDaily);
       setPipelineReport(pipeline);
       setPipelinePhaseReport(pipelinePhases);
       setAttributionReport(attribution);
@@ -860,6 +914,9 @@ export function DashboardHub() {
                 </div>
               )}
               <FeedReport data={feedReport} />
+              {recommendationReport && (
+                <RecommendationReport data={recommendationReport} />
+              )}
             </div>
           ) : area === "pipelines" &&
             pipelineReport &&
