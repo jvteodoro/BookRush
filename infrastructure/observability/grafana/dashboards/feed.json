@@ -1,7 +1,7 @@
 {
   "uid": "bookrush-feed",
   "title": "BookRush / Feed & Recommendations",
-  "description": "FD-06, FD-07 and FD-11. Operational recommendation signals with explicit instrumentation gaps.",
+  "description": "FD-06, FD-07, FD-08, FD-11 and FD-12. Operational recommendation signals with explicit attribution boundaries.",
   "tags": ["bookrush", "recommendations", "versioned"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -10,7 +10,7 @@
   "panels": [
     {"id": 21, "title": "FD-06 PFV1 serving paths", "type": "timeseries", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_feed_requests_total[5m]))", "legendFormat": "requests {{outcome}}"}, {"refId": "B", "expr": "sum by (result) (rate(bookrush_feed_ranking_total[5m]))", "legendFormat": "ranking {{result}}"}], "fieldConfig": {"defaults": {"unit": "reqps"}}},
     {"id": 22, "title": "FD-07 Ranking stage latency", "type": "timeseries", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (stage, le) (rate(bookrush_feed_stage_duration_seconds_bucket[5m])))", "legendFormat": "p95 {{stage}}"}], "fieldConfig": {"defaults": {"unit": "s"}}},
-    {"id": 23, "title": "FD-11 Shadow overlap", "type": "text", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "options": {"mode": "markdown", "content": "### NOT_INSTRUMENTED\n\nNo persisted PFV1 shadow-overlap metric is currently exported. This panel is deliberately explicit so overlap is not confused with zero or causal uplift.\n\n**Required source:** recommendation ledger + assignment snapshot (dash-08/09)."}},
-    {"id": 24, "title": "Recommendation signal coverage", "type": "text", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "options": {"mode": "markdown", "content": "Feed request/ranking counters are operational signals only. Viewability, attribution, confidence and conversion require the versioned reporting facts/API and must not be reconstructed from Prometheus."}}
+    {"id": 23, "title": "FD-11 Shadow overlap", "type": "timeseries", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum(rate(bookrush_feed_personalized_shadow_overlap_total[5m])) / clamp_min(sum(rate(bookrush_feed_personalized_shadow_compared_total[5m])), 1)", "legendFormat": "overlap / compared"}, {"refId": "B", "expr": "sum(rate(bookrush_feed_personalized_shadow_rank_movement_total[5m]))", "legendFormat": "rank movement"}], "fieldConfig": {"defaults": {"unit": "short"}}},
+    {"id": 24, "title": "FD-08/12 Candidate and profile coverage", "type": "timeseries", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_feed_candidates_total[5m]))", "legendFormat": "candidates {{outcome}}"}, {"refId": "B", "expr": "sum by (outcome) (rate(bookrush_feed_items_total[5m]))", "legendFormat": "items {{outcome}}"}, {"refId": "C", "expr": "sum by (outcome) (rate(bookrush_feed_personalized_profile_confidence_total[5m]))", "legendFormat": "confidence {{outcome}}"}], "fieldConfig": {"defaults": {"unit": "ops"}}}
   ]
 }

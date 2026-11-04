@@ -19,6 +19,9 @@ até a integração SSO do pacote `dash-06`.
 - DQ-05: `bookrush_reporting_projection_*` expõe status, timestamp da última
   atualização e quantidade materializada por projeção, com a etiqueta de
   baixa cardinalidade `projection`.
+- Feed: `bookrush_feed_*` expõe caminhos de personalização, candidatos,
+  itens, confiança de perfil e comparação shadow; os painéis não interpretam
+  esses contadores operacionais como conversão ou causalidade.
 
 As imagens são fixadas por versão. Os volumes `prometheus_data`,
 `grafana_data`, `loki_data` e `tempo_data` são persistentes e independentes dos
