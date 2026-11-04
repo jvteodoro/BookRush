@@ -53,22 +53,55 @@ public class BehaviorMaintenance {
           reads=excluded.reads, shares=excluded.shares, comments=excluded.comments
         """);
     jdbc.update("""
+        WITH raw_outcomes AS (
+          SELECT id, identity_subject, book_id, event_type, payload, occurred_at
+          FROM behavior.events
+          WHERE identity_subject IS NOT NULL AND book_id IS NOT NULL
+            AND event_type IN ('BOOK_OPEN', 'BOOK_COMPLETE', 'READ_PROGRESS', 'READ_SESSION',
+              'BOOK_LIKE', 'BOOK_UNLIKE', 'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
+        ), classified AS (
+          SELECT o.*, o.payload->>'recommendationItemId' AS item_text,
+            o.payload->>'impressionId' AS impression_text,
+            CASE
+              WHEN o.payload->>'recommendationItemId' IS NULL
+                AND o.payload->>'impressionId' IS NULL THEN 'ORGANIC'
+              WHEN EXISTS (
+                SELECT 1 FROM behavior.events exposure
+                WHERE exposure.identity_subject = o.identity_subject
+                  AND exposure.book_id = o.book_id
+                  AND exposure.event_type = 'EXCERPT_IMPRESSION'
+                  AND exposure.payload->>'viewable' = 'true'
+                  AND exposure.payload->>'impressionId' = o.payload->>'impressionId'
+                  AND exposure.occurred_at <= o.occurred_at
+                  AND exposure.occurred_at > o.occurred_at - INTERVAL '7 days'
+              ) THEN 'ATTRIBUTED'
+              WHEN EXISTS (
+                SELECT 1 FROM behavior.events exposure
+                WHERE exposure.identity_subject = o.identity_subject
+                  AND exposure.book_id = o.book_id
+                  AND exposure.event_type = 'EXCERPT_IMPRESSION'
+                  AND exposure.payload->>'impressionId' = o.payload->>'impressionId'
+              ) THEN 'OUTSIDE_WINDOW'
+              ELSE 'INVALID_REFERENCE'
+            END AS attribution_status
+          FROM raw_outcomes o
+        )
         INSERT INTO behavior.outcome_attribution(
             id, subject_key, book_id, outcome_type, source_event_id, occurred_at,
-            recommendation_item_id, impression_id)
+            recommendation_item_id, impression_id, attribution_status,
+            attribution_rule_version, attribution_window_seconds)
         SELECT gen_random_uuid(), identity_subject, book_id, event_type, id, occurred_at,
-          CASE WHEN payload->>'recommendationItemId' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            THEN (payload->>'recommendationItemId')::uuid END,
-          CASE WHEN payload->>'impressionId' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-            THEN (payload->>'impressionId')::uuid END
-        FROM behavior.events
-        WHERE identity_subject IS NOT NULL AND book_id IS NOT NULL
-          AND event_type IN ('BOOK_OPEN', 'BOOK_COMPLETE', 'READ_PROGRESS', 'READ_SESSION',
-            'BOOK_LIKE', 'BOOK_UNLIKE', 'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
+          CASE WHEN item_text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN item_text::uuid END,
+          CASE WHEN impression_text ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN impression_text::uuid END,
+          attribution_status, 'attribution-v1', 604800
+        FROM classified
         ON CONFLICT (source_event_id, outcome_type) DO UPDATE SET
           recommendation_item_id = excluded.recommendation_item_id,
           impression_id = excluded.impression_id,
-          occurred_at = excluded.occurred_at
+          occurred_at = excluded.occurred_at,
+          attribution_status = excluded.attribution_status,
+          attribution_rule_version = excluded.attribution_rule_version,
+          attribution_window_seconds = excluded.attribution_window_seconds
         """);
     rebuildUserBookSignals();
   }

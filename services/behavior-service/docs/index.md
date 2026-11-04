@@ -96,6 +96,13 @@ There is intentionally no cross-schema foreign key: recommendation-service
 validates impression ownership before emitting viewability, while behavior
 enforces subject scoping at ingestion.
 
+`V11__versioned_outcome_attribution.sql` adds `attribution_status`,
+`attribution_rule_version` and `attribution_window_seconds`. Rebuilds classify
+outcomes as `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` or
+`INVALID_REFERENCE`; only an authenticated subject/book/impression match to a
+viewable exposure in the seven-day `attribution-v1` window is attributed. The
+classification is rebuildable and does not delete historical events.
+
 ## Outbox downstream
 
 Eventos aceitos entram na outbox e são enviados pelo dispatcher para

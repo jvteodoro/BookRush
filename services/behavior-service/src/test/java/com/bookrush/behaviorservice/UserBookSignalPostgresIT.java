@@ -48,6 +48,8 @@ class UserBookSignalPostgresIT {
         .execute(dataSource);
     new ResourceDatabasePopulator(new ClassPathResource("db/migration/V10__recommendation_outcome_correlation.sql"))
         .execute(dataSource);
+    new ResourceDatabasePopulator(new ClassPathResource("db/migration/V11__versioned_outcome_attribution.sql"))
+        .execute(dataSource);
   }
 
   @Test
