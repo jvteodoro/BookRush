@@ -123,6 +123,11 @@ nenhum token, e-mail ou texto do livro entra nela.
 
 O web registra impressões somente quando o elemento atinge o limiar de
 visibilidade (`IntersectionObserver`) e mede `DWELL` com duração não negativa.
+Para cards originados do feed, a viewability é confirmada pelo endpoint
+server-side do ledger (`/recommendations/impressions/{id}/viewable`); o web não
+envia um segundo `EXCERPT_IMPRESSION` para o mesmo `impressionId`. Impressões
+orgânicas sem ledger continuam usando o evento de telemetria. Isso evita que
+retry/reconciliação conte duas vezes o mesmo fato.
 O mobile expõe os mesmos eventos por `impression` e `dwell`, pois não possui
 um DOM; `BOOK_OPEN`, `BOOK_SAVED` e `BOOK_UNSAVED` são enfileirados pelo app.
 O envio chama `POST /api/v1/behavior/events` com o bearer apenas no cabeçalho.

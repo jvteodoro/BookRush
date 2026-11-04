@@ -39,7 +39,8 @@ public class BehaviorMaintenance {
     jdbc.update("""
         INSERT INTO behavior.daily_book(day, book_id, impressions, opens, likes, reads, shares, comments)
         SELECT occurred_at::date, book_id,
-          count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
+          count(DISTINCT CASE WHEN event_type = 'EXCERPT_IMPRESSION'
+            THEN COALESCE(payload->>'impressionId', id::text) END),
           count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
           count(*) FILTER (WHERE event_type IN ('BOOK_LIKE', 'BOOK_UNLIKE')),
           count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE')),
@@ -87,8 +88,11 @@ public class BehaviorMaintenance {
           ORDER BY identity_subject, book_id, event_type, occurred_at DESC, id DESC
         ), aggregate AS (
           SELECT identity_subject, book_id,
-              count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION') AS impression_count,
-              count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION' AND payload->>'viewable' = 'true') AS viewable_impression_count,
+              count(DISTINCT CASE WHEN event_type = 'EXCERPT_IMPRESSION'
+                THEN COALESCE(payload->>'impressionId', id::text) END) AS impression_count,
+              count(DISTINCT CASE WHEN event_type = 'EXCERPT_IMPRESSION'
+                AND payload->>'viewable' = 'true'
+                THEN COALESCE(payload->>'impressionId', id::text) END) AS viewable_impression_count,
               count(*) FILTER (WHERE event_type = 'BOOK_OPEN') AS open_count,
               count(*) FILTER (WHERE event_type = 'READ_PROGRESS') AS progress_event_count,
               count(*) FILTER (WHERE event_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')) AS completion_count,

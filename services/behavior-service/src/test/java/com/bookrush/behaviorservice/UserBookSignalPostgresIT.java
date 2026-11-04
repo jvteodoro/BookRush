@@ -62,6 +62,9 @@ class UserBookSignalPostgresIT {
     insert("user-a", bookA, "BOOK_SAVE", "{}", base.plusSeconds(3));
     insert("user-a", bookA, "BOOK_UNSAVE", "{}", base.plusSeconds(4));
     insert("user-a", bookA, "EXCERPT_IMPRESSION", viewableCorrelationPayload(recommendationItem, impression), base.plusSeconds(5));
+    // A client retry/server reconciliation can produce a second event key for
+    // the same impression. It must remain one logical exposure.
+    insert("user-a", bookA, "EXCERPT_IMPRESSION", correlationPayload(recommendationItem, impression), base.plusSeconds(5));
     insert("user-a", bookA, "BOOK_OPEN", correlationPayload(recommendationItem, impression), base.plusSeconds(6));
     insert("user-a", bookA, "READ_PROGRESS", "{\"percent\":42.5}", base.plusSeconds(7));
     insert("user-a", bookA, "READ_SESSION", "{\"activeSeconds\":120}", base.plusSeconds(8));

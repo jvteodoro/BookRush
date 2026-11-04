@@ -39,6 +39,13 @@ projeção só inclui eventos com sujeito e `book_id`, portanto uma impressão s
 livro continua disponível no log bruto, mas não é atribuída artificialmente a
 um livro.
 
+As projeções tratam `EXCERPT_IMPRESSION` com `impressionId` como um fato lógico
+deduplicado, mesmo quando retries chegam com `eventKey` diferentes. Impressões
+sem correlação preservam o `event.id` como fallback; elas não são artificialmente
+unidas. O frontend não envia mais um evento paralelo quando o ledger do feed já
+confirma a viewability server-side. O teste PostgreSQL cobre a combinação de
+reenvio, viewability e idempotência.
+
 ## API interna de sinais
 
 `POST /api/internal/v1/recommendation/signals` é uma API somente S2S para o
