@@ -11,7 +11,7 @@ otelcol.receiver.otlp "bookrush" {
   }
   output {
     traces = [otelcol.exporter.otlp.tempo.input]
-    logs = [otelcol.exporter.loki.bookrush.receiver]
+    logs = [otelcol.exporter.loki.bookrush.input]
   }
 }
 

@@ -9,6 +9,7 @@ services:
       - --storage.tsdb.path=/prometheus
       - --storage.tsdb.retention.time=${OBS_PROMETHEUS_RETENTION:-15d}
       - --web.enable-lifecycle
+      - --web.enable-remote-write-receiver
     volumes:
       - prometheus_data:/prometheus
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -121,7 +122,7 @@ services:
         condition: service_healthy
     networks: [observability, bookrush]
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:12345/-/ready"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 10s
       timeout: 5s
       retries: 12

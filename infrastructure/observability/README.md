@@ -61,6 +61,27 @@ configurações, os healthchecks, o provisionamento idempotente, a retenção e 
 backup/restore dos quatro volumes. A integração com o Compose principal e o
 SSO Keycloak permanecem nos pacotes seguintes.
 
+O Tempo habilita `span-metrics` e `service-graphs` em
+`overrides.defaults.metrics_generator` e envia as séries derivadas ao
+Prometheus pelo endpoint privado de remote-write. O Loki usa o armazenamento
+filesystem também para `delete_request_store`, requisito quando a retenção
+está habilitada. O Alloy recebe OTLP em rede privada; seu healthcheck valida a
+vida do processo porque a imagem oficial não inclui `wget` ou `curl`.
+
+Smoke descartável recomendado (use uma rede e um projeto Compose exclusivos):
+
+```bash
+docker compose --env-file /run/bookrush-observability.env \
+  -f infrastructure/observability/compose.yaml up -d
+curl -fsS http://127.0.0.1:13000/api/health
+```
+
+Além dos healthchecks, confirme que os quatro dashboards e os três
+datasources foram provisionados no Grafana, que as regras aparecem no
+Prometheus e que um trace/log OTLP de teste pode ser consultado no Tempo/Loki.
+Remova os containers e volumes do projeto descartável ao terminar; nunca use
+esses comandos sobre o projeto Compose de produção.
+
 Quando habilitado, o OAuth genérico do Grafana usa o realm
 `bookrush-platform`; `platform-admins` recebe Admin, `operators` recebe Editor
 e os demais usuários autenticados recebem Viewer. O backend de reporting deve
