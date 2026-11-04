@@ -1,3 +1,5 @@
+import { categoryLabel } from "./reader/bookCategories";
+import { recordOpenedBook } from "./reader/seen";
 import { loadFollowerStats } from "./reader/followers";
 import { mountAppearance } from "./reader/appearancePanel";
 import { mountReaderPanels } from "./reader/readerPanels";
@@ -122,7 +124,9 @@ function App() {
               id: book.id,
               title: book.canonicalTitle,
               author: "Catálogo BookRush",
-              genre: book.originalLanguage?.toUpperCase() ?? "Clássico",
+              genre: categoryLabel(book.categories),
+              categories: book.categories ?? [],
+              language: book.originalLanguage,
               keywords: [],
               match: Math.max(70, 96 - index * 2),
               a: palettes[index % palettes.length][0],
@@ -545,13 +549,11 @@ function App() {
           },
           open: async (id: string, fromRecommendation = false) => {
             const headers = fromRecommendation ? correlationHeaders(id) : {};
-            readerSessionOrigin.request(
-              fromRecommendation ? { bookId: id, headers } : null,
-            );
-            await authClient.fetch(apiRoutes.reader.opened(id), {
-              method: "POST",
-              headers,
-            });
+            if (fromRecommendation) {
+              readerSessionOrigin.request({ bookId: id, headers });
+              return;
+            }
+            await recordOpenedBook(id, readerSessionOrigin.activeFor(id));
           },
           chapters: async (id: string) => {
             const response = await authClient.fetch(

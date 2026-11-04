@@ -53,6 +53,16 @@ public class ReaderBffController {
     return get(state, "/api/v1/reader/library", request, Map.of());
   }
 
+  @GetMapping("/books/seen")
+  public Object seen(@RequestParam java.util.List<UUID> bookIds, Principal principal, HttpServletRequest request) {
+    requireReader(principal);
+    if (bookIds.isEmpty() || bookIds.size() > 100) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bookIds must contain 1 to 100 UUIDs");
+    }
+    return get(state, "/api/v1/reader/books/seen", request,
+        Map.of("bookIds", bookIds.stream().distinct().map(UUID::toString).collect(java.util.stream.Collectors.joining(","))));
+  }
+
   @GetMapping("/recent")
   public Object recent(Principal principal, HttpServletRequest request) {
     requireReader(principal);

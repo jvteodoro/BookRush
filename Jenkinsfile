@@ -84,6 +84,7 @@ pipeline {
           bash scripts/test-deploy-compose-config.sh
           bash scripts/test-profile-search-e2e.sh
           bash scripts/test-book-ratings-e2e.sh
+          bash scripts/test-book-metadata-e2e.sh
           bash scripts/validate-pipelines.sh
           bash scripts/test-keycloak-realms.sh
           bash scripts/test-keycloak-reconcile.sh
@@ -118,6 +119,8 @@ pipeline {
         sh 'docker run --rm "bookrush/catalog-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$BACKEND_IMAGE" -f services/catalog-service/Dockerfile .'
         sh 'docker build -t "$FRONTEND_IMAGE" frontend'
+        sh 'docker build --target build -t "bookrush/ingestion-test:$BUILD_NUMBER" -f services/book-ingestion-service/Dockerfile .'
+        sh 'docker run --rm "bookrush/ingestion-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$INGESTION_IMAGE" -f services/book-ingestion-service/Dockerfile .'
         sh 'docker build -t "$ANALYTICS_IMAGE" services/book-analytics-service'
         sh 'docker build ' + (params.ANALYTICS_GPU ? '--build-arg ANALYTICS_RUNTIME_REQUIREMENTS=requirements.cuda.txt ' : '') + '-t "$ANALYTICS_RUNTIME_IMAGE" services/book-analytics-runtime'

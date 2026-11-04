@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -69,14 +70,35 @@ public class ReaderStateController {
 
   public record Progress(@NotNull Long positionCodepoint, @NotNull Double percent) {}
 
+  @Transactional
   @PostMapping("/books/{bookId}/opened")
   public Map<String, Object> opened(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
     jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?) "
         + "on conflict(subject_key,book_id) do update set last_opened_at=now()",
         subject, bookId);
+    jdbc.update("INSERT INTO reader_state.seen_book(subject_key,book_id) VALUES (?,?) "
+        + "ON CONFLICT(subject_key,book_id) DO UPDATE SET last_seen_at=clock_timestamp()",
+        subject, bookId);
     behavior.publish("BOOK_OPEN", bookId, correlation(request), authorization(request));
     return Map.of("bookId", bookId, "recorded", true);
+  }
+
+  @GetMapping("/books/seen")
+  public Map<String, Object> seen(@RequestParam java.util.List<UUID> bookIds, Principal principal) {
+    String subject = subject(principal);
+    if (bookIds.isEmpty() || bookIds.size() > 100) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bookIds must contain 1 to 100 UUIDs");
+    }
+    var entries = new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query(
+        "SELECT book_id, first_seen_at, last_seen_at FROM reader_state.seen_book "
+            + "WHERE subject_key=:subject AND book_id IN (:books) ORDER BY book_id",
+        Map.of("subject", subject, "books", bookIds.stream().distinct().toList()),
+        (row, index) -> Map.of(
+            "bookId", row.getObject("book_id", UUID.class),
+            "firstSeenAt", row.getObject("first_seen_at", java.time.OffsetDateTime.class).toInstant(),
+            "lastSeenAt", row.getObject("last_seen_at", java.time.OffsetDateTime.class).toInstant()));
+    return Map.of("items", entries);
   }
 
   @GetMapping("/recent")

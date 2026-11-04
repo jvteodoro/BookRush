@@ -1,6 +1,10 @@
 package com.bookrush.catalog.book;
 
 import com.bookrush.catalog.persistence.model.Book;
+import com.bookrush.catalog.subject.BookCategoryQuery;
+import com.bookrush.catalog.subject.BookCategoryQuery.Category;
+import java.util.List;
+import java.util.Map;
 import com.bookrush.catalog.persistence.repository.BookRepository;
 import java.time.Instant;
 import java.util.UUID;
@@ -23,8 +27,11 @@ public class BookQueryController {
   private static final int MAX_PAGE_SIZE = 100;
   private final BookRepository books;
 
-  public BookQueryController(BookRepository books) {
+  private final BookCategoryQuery categories;
+
+  public BookQueryController(BookRepository books, BookCategoryQuery categories) {
     this.books = books;
+    this.categories = categories;
   }
 
   @GetMapping
@@ -40,14 +47,14 @@ public class BookQueryController {
         q.isBlank()
             ? books.findAll(PageRequest.of(page, size, Sort.by("canonicalTitle").ascending()))
             : books.search(q.trim(), PageRequest.of(page, size));
-    return BookPage.from(result);
+    return BookPage.from(result, categories.forBooks(result.getContent().stream().map(Book::getId).toList()));
   }
 
   @GetMapping("/{bookId}")
   public ResponseEntity<BookView> get(@PathVariable UUID bookId) {
     return books
         .findById(bookId)
-        .map(book -> ResponseEntity.ok(BookView.from(book)))
+        .map(book -> ResponseEntity.ok(BookView.from(book, categories.forBooks(List.of(bookId)).getOrDefault(bookId, List.of()))))
         .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
@@ -58,9 +65,9 @@ public class BookQueryController {
       long totalItems,
       int totalPages,
       boolean last) {
-    static BookPage from(Page<Book> page) {
+    static BookPage from(Page<Book> page, Map<UUID, List<Category>> categories) {
       return new BookPage(
-          page.map(BookView::from).getContent(),
+          page.map(book -> BookView.from(book, categories.getOrDefault(book.getId(), List.of()))).getContent(),
           page.getNumber(),
           page.getSize(),
           page.getTotalElements(),
@@ -77,10 +84,11 @@ public class BookQueryController {
       Short firstPublicationYear,
       String description,
       String thumbnailUrl,
+      List<Category> categories,
       String status,
       Instant createdAt,
       Instant updatedAt) {
-    static BookView from(Book book) {
+    static BookView from(Book book, List<Category> categories) {
       return new BookView(
           book.getId(),
           book.getCanonicalTitle(),
@@ -89,6 +97,7 @@ public class BookQueryController {
           book.getFirstPublicationYear(),
           book.getDescription(),
           "/api/v1/books/" + book.getId() + "/thumbnail",
+          categories,
           book.getStatus().name(),
           book.getCreatedAt(),
           book.getUpdatedAt());

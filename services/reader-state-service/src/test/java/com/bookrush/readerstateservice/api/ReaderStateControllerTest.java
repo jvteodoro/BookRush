@@ -59,7 +59,6 @@ class ReaderStateControllerTest {
     verify(dailyPlant).record("iss:subject-1", id, 15, end);
     assertThrows(ResponseStatusException.class, () -> controller.readingTime(interval, null));
   }
-
   @Test
   void sessionStartPersistsBookAndFeedCorrelation() {
     UUID bookId = UUID.randomUUID();
@@ -128,4 +127,23 @@ class ReaderStateControllerTest {
         eq(Map.of("recommendationItemId", itemId, "impressionId", impressionId, "percent", 100)), any(),
         eq("BOOK_COMPLETE:iss:subject-1:" + bookId));
   }
+  @Test
+  void openingMarksOnlyTheAuthenticatedReadersBookAsSeen() {
+    UUID book = UUID.randomUUID();
+    controller.opened(book, user, null);
+    verify(jdbc).update(
+        eq("INSERT INTO reader_state.seen_book(subject_key,book_id) VALUES (?,?) "
+            + "ON CONFLICT(subject_key,book_id) DO UPDATE SET last_seen_at=clock_timestamp()"),
+        eq(user.getName()), eq(book));
+    assertThrows(ResponseStatusException.class, () -> controller.opened(book, null, null));
+  }
+
+  @Test
+  void seenRejectsUnauthenticatedAndUnboundedQueries() {
+    assertThrows(ResponseStatusException.class, () -> controller.seen(List.of(UUID.randomUUID()), null));
+    assertThrows(ResponseStatusException.class, () -> controller.seen(List.of(), user));
+    assertThrows(ResponseStatusException.class,
+        () -> controller.seen(java.util.Collections.nCopies(101, UUID.randomUUID()), user));
+  }
+
 }

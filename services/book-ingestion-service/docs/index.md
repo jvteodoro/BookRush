@@ -12,3 +12,7 @@ Consultas ao catálogo recebem uma única repetição após falha de I/O, com es
 curta. Respostas HTTP não bem-sucedidas e interrupções não são repetidas: a
 interrupção restaura o estado da thread e a falha sobe para o workflow de jobs,
 que permanece responsável pela política durável de tentativas.
+
+## Assuntos RDF Gutenberg
+
+O parser respeita namespaces e o contexto RDF: idioma vem de dcterms:language, assuntos de dcterms:subject (LCSH ou sem vocabulário declarado) e categorias de pgterms:bookshelf. Classificação LCC, tipo de conteúdo e formatos MIME não são assuntos. Valores XML fragmentados/CDATA são concatenados antes de interpretar título/assunto. Mantém bloqueio de DTD/entidades externas e preferência EPUB sem imagens. O catálogo filtra também representações técnicas já importadas, preservando dados e proveniência.
