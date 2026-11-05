@@ -28,3 +28,5 @@ Código, contratos e decisões relacionadas.
 - [Modelo de dados](ADR-001-book-storage-data-model.md)
 - [Storage](ADR-002-object-storage-s3.md)
 - [Developer Portal](ADR-003-developer-portal.md)
+
+- [ADR-012 — Fronteiras dos dashboards administrativos e observabilidade (Proposed)](ADR-012-administration-observability-boundaries.md)
