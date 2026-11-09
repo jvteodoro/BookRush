@@ -61,8 +61,12 @@ A Biblioteca (`reader/LibraryPage.tsx`) consulta a estante e os recentes reais,
 resolve os metadados pelo ID de cada livro e busca progresso no reader-state.
 
 A tela Minha planta consulta `GET /api/v1/reader/plant` no reader-state-service.
-Ela exibe o estágio e os minutos acumulados da projeção versionada
-`reading-minutes-v1`; não usa métricas demonstrativas locais.
+Ela exibe o estágio, a sequência e o tempo acumulado no dia da projeção
+`daily-reading-v2`, sem limitar a exibição à meta de 15 minutos. O tempo usa
+minutos completos e, a partir de uma hora, horas e minutos (por exemplo,
+`1h15min`). O dia segue o fuso America/Sao_Paulo; o histórico continua sendo
+usado para calcular o crescimento da planta. A tela não exibe o total histórico
+de leitura nem a quantidade de livros salvos.
 Metadados do catálogo usam GET público sem Bearer, pois o catálogo valida o
 realm de plataforma; biblioteca, recentes e progresso usam o token do leitor.
 Ela não limita a estante aos livros do feed.

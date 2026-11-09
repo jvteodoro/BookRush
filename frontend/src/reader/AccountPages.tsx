@@ -95,6 +95,11 @@ export function AccountPage({
   const displayName = profile?.displayName?.trim() || userName;
   if (tab === "plant") {
     const stage = Math.max(0, Math.min(5, Math.trunc(plant?.stage ?? 0)));
+    const minutes = Math.floor((plant?.todaySeconds ?? 0) / 60);
+    const todayTime =
+      minutes < 60
+        ? `${minutes} minutos`
+        : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}min`;
     return (
       <section className="br-account-page">
         <PageHeading
@@ -135,8 +140,8 @@ export function AccountPage({
                 </p>
                 {typeof plant.todaySeconds === "number" && (
                   <p>
-                    Hoje: {Math.min(15, Math.floor(plant.todaySeconds / 60))} de
-                    15 minutos{plant.goalReached ? " — meta cumprida!" : ""}
+                    Hoje: {todayTime} de 15 minutos
+                    {plant.goalReached ? " — meta cumprida!" : ""}
                   </p>
                 )}
                 {stage === 5 && (
@@ -144,12 +149,6 @@ export function AccountPage({
                 )}
               </div>
               <div className="br-account-stats">
-                <span>
-                  <b>{savedCount}</b> livros salvos
-                </span>
-                <span>
-                  <b>{plant?.totalReadingMinutes ?? 0}</b> min lidos
-                </span>
                 <span>
                   <b>{plant?.stage ?? 0}</b>/5 estágio da planta
                 </span>
