@@ -91,7 +91,6 @@
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     type: '<path d="M4 6V4h16v2M12 4v16M8 20h8"/>',
     arrow: '<path d="m5 12 14 0M13 6l6 6-6 6"/>',
-    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
     bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',
   };
 
@@ -164,7 +163,6 @@
           <button class="nav-item publisher-link ${state.route === "publisher" ? "active" : ""}" data-route="publisher">${icon("upload")}<span class="nav-label">Publicador</span></button>
         </nav>
         <div class="sidebar-spacer"></div>
-        <button class="nav-item" data-switch-mode>${icon("menu")}<span class="nav-label">Versão mobile</span></button>
         <div class="profile-mini"><div class="avatar">JV</div><div><strong>João Victor</strong><span>@joaovictor</span></div></div>
       </aside>
       <section class="main-area">
@@ -183,7 +181,6 @@
       window.dispatchEvent(
         new CustomEvent("bookrush:legacy-search", { detail: state.search }),
       );
-    updateModeSwitcher();
   }
 
   function mobileNav() {
@@ -210,40 +207,6 @@
           toast("Você está em dia. Nenhuma notificação nova."),
         ),
       );
-    document
-      .querySelectorAll("[data-switch-mode]")
-      .forEach((el) => el.addEventListener("click", () => setMode("app")));
-  }
-  function setMode(next) {
-    document.body.dataset.mode = next;
-    const url = new URL(window.location.href);
-    if (next === "app") url.searchParams.set("mode", "app");
-    else url.searchParams.delete("mode");
-    window.history.replaceState(window.history.state, "", url);
-    if (
-      next === "app" &&
-      (state.route === "admin" || state.route === "publisher")
-    )
-      state.route = "feed";
-    render();
-  }
-  function updateModeSwitcher() {
-    let el = document.querySelector(".prototype-switcher");
-    if (state.route === "reader") {
-      el?.remove();
-      return;
-    }
-    if (!el) {
-      el = document.createElement("div");
-      el.className = "prototype-switcher";
-      el.innerHTML = '<button type="button" class="prototype-pill"></button>';
-      el.firstChild.addEventListener("click", () =>
-        setMode(getMode() === "app" ? "web" : "app"),
-      );
-      document.body.appendChild(el);
-    }
-    el.firstChild.textContent =
-      getMode() === "app" ? "BookRush Web" : "BookRush Mobile";
   }
   function go(route) {
     if (window.location.pathname.startsWith("/usuarios/"))

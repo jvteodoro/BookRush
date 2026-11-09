@@ -1975,22 +1975,6 @@ select:focus-visible {
   font-weight: 700;
   animation: toastin 0.2s ease;
 }
-.prototype-switcher {
-  position: fixed;
-  right: 14px;
-  top: 78px;
-  z-index: 80;
-}
-.prototype-pill {
-  border: 1px solid var(--line);
-  background: rgba(18, 20, 25, 0.84);
-  backdrop-filter: blur(10px);
-  color: #aaaeb8;
-  border-radius: 999px;
-  padding: 8px 11px;
-  font-size: 10px;
-  box-shadow: var(--shadow);
-}
 @keyframes slidein {
   from {
     transform: translateX(100%);
@@ -2398,9 +2382,6 @@ body[data-mode="app"] .analytics-book-row > *:nth-child(n + 5) {
   }
   .share-grid {
     grid-template-columns: 1fr 1fr;
-  }
-  .prototype-switcher {
-    display: none;
   }
 }
 
