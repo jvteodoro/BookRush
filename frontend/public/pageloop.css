@@ -2056,6 +2056,79 @@ select:focus-visible {
   gap: 8px;
   margin-top: 19px;
 }
+
+/* The lucky flow is rendered outside the React shell but shares its theme. */
+.modal.lucky-modal {
+  box-sizing: border-box;
+  max-height: calc(100dvh - 44px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  background: var(--br-surface);
+  color: var(--br-content);
+  border: 2px solid var(--br-outline);
+  border-radius: var(--br-radius-card);
+  box-shadow: var(--br-shadow);
+  font-family: var(--br-font-sans);
+}
+.lucky-modal .eyebrow {
+  color: var(--br-content-dim);
+}
+.lucky-modal h2 {
+  color: var(--br-content);
+  font-family: var(--br-font-reading);
+  line-height: 1.2;
+}
+.lucky-modal p {
+  color: var(--br-content-dim);
+  font-size: 14px;
+}
+.lucky-modal .lucky-input {
+  box-sizing: border-box;
+  background: var(--br-bg);
+  color: var(--br-content);
+  border: 2px solid var(--br-outline-soft);
+  font: inherit;
+}
+.lucky-modal .lucky-input::placeholder {
+  color: var(--br-content-dim);
+  opacity: 1;
+}
+.lucky-modal .lucky-input:focus-visible {
+  outline: 3px solid var(--br-teal);
+  outline-offset: 2px;
+}
+.lucky-modal .notice {
+  background: var(--br-surface-2);
+  color: var(--br-content);
+  border: 1px solid var(--br-outline-soft);
+}
+.lucky-result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+.lucky-result .result-cover {
+  flex: 0 0 auto;
+}
+.lucky-result-meta {
+  min-width: 0;
+}
+.lucky-result-details {
+  color: var(--br-content-dim);
+  font-size: 12px;
+}
+.lucky-modal .modal-actions {
+  flex-wrap: wrap;
+}
+@media (max-width: 480px) {
+  .lucky-modal .modal-actions {
+    flex-direction: column;
+  }
+  .lucky-modal .modal-actions button {
+    width: 100%;
+  }
+}
 .toast-stack {
   position: fixed;
   right: 20px;
