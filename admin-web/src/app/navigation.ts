@@ -5,6 +5,7 @@ export const adminNavigation = [
   { to: "/analytics", label: "Analytics" },
   { to: "/feed-lab", label: "Feed Lab" },
   { to: "/training", label: "Training" },
+  { to: "/publisher", label: "Meus livros e estatísticas" },
   { to: "/operations", label: "Users & moderation" },
 ] as const;
 

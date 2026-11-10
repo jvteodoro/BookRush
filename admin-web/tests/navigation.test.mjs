@@ -5,20 +5,31 @@ import { test } from "node:test";
 import { build } from "esbuild";
 
 const bundled = await build({
-  entryPoints: [fileURLToPath(new URL("../src/app/navigation.ts", import.meta.url))],
+  entryPoints: [
+    fileURLToPath(new URL("../src/app/navigation.ts", import.meta.url)),
+  ],
   bundle: true,
   format: "esm",
   platform: "browser",
   write: false,
 });
 const navigation = await import(
-  `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`,
+  `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString("base64")}`
 );
 
 test("admin navigation exposes every routed console area", () => {
   assert.deepEqual(
     navigation.adminNavigation.map((item) => item.to),
-    ["/", "/catalog", "/review", "/analytics", "/feed-lab", "/training", "/operations"],
+    [
+      "/",
+      "/catalog",
+      "/review",
+      "/analytics",
+      "/feed-lab",
+      "/training",
+      "/publisher",
+      "/operations",
+    ],
   );
   assert.equal(navigation.isAdminRoute("/review"), true);
   assert.equal(navigation.isAdminRoute("/missing"), false);

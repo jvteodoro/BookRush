@@ -23,6 +23,10 @@ bookrush:
   cors:
     allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
 publisher:
+  metrics:
+    token-uri: ${PUBLISHER_METRICS_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+    client-id: ${PUBLISHER_METRICS_CLIENT_ID:bookrush-publisher-metrics-s2s}
+    client-secret: ${PUBLISHER_METRICS_CLIENT_SECRET:}
   ingestion-callback-token: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:}
   ingestion:
     url: ${PUBLISHER_INGESTION_URL:http://book-ingestion-service:8090}

@@ -1,3 +1,4 @@
+import { PublisherStatisticsPage } from "../features/publisher/PublisherStatisticsPage";
 import { createBrowserRouter } from "react-router-dom";
 import { AnalyticsPage } from "../features/analytics/AnalyticsPage";
 import { AnalyticsJobPage } from "../features/analytics/AnalyticsJobPage";
@@ -29,6 +30,7 @@ export function createAdminRouter() {
           },
           { path: "feed-lab", element: <FeedLabPage /> },
           { path: "training", element: <TrainingPage /> },
+          { path: "publisher", element: <PublisherStatisticsPage /> },
           { path: "operations", element: <OperationsPage /> },
         ],
       },

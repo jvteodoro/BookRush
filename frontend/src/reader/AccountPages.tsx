@@ -269,15 +269,14 @@ export function AccountPage({
           description="Acompanhe suas publicações e envie novas histórias."
         />
         <Card className="br-account-panel">
-          <h2>Suas publicações</h2>
-          <strong className="br-account-number">—</strong>
+          <h2>Desempenho das suas publicações</h2>
           <p className="br-muted">
-            O portal de publicações usa a console protegida do realm de
-            plataforma. Abra a console administrativa para continuar.
+            Entre com a conta usada para publicar seus livros e acompanhe
+            impressões, aberturas, leituras e interações de cada publicação.
           </p>
           <ActionRow>
-            <Button onClick={() => window.location.assign("/admin/")}>
-              Abrir console
+            <Button onClick={() => window.location.assign("/admin/publisher")}>
+              Ver estatísticas dos meus livros
             </Button>
             <Button variant="ghost" onClick={() => onNavigate("feed")}>
               Voltar para o feed

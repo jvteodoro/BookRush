@@ -96,3 +96,7 @@ Eventos aceitos entram na outbox e são enviados pelo dispatcher para
 `book-analytics-service` em `/api/internal/v1/behavior/events`; a autenticação
 entre os serviços usa `BEHAVIOR_OUTBOX_SINK_TOKEN`, mantido somente no `.env`
 protegido. A linha só recebe `published_at` depois de uma resposta 2xx.
+
+## Métricas de publicações
+
+GET `/api/internal/v1/publisher/metrics/books/{bookId}?days=30` retorna apenas agregados diários de impressões, aberturas, leituras, curtidas, compartilhamentos e comentários de um livro, sem identidades de leitores. O período aceita 1–365 dias e filtra datas no banco, incluindo hoje. Exige token RS256 do realm plataforma, audience bookrush-behavior e scope bookrush.publisher.metrics.read. O publisher-service valida a propriedade da publicação antes de chamar esta rota; o scope comum de recomendações não dá acesso a ela. Os dados vêm da projeção existente behavior.daily_book, atualizada pelo job de manutenção.
