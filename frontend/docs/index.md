@@ -432,3 +432,13 @@ mensagem com retry, sem bloquear a leitura ou fingir que o servidor confirmou
 uma marca. Navegação durante um carregamento ignora a conclusão obsoleta.
 
 Cards de livros usam linhas de altura automática para título, autor, categorias, selo Visto e progresso. Categorias longas são limitadas a duas linhas no card, com texto completo no painel de informações. Valores MIME, tipo RDF Text e códigos legados Gutenberg não são apresentados como categorias; o prefixo técnico Category: das prateleiras é removido somente da legenda.
+
+## Links compartilhados de livros
+
+`/book/{id}` mantém o destino durante o login e abre os detalhes após consultar
+`GET /api/v1/books/{id}`. O livro não precisa constar das recomendações ou da
+biblioteca. Links inválidos, livros ausentes e falhas de rede exibem mensagens
+com opção de retornar ao feed; falhas transitórias podem ser tentadas novamente.
+O histórico e a recarga preservam a rota. Para validar a integração, execute os
+testes do frontend e teste uma nova aba, login, recarga, Voltar e leitura de um
+livro fora do feed no ambiente implantado.

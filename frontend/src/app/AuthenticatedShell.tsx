@@ -5,6 +5,7 @@ import type { ReaderTab } from "./useLegacyNavigation";
 
 type AuthenticatedShellProps = {
   error: string;
+  bookPath: string | null;
   feedReady: boolean;
   legacyQuery: string;
   legacyVisible: boolean;
@@ -16,6 +17,7 @@ type AuthenticatedShellProps = {
 
 export function AuthenticatedShell({
   error,
+  bookPath,
   feedReady,
   legacyQuery,
   legacyVisible,
@@ -50,6 +52,7 @@ export function AuthenticatedShell({
         <div hidden={legacyVisible}>
           <LiveReader
             visible={!legacyVisible}
+            bookPath={bookPath}
             initialTab={readerTab}
             legacyQuery={legacyQuery}
             userName={String(

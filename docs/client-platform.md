@@ -190,3 +190,10 @@ O contador exibido é sempre o `count` persistido retornado pelo serviço. O est
 A tela inicial anterior ao login apresenta a planta de leitura no estágio 5 como
 mascote e usa os tokens visuais do frontend em um layout responsivo. As ações de
 entrar e cadastrar continuam usando os fluxos existentes do Keycloak.
+
+Links compartilhados `/book/{id}` abrem os detalhes do livro após o login. O
+frontend preserva o caminho no retorno OIDC e busca os metadados por ID em
+`GET /api/v1/books/{id}`, sem depender do feed. IDs inválidos, livros ausentes
+e falhas de rede mostram uma mensagem; fechar uma entrada direta leva ao feed.
+A leitura e a biblioteca usam as ações existentes, sem atribuir a abertura
+compartilhada a uma recomendação.

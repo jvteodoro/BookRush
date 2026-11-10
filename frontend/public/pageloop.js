@@ -732,12 +732,14 @@
     });
   }
 
-  async function openBook(id, fromRecommendation = false) {
+  async function openBook(id, fromRecommendation, direct = false) {
     const item = book(id);
     const recommendationOrigin =
       fromRecommendation ||
-      (state.route === "feed" && Boolean(item?.recommendationItemId));
-    if (item?.excerpt)
+      (!direct &&
+        state.route === "feed" &&
+        Boolean(item?.recommendationItemId));
+    if (!direct && item?.excerpt)
       window.__BOOKRUSH_API__?.trackExcerpt?.(
         "BOOK_OPEN_FROM_EXCERPT",
         id,
@@ -746,7 +748,7 @@
     state.readerBook = id;
     state.route = "reader";
     try {
-      await window.__BOOKRUSH_API__?.viewable?.(id);
+      if (!direct) await window.__BOOKRUSH_API__?.viewable?.(id);
       if (recommendationOrigin) await window.__BOOKRUSH_API__?.open?.(id, true);
       window.__BOOKRUSH_CHAPTERS__ =
         (await window.__BOOKRUSH_API__?.chapters?.(id)) || [];
@@ -1515,10 +1517,10 @@
       if (route === "search") state.search = query;
       go(route);
     },
-    openBook: async (id, query, fromRecommendation = false) => {
+    openBook: async (id, query, fromRecommendation, direct = false) => {
       if (typeof query === "string") state.search = query;
       syncReactFeed();
-      await openBook(id, fromRecommendation);
+      await openBook(id, fromRecommendation, direct);
     },
     openComments,
     openShare,
