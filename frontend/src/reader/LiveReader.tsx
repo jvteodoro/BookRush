@@ -433,7 +433,6 @@ export function LiveReader({
           "privacy",
           "admin",
           "publisher",
-          "prototype",
         ].includes(tab) ? (
         <AccountPage
           tab={
@@ -443,7 +442,6 @@ export function LiveReader({
               | "privacy"
               | "admin"
               | "publisher"
-              | "prototype"
           }
           userName={userName}
           savedCount={saved.length}

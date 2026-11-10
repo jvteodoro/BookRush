@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { useTheme } from '../../theme/ThemeProvider';
 import { Icon, type IconName } from '../ui/Icon';
 
-export type ReaderTab = 'feed' | 'recommendations' | 'search' | 'library' | 'plant' | 'profile' | 'privacy' | 'admin' | 'publisher' | 'prototype';
+export type ReaderTab = 'feed' | 'recommendations' | 'search' | 'library' | 'plant' | 'profile' | 'privacy' | 'admin' | 'publisher';
 const tabs: { id: ReaderTab; label: string; icon: IconName; separator?: boolean }[] = [
   { id: 'feed', label: 'Para você', icon: 'home' },
   { id: 'recommendations', label: 'Recomendações', icon: 'sparkle' },
@@ -15,7 +15,6 @@ const tabs: { id: ReaderTab; label: string; icon: IconName; separator?: boolean 
   { id: 'privacy', label: 'Privacidade', icon: 'shield' },
   { id: 'admin', label: 'Administração', icon: 'admin', separator: true },
   { id: 'publisher', label: 'Publicador', icon: 'upload', separator: true },
-  { id: 'prototype', label: 'Menu do protótipo', icon: 'grid', separator: true },
 ];
 
 type Props = { children: ReactNode; active: ReaderTab; onNavigate: (tab: ReaderTab) => void; query: string; onSearch: (query: string) => void; userName?: string };
@@ -40,7 +39,7 @@ export function AppShell({ children, active, onNavigate, query, onSearch, userNa
   const navigation = (mobile: boolean) => <nav ref={mobile ? undefined : sidebarNav} aria-label={mobile ? 'Navegação mobile' : 'Navegação principal'} className={mobile ? 'br-tabbar' : 'br-sidebar__nav'}>
     {!mobile && <span aria-hidden="true" className="br-nav-indicator" style={{ height: indicator.height, transform: `translateY(${indicator.top}px)` }} />}
     {tabs.map(tab => <button key={tab.id} type="button" className={!mobile && tab.separator ? 'br-nav-separator' : undefined} aria-current={active === tab.id ? 'page' : undefined} aria-label={tab.label} title={tab.label} onClick={() => onNavigate(tab.id)}>
-      <Icon name={tab.icon} /><span className="br-nav-label">{!mobile && tab.id === 'prototype' ? <>Menu do<br />protótipo</> : tab.label}</span>
+      <Icon name={tab.icon} /><span className="br-nav-label">{tab.label}</span>
     </button>)}
   </nav>;
   return <div className={`br-shell${collapsed ? ' br-shell--collapsed' : ''}${active === 'feed' ? ' br-shell--feed' : ''}`}>
