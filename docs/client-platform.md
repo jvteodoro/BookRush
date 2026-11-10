@@ -127,7 +127,8 @@ O leitor ocupa a viewport inteira para preservar a área útil do Readium. Os co
 A navegação web usa o mesmo layout responsivo em telas de desktop e celular,
 sem controles de alternância entre versões ou opção de menu do protótipo. A
 barra lateral não exibe um usuário fixo; os perfis públicos continuam usando
-os dados retornados pelo serviço de perfis.
+os dados retornados pelo serviço de perfis. A navegação para perfis de outros
+leitores continua acessível pela busca e pelos comentários.
 
 
 Ao sair da rota de leitura, o frontend destrói explicitamente o `WebPubNavigator` antes de uma nova abertura. Isso evita manter um iframe/blob antigo e garante que uma reabertura recrie o fetcher autenticado e a publicação atual.

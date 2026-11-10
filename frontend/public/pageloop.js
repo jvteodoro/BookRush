@@ -1445,11 +1445,7 @@
   window.__BOOKRUSH_LEGACY__ = {
     navigate: (route, query = "") => {
       if (
-        ![
-          ...NAV.map((item) => item[0]),
-          "admin",
-          "publisher",
-        ].includes(route)
+        ![...NAV.map((item) => item[0]), "admin", "publisher"].includes(route)
       )
         return;
       syncReactFeed();
