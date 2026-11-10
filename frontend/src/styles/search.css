@@ -12,7 +12,41 @@
 }
 .br-search-results {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
+}
+.br-person-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1.25rem;
+}
+.br-person-result__identity {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.br-person-result__identity h2 {
+  margin: 0;
+  font: 700 1rem/1.5 var(--br-font-sans);
+}
+.br-person-result__identity p {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+}
+.br-person-result > .br-button {
+  box-sizing: border-box;
+  max-width: 100%;
+  justify-self: end;
+}
+@media (max-width: 575px) {
+  .br-person-result {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .br-person-result > .br-button {
+    justify-self: start;
+  }
 }
 .br-search-result {
   position: relative;

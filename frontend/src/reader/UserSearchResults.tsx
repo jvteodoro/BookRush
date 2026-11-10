@@ -94,9 +94,13 @@ export function UserSearchResults({
           </div>
           <div className="br-search-results">
             {data.items.map((user) => (
-              <Card key={user.subject}>
-                <h2>{user.displayName || user.username || "Leitor"}</h2>
-                {user.username && <p className="br-muted">@{user.username}</p>}
+              <Card className="br-person-result" key={user.subject}>
+                <div className="br-person-result__identity">
+                  <h2>{user.displayName || user.username || "Leitor"}</h2>
+                  {user.username && (
+                    <p className="br-muted">@{user.username}</p>
+                  )}
+                </div>
                 <Button
                   variant="secondary"
                   onClick={() => onProfile(user.subject)}
