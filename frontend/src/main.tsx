@@ -1,3 +1,4 @@
+import { bookMetadata } from "./reader/bookMetadata";
 import { categoryLabel } from "./reader/bookCategories";
 import { recordOpenedBook } from "./reader/seen";
 import { loadFollowerStats } from "./reader/followers";
@@ -125,7 +126,7 @@ function App() {
             return {
               id: book.id,
               title: book.canonicalTitle,
-              author: "Catálogo BookRush",
+              ...bookMetadata(book),
               genre: categoryLabel(book.categories),
               categories: book.categories ?? [],
               language: book.originalLanguage,

@@ -23,7 +23,7 @@ test('saved books outside the feed are resolved by ID with real progress; duplic
     if (url === '/api/v1/reader/library') return response([{ book_id: 'outside-feed' }, { bookId: 'outside-feed' }]);
     if (url === '/api/v1/reader/recent') return response([{ book_id: 'recent-only' }]);
     if (url.endsWith('/progress')) return response([{ percent: url.includes('outside-feed') ? 37 : 8 }]);
-    if (url === '/api/v1/reader/books/outside-feed') return response({ book: { canonicalTitle: 'Livro salvo', originalLanguage: 'pt', thumbnailUrl: '/cover.png' } });
+    if (url === '/api/v1/reader/books/outside-feed') return response({ book: { canonicalTitle: 'Livro salvo', authors: ['Machado de Assis'], firstPublicationYear: 1899, originalLanguage: 'pt', thumbnailUrl: '/cover.png' } });
     if (url === '/api/v1/reader/books/recent-only') return response({ book: { canonicalTitle: 'Livro recente', originalLanguage: 'pt', thumbnailUrl: '/cover.png' } });
     return response({ canonicalTitle: 'Livro inesperado' });
   };
@@ -31,6 +31,10 @@ test('saved books outside the feed are resolved by ID with real progress; duplic
   assert.deepEqual(result.saved, ['outside-feed']);
   assert.deepEqual(result.recent, ['recent-only']);
   assert.equal(result.books[0].title, 'Livro salvo');
+  assert.equal(result.books[0].author, 'Machado de Assis');
+  assert.equal(result.books[0].firstPublicationYear, 1899);
+  assert.equal(result.books[1].author, 'Autor não informado');
+  assert.equal(result.books[1].firstPublicationYear, null);
   assert.equal(result.books[0].progress, 37);
   assert.equal(result.books[0].available, true);
   assert.equal(requests.filter(url => url === '/api/v1/reader/books/outside-feed').length, 1);

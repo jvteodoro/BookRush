@@ -1,3 +1,4 @@
+import { bookMetadata } from "./bookMetadata";
 import { categoryLabel, type BookCategory } from "./bookCategories";
 import { authClient } from "../auth";
 import type { ReaderBook } from "../components/book/BookCard";
@@ -62,12 +63,16 @@ export async function loadLibrary(
           const payload = (await response.json()) as {
             book?: {
               canonicalTitle?: string;
+              authors?: string[] | null;
+              firstPublicationYear?: number | null;
               originalLanguage?: string;
               categories?: BookCategory[];
               description?: string;
               thumbnailUrl?: string;
             };
             canonicalTitle: string;
+            authors?: string[] | null;
+            firstPublicationYear?: number | null;
             originalLanguage?: string;
             categories?: BookCategory[];
             description?: string;
@@ -94,7 +99,7 @@ export async function loadLibrary(
           books[index] = {
             id,
             title: book.canonicalTitle,
-            author: "Catálogo BookRush",
+            ...bookMetadata(book),
             genre: categoryLabel(book.categories),
             categories: book.categories ?? [],
             language: book.originalLanguage,

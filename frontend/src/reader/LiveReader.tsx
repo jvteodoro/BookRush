@@ -21,6 +21,7 @@ type SourceBook = {
   id: string;
   title: string;
   author: string;
+  firstPublicationYear?: number | null;
   genre: string;
   categories?: BookCategory[];
   language?: string | null;
@@ -211,6 +212,7 @@ export function LiveReader({
         id: book.id,
         title: book.title,
         author: book.author,
+        firstPublicationYear: book.firstPublicationYear,
         genre: book.genre,
         categories: book.categories,
         language: book.language,

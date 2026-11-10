@@ -1,3 +1,4 @@
+import { bookMetadata } from "./bookMetadata";
 import { categoryLabel, type BookCategory } from "./bookCategories";
 import type { LibraryBook } from "./library";
 
@@ -11,6 +12,8 @@ type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 type CatalogBook = {
   id: string;
   canonicalTitle: string;
+  authors?: string[] | null;
+  firstPublicationYear?: number | null;
   originalTitle?: string;
   originalLanguage?: string;
   categories?: BookCategory[];
@@ -49,7 +52,7 @@ export async function searchCatalog(
     books: payload.items.map((book) => ({
       id: book.id,
       title: book.canonicalTitle,
-      author: "Catálogo BookRush",
+      ...bookMetadata(book),
       genre: categoryLabel(book.categories),
       categories: book.categories ?? [],
       language: book.originalLanguage,

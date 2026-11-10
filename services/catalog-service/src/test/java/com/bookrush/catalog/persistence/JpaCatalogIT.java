@@ -21,12 +21,32 @@ import org.springframework.transaction.annotation.Transactional;
 @Sql("/catalog-fixture.sql")
 class JpaCatalogIT {
   @Autowired EntityManager em;
+  @Autowired com.bookrush.catalog.book.BookAuthorQuery authorQuery;
   @Autowired BookRepository books;
   @Autowired BookAssetRepository assets;
   @Autowired BookAssetVersionRepository versions;
 
   private UUID id(String prefix, int n) {
     return UUID.fromString(prefix + "0000000-0000-4000-8000-00000000000" + n);
+  }
+
+  @Test
+  void readsOnlyAuthorsInCreditOrderAndHandlesMissingCredits() {
+    Book work = new Book(); work.setCanonicalTitle("Coauthored work");
+    books.saveAndFlush(work);
+    for (int position : new int[] {3, 1, 2}) {
+      Author author = new Author(); author.setName("Credit " + position); em.persist(author);
+      BookAuthor credit = new BookAuthor();
+      credit.setBookId(work.getId()); credit.setAuthorId(author.getId());
+      credit.setRole(position == 2 ? BookAuthorRole.TRANSLATOR : BookAuthorRole.AUTHOR);
+      credit.setPosition(position); em.persist(credit);
+    }
+    em.flush();
+    UUID unknown = UUID.randomUUID();
+    var result = authorQuery.forBooks(java.util.List.of(work.getId(), unknown));
+    assertEquals(java.util.List.of("Credit 1", "Credit 3"), result.get(work.getId()));
+    assertFalse(result.containsKey(unknown));
+    assertTrue(authorQuery.forBooks(java.util.List.of()).isEmpty());
   }
 
   @Test

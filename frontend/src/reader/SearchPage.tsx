@@ -194,7 +194,11 @@ export function SearchPage({
                     </button>
                   </h2>
                   <p>
-                    {book.author} · {book.genre}
+                    {book.author}
+                    {book.firstPublicationYear != null
+                      ? ` · ${book.firstPublicationYear}`
+                      : ""}{" "}
+                    · {book.genre}
                   </p>
                   {book.description && (
                     <p className="br-search-result__description">

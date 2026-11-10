@@ -17,6 +17,9 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 class BookQueryControllerTest {
+  private final BookAuthorQuery authors = org.mockito.Mockito.mock(BookAuthorQuery.class);
+  @org.junit.jupiter.api.BeforeEach
+  void authorsDefault() { when(authors.forBooks(any())).thenReturn(Map.of()); }
   private final BookCategoryQuery categories = org.mockito.Mockito.mock(BookCategoryQuery.class);
   @Test
   void listsBooksThroughPaginatedRepositoryBoundary() {
@@ -24,14 +27,19 @@ class BookQueryControllerTest {
     var book = new Book();
     book.setId(UUID.randomUUID());
     book.setCanonicalTitle("A Book");
+    book.setFirstPublicationYear((short) 1899);
+    when(authors.forBooks(List.of(book.getId()))).thenReturn(Map.of(book.getId(), List.of("Machado de Assis", "Coautor")));
     when(categories.forBooks(any())).thenReturn(Map.of());
     when(repository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(List.of(book)));
 
-    var result = new BookQueryController(repository, categories).list("", 0, 50);
+    var result = new BookQueryController(repository, categories, authors).list("", 0, 50);
 
     assertThat(result.items()).hasSize(1);
     assertThat(result.items().getFirst().canonicalTitle()).isEqualTo("A Book");
     assertThat(result.totalItems()).isEqualTo(1);
+    assertThat(result.items().getFirst().authors()).containsExactly("Machado de Assis", "Coautor");
+    assertThat(result.items().getFirst().firstPublicationYear()).isEqualTo((short) 1899);
+    verify(authors).forBooks(List.of(book.getId()));
   }
 
   @Test
@@ -43,7 +51,7 @@ class BookQueryControllerTest {
     when(categories.forBooks(any())).thenReturn(Map.of());
     when(repository.search(any(), any())).thenReturn(new PageImpl<>(List.of(book)));
 
-    var result = new BookQueryController(repository, categories).list("franken", 2, 20);
+    var result = new BookQueryController(repository, categories, authors).list("franken", 2, 20);
 
     assertThat(result.items()).extracting(BookQueryController.BookView::canonicalTitle)
         .containsExactly("Frankenstein");
@@ -58,9 +66,11 @@ class BookQueryControllerTest {
     when(repository.findAll(any(PageRequest.class))).thenReturn(new PageImpl<>(List.of(first, second)));
     when(categories.forBooks(List.of(first.getId(), second.getId())))
         .thenReturn(Map.of(first.getId(), List.of(category)));
-    var result = new BookQueryController(repository, categories).list("", 0, 50);
+    var result = new BookQueryController(repository, categories, authors).list("", 0, 50);
     assertThat(result.items().get(0).categories()).containsExactly(category);
     assertThat(result.items().get(1).categories()).isEmpty();
+    assertThat(result.items().get(1).authors()).isEmpty();
+    assertThat(result.items().get(1).firstPublicationYear()).isNull();
     verify(categories).forBooks(List.of(first.getId(), second.getId()));
   }
 
@@ -71,8 +81,12 @@ class BookQueryControllerTest {
     var category = new Category(UUID.randomUUID(), "Fiction", "LCSH");
     when(repository.findById(book.getId())).thenReturn(java.util.Optional.of(book));
     when(categories.forBooks(List.of(book.getId()))).thenReturn(Map.of(book.getId(), List.of(category)));
-    var controller = new BookQueryController(repository, categories);
+    book.setFirstPublicationYear((short) 1818);
+    when(authors.forBooks(List.of(book.getId()))).thenReturn(Map.of(book.getId(), List.of("Mary Shelley")));
+    var controller = new BookQueryController(repository, categories, authors);
     assertThat(controller.get(book.getId()).getBody().categories()).containsExactly(category);
+    assertThat(controller.get(book.getId()).getBody().authors()).containsExactly("Mary Shelley");
+    assertThat(controller.get(book.getId()).getBody().firstPublicationYear()).isEqualTo((short) 1818);
     assertThat(controller.get(UUID.randomUUID()).getStatusCode().value()).isEqualTo(404);
   }
 
