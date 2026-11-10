@@ -129,6 +129,7 @@ function App() {
               genre: categoryLabel(book.categories),
               categories: book.categories ?? [],
               language: book.originalLanguage,
+              description: book.description ?? "",
               keywords: [],
               match: Math.max(70, 96 - index * 2),
               a: palettes[index % palettes.length][0],

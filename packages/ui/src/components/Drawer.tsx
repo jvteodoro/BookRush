@@ -9,26 +9,31 @@ export function Drawer({
   children,
   footer,
   onClose,
+  className = "",
 }: {
   title: string;
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
+  className?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
     const element = dialog.current;
+    const trigger = document.activeElement;
     element?.showModal();
     return () => {
       if (element?.open) element.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected)
+        trigger.focus();
     };
   }, []);
   return createPortal(
     <dialog
       ref={dialog}
-      className="br-drawer"
+      className={`br-drawer ${className}`.trim()}
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();

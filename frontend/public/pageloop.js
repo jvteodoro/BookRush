@@ -1397,26 +1397,90 @@
   }
 
   function openShare(id) {
-    const label = id === "profile" ? "este perfil" : `“${book(id).title}”`;
-    modal(
-      `<div class="eyebrow">COMPARTILHAR</div><h2>Envie ${label}</h2><p>Escolha uma opção para compartilhar.</p><div class="share-grid"><button class="share-choice" data-share-choice><strong>↗</strong>Copiar link</button><button class="share-choice" data-share-choice><strong>•••</strong>Mais</button></div>`,
-      `<button class="secondary-btn" data-close-modal>Cancelar</button>`,
-    );
-    document.querySelectorAll("[data-share-choice]").forEach(
-      (b) =>
-        (b.onclick = async () => {
+    document.querySelector(".br-share-dialog")?.close();
+    const trigger = document.activeElement;
+    const profile = window.__BOOKRUSH_PROFILE__ || {};
+    const isProfile = id === "profile";
+    const title = isProfile
+      ? profile.display_name || profile.displayName || "Perfil BookRush"
+      : book(id).title;
+    const subject = profile.subject_key || profile.subject;
+    const url = `${window.location.origin}${isProfile && subject ? `/usuarios/${encodeURIComponent(subject)}` : `/book/${encodeURIComponent(id)}`}`;
+    const dialog = document.createElement("dialog");
+    dialog.className = "br-share-dialog";
+    dialog.setAttribute("aria-labelledby", "br-share-title");
+    dialog.setAttribute("aria-describedby", "br-share-description");
+    dialog.innerHTML = `
+      <header class="br-share-dialog__header">
+        <span class="br-share-dialog__symbol">${icon("share")}</span>
+        <button type="button" class="br-button br-button--ghost br-button--sm br-share-dialog__close" aria-label="Fechar compartilhamento">${icon("close")}</button>
+      </header>
+      <span class="br-share-dialog__eyebrow">BOAS HISTÓRIAS MERECEM COMPANHIA</span>
+      <h2 id="br-share-title">Compartilhar ${isProfile ? "perfil" : "livro"}</h2>
+      <p id="br-share-description">${isProfile ? "Convide alguém para conhecer este perfil." : "Envie sua próxima descoberta para alguém."}</p>
+      <div class="br-share-dialog__preview">${icon(isProfile ? "user" : "library")}<div><small>${isProfile ? "PERFIL" : "LIVRO"}</small><strong>${esc(title)}</strong></div></div>
+      <label class="br-share-dialog__label" for="br-share-url">Link para compartilhar</label>
+      <div class="br-share-dialog__link">
+        <input id="br-share-url" type="text" readonly value="${esc(url)}" spellcheck="false" />
+        <button type="button" class="br-button br-button--primary br-button--md" data-copy-share>Copiar link</button>
+      </div>
+      <p class="br-share-dialog__status" role="status" aria-live="polite"></p>
+      <footer class="br-share-dialog__footer"><button type="button" class="br-button br-button--ghost br-button--sm" data-close-share>Fechar</button></footer>`;
+    document.body.appendChild(dialog);
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (trigger instanceof HTMLElement && trigger.isConnected)
+        trigger.focus();
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target !== dialog) return;
+      const bounds = dialog.getBoundingClientRect();
+      if (
+        event.clientX < bounds.left ||
+        event.clientX > bounds.right ||
+        event.clientY < bounds.top ||
+        event.clientY > bounds.bottom
+      )
+        dialog.close();
+    });
+    dialog
+      .querySelectorAll(".br-share-dialog__close, [data-close-share]")
+      .forEach((button) => {
+        button.onclick = () => dialog.close();
+      });
+    const input = dialog.querySelector("input");
+    input.onfocus = () => input.select();
+    const copy = dialog.querySelector("[data-copy-share]");
+    const status = dialog.querySelector("[role=status]");
+    copy.onclick = async () => {
+      if (copy.disabled) return;
+      copy.disabled = true;
+      status.textContent = "";
+      try {
+        if (!navigator.clipboard?.writeText)
+          throw new Error("Selecione e copie o link acima para compartilhar.");
+        await navigator.clipboard.writeText(url);
+        copy.textContent = "Copiado!";
+        status.textContent = "Link copiado. Agora é só enviar!";
+        if (!isProfile) {
           try {
             await window.__BOOKRUSH_API__?.share?.(id);
-            await navigator.clipboard?.writeText(
-              `${window.location.origin}/book/${id}`,
-            );
-            toast("Compartilhamento registrado");
-          } catch (e) {
-            toast(e.message || "Não foi possível compartilhar");
+          } catch {
+            status.textContent =
+              "Link copiado. Não foi possível registrar o compartilhamento agora.";
           }
-          document.querySelector(".modal-wrap")?.remove();
-        }),
-    );
+        }
+      } catch (error) {
+        copy.textContent = "Copiar link";
+        status.textContent =
+          error.message ||
+          "Não foi possível copiar. Selecione e copie o link acima.";
+        input.focus();
+      } finally {
+        copy.disabled = false;
+      }
+    };
+    dialog.showModal();
   }
 
   window.addEventListener("keydown", (e) => {

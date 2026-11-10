@@ -242,6 +242,11 @@
     var(--br-surface) 70%
   );
 }
+.br-excerpt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
 .br-excerpt-copy {
   min-width: 0;
   padding-right: 1rem;

@@ -177,12 +177,22 @@ export function SearchPage({
                 <div className="br-search-result__cover">
                   <BookCard
                     book={{ ...book, seen: seenState.seen.has(book.id) }}
-                    onOpen={() => onOpen(book)}
+                    onOpen={() => (onDetails ?? onOpen)(book)}
                     disabled={pending.includes(book.id)}
                   />
                 </div>
                 <div className="br-search-result__copy">
-                  <h2>{book.title}</h2>
+                  <h2>
+                    <button
+                      type="button"
+                      className="br-search-result__open"
+                      disabled={pending.includes(book.id)}
+                      aria-label={`Ver ${book.title}, de ${book.author}`}
+                      onClick={() => (onDetails ?? onOpen)(book)}
+                    >
+                      {book.title}
+                    </button>
+                  </h2>
                   <p>
                     {book.author} · {book.genre}
                   </p>
@@ -193,15 +203,6 @@ export function SearchPage({
                   )}
                 </div>
                 <div className="br-search-result__actions">
-                  {onDetails && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDetails(book)}
-                    >
-                      Sobre e avaliações
-                    </Button>
-                  )}
                   <Button
                     variant={saved.includes(book.id) ? "secondary" : "ghost"}
                     size="sm"
