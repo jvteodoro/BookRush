@@ -1,6 +1,12 @@
+import { Notice } from "@bookrush/ui/Notice";
+import { SearchField } from "@bookrush/ui/SearchField";
+import { Textarea } from "@bookrush/ui/Textarea";
+import { Surface } from "@bookrush/ui/Surface";
+import { Select } from "@bookrush/ui/Select";
+import { Button } from "../../components/ui/Button";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, EyeOff, History, Search, Trash2 } from "lucide-react";
+import { Eye, EyeOff, History, Trash2 } from "lucide-react";
 import { services, type AdminComment } from "../../lib/services";
 
 const states = {
@@ -91,7 +97,8 @@ function CommentCard({
           ).map(([visibility, action]) => {
             const Icon = action.icon;
             return (
-              <button
+              <Button
+                variant="ghost"
                 type="button"
                 key={visibility}
                 className={`secondary-action ${visibility === "REMOVED" ? "danger-action" : ""}`}
@@ -106,17 +113,18 @@ function CommentCard({
                 }}
               >
                 <Icon size={15} /> {action.action}
-              </button>
+              </Button>
             );
           })}
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="secondary-action"
             aria-expanded={showHistory}
             onClick={() => setShowHistory((value) => !value)}
           >
             <History size={15} /> Histórico
-          </button>
+          </Button>
         </div>
       </div>
       {decision && (
@@ -141,7 +149,7 @@ function CommentCard({
           </p>
           <label>
             Justificativa (3 a 80 caracteres)
-            <textarea
+            <Textarea
               value={reason}
               required
               minLength={3}
@@ -152,21 +160,23 @@ function CommentCard({
             />
           </label>
           <div className="review-asset-actions">
-            <button
+            <Button
+              variant="primary"
               type="submit"
               className="primary-action"
               disabled={busy || reason.trim().length < 3}
             >
               {busy ? "Salvando…" : "Confirmar decisão"}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               type="button"
               className="secondary-action"
               disabled={busy}
               onClick={() => setDecision(undefined)}
             >
               Cancelar
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -176,16 +186,17 @@ function CommentCard({
           {history.isLoading ? (
             <p>Carregando histórico…</p>
           ) : history.isError ? (
-            <div role="alert">
+            <Notice as="div" role="alert">
               <p>Não foi possível carregar o histórico.</p>
-              <button
+              <Button
+                variant="ghost"
                 type="button"
                 className="secondary-action"
                 onClick={() => void history.refetch()}
               >
                 Tentar novamente
-              </button>
-            </div>
+              </Button>
+            </Notice>
           ) : history.data?.length ? (
             <ol>
               {history.data.map((entry) => (
@@ -246,7 +257,7 @@ export function CommentModeration({
     },
   });
   return (
-    <div className="panel" id="comment-moderation">
+    <Surface as="div" className="panel" id="comment-moderation">
       <div className="moderation-section-heading">
         <div>
           <h2>Comentários</h2>
@@ -270,19 +281,16 @@ export function CommentModeration({
       >
         <label className="user-search-label">
           <span>Buscar por comentário, autor ou livro</span>
-          <span className="user-search-field">
-            <Search size={18} aria-hidden="true" />
-            <input
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              maxLength={200}
-              placeholder="Texto, autor ou ID do livro"
-            />
-          </span>
+          <SearchField
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            maxLength={200}
+            placeholder="Texto, autor ou ID do livro"
+          />
         </label>
         <label className="user-search-label">
           <span>Visibilidade</span>
-          <select
+          <Select
             value={visibility}
             onChange={(event) => {
               setVisibility(event.target.value);
@@ -295,17 +303,17 @@ export function CommentModeration({
                 {state.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
-        <button type="submit" className="primary-action">
+        <Button variant="primary" type="submit" className="primary-action">
           Buscar comentários
-        </button>
+        </Button>
       </form>
       {moderation.isError && (
-        <p role="alert" className="moderation-error">
+        <Notice as="p" role="alert" className="moderation-error">
           Não foi possível atualizar o comentário. Verifique sua permissão e
           tente novamente.
-        </p>
+        </Notice>
       )}
       {moderation.isSuccess && (
         <p role="status">Decisão registrada com sucesso.</p>
@@ -313,16 +321,17 @@ export function CommentModeration({
       {comments.isLoading ? (
         <p>Carregando comentários…</p>
       ) : comments.isError ? (
-        <div role="alert" className="user-load-error">
+        <Notice as="div" role="alert" className="user-load-error">
           <p>Não foi possível carregar os comentários.</p>
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="secondary-action"
             onClick={() => void comments.refetch()}
           >
             Tentar novamente
-          </button>
-        </div>
+          </Button>
+        </Notice>
       ) : comments.data?.items.length ? (
         comments.data.items.map((comment) => (
           <CommentCard
@@ -339,18 +348,20 @@ export function CommentModeration({
       )}
       {comments.data && comments.data.totalItems > 0 && (
         <div className="review-asset-actions">
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="secondary-action"
             disabled={page === 0 || comments.isFetching || moderation.isPending}
             onClick={() => setPage((value) => value - 1)}
           >
             Anterior
-          </button>
+          </Button>
           <span>
             Página {page + 1} · {comments.data.totalItems} comentários
           </span>
-          <button
+          <Button
+            variant="ghost"
             type="button"
             className="secondary-action"
             disabled={
@@ -359,9 +370,9 @@ export function CommentModeration({
             onClick={() => setPage((value) => value + 1)}
           >
             Próxima
-          </button>
+          </Button>
         </div>
       )}
-    </div>
+    </Surface>
   );
 }

@@ -8,7 +8,7 @@ import { runInNewContext } from 'node:vm';
 
 async function load(entry, hooks = false) {
   const result = await build({ entryPoints: [fileURLToPath(new URL(entry, import.meta.url))], bundle: true,
-    write: false, platform: 'browser', format: 'esm', jsx: 'automatic',
+    write: false, platform: 'browser', format: 'esm', jsx: 'automatic', preserveSymlinks: true,
     plugins: [{ name: 'metadata-test', setup(builder) {
       builder.onResolve({ filter: /auth$/ }, () => ({ path: 'auth', namespace: 'auth' }));
       builder.onLoad({ filter: /.*/, namespace: 'auth' }, () => ({ contents: 'export const authClient={fetch(...args){return globalThis.__metadataFetch(...args);}};' }));

@@ -1,3 +1,11 @@
+import { Tabs } from "@bookrush/ui/Tabs";
+import { Notice } from "@bookrush/ui/Notice";
+import { SearchField } from "@bookrush/ui/SearchField";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Select } from "@bookrush/ui/Select";
+import { Toolbar } from "@bookrush/ui/Toolbar";
+import { Surface } from "@bookrush/ui/Surface";
+import { Button } from "../../components/ui/Button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UseMutationResult } from "@tanstack/react-query";
 import ePub from "epubjs";
@@ -8,7 +16,6 @@ import {
   ChevronUp,
   ExternalLink,
   Image,
-  Search,
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
@@ -100,7 +107,7 @@ export function ReviewPage() {
   const error = action.error ?? revoke.error;
   return (
     <section>
-      <header className="pagehead">
+      <PageHeader className="">
         <div>
           <span className="eyebrow">CONTENT GOVERNANCE</span>
           <h1>Review Queue</h1>
@@ -114,13 +121,14 @@ export function ReviewPage() {
             ? `${books.data?.totalItems ?? 0} aguardando`
             : `${history.data?.totalItems ?? 0} decisões`}
         </span>
-      </header>
-      <div
+      </PageHeader>
+      <Tabs
         className="review-tabs"
         role="tablist"
         aria-label="Revisão editorial"
       >
-        <button
+        <Button
+          variant="ghost"
           className={tab === "queue" ? "active" : ""}
           onClick={() => {
             setTab("queue");
@@ -128,8 +136,9 @@ export function ReviewPage() {
           }}
         >
           Fila de revisão
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           className={tab === "history" ? "active" : ""}
           onClick={() => {
             setTab("history");
@@ -137,32 +146,28 @@ export function ReviewPage() {
           }}
         >
           Histórico de aprovações
-        </button>
-      </div>
+        </Button>
+      </Tabs>
       {error && (
-        <div className="error-box" role="alert">
+        <Notice as="div" className="error-box" role="alert">
           {error instanceof Error ? error.message : "A operação foi rejeitada."}
-        </div>
+        </Notice>
       )}
       {tab === "queue" ? (
         <>
           <div className="review-controls" aria-label="Controles da fila">
-            <label className="review-search">
-              <Search size={17} aria-hidden="true" />
-              <span className="sr-only">Pesquisar livros</span>
-              <input
-                value={query}
-                placeholder="Pesquisar por título, idioma ou descrição"
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(0);
-                }}
-              />
-            </label>
+            <SearchField
+              value={query}
+              placeholder="Pesquisar por título, idioma ou descrição"
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(0);
+              }}
+            />
             <label className="review-select">
               <ArrowDownAZ size={17} aria-hidden="true" />
               <span className="sr-only">Ordenar por</span>
-              <select
+              <Select
                 value={sort}
                 onChange={(event) => {
                   setSort(event.target.value);
@@ -173,9 +178,10 @@ export function ReviewPage() {
                 <option value="title">Título</option>
                 <option value="language">Idioma</option>
                 <option value="year">Ano de publicação</option>
-              </select>
+              </Select>
             </label>
-            <button
+            <Button
+              variant="ghost"
               className="review-sort-direction"
               type="button"
               onClick={() => {
@@ -187,7 +193,7 @@ export function ReviewPage() {
               }
             >
               {direction === "asc" ? "A → Z" : "Z → A"}
-            </button>
+            </Button>
           </div>
           <QueueContent
             books={books.data?.items ?? []}
@@ -211,22 +217,24 @@ export function ReviewPage() {
           revoke={revoke}
         />
       )}
-      <div className="toolbar">
-        <button
+      <Toolbar className="">
+        <Button
+          variant="ghost"
           disabled={page === 0}
           onClick={() => setPage((current) => current - 1)}
         >
           Página anterior
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           disabled={
             (tab === "queue" ? books.data?.last : history.data?.last) ?? true
           }
           onClick={() => setPage((current) => current + 1)}
         >
           Próxima página
-        </button>
-      </div>
+        </Button>
+      </Toolbar>
       {previewAsset && (
         <AssetPreview
           preview={previewAsset}
@@ -256,28 +264,28 @@ function QueueContent({
 }) {
   if (loading)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h2>Carregando fila</h2>
         <p>Buscando livros e assets aguardando revisão…</p>
-      </section>
+      </Surface>
     );
   if (error)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h2>Fila indisponível</h2>
         <p>
           {error instanceof Error
             ? error.message
             : "Não foi possível carregar a fila de revisão."}
         </p>
-      </section>
+      </Surface>
     );
   if (books.length === 0)
     return (
-      <div className="panel">
+      <Surface as="div" className="panel">
         <h2>Nenhum item aguardando revisão</h2>
         <p>Novas importações com status REVIEW_REQUIRED aparecerão aqui.</p>
-      </div>
+      </Surface>
     );
   return (
     <div className="review-list">
@@ -287,7 +295,8 @@ function QueueContent({
           key={book.id}
         >
           <div className="review-card-head">
-            <button
+            <Button
+              variant="ghost"
               className="review-card-summary"
               type="button"
               aria-expanded={expandedBookId === book.id}
@@ -318,16 +327,17 @@ function QueueContent({
               ) : (
                 <ChevronDown size={20} />
               )}
-            </button>
+            </Button>
             <div className="review-card-actions">
-              <button
+              <Button
+                variant="primary"
                 className="primary-action"
                 disabled={action.isPending}
                 onClick={() => action.mutate({ kind: "book", bookId: book.id })}
               >
                 <ShieldCheck size={16} />
                 Aprovar livro
-              </button>
+              </Button>
             </div>
           </div>
           {expandedBookId === book.id && (
@@ -359,13 +369,14 @@ function QueueContent({
                       </div>
                       <div className="review-asset-actions">
                         {asset.versionId && (
-                          <button
+                          <Button
+                            variant="secondary"
                             className="secondary-action"
                             onClick={() => openAsset(book, asset)}
                           >
                             <ExternalLink size={15} />
                             Abrir para revisão
-                          </button>
+                          </Button>
                         )}
                         {assetReady(asset) ? (
                           <span className="review-approved">
@@ -373,7 +384,8 @@ function QueueContent({
                             Aprovado
                           </span>
                         ) : (
-                          <button
+                          <Button
+                            variant="secondary"
                             className="secondary-action"
                             disabled={action.isPending}
                             onClick={() =>
@@ -386,7 +398,7 @@ function QueueContent({
                           >
                             <CheckCircle2 size={16} />
                             Aprovar asset
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -456,9 +468,13 @@ function AssetPreview({
               {preview.asset.contentType ?? "tipo desconhecido"}
             </p>
           </div>
-          <button className="secondary-action" onClick={onClose}>
+          <Button
+            variant="secondary"
+            className="secondary-action"
+            onClick={onClose}
+          >
             Fechar
-          </button>
+          </Button>
         </header>
         {link.isLoading && (
           <div className="asset-preview-state">Preparando visualização…</div>
@@ -582,28 +598,28 @@ function HistoryContent({
 }) {
   if (loading)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h2>Carregando histórico</h2>
         <p>Buscando decisões editoriais…</p>
-      </section>
+      </Surface>
     );
   if (error)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h2>Histórico indisponível</h2>
         <p>
           {error instanceof Error
             ? error.message
             : "Não foi possível carregar o histórico."}
         </p>
-      </section>
+      </Surface>
     );
   if (history.length === 0)
     return (
-      <div className="panel">
+      <Surface as="div" className="panel">
         <h2>Nenhuma decisão registrada</h2>
         <p>Aprovações e revogações aparecerão aqui.</p>
-      </div>
+      </Surface>
     );
   return (
     <div className="review-history">
@@ -622,14 +638,15 @@ function HistoryContent({
             </p>
           </div>
           {item.action === "APPROVED" && item.currentStatus === "ACTIVE" && (
-            <button
+            <Button
+              variant="secondary"
               className="secondary-action"
               disabled={revoke.isPending}
               onClick={() => revoke.mutate(item.bookId)}
             >
               <RotateCcw size={15} />
               Revogar aprovação
-            </button>
+            </Button>
           )}
         </article>
       ))}

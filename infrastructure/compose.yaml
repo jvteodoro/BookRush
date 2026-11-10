@@ -730,7 +730,8 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE:-bookrush/frontend:local}
     build:
-      context: ../frontend
+      context: ..
+      dockerfile: frontend/Dockerfile
     depends_on:
       catalog-service:
         condition: service_healthy
@@ -741,7 +742,8 @@ services:
   admin-web:
     image: ${ADMIN_WEB_IMAGE:-bookrush/admin-web:local}
     build:
-      context: ../admin-web
+      context: ..
+      dockerfile: admin-web/Dockerfile
       args:
         VITE_USE_MOCKS: ${ADMIN_WEB_USE_MOCKS:-false}
         VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-https://keycloak-bookrush.jteodoro.tec.br}

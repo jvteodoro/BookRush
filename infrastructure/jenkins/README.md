@@ -75,6 +75,10 @@ remota participam do build. Alterações locais deste diretório não são impla
 O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
+Frontend e admin compartilham `packages/ui`; seus builds usam o repositório
+como contexto (`docker build -f frontend/Dockerfile .` e
+`docker build -f admin-web/Dockerfile .`). Veja o
+[contrato dos componentes compartilhados](../../docs/development/shared-ui.md).
 O estágio `Validação Mobile` executa `npm ci`, `npm run typecheck` e
 `EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export` em `mobile/` usando
 `node:20-bookworm`. O bundle Android em `mobile/dist/` é arquivado como

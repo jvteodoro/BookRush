@@ -1,3 +1,10 @@
+import { Tabs } from "@bookrush/ui/Tabs";
+import { Notice } from "@bookrush/ui/Notice";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Surface } from "@bookrush/ui/Surface";
+import { Select } from "@bookrush/ui/Select";
+import { Input } from "@bookrush/ui/Input";
+import { Button } from "../../components/ui/Button";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -52,7 +59,7 @@ export function TrainingPage() {
   )?.error;
   return (
     <section>
-      <header className="pagehead">
+      <PageHeader className="">
         <div>
           <span className="eyebrow">TRAINING & GROUND TRUTH</span>
           <h1>Excerpt quality</h1>
@@ -61,26 +68,27 @@ export function TrainingPage() {
             aparecem depois do lock primário.
           </p>
         </div>
-        <button
+        <Button
+          variant="ghost"
           className="button-action"
           onClick={() => create.mutate()}
           disabled={create.isPending}
         >
           <Plus size={16} />
           Criar piloto 50 EN + 50 PT
-        </button>
-      </header>
+        </Button>
+      </PageHeader>
       {failure && (
-        <div className="panel import-error">
+        <Surface as="div" className="panel import-error">
           <strong>Ação não concluída</strong>
           <p>
             {failure instanceof Error
               ? failure.message
               : "O serviço recusou a operação. Consulte os logs do analytics."}
           </p>
-        </div>
+        </Surface>
       )}
-      <div className="training-tabs">
+      <Tabs className="training-tabs">
         {[
           ["campaigns", "Campaigns"],
           ["studio", "Annotation Studio"],
@@ -88,17 +96,18 @@ export function TrainingPage() {
           ["datasets", "Datasets"],
           ["evaluation", "Model Evaluation"],
         ].map(([id, label]) => (
-          <button
+          <Button
+            variant="ghost"
             className={tab === id ? "active" : ""}
             onClick={() => setTab(id)}
             key={id}
           >
             {label}
-          </button>
+          </Button>
         ))}
-      </div>
+      </Tabs>
       {tab === "campaigns" && (
-        <div className="panel">
+        <Surface as="div" className="panel">
           <div className="panelhead">
             <div>
               <h2>Annotation campaigns</h2>
@@ -129,15 +138,17 @@ export function TrainingPage() {
                 <code>{c.id}</code>
               </div>
               <div className="runrow">
-                <button
+                <Button
+                  variant="ghost"
                   onClick={(e) => {
                     e.stopPropagation();
                     sample.mutate(c.id);
                   }}
                 >
                   Sample 100
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={(e) => {
                     e.stopPropagation();
                     action.mutate({
@@ -147,42 +158,43 @@ export function TrainingPage() {
                   }}
                 >
                   {c.status === "DRAFT" ? "Iniciar" : "Pausar"}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={(e) => {
                     e.stopPropagation();
                     dataset.mutate(c.id);
                   }}
                 >
                   Publicar dataset
-                </button>
+                </Button>
               </div>
             </article>
           ))}
-        </div>
+        </Surface>
       )}
       {tab === "studio" && <BlindStudio />}
       {tab === "review" && <ReviewPanel campaignId={selected} />}{" "}
       {tab === "datasets" && <DatasetPanel campaignId={selected} />}{" "}
       {tab === "evaluation" && (
-        <div className="panel">
+        <Surface as="div" className="panel">
           <h2>Model Evaluation</h2>
           <p>
             Comparações human × model serão exibidas com versão, idioma, MAE e
             Spearman. Correlação não implica validade de constructo.
           </p>
           <FlaskConical size={28} />
-        </div>
+        </Surface>
       )}
       {selected && (
-        <div className="panel">
+        <Surface as="div" className="panel">
           <h2>QA da campanha selecionada</h2>
           {metrics.isLoading ? (
             <p>Calculando…</p>
           ) : (
             <pre>{JSON.stringify(metrics.data, null, 2)}</pre>
           )}
-        </div>
+        </Surface>
       )}
     </section>
   );
@@ -232,7 +244,8 @@ function RatingControl({
         aria-label={dimensionLabels[code] ?? code}
       >
         {[1, 2, 3, 4, 5].map((n) => (
-          <button
+          <Button
+            variant="ghost"
             type="button"
             key={n}
             role="radio"
@@ -250,7 +263,7 @@ function RatingControl({
             onClick={() => onChange(n)}
           >
             {n}
-          </button>
+          </Button>
         ))}
       </div>
       <div className="rating-scale">
@@ -435,7 +448,7 @@ function BlindStudio() {
     }
   };
   return (
-    <div className="panel blind-studio">
+    <Surface as="div" className="panel blind-studio">
       <h2>Annotation Studio</h2>
       <p className="studio-intro">
         Leia o trecho sem influência de modelos. Dê sua primeira impressão,
@@ -456,9 +469,9 @@ function BlindStudio() {
         </div>
       )}
       {studioError && (
-        <div className="error-box" role="alert">
+        <Notice as="div" className="error-box" role="alert">
           {studioError}
-        </div>
+        </Notice>
       )}
       {!item ? (
         <>
@@ -466,7 +479,7 @@ function BlindStudio() {
             Escolha uma campanha com amostra materializada para reivindicar um
             item.
           </p>
-          <select
+          <Select
             className="theme-select"
             aria-label="Annotation campaign"
             value={campaign}
@@ -478,14 +491,15 @@ function BlindStudio() {
                 {c.name} · {c.status}
               </option>
             ))}
-          </select>
-          <button
+          </Select>
+          <Button
+            variant="primary"
             className="primary-action"
             disabled={!campaign || busy}
             onClick={() => void claim()}
           >
             {busy ? "Reivindicando…" : "Claim next item"}
-          </button>
+          </Button>
         </>
       ) : (
         <>
@@ -543,7 +557,8 @@ function BlindStudio() {
               ),
             )}
           </fieldset>
-          <button
+          <Button
+            variant="primary"
             className="primary-action"
             disabled={
               locked ||
@@ -559,20 +574,25 @@ function BlindStudio() {
               : busy
                 ? "Salvando…"
                 : "Lock primary annotation"}
-          </button>
+          </Button>
           {locked && (
-            <button
+            <Button
+              variant="secondary"
               className="secondary-action"
               disabled={busy}
               onClick={() => void nextExcerpt()}
             >
               Próximo excerpt
-            </button>
+            </Button>
           )}
           {locked && !context && (
-            <button className="secondary-action" onClick={() => void reveal()}>
+            <Button
+              variant="secondary"
+              className="secondary-action"
+              onClick={() => void reveal()}
+            >
               Reveal context
-            </button>
+            </Button>
           )}
           {context && (
             <div className="context-box">
@@ -631,18 +651,19 @@ function BlindStudio() {
                   </div>
                 </>
               )}
-              <button
+              <Button
+                variant="primary"
                 className="primary-action"
                 disabled={busy}
                 onClick={() => void submitDiagnostic()}
               >
                 {busy ? "Salvando…" : "Submit diagnostic e próximo excerpt"}
-              </button>
+              </Button>
             </div>
           )}
         </>
       )}
-    </div>
+    </Surface>
   );
 }
 function ReviewPanel({ campaignId }: { campaignId?: string }) {
@@ -659,7 +680,7 @@ function ReviewPanel({ campaignId }: { campaignId?: string }) {
     onSuccess: () => q.refetch(),
   });
   return (
-    <div className="panel">
+    <Surface as="div" className="panel">
       <h2>Review & Adjudication</h2>
       <p>
         Discordâncias com amplitude igual ou maior que 2. Labels brutos
@@ -683,21 +704,22 @@ function ReviewPanel({ campaignId }: { campaignId?: string }) {
               </small>
             </div>
             <div>
-              <input
+              <Input
                 aria-label="Rationale"
                 placeholder="Rationale"
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
               />
-              <select
+              <Select
                 value={value}
                 onChange={(e) => setValue(Number(e.target.value))}
               >
                 {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n}>{n}</option>
                 ))}
-              </select>
-              <button
+              </Select>
+              <Button
+                variant="ghost"
                 onClick={() =>
                   adjudicate.mutate({
                     item: item.campaign_item_id,
@@ -706,19 +728,19 @@ function ReviewPanel({ campaignId }: { campaignId?: string }) {
                 }
               >
                 Adjudicate
-              </button>
+              </Button>
             </div>
           </article>
         ))
       )}
-    </div>
+    </Surface>
   );
 }
 function DatasetPanel({ campaignId }: { campaignId?: string }) {
   const [version, setVersion] = useState(1);
   const [result, setResult] = useState<unknown>();
   return (
-    <div className="panel">
+    <Surface as="div" className="panel">
       <h2>Datasets imutáveis</h2>
       <p>
         Snapshots guardam manifesto, labels brutos e adjudicações separadamente.
@@ -729,14 +751,15 @@ function DatasetPanel({ campaignId }: { campaignId?: string }) {
         <>
           <label>
             Version{" "}
-            <input
+            <Input
               type="number"
               min={1}
               value={version}
               onChange={(e) => setVersion(Number(e.target.value))}
             />
           </label>
-          <button
+          <Button
+            variant="ghost"
             onClick={async () =>
               setResult(
                 await services.exportAnnotationDataset(campaignId, version),
@@ -744,11 +767,11 @@ function DatasetPanel({ campaignId }: { campaignId?: string }) {
             }
           >
             Export dataset
-          </button>
+          </Button>
           {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
         </>
       )}
       <Database size={28} />
-    </div>
+    </Surface>
   );
 }

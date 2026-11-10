@@ -1,5 +1,10 @@
+import { useSearchParams } from "react-router-dom";
+import { SearchField } from "@bookrush/ui/SearchField";
+import { Surface } from "@bookrush/ui/Surface";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Button } from "../../components/ui/Button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, RefreshCw, Search } from "lucide-react";
+import { BookOpen, Download, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ImportJob, services } from "../../lib/services";
 
@@ -20,7 +25,12 @@ const statusLabels: Record<string, string> = {
 
 export function CatalogPage() {
   const qc = useQueryClient();
-  const [q, setQ] = useState("");
+  const [searchParams] = useSearchParams();
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
+  useEffect(() => {
+    setQ(searchParams.get("q") ?? "");
+    setPage(0);
+  }, [searchParams]);
   const [page, setPage] = useState(0);
   const [job, setJob] = useState<ImportJob>();
   const [jobBook, setJobBook] = useState<string>();
@@ -79,14 +89,14 @@ export function CatalogPage() {
   );
   if (books.isLoading)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h1>Catálogo Gutenberg</h1>
         <p>Consultando o índice paginado…</p>
-      </section>
+      </Surface>
     );
   if (books.isError)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h1>Catálogo indisponível</h1>
         <p>
           {books.error instanceof Error
@@ -97,7 +107,7 @@ export function CatalogPage() {
           Faça login com uma conta do realm administrativo que tenha OPERATOR,
           REVIEWER ou CLEANUP.
         </p>
-      </section>
+      </Surface>
     );
   const progress = job?.itemsDiscovered
     ? Math.min(
@@ -107,8 +117,8 @@ export function CatalogPage() {
     : 0;
   const terminal = !job || terminalStatuses.includes(job.status);
   return (
-    <section>
-      <header className="pagehead">
+    <section className="catalog-page">
+      <PageHeader className="">
         <div>
           <span className="eyebrow">CONTENT OPERATIONS</span>
           <h1>Catalog & Import</h1>
@@ -117,19 +127,17 @@ export function CatalogPage() {
             proveniência e envie o ID para a pipeline.
           </p>
         </div>
-      </header>
-      <div className="toolbar">
-        <div className="search">
-          <Search size={17} />
-          <input
-            value={q}
-            onChange={(event) => {
-              setQ(event.target.value);
-              setPage(0);
-            }}
-            placeholder="Buscar título ou autor"
-          />
-        </div>
+      </PageHeader>
+      <div className="catalog-toolbar">
+        <SearchField
+          value={q}
+          onChange={(event) => {
+            setQ(event.target.value);
+            setPage(0);
+          }}
+          placeholder="Buscar título ou autor"
+          aria-label="Buscar título ou autor"
+        />
         <span>
           {filtered.length} obras nesta página · {books.data?.totalItems ?? "—"}{" "}
           no índice · página {page + 1}
@@ -183,38 +191,46 @@ export function CatalogPage() {
         </section>
       )}
       {filtered.length === 0 ? (
-        <div className="panel">
+        <Surface as="div" className="panel">
           <h2>Nenhuma obra nesta página</h2>
           <p>Use outra busca ou avance pelas páginas do índice Gutenberg.</p>
-        </div>
+        </Surface>
       ) : (
-        <div className="bookgrid">
+        <div className="catalog-grid">
           {filtered.map((book) => (
-            <article className="bookcard" key={book.id}>
-              <div className="bookcover">
-                {book.title.split(" ").slice(0, 3).join("\n")}
-              </div>
-              <div className="bookbody">
-                <span className="source">{book.source}</span>
-                <h3>{book.title}</h3>
-                <p>{book.author}</p>
-                <div className="meta">
+            <article className="br-card catalog-card" key={book.id}>
+              <div className="catalog-card-heading">
+                <div className="catalog-cover" aria-hidden="true">
+                  <BookOpen size={28} strokeWidth={1.5} />
                   <span>{book.language.toUpperCase()}</span>
-                  <span>
-                    {book.status === "IMPORTED"
-                      ? "IMPORTADO"
-                      : book.status === "IMPORTING"
-                        ? "PROCESSANDO"
-                        : book.status === "QUEUED"
-                          ? "NA FILA"
-                          : "DISPONÍVEL"}
-                  </span>
                 </div>
-                <p className="desc">
-                  {book.description ??
-                    "Metadata e proveniência serão exibidos pelo catálogo."}
-                </p>
-                <button
+                <div className="catalog-copy">
+                  <span className="catalog-source">{book.source}</span>
+                  <h3>{book.title}</h3>
+                  <p className="catalog-author">{book.author}</p>
+                </div>
+              </div>
+              <div className="catalog-meta">
+                <span>{book.language.toUpperCase()}</span>
+                <span>
+                  {book.status === "IMPORTED"
+                    ? "IMPORTADO"
+                    : book.status === "IMPORTING"
+                      ? "PROCESSANDO"
+                      : book.status === "QUEUED"
+                        ? "NA FILA"
+                        : "DISPONÍVEL"}
+                </span>
+              </div>
+              <p className="catalog-description">
+                {book.description ??
+                  "Metadata e proveniência serão exibidos pelo catálogo."}
+              </p>
+              <footer className="catalog-card-footer">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  fullWidth
                   disabled={
                     book.status === "QUEUED" ||
                     book.status === "IMPORTING" ||
@@ -242,25 +258,27 @@ export function CatalogPage() {
                       Importar livro
                     </>
                   )}
-                </button>
-              </div>
+                </Button>
+              </footer>
             </article>
           ))}
         </div>
       )}
-      <div className="toolbar">
-        <button
+      <div className="catalog-pagination">
+        <Button
+          variant="ghost"
           disabled={page === 0}
           onClick={() => setPage((current) => current - 1)}
         >
           Página anterior
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           disabled={!books.data?.hasNext}
           onClick={() => setPage((current) => current + 1)}
         >
           Próxima página
-        </button>
+        </Button>
       </div>
     </section>
   );

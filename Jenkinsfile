@@ -118,7 +118,7 @@ pipeline {
         sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" -f services/catalog-service/Dockerfile .'
         sh 'docker run --rm "bookrush/catalog-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$BACKEND_IMAGE" -f services/catalog-service/Dockerfile .'
-        sh 'docker build -t "$FRONTEND_IMAGE" frontend'
+        sh 'docker build -t "$FRONTEND_IMAGE" -f frontend/Dockerfile .'
         sh 'docker build --target build -t "bookrush/ingestion-test:$BUILD_NUMBER" -f services/book-ingestion-service/Dockerfile .'
         sh 'docker run --rm "bookrush/ingestion-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$INGESTION_IMAGE" -f services/book-ingestion-service/Dockerfile .'
@@ -135,7 +135,7 @@ pipeline {
         sh 'docker build --target build -t "bookrush/admin-service-test:$BUILD_NUMBER" -f services/admin-service/Dockerfile .'
         sh 'docker run --rm "bookrush/admin-service-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$ADMIN_SERVICE_IMAGE" -f services/admin-service/Dockerfile .'
-        sh 'docker build -t "$ADMIN_WEB_IMAGE" admin-web'
+        sh 'docker build -t "$ADMIN_WEB_IMAGE" -f admin-web/Dockerfile .'
       }
     }
 

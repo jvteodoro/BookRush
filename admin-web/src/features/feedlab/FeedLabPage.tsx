@@ -1,3 +1,6 @@
+import { Surface } from "@bookrush/ui/Surface";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Button } from "../../components/ui/Button";
 import { useQuery } from "@tanstack/react-query";
 import {
   Heart,
@@ -102,7 +105,7 @@ export function FeedLabPage() {
   if (feed.isLoading) return <p>Loading feed…</p>;
   if (feed.isError)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h1>Feed Lab indisponível</h1>
         <p>
           {feed.error instanceof Error
@@ -113,21 +116,21 @@ export function FeedLabPage() {
           O catálogo, analytics e ingestão continuam independentes; configure a
           rota `/feed` quando o serviço de feed estiver implantado.
         </p>
-      </section>
+      </Surface>
     );
   if (!item)
     return (
-      <section className="panel">
+      <Surface as="section" className="panel">
         <h1>Nenhum excerpt disponível</h1>
         <p>
           Execute analytics e gere candidatos antes de iniciar uma sessão de
           treino.
         </p>
-      </section>
+      </Surface>
     );
   return (
     <section>
-      <header className="pagehead">
+      <PageHeader className="">
         <div>
           <span className="eyebrow">RECOMMENDATION LAB</span>
           <h1>Feed Lab</h1>
@@ -139,7 +142,7 @@ export function FeedLabPage() {
         <div className="sessionbadge">
           Session {session?.id?.slice(-6) ?? "..."}
         </div>
-      </header>
+      </PageHeader>
       <div className="labgrid">
         <div className="phone">
           <div className="phonebar">
@@ -157,19 +160,23 @@ export function FeedLabPage() {
             </div>
           </div>
           <div className="actions">
-            <button onClick={() => emit("DISLIKE")}>
+            <Button variant="ghost" onClick={() => emit("DISLIKE")}>
               <ThumbsDown />
-            </button>
-            <button onClick={() => emit("LIKE")}>
+            </Button>
+            <Button variant="ghost" onClick={() => emit("LIKE")}>
               <Heart />
-            </button>
-            <button onClick={() => emit("SAVE")}>
+            </Button>
+            <Button variant="ghost" onClick={() => emit("SAVE")}>
               <Save />
-            </button>
+            </Button>
           </div>
-          <button className="next" onClick={() => emit("SKIP")}>
+          <Button
+            variant="primary"
+            className="next"
+            onClick={() => emit("SKIP")}
+          >
             Skip / next excerpt
-          </button>
+          </Button>
         </div>
         <aside className="tuner">
           <div className="tunerhead">
@@ -177,9 +184,9 @@ export function FeedLabPage() {
               <SlidersHorizontal size={18} />
               <h2>Ranking parameters</h2>
             </div>
-            <button onClick={() => setWeights(defaultWeights)}>
+            <Button variant="ghost" onClick={() => setWeights(defaultWeights)}>
               <RotateCcw size={15} />
-            </button>
+            </Button>
           </div>
           <p>
             Cada alteração gera uma nova versão de parâmetros associada aos
@@ -264,7 +271,8 @@ export function FeedLabPage() {
             </div>
           </div>
           {session && auth.roles.includes("feed_admin") && (
-            <button
+            <Button
+              variant="ghost"
               className="next"
               onClick={() =>
                 void services.promoteBaseline(
@@ -274,7 +282,7 @@ export function FeedLabPage() {
               }
             >
               Promote validated baseline
-            </button>
+            </Button>
           )}
         </aside>
       </div>
