@@ -163,7 +163,6 @@
           <button class="nav-item publisher-link ${state.route === "publisher" ? "active" : ""}" data-route="publisher">${icon("upload")}<span class="nav-label">Publicador</span></button>
         </nav>
         <div class="sidebar-spacer"></div>
-        <div class="profile-mini"><div class="avatar">JV</div><div><strong>João Victor</strong><span>@joaovictor</span></div></div>
       </aside>
       <section class="main-area">
         <header class="topbar"><div class="topbar-title">${title}</div><div class="topbar-actions"><button class="icon-btn" data-action="notify" aria-label="Notificações">${icon("bell")}</button><button class="icon-btn" data-route="profile" aria-label="Perfil">${icon("user")}</button></div></header>
@@ -1446,17 +1445,12 @@
   window.__BOOKRUSH_LEGACY__ = {
     navigate: (route, query = "") => {
       if (
-        ![
-          ...NAV.map((item) => item[0]),
-          "admin",
-          "publisher",
-          "prototype",
-        ].includes(route)
+        ![...NAV.map((item) => item[0]), "admin", "publisher"].includes(route)
       )
         return;
       syncReactFeed();
       if (route === "search") state.search = query;
-      go(route === "prototype" ? "feed" : route);
+      go(route);
     },
     openBook: async (id, query, fromRecommendation = false) => {
       if (typeof query === "string") state.search = query;

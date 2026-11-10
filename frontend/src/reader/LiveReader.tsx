@@ -427,24 +427,11 @@ export function LiveReader({
           onDetails={setDetailsBook}
           onDiscover={() => navigate("feed")}
         />
-      ) : [
-          "plant",
-          "profile",
-          "privacy",
-          "admin",
-          "publisher",
-          "prototype",
-        ].includes(tab) ? (
+      ) : ["plant", "profile", "privacy", "admin", "publisher"].includes(
+          tab,
+        ) ? (
         <AccountPage
-          tab={
-            tab as
-              | "plant"
-              | "profile"
-              | "privacy"
-              | "admin"
-              | "publisher"
-              | "prototype"
-          }
+          tab={tab as "plant" | "profile" | "privacy" | "admin" | "publisher"}
           userName={userName}
           savedCount={saved.length}
           streak={streak}

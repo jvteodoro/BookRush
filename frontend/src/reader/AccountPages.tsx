@@ -48,7 +48,7 @@ const accountRuntime = () => window as unknown as AccountRuntime;
 type Props = {
   tab: Extract<
     ReaderTab,
-    "plant" | "profile" | "privacy" | "admin" | "publisher" | "prototype"
+    "plant" | "profile" | "privacy" | "admin" | "publisher"
   >;
   userName: string;
   savedCount: number;
@@ -287,24 +287,5 @@ export function AccountPage({
     );
   }
 
-  return (
-    <section className="br-account-page">
-      <PageHeading
-        eyebrow="BOOKRUSH"
-        title="Menu do protótipo"
-        description="Explore as áreas construídas com o design system atual."
-      />
-      <Card className="br-account-panel">
-        <ActionRow>
-          <Button onClick={() => onNavigate("feed")}>Para você</Button>
-          <Button variant="ghost" onClick={() => onNavigate("admin")}>
-            Administração
-          </Button>
-          <Button variant="ghost" onClick={() => onNavigate("publisher")}>
-            Publicador
-          </Button>
-        </ActionRow>
-      </Card>
-    </section>
-  );
+  return null;
 }
