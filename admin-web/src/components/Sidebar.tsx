@@ -24,6 +24,7 @@ const icons = {
   "/feed-lab": FlaskConical,
   "/training": GraduationCap,
   "/operations": UsersRound,
+  "/publisher": ChartNoAxesCombined,
 };
 const items = adminNavigation.map(({ to, label }) => {
   const MenuIcon = icons[to];

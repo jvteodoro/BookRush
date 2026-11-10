@@ -38,6 +38,8 @@ public class BehaviorSecurityConfiguration {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .requestMatchers("/api/internal/v1/publisher/metrics/**")
+                .hasAuthority("SCOPE_bookrush.publisher.metrics.read")
             .requestMatchers("/api/internal/v1/recommendation/signals")
                 .hasAuthority("SCOPE_bookrush.behavior.read")
             .requestMatchers("/api/internal/v1/recommendation/trending")
@@ -69,7 +71,8 @@ public class BehaviorSecurityConfiguration {
     s2sDecoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
         JwtValidators.createDefaultWithIssuer(s2sIssuer), audience));
     AuthenticationManager s2s = manager(s2sDecoder, converter);
-    return request -> request.getRequestURI().startsWith("/api/internal/v1/recommendation/")
+    return request -> (request.getRequestURI().startsWith("/api/internal/v1/recommendation/")
+        || request.getRequestURI().startsWith("/api/internal/v1/publisher/metrics/"))
         ? s2s : product;
   }
 

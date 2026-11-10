@@ -11,6 +11,35 @@ info:
 servers:
   - url: /
 paths:
+  /api/internal/v1/publisher/metrics/books/{bookId}:
+    get:
+      summary: Daily aggregates for the publisher metrics service
+      description: Requires a bookrush-platform RS256 service token with audience bookrush-behavior and scope bookrush.publisher.metrics.read. Caller must enforce publication ownership. No reader identities are returned.
+      security: [{behaviorSignalsS2S: []}]
+      parameters:
+        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: days, in: query, schema: {type: integer, minimum: 1, maximum: 365, default: 30}}
+      responses:
+        '200':
+          description: Daily aggregates in descending day order, bounded by the requested calendar window including today
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [day, impressions, opens, reads, likes, shares, comments]
+                  properties:
+                    day: {type: string, format: date}
+                    impressions: {type: integer, format: int64, minimum: 0}
+                    opens: {type: integer, format: int64, minimum: 0}
+                    reads: {type: integer, format: int64, minimum: 0}
+                    likes: {type: integer, format: int64, minimum: 0}
+                    shares: {type: integer, format: int64, minimum: 0}
+                    comments: {type: integer, format: int64, minimum: 0}
+        '400': {description: Invalid book ID or days}
+        '401': {description: Missing or invalid token}
+        '403': {description: Missing publisher metrics scope}
   /api/internal/v1/recommendation/signals:
     post:
       summary: Read bounded user-book serving signals
