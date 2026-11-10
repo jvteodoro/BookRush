@@ -10,6 +10,40 @@ privacidade, planta, administração e publicador.
 
 ## Capacidades atuais
 
+### Detalhes dos livros e ajustes de navegação
+
+`reader/BookDetailsDrawer.tsx` apresenta um modal central e responsivo com
+capa autenticada, descrição do catálogo, categorias, idioma, progresso e
+avaliações reais. Permite começar/continuar a leitura, salvar na biblioteca
+e acessar os comentários. A descrição pode estar ausente ou conter metadados
+legados da ingestão; esta mudança não importa nem traduz sinopses.
+
+No Para você, **Ver livro** abre o modal; **Ler agora** abre o leitor diretamente,
+sem seta e com espaçamento entre as ações. Na Biblioteca e em Recomendações,
+o clique no livro abre os detalhes, sem botão adicional. No Buscar, a faixa
+do resultado abre o modal por clique ou teclado, com hover discreto e respeito
+a movimento reduzido. Salvar e Ler agora mantêm ações independentes.
+
+Os resultados de pessoas usam `br-person-result`: nome e @usuário quebram
+textos longos dentro do card; em telas pequenas, Ver perfil fica abaixo da
+identidade. O popup Compartilhar em `public/pageloop.js` usa diálogo nativo,
+tokens e botões do design system nos dois temas, campo de link selecionável,
+confirmação de cópia e mensagens de falha. Escape, botão e clique no fundo
+fecham o diálogo e restauram o foco. A cópia de livros mantém o registro no
+social-service; perfis usam o caminho `/usuarios/<subject>`.
+
+Validação local: build e 68 testes do frontend passaram. A conferência em
+Chrome cobriu os cliques independentes, teclado e layouts de 320/390 px,
+incluindo nomes longos e falhas de clipboard/registro do compartilhamento.
+`admin-web/tests/book-details.e2e.mjs` verifica o modal com dados simulados;
+`frontend/tests/fixtures/book-details.html` permite revisar o visual no Vite.
+Estas evidências não representam deploy nem smoke autenticado em produção.
+
+Antes de publicar mudanças do frontend, execute o change gate com documentação
+incluída: `bash scripts/validate-change.sh --staged` e, após o commit,
+`bash scripts/validate-change.sh --ci`. Jenkins compara a branch com
+`origin/main` quando disponível; documentação somente local não entra no gate.
+
 Comentários usam `reader/CommentsDrawer.tsx` e o componente reutilizável
 `components/ui/Drawer.tsx`, um diálogo modal com foco contido, fechamento por
 Escape, botão ou clique no fundo e restauração de foco pelo navegador. O painel
