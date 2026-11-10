@@ -1,3 +1,5 @@
+import { Surface } from "@bookrush/ui/Surface";
+import { Button } from "../components/ui/Button";
 import { Component, ErrorInfo, PropsWithChildren, ReactNode } from "react";
 
 type State = { error?: Error };
@@ -16,11 +18,13 @@ export class ErrorBoundary extends Component<PropsWithChildren, State> {
   render(): ReactNode {
     return this.state.error ? (
       <main className="center">
-        <section className="panel">
+        <Surface as="section" className="panel">
           <h1>Admin console unavailable</h1>
           <p>Ocorreu um erro recuperável na interface.</p>
-          <button onClick={() => location.reload()}>Reload</button>
-        </section>
+          <Button variant="ghost" onClick={() => location.reload()}>
+            Reload
+          </Button>
+        </Surface>
       </main>
     ) : (
       this.props.children

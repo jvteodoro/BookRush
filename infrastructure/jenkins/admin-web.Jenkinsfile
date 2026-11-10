@@ -54,7 +54,7 @@ pipeline {
           --build-arg VITE_INGESTION_API_URL="$ADMIN_WEB_INGESTION_API_URL" \
           --build-arg VITE_ANALYTICS_API_URL="$ADMIN_WEB_ANALYTICS_API_URL" \
           --build-arg VITE_FEED_API_URL="$ADMIN_WEB_FEED_API_URL" \
-          --build-arg VITE_BASE_PATH="$ADMIN_WEB_BASE_PATH" admin-web'''
+          --build-arg VITE_BASE_PATH="$ADMIN_WEB_BASE_PATH" -f admin-web/Dockerfile .'''
       }
     }
 
@@ -73,7 +73,7 @@ pipeline {
           --build-arg VITE_INGESTION_API_URL="$ADMIN_WEB_INGESTION_API_URL" \
           --build-arg VITE_ANALYTICS_API_URL="$ADMIN_WEB_ANALYTICS_API_URL" \
           --build-arg VITE_FEED_API_URL="$ADMIN_WEB_FEED_API_URL" \
-          --build-arg VITE_BASE_PATH="$ADMIN_WEB_BASE_PATH" admin-web'''
+          --build-arg VITE_BASE_PATH="$ADMIN_WEB_BASE_PATH" -f admin-web/Dockerfile .'''
       }
     }
 

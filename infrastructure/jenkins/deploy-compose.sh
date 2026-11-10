@@ -101,7 +101,7 @@ if ! docker image inspect "$ADMIN_SERVICE_IMAGE" >/dev/null 2>&1; then
 fi
 if ! docker image inspect "$ADMIN_WEB_IMAGE" >/dev/null 2>&1; then
   echo "Imagem $ADMIN_WEB_IMAGE ausente; construindo compatibilidade do admin-web." >&2
-  docker build -t "$ADMIN_WEB_IMAGE" "$repo_dir/admin-web"
+  docker build -t "$ADMIN_WEB_IMAGE" -f "$repo_dir/admin-web/Dockerfile" "$repo_dir"
 fi
 # Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
 # Este preflight também detecta builds feitos em um daemon diferente do deploy.

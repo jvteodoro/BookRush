@@ -7,7 +7,7 @@ import { build } from 'esbuild';
 async function load(entry, hooks = false) {
   const bundle = await build({
     entryPoints: [fileURLToPath(new URL(entry, import.meta.url))], bundle: true,
-    write: false, platform: 'browser', format: 'esm', jsx: 'automatic',
+    write: false, platform: 'browser', format: 'esm', jsx: 'automatic', preserveSymlinks: true,
     plugins: [{ name: 'user-search-transport', setup(builder) {
       builder.onResolve({ filter: /auth$/ }, () => ({ path: 'auth', namespace: 'test' }));
       builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const authClient = { fetch(...args) { return globalThis.__searchFetch(...args); } };' }));

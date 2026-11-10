@@ -1,3 +1,4 @@
+import { Notice } from "@bookrush/ui/Notice";
 import { categoryNames, type BookCategory } from "./bookCategories";
 import { useSeenBooks } from "./useSeenBooks";
 import { SeenBadge } from "../components/book/SeenBadge";
@@ -123,7 +124,11 @@ export function BookDetailsDrawer({
         ) : (
           <>
             {summary && <p role="status">{ratingLabel(summary)}</p>}
-            {error && <p role="alert">{error}</p>}
+            {error && (
+              <Notice as="p" role="alert">
+                {error}
+              </Notice>
+            )}
             {!summary ? (
               <Button onClick={() => setAttempt((value) => value + 1)}>
                 Tentar novamente

@@ -1,3 +1,4 @@
+import { Button } from "../components/ui/Button";
 import { RouterProvider } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { createAdminRouter } from "./adminRouter";
@@ -11,9 +12,9 @@ export function AuthGate() {
   if (!auth.authenticated) {
     return (
       <div className="center">
-        <button type="button" onClick={auth.login}>
+        <Button variant="primary" type="button" onClick={auth.login}>
           Sign in
-        </button>
+        </Button>
       </div>
     );
   }

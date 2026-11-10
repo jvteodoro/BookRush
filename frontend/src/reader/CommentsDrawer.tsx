@@ -1,3 +1,5 @@
+import { Notice } from "@bookrush/ui/Notice";
+import { Textarea } from "@bookrush/ui/Textarea";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "../components/ui/Drawer";
 import { Button } from "../components/ui/Button";
@@ -154,7 +156,7 @@ export function CommentsDrawer({
           }}
         >
           <label htmlFor="comment-draft">Seu comentário</label>
-          <textarea
+          <Textarea
             id="comment-draft"
             rows={3}
             maxLength={2000}
@@ -180,9 +182,9 @@ export function CommentsDrawer({
             </Button>
           </div>
           {error && (
-            <p role="alert" className="br-comment-error">
+            <Notice as="p" role="alert" className="br-comment-error">
               {error}
-            </p>
+            </Notice>
           )}
           {notice && <p role="status">{notice}</p>}
         </form>
@@ -192,7 +194,9 @@ export function CommentsDrawer({
         <p role="status">Carregando comentários…</p>
       ) : loadError ? (
         <div>
-          <p role="alert">{loadError}</p>
+          <Notice as="p" role="alert">
+            {loadError}
+          </Notice>
           <Button
             variant="ghost"
             onClick={() => setAttempt((current) => current + 1)}

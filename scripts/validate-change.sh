@@ -84,7 +84,7 @@ for service_dir in services/*; do
   fi
 done
 
-if has_prefix frontend/src/ || has_path frontend/package.json || has_path frontend/Dockerfile; then
+if has_prefix frontend/src/ || has_path frontend/package.json || has_path frontend/Dockerfile || has_prefix packages/ui/; then
   documentation_changed_for frontend/ || errors+=("frontend mudou sem atualização de documentação")
 fi
 if has_prefix backstage/packages/ || has_prefix backstage/catalog/ || has_path backstage/app-config.yaml || has_path backstage/app-config.docker.yaml || has_path backstage/Dockerfile || has_path backstage/package.json; then

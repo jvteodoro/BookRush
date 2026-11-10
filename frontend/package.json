@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "vite --config vite.config.ts --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . && cd .. && node frontend/node_modules/eslint/bin/eslint.js --config eslint.shared.config.mjs packages/ui/src && node packages/ui/check-consumers.mjs",
+    "format:ui": "prettier --check ../packages/ui/src",
     "test": "node --test tests/*.test.mjs",
     "test:coverage": "node --test --experimental-test-coverage tests/*.test.mjs",
     "format": "prettier --write src/main.tsx src/app/*.ts src/reader/AccountPages.tsx src/reader/bookCategories.ts src/reader/seen.ts src/reader/useSeenBooks.ts src/reader/ratings.ts src/reader/BookDetailsDrawer.tsx src/reader/comments.ts src/reader/followers.ts src/reader/FollowerCount.tsx src/reader/CommentsDrawer.tsx src/reader/library.ts src/reader/readiumBridge.ts src/reader/search.ts src/reader/userSearch.ts src/reader/UserSearchResults.tsx src/reader/LiveReader.tsx src/reader/PrivacyPage.tsx src/reader/privacy.ts tests/privacy.test.mjs public/pageloop.js public/pageloop.css",
@@ -14,6 +15,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@bookrush/ui": "file:../packages/ui",
     "@readium/navigator": "2.11.1",
     "@readium/shared": "2.6.0",
     "@vitejs/plugin-react": "4.3.4",

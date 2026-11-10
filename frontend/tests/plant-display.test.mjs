@@ -20,20 +20,30 @@ const bundle = await build({
     resolveDir: fileURLToPath(new URL("..", import.meta.url)),
     loader: "jsx",
   },
-  plugins: [{
-    name: "stub-images",
-    setup(build) {
-      build.onLoad({ filter: /\.png$/ }, () => ({ contents: 'export default "plant.png"' }));
+  plugins: [
+    {
+      name: "stub-images",
+      setup(build) {
+        build.onLoad({ filter: /\.png$/ }, () => ({
+          contents: 'export default "plant.png"',
+        }));
+      },
     },
-  }],
+  ],
   bundle: true,
+  preserveSymlinks: true,
+  jsx: "automatic",
   define: { "import.meta.env": "{}" },
   write: false,
   format: "esm",
   platform: "browser",
 });
 globalThis.window = { location: { origin: "http://localhost" } };
-globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+globalThis.localStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+};
 const { renderPlant } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
 );

@@ -1,6 +1,11 @@
+import { SearchField } from "@bookrush/ui/SearchField";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Select } from "@bookrush/ui/Select";
+import { Surface } from "@bookrush/ui/Surface";
+import { Button } from "../../components/ui/Button";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { RefreshCw, Search } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { services } from "../../lib/services";
 import { AnalyticsJob } from "../../types/domain";
@@ -54,30 +59,28 @@ export function AnalyticsPage() {
   }, [jobs.data, query, sort, status]);
   return (
     <section className="analytics-console">
-      <header className="pagehead analytics-pagehead">
+      <PageHeader className="analytics-pagehead">
         <div>
           <span className="eyebrow">MODEL OPERATIONS</span>
           <h1>Analysis jobs</h1>
           <p>Execuções persistidas, progresso e falhas operacionais.</p>
         </div>
-        <button
+        <Button
+          variant="ghost"
           className="button-action compact-action"
           onClick={() => void jobs.refetch()}
           disabled={jobs.isFetching}
         >
           <RefreshCw size={14} /> Atualizar
-        </button>
-      </header>
+        </Button>
+      </PageHeader>
       <div className="analytics-toolbar">
-        <label className="search-field">
-          <Search size={15} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filtrar por ID ou operation key"
-          />
-        </label>
-        <select
+        <SearchField
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Filtrar por ID ou operation key"
+        />
+        <Select
           value={status}
           onChange={(event) => setStatus(event.target.value)}
         >
@@ -87,8 +90,8 @@ export function AnalyticsPage() {
               {statusLabel[value]}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           value={sort}
           onChange={(event) => setSort(event.target.value as typeof sort)}
         >
@@ -96,16 +99,18 @@ export function AnalyticsPage() {
           <option value="progress">Maior progresso</option>
           <option value="id">ID</option>
           <option value="status">Status</option>
-        </select>
+        </Select>
         <span className="table-count">{visibleJobs.length} jobs</span>
       </div>
       {jobs.isLoading && (
-        <div className="panel compact-panel">Carregando jobs…</div>
+        <Surface as="div" className="panel compact-panel">
+          Carregando jobs…
+        </Surface>
       )}
       {jobs.isError && (
-        <div className="panel import-error compact-panel">
+        <Surface as="div" className="panel import-error compact-panel">
           Não foi possível consultar os jobs de analytics.
-        </div>
+        </Surface>
       )}
       {!jobs.isLoading && !jobs.isError && (
         <div className="table-shell">

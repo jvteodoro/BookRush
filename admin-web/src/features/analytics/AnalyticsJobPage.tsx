@@ -1,6 +1,10 @@
+import { SearchField } from "@bookrush/ui/SearchField";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Select } from "@bookrush/ui/Select";
+import { Button } from "../../components/ui/Button";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { services } from "../../lib/services";
 
@@ -58,7 +62,7 @@ export function AnalyticsJobPage() {
         </Link>
         <span>/ {jobId.slice(0, 8)}</span>
       </div>
-      <header className="pagehead analytics-pagehead">
+      <PageHeader className="analytics-pagehead">
         <div>
           <span className="eyebrow">JOB DETAIL</span>
           <h1>{jobId}</h1>
@@ -69,7 +73,7 @@ export function AnalyticsJobPage() {
               : "sem estágio"}
           </p>
         </div>
-      </header>
+      </PageHeader>
       <div className="analytics-summary-strip">
         <b>
           {Number(jobData?.processed_items ?? 0)}/
@@ -85,15 +89,12 @@ export function AnalyticsJobPage() {
         </span>
       </div>
       <div className="analytics-toolbar">
-        <label className="search-field">
-          <Search size={15} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filtrar item, asset ou livro"
-          />
-        </label>
-        <select
+        <SearchField
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Filtrar item, asset ou livro"
+        />
+        <Select
           value={status}
           onChange={(event) => {
             setStatus(event.target.value);
@@ -105,13 +106,13 @@ export function AnalyticsJobPage() {
           <option value="RUNNING">Em execução</option>
           <option value="COMPLETED">Concluídos</option>
           <option value="FAILED">Falhos</option>
-        </select>
-        <select value={sort} onChange={(event) => setSort(event.target.value)}>
+        </Select>
+        <Select value={sort} onChange={(event) => setSort(event.target.value)}>
           <option value="created">Mais recentes</option>
           <option value="attempts">Tentativas</option>
           <option value="status">Status</option>
           <option value="id">ID</option>
-        </select>
+        </Select>
         <span className="table-count">{visible.length} itens nesta página</span>
       </div>
       <div className="table-shell">
@@ -169,21 +170,23 @@ export function AnalyticsJobPage() {
         )}
       </div>
       <div className="table-pagination">
-        <button
+        <Button
+          variant="ghost"
           className="button-action compact-action"
           disabled={page === 0}
           onClick={() => setPage((value) => value - 1)}
         >
           <ChevronLeft size={14} /> Anterior
-        </button>
+        </Button>
         <span>Página {page + 1}</span>
-        <button
+        <Button
+          variant="ghost"
           className="button-action compact-action"
           disabled={!items.data?.hasMore}
           onClick={() => setPage((value) => value + 1)}
         >
           Próxima <ChevronRight size={14} />
-        </button>
+        </Button>
       </div>
     </section>
   );

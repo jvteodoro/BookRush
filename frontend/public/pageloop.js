@@ -156,18 +156,10 @@
   function shell(content, title = "BookRush") {
     const app = document.getElementById("app");
     app.innerHTML = `<div class="app-shell">
-      <aside class="sidebar">
-        <div class="logo"><span class="brand-badge">B</span><span class="logo-text">BookRush</span></div>
-        <nav class="nav-list">${NAV.map(([r, i, l]) => `<button class="nav-item ${state.route === r ? "active" : ""}" data-route="${r}"><span class="nav-icon-wrap">${icon(i)}</span><span class="nav-label">${l}</span></button>`).join("")}
-          <button class="nav-item admin-link ${state.route === "admin" ? "active" : ""}" data-route="admin">${icon("admin")}<span class="nav-label">Administração</span></button>
-          <button class="nav-item publisher-link ${state.route === "publisher" ? "active" : ""}" data-route="publisher">${icon("upload")}<span class="nav-label">Publicador</span></button>
-        </nav>
-        <div class="sidebar-spacer"></div>
-      </aside>
+      <div id="bookrush-sidebar-slot" data-active-route="${state.route}"></div>
       <section class="main-area">
         <header class="topbar"><div class="topbar-title">${title}</div><div class="topbar-actions"><button class="icon-btn" data-action="notify" aria-label="Notificações">${icon("bell")}</button><button class="icon-btn" data-route="profile" aria-label="Perfil">${icon("user")}</button></div></header>
         ${content}
-        ${mobileNav()}
       </section>
       <div class="toast-stack"></div>
     </div>
@@ -180,17 +172,6 @@
       window.dispatchEvent(
         new CustomEvent("bookrush:legacy-search", { detail: state.search }),
       );
-  }
-
-  function mobileNav() {
-    const items = [
-      ["feed", "home", "Início"],
-      ["recommendations", "sparkle", "Descobrir"],
-      ["search", "search", "Buscar"],
-      ["library", "library", "Biblioteca"],
-      ["profile", "user", "Perfil"],
-    ];
-    return `<nav class="mobile-nav">${items.map(([r, i, l]) => `<button data-route="${r}" class="${state.route === r ? "active" : ""}">${icon(i)}<span>${l}</span></button>`).join("")}</nav>`;
   }
 
   function bindCommon() {
@@ -207,6 +188,14 @@
         ),
       );
   }
+  window.addEventListener("bookrush:navigate", (event) => {
+    if (
+      [...NAV.map((item) => item[0]), "admin", "publisher"].includes(
+        event.detail,
+      )
+    )
+      go(event.detail);
+  });
   function go(route) {
     if (window.location.pathname.startsWith("/usuarios/"))
       window.history.pushState({ route }, "", "/");

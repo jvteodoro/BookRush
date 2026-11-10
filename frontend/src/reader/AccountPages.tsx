@@ -1,3 +1,4 @@
+import { Notice } from "@bookrush/ui/Notice";
 import { ReadingSummary } from "./ReadingSummary";
 import { FollowerCount } from "./FollowerCount";
 import type { ReactNode } from "react";
@@ -110,16 +111,16 @@ export function AccountPage({
         <Card className="br-account-hero br-plant-card">
           {plantLoading && <p role="status">Carregando sua planta…</p>}
           {plantError && (
-            <p role="alert">
+            <Notice as="p" role="alert">
               Não foi possível atualizar sua planta. Tente abrir esta página
               novamente.
-            </p>
+            </Notice>
           )}
           {accountRuntime().__BOOKRUSH_PLANT_SAVE_ERROR__ && (
-            <p role="alert">
+            <Notice as="p" role="alert">
               Parte do tempo de leitura não pôde ser salva. Verifique sua
               conexão.
-            </p>
+            </Notice>
           )}
           {!plantLoading && !plantError && plant && (
             <>

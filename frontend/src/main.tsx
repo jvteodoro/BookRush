@@ -15,6 +15,8 @@ import { DesignSystemPreview } from "./design-system/DesignSystemPreview";
 import { HomePreview } from "./design-system/HomePreview";
 import "./styles/reader-shell.css";
 import "./styles/reader-refinements.css";
+import "@bookrush/ui/sidebar.css";
+import "@bookrush/ui/layout.css";
 import "./styles/search.css";
 import "./styles/recommendations.css";
 import "./styles/comments.css";
