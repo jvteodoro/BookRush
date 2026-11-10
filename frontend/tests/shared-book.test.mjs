@@ -94,20 +94,19 @@ test("cancelled and failed requests are not substituted with a different book", 
   );
 });
 
-test("an inactive catalog book is unavailable", async () => {
-  await assert.rejects(
-    loadSharedBook(
-      id,
-      undefined,
-      async () =>
-        new globalThis.Response(
-          JSON.stringify({
-            id,
-            canonicalTitle: "Indisponível",
-            status: "INACTIVE",
-          }),
-        ),
-    ),
-    /indisponível/,
+test("catalog books in review remain accessible when the catalog returns them", async () => {
+  const book = await loadSharedBook(
+    id,
+    undefined,
+    async () =>
+      new globalThis.Response(
+        JSON.stringify({
+          id,
+          canonicalTitle: "Livro em revisão",
+          status: "REVIEW_REQUIRED",
+        }),
+      ),
   );
+  assert.equal(book.id, id);
+  assert.equal(book.title, "Livro em revisão");
 });

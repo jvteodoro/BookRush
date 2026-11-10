@@ -197,3 +197,7 @@ frontend preserva o caminho no retorno OIDC e busca os metadados por ID em
 e falhas de rede mostram uma mensagem; fechar uma entrada direta leva ao feed.
 A leitura e a biblioteca usam as ações existentes, sem atribuir a abertura
 compartilhada a uma recomendação.
+
+O cliente de links respeita a resposta do catálogo e não aplica um filtro local
+de status diferente daquele usado pela busca e pelo feed. O catálogo informa
+livros inexistentes por HTTP 404.

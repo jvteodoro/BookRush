@@ -40,9 +40,7 @@ export async function loadSharedBook(
         "Não foi possível carregar o livro. Tente novamente.",
     );
   }
-  const book = (await response.json()) as CatalogBook & { status?: string };
-  if (book.status && book.status !== "ACTIVE")
-    throw new Error("Livro não encontrado ou indisponível.");
+  const book = (await response.json()) as CatalogBook;
   if (!book.canonicalTitle || book.id?.toLowerCase() !== id.toLowerCase())
     throw new Error("Livro indisponível. Tente novamente.");
   return {
