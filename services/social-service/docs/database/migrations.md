@@ -57,3 +57,8 @@ Upsert concorrente preserva uma nota por leitor/livro; repetição da mesma nota
 não altera updated_at. A média e a nota do leitor vêm da mesma consulta.
 Nenhuma tabela anterior é alterada. O E2E cobre boot vazio, upgrade V9 e
 validação Flyway em segundo boot.
+
+## V11 — threads de comentários
+
+`V11__comment_threads.sql` adiciona pai anulável, referência composta pelo livro,
+restrição de autorreferência e índice. Comentários antigos permanecem raízes.

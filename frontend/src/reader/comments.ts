@@ -2,7 +2,9 @@ import { authClient } from "../auth";
 
 export type BookComment = {
   id: string;
-  body: string;
+  body?: string;
+  parentCommentId?: string | null;
+  available?: boolean;
   subject_key?: string;
   authorName?: string;
   canDelete?: boolean;
@@ -14,7 +16,10 @@ export async function loadComments(
   signal?: AbortSignal,
   fetcher: Fetcher = authClient.fetch.bind(authClient),
 ): Promise<BookComment[]> {
-  const response = await fetcher(apiRoutes.social.comments(bookId), { signal });
+  const response = await fetcher(
+    `${apiRoutes.social.comments(bookId)}?includeUnavailable=true`,
+    { signal },
+  );
   if (!response.ok)
     throw new Error(
       response.status === 401
@@ -27,6 +32,7 @@ export async function postComment(
   bookId: string,
   body: string,
   fetcher: Fetcher = authClient.fetch.bind(authClient),
+  parentCommentId?: string | null,
 ): Promise<BookComment> {
   const text = body.trim();
   if (!text || text.length > 2000)
@@ -34,13 +40,18 @@ export async function postComment(
   const response = await fetcher(apiRoutes.social.comments(bookId), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ body: text }),
+    body: JSON.stringify({
+      body: text,
+      ...(parentCommentId ? { parentCommentId } : {}),
+    }),
   });
   if (!response.ok)
     throw new Error(
       response.status === 401
         ? "Sua sessão expirou. Entre novamente."
-        : "Não foi possível publicar o comentário. Seu texto foi preservado.",
+        : response.status === 409
+          ? "O comentário ao qual você respondeu não está mais disponível. Atualize a conversa; seu texto foi preservado."
+          : "Não foi possível publicar o comentário. Seu texto foi preservado.",
     );
   return response.json();
 }
@@ -85,4 +96,47 @@ export async function deleteComment(
         "Não foi possível remover o comentário. Tente novamente.",
     );
   }
+}
+
+export function visibleCommentCount(rows: BookComment[]): number {
+  return rows.filter((row) => row.available !== false).length;
+}
+
+export function threadRows(
+  rows: BookComment[],
+  collapsed: Set<string>,
+): Array<{ comment: BookComment; depth: number; children: number }> {
+  const ids = new Set(rows.map((row) => row.id));
+  const children = new Map<string | null, BookComment[]>();
+  for (const row of rows) {
+    const parent =
+      row.parentCommentId && ids.has(row.parentCommentId)
+        ? row.parentCommentId
+        : null;
+    const group = children.get(parent) ?? [];
+    group.push(row);
+    children.set(parent, group);
+  }
+  const result: Array<{
+    comment: BookComment;
+    depth: number;
+    children: number;
+  }> = [];
+  const stack = (children.get(null) ?? [])
+    .slice()
+    .reverse()
+    .map((comment) => ({ comment, depth: 0 }));
+  const visited = new Set<string>();
+  while (stack.length) {
+    const item = stack.pop()!;
+    if (visited.has(item.comment.id)) continue;
+    visited.add(item.comment.id);
+    const replies = children.get(item.comment.id) ?? [];
+    result.push({ ...item, children: replies.length });
+    if (!collapsed.has(item.comment.id)) {
+      for (let i = replies.length - 1; i >= 0; i--)
+        stack.push({ comment: replies[i], depth: item.depth + 1 });
+    }
+  }
+  return result;
 }
