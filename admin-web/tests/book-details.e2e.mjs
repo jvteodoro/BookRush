@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, URL } from "node:url";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "vite";
 import { chromium } from "playwright";

@@ -38,6 +38,10 @@ incluindo nomes longos e falhas de clipboard/registro do compartilhamento.
 `admin-web/tests/book-details.e2e.mjs` verifica o modal com dados simulados;
 `frontend/tests/fixtures/book-details.html` permite revisar o visual no Vite.
 Estas evidências não representam deploy nem smoke autenticado em produção.
+O teste de navegador importa `URL` explicitamente de `node:url`, conforme o
+lint do admin, que também é executado no build da imagem usada pelo E2E.
+O mock HTTP dos testes de moderação reconhece separadores Windows e Linux;
+formatação, lint, testes, cobertura e build do admin foram verificados localmente.
 
 Antes de publicar mudanças do frontend, execute o change gate com documentação
 incluída: `bash scripts/validate-change.sh --staged` e, após o commit,

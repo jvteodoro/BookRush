@@ -29,7 +29,7 @@ const bundled = await build({
   plugins: [{
     name: "authenticated-http-transport",
     setup(builder) {
-      builder.onLoad({ filter: /\/lib\/http\.ts$/ }, () => ({
+      builder.onLoad({ filter: /[\\/]lib[\\/]http\.ts$/ }, () => ({
         contents: "export const createHttp = () => globalThis.moderationTestHttp;",
         loader: "js",
       }));
