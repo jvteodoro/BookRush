@@ -18,7 +18,7 @@ test('search delegates query and pagination to the catalog API', async () => {
       ok: true,
       status: 200,
       json: async () => ({
-        items: [{ id: 'book-1', canonicalTitle: 'Frankenstein', originalLanguage: 'en' }],
+        items: [{ id: 'book-1', canonicalTitle: 'Frankenstein', originalLanguage: 'en', authors: ['Mary Shelley'], firstPublicationYear: 1818 }],
         totalItems: 21,
         totalPages: 2,
         page: 1,
@@ -31,4 +31,6 @@ test('search delegates query and pagination to the catalog API', async () => {
   assert.equal(requests[0].init.credentials, 'same-origin');
   assert.equal(result.totalItems, 21);
   assert.equal(result.books[0].title, 'Frankenstein');
+  assert.equal(result.books[0].author, 'Mary Shelley');
+  assert.equal(result.books[0].firstPublicationYear, 1818);
 });

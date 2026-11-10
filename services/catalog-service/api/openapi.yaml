@@ -699,13 +699,17 @@ components:
         last: {type: boolean}
     BookView:
       type: object
-      required: [id, canonicalTitle, status, categories]
+      required: [id, canonicalTitle, status, categories, authors]
       properties:
         id: {type: string, format: uuid}
         canonicalTitle: {type: string}
         originalTitle: {type: string, nullable: true}
         originalLanguage: {type: string, nullable: true}
-        firstPublicationYear: {type: integer, format: int32, nullable: true}
+        authors:
+          type: array
+          description: Work authors in credit order (AUTHOR role only); empty when unknown.
+          items: {type: string}
+        firstPublicationYear: {type: integer, format: int32, nullable: true, description: Year of first publication of the work; not the edition or ingestion year.}
         description: {type: string, nullable: true}
         thumbnailUrl: {type: string, format: uri, nullable: true}
         categories:

@@ -476,7 +476,7 @@
   window.addEventListener("resize", scheduleFeedQuoteFit, { passive: true });
 
   function bookCard(b) {
-    return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank ? `posição ${b.rank}` : "disponível"}</span></div></article>`;
+    return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}${b.firstPublicationYear != null ? ` · ${esc(b.firstPublicationYear)}` : ""}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank ? `posição ${b.rank}` : "disponível"}</span></div></article>`;
   }
 
   function renderRecommendations() {
@@ -556,7 +556,15 @@
           const book = {
             id: i.id,
             title: i.canonicalTitle,
-            author: "Catálogo BookRush",
+            author:
+              [
+                ...new Set(
+                  (i.authors || []).map((name) => name.trim()).filter(Boolean),
+                ),
+              ].join(" · ") || "Autor não informado",
+            firstPublicationYear: Number.isInteger(i.firstPublicationYear)
+              ? i.firstPublicationYear
+              : null,
             genre:
               [
                 ...new Set(
@@ -631,7 +639,7 @@
 
   function openLucky(b, term = "", note = "") {
     modal(
-      `<div class="eyebrow">ESTOU COM SORTE${term && !note ? ` · “${esc(term)}”` : ""}</div><h2>${esc(b.title)}</h2>${note ? `<p class="notice">${esc(note)}</p>` : ""}<p>${esc(b.quote)}</p><div class="lucky-result"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"></div><div class="lucky-result-meta"><strong>${esc(b.author)}</strong><div class="lucky-result-details">${esc(b.genre)}${b.pages ? ` • ${b.pages} páginas` : ""}</div></div></div>`,
+      `<div class="eyebrow">ESTOU COM SORTE${term && !note ? ` · “${esc(term)}”` : ""}</div><h2>${esc(b.title)}</h2>${note ? `<p class="notice">${esc(note)}</p>` : ""}<p>${esc(b.quote)}</p><div class="lucky-result"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"></div><div class="lucky-result-meta"><strong>${esc(b.author)}</strong><div class="lucky-result-details">${esc(b.genre)}${b.firstPublicationYear != null ? ` • ${esc(b.firstPublicationYear)}` : ""}${b.pages ? ` • ${b.pages} páginas` : ""}</div></div></div>`,
       `<button class="br-button br-button--ghost br-button--sm" data-lucky-change>Mudar palavra</button><button class="br-button br-button--secondary br-button--sm" data-lucky-again>Outra vez</button><button class="br-button br-button--primary br-button--sm" data-modal-open="${b.id}">Ler este livro ${icon("arrow", "icon-sm")}</button>`,
       "lucky-modal",
     );
@@ -887,7 +895,7 @@
           : (state.recent || []).map(book);
     const content = `<main class="content"><div class="page-heading"><div><div class="eyebrow">SUA ESTANTE</div><h1>Minha biblioteca</h1><p>Livros salvos, leituras em andamento e itens abertos recentemente.</p></div></div>
       <div class="tab-row">${tabs.map(([id, l]) => `<button class="tab-btn ${state.libraryTab === id ? "active" : ""}" data-tab="${id}">${l}</button>`).join("")}</div>
-      <div class="library-grid">${list.map((b) => `<article class="library-item" data-open-book="${b.id}" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"><div class="library-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="library-progress"><span style="width:${b.progress || 12}%"></span></div><span class="library-percent">${b.progress || 12}% lido</span></div></article>`).join("") || `<div class="panel-card"><h3>Nada aqui ainda</h3><p class="muted">Salve livros no feed para vê-los nesta seção.</p></div>`}</div>
+      <div class="library-grid">${list.map((b) => `<article class="library-item" data-open-book="${b.id}" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"><div class="library-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)}${b.firstPublicationYear != null ? ` · ${esc(b.firstPublicationYear)}` : ""}</p><div class="library-progress"><span style="width:${b.progress || 12}%"></span></div><span class="library-percent">${b.progress || 12}% lido</span></div></article>`).join("") || `<div class="panel-card"><h3>Nada aqui ainda</h3><p class="muted">Salve livros no feed para vê-los nesta seção.</p></div>`}</div>
       <div class="section-row"><h2>Retomar rapidamente</h2></div><div class="book-grid">${BOOKS.filter(
         (b) => b.progress > 20,
       )
