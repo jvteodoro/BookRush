@@ -591,8 +591,9 @@
 
   function openLuckyPrompt() {
     modal(
-      `<div class="eyebrow">ESTOU COM SORTE</div><h2>Quer dar uma dica?</h2><p>Digite uma palavra (ex.: <em>campo</em>, <em>amor</em>, <em>Machado</em>) e eu sorteio um livro relacionado. Deixe em branco para uma surpresa total.</p><input id="luckyTerm" class="lucky-input" maxlength="60" placeholder="Uma palavra, título ou autor…" autocomplete="off" autofocus/>`,
-      `<button class="secondary-btn" data-close-modal>Cancelar</button><button class="primary-btn" id="luckyGo">${icon("sparkle", "icon-sm")} Sortear</button>`,
+      `<div class="eyebrow">ESTOU COM SORTE</div><h2>Quer dar uma dica?</h2><p>Digite uma palavra (ex.: <em>campo</em>, <em>amor</em>, <em>Machado</em>) e eu sorteio um livro relacionado. Deixe em branco para uma surpresa total.</p><input id="luckyTerm" class="lucky-input" aria-label="Uma palavra, título ou autor" maxlength="60" placeholder="Uma palavra, título ou autor…" autocomplete="off" autofocus/>`,
+      `<button class="br-button br-button--ghost br-button--sm" data-close-modal>Cancelar</button><button class="br-button br-button--primary br-button--sm" id="luckyGo">${icon("sparkle", "icon-sm")} Sortear</button>`,
+      "lucky-modal",
     );
     const input = document.getElementById("luckyTerm");
     const go = () => pickLucky(input.value.trim());
@@ -630,8 +631,9 @@
 
   function openLucky(b, term = "", note = "") {
     modal(
-      `<div class="eyebrow">ESTOU COM SORTE${term && !note ? ` · “${esc(term)}”` : ""}</div><h2>${esc(b.title)}</h2>${note ? `<p class="notice">${esc(note)}</p>` : ""}<p>${esc(b.quote)}</p><div style="display:flex;gap:10px;align-items:center;margin-top:18px"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"></div><div><strong>${esc(b.author)}</strong><div class="muted tiny">${esc(b.genre)}${b.pages ? ` • ${b.pages} páginas` : ""}</div></div></div>`,
-      `<button class="ghost-btn" data-lucky-change>Mudar palavra</button><button class="secondary-btn" data-lucky-again>Outra vez</button><button class="primary-btn" data-modal-open="${b.id}">Ler este livro ${icon("arrow", "icon-sm")}</button>`,
+      `<div class="eyebrow">ESTOU COM SORTE${term && !note ? ` · “${esc(term)}”` : ""}</div><h2>${esc(b.title)}</h2>${note ? `<p class="notice">${esc(note)}</p>` : ""}<p>${esc(b.quote)}</p><div class="lucky-result"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"></div><div class="lucky-result-meta"><strong>${esc(b.author)}</strong><div class="lucky-result-details">${esc(b.genre)}${b.pages ? ` • ${b.pages} páginas` : ""}</div></div></div>`,
+      `<button class="br-button br-button--ghost br-button--sm" data-lucky-change>Mudar palavra</button><button class="br-button br-button--secondary br-button--sm" data-lucky-again>Outra vez</button><button class="br-button br-button--primary br-button--sm" data-modal-open="${b.id}">Ler este livro ${icon("arrow", "icon-sm")}</button>`,
+      "lucky-modal",
     );
     document.querySelector("[data-lucky-again]").onclick = () => {
       document.querySelector(".modal-wrap")?.remove();
@@ -1309,11 +1311,11 @@
     );
   }
 
-  function modal(body, actions = "") {
+  function modal(body, actions = "", modalClass = "") {
     document.querySelector(".modal-wrap")?.remove();
     const wrap = document.createElement("div");
     wrap.className = "modal-wrap";
-    wrap.innerHTML = `<section class="modal">${body}<div class="modal-actions">${actions || '<button class="primary-btn" data-close-modal>Fechar</button>'}</div></section>`;
+    wrap.innerHTML = `<section class="modal ${modalClass}">${body}<div class="modal-actions">${actions || '<button class="primary-btn" data-close-modal>Fechar</button>'}</div></section>`;
     document.body.appendChild(wrap);
     wrap.addEventListener("click", (e) => {
       if (e.target === wrap) wrap.remove();
