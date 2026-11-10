@@ -63,6 +63,7 @@ export type PageLoopBook = {
   a: string;
   b: string;
   quote: string;
+  description?: string;
   excerpt?: FeedExcerpt | null;
   likes: number;
   comments: number;

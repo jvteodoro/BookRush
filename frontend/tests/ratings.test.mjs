@@ -15,7 +15,7 @@ async function load(entry, hooks = false) {
       if (hooks) {
         builder.onResolve({ filter: /\/Drawer$/ }, () => ({ path: 'drawer', namespace: 'drawer' }));
         builder.onLoad({ filter: /.*/, namespace: 'drawer' }, () => ({ contents: 'export const Drawer = props => props.children;' }));
-        builder.onResolve({ filter: /^react$/ }, args => args.importer.includes('/node_modules/') ? undefined : ({ path: 'react', namespace: 'hooks' }));
+        builder.onResolve({ filter: /^react$/ }, args => args.importer.replaceAll('\\', '/').includes('/node_modules/') ? undefined : ({ path: 'react', namespace: 'hooks' }));
         builder.onLoad({ filter: /.*/, namespace: 'hooks' }, () => ({ contents: `
           export const forwardRef = fn => fn;
           export const useRef = () => ({ current: false });

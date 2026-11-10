@@ -125,25 +125,13 @@ export function LibraryPage({
           }))}
           onOpen={(book) => {
             const entry = list.find((item) => item.id === book.id);
-            if (entry?.available) onOpen(entry);
+            if (entry?.available) (onDetails ?? onOpen)(entry);
           }}
           disabledIds={list
             .filter((book) => !book.available || pending.includes(book.id))
             .map((book) => book.id)}
           renderActions={(book) => (
             <>
-              {onDetails &&
-                list.find((item) => item.id === book.id)?.available && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      onDetails(list.find((item) => item.id === book.id)!)
-                    }
-                  >
-                    Sobre e avaliações
-                  </Button>
-                )}
               {saved.includes(book.id) ? (
                 <Button
                   variant="ghost"

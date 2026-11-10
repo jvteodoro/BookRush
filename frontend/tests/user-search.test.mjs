@@ -12,7 +12,7 @@ async function load(entry, hooks = false) {
       builder.onResolve({ filter: /auth$/ }, () => ({ path: 'auth', namespace: 'test' }));
       builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const authClient = { fetch(...args) { return globalThis.__searchFetch(...args); } };' }));
       if (hooks) {
-        builder.onResolve({ filter: /^react$/ }, args => args.importer.includes('/node_modules/') ? undefined : ({ path: 'react', namespace: 'hooks' }));
+        builder.onResolve({ filter: /^react$/ }, args => args.importer.replaceAll('\\', '/').includes('/node_modules/') ? undefined : ({ path: 'react', namespace: 'hooks' }));
         builder.onLoad({ filter: /.*/, namespace: 'hooks' }, () => ({ contents: `
           export const forwardRef = fn => fn;
           export function useState() { const value = globalThis.__searchStates.shift(); return [value, next => globalThis.__searchUpdates.push(next)]; }
