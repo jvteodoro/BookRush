@@ -94,3 +94,11 @@ Validação isolada: `bash scripts/test-book-ratings-e2e.sh` executa Maven verif
 imagens reais, PostgreSQL 16, upgrade V9→V10, JWTs de dois leitores e chamadas
 pelo gateway versionado, incluindo CORS, concorrência, edição e exclusão.
 Recursos do teste são descartados, sem usar `.env` ou volumes de produção.
+
+## Threads de comentários
+
+POST de comentário aceita `parentCommentId` opcional para responder a um comentário
+visível do mesmo livro; pai indisponível retorna 409. GET com
+`includeUnavailable=true` inclui marcadores sem conteúdo ou autor para ancestrais
+indisponíveis de respostas visíveis. Sem o parâmetro, somente comentários visíveis
+são retornados. Remoção e moderação não removem respostas.

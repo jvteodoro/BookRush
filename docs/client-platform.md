@@ -169,6 +169,18 @@ e usa os contratos existentes `PUT`/`DELETE` para alterá-lo. Se a consulta
 social falhar, o nome e a biografia públicos ainda aparecem, mas o botão fica
 indisponível.
 
+O painel de comentários apresenta respostas em threads, com ações para responder,
+expandir ou recolher cada conversa. O formulário identifica o comentário escolhido
+e permite cancelar a resposta; se ele se tornar indisponível, o texto é preservado
+e a conversa pode ser atualizada. Comentários removidos ou ocultados pela moderação
+aparecem como marcadores sem conteúdo quando há descendentes visíveis. O recuo
+visual é limitado em telas estreitas, sem limitar a profundidade das respostas.
+
+A listagem do painel solicita `includeUnavailable=true` ao `social-service` e
+monta a hierarquia a partir de `parentCommentId`. A contagem inclui comentários
+e respostas visíveis, mas não os marcadores de comentários indisponíveis. Clientes
+antigos continuam recebendo somente comentários visíveis sem esse parâmetro.
+
 Os cartões do feed carregam os contadores persistidos de likes e comentários pelos endpoints do `social-service`. Depois de uma curtida ou comentário, o frontend consulta novamente esses contadores e atualiza o cartão; os valores não são mantidos como números locais do protótipo.
 
 O endpoint de likes também retorna `liked` para o subject autenticado. O feed usa esse campo para restaurar o estado do coração após reload e enviar `DELETE` quando o usuário já curtiu, evitando curtidas duplicadas.

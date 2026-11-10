@@ -9,6 +9,8 @@ import {
   reportComment,
   deleteComment,
   type BookComment,
+  threadRows,
+  visibleCommentCount,
 } from "./comments";
 
 type Props = {
@@ -27,6 +29,8 @@ export function CommentsDrawer({
 }: Props) {
   const [comments, setComments] = useState<BookComment[]>([]);
   const [draft, setDraft] = useState("");
+  const [replyTo, setReplyTo] = useState<BookComment | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +49,7 @@ export function CommentsDrawer({
       .then((rows) => {
         if (controller.signal.aborted) return;
         setComments(rows);
-        onCount(book.id, rows.length);
+        onCount(book.id, visibleCommentCount(rows));
       })
       .catch((error) => {
         if (!controller.signal.aborted) setLoadError(error.message);
@@ -62,16 +66,23 @@ export function CommentsDrawer({
     setError("");
     setNotice("");
     try {
-      const posted = await postComment(book.id, draft);
+      const posted = await postComment(book.id, draft, undefined, replyTo?.id);
       setDraft("");
+      setReplyTo(null);
+      if (replyTo)
+        setCollapsed((current) => {
+          const next = new Set(current);
+          next.delete(replyTo.id);
+          return next;
+        });
       const confirmed = [...comments, { ...posted, authorName: userName }];
       setComments(confirmed);
-      onCount(book.id, confirmed.length);
+      onCount(book.id, visibleCommentCount(confirmed));
       setNotice("Comentário publicado.");
       try {
         const rows = await loadComments(book.id);
         setComments(rows);
-        onCount(book.id, rows.length);
+        onCount(book.id, visibleCommentCount(rows));
       } catch {
         setNotice(
           "Comentário publicado. Não foi possível atualizar a lista agora.",
@@ -96,15 +107,27 @@ export function CommentsDrawer({
     setNotice("");
     try {
       await deleteComment(comment.id);
-      const remaining = comments.filter((item) => item.id !== comment.id);
+      const remaining = comments.some(
+        (item) => item.parentCommentId === comment.id,
+      )
+        ? comments.map((item) =>
+            item.id === comment.id
+              ? {
+                  id: item.id,
+                  parentCommentId: item.parentCommentId,
+                  available: false,
+                }
+              : item,
+          )
+        : comments.filter((item) => item.id !== comment.id);
       setComments(remaining);
-      onCount(book.id, remaining.length);
+      onCount(book.id, visibleCommentCount(remaining));
       setConfirmDeleteId("");
       setNotice("Comentário removido.");
       try {
         const rows = await loadComments(book.id);
         setComments(rows);
-        onCount(book.id, rows.length);
+        onCount(book.id, visibleCommentCount(rows));
       } catch {
         setNotice(
           "Comentário removido. Não foi possível atualizar a lista agora.",
@@ -155,6 +178,14 @@ export function CommentsDrawer({
             void submit();
           }}
         >
+          {replyTo && (
+            <p>
+              Respondendo a {replyTo.authorName?.trim() || "Leitor"}{" "}
+              <button type="button" onClick={() => setReplyTo(null)}>
+                Cancelar resposta
+              </button>
+            </p>
+          )}
           <label htmlFor="comment-draft">Seu comentário</label>
           <Textarea
             id="comment-draft"
@@ -186,6 +217,20 @@ export function CommentsDrawer({
               {error}
             </Notice>
           )}
+          {error.includes("não está mais disponível") && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setReplyTo(null);
+                setError("");
+                setAttempt((current) => current + 1);
+              }}
+            >
+              Atualizar conversa
+            </Button>
+          )}
           {notice && <p role="status">{notice}</p>}
         </form>
       }
@@ -211,89 +256,137 @@ export function CommentsDrawer({
         </div>
       ) : (
         <ol className="br-comments-list">
-          {comments.map((comment) => {
-            const name = comment.authorName?.trim() || "Leitor";
-            const author = (
-              <>
-                <span className="br-comment-avatar" aria-hidden="true">
-                  {name.slice(0, 2).toUpperCase()}
-                </span>
-                <strong>{name}</strong>
-              </>
-            );
-            return (
-              <li className="br-comment" key={comment.id}>
-                <div className="br-comment-heading">
-                  {comment.subject_key ? (
-                    <a
-                      className="br-comment-author"
-                      href={`/usuarios/${encodeURIComponent(comment.subject_key)}`}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        onProfile(comment.subject_key!);
-                      }}
-                    >
-                      {author}
-                    </a>
+          {threadRows(comments, collapsed).map(
+            ({ comment, depth, children }) => {
+              const name = comment.authorName?.trim() || "Leitor";
+              const author = (
+                <>
+                  <span className="br-comment-avatar" aria-hidden="true">
+                    {name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <strong>{name}</strong>
+                </>
+              );
+              return (
+                <li
+                  className="br-comment"
+                  key={comment.id}
+                  style={{
+                    marginInlineStart: `${Math.min(depth, 3) * 1.25}rem`,
+                  }}
+                >
+                  {comment.available === false ? (
+                    <p>Comentário indisponível</p>
                   ) : (
-                    <div className="br-comment-author">{author}</div>
-                  )}
-                  <span className="br-comment-actions">
-                    {comment.canDelete ? (
+                    <>
+                      <div className="br-comment-heading">
+                        {comment.subject_key ? (
+                          <a
+                            className="br-comment-author"
+                            href={`/usuarios/${encodeURIComponent(comment.subject_key)}`}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              onProfile(comment.subject_key!);
+                            }}
+                          >
+                            {author}
+                          </a>
+                        ) : (
+                          <div className="br-comment-author">{author}</div>
+                        )}
+                        <span className="br-comment-actions">
+                          {comment.canDelete ? (
+                            <button
+                              type="button"
+                              className="br-comment-report"
+                              disabled={
+                                sending || Boolean(deletingId) || loading
+                              }
+                              onClick={() => {
+                                setConfirmDeleteId(comment.id);
+                                setError("");
+                              }}
+                            >
+                              Remover
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="br-comment-report"
+                              disabled={Boolean(reportingId)}
+                              onClick={() => void report(comment)}
+                            >
+                              {reportingId === comment.id
+                                ? "Enviando…"
+                                : "Denunciar"}
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                      <p>{comment.body}</p>
                       <button
                         type="button"
                         className="br-comment-report"
-                        disabled={sending || Boolean(deletingId) || loading}
                         onClick={() => {
-                          setConfirmDeleteId(comment.id);
-                          setError("");
+                          setReplyTo(comment);
+                          document.getElementById("comment-draft")?.focus();
                         }}
                       >
-                        Remover
+                        Responder
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="br-comment-report"
-                        disabled={Boolean(reportingId)}
-                        onClick={() => void report(comment)}
-                      >
-                        {reportingId === comment.id ? "Enviando…" : "Denunciar"}
-                      </button>
-                    )}
-                  </span>
-                </div>
-                <p>{comment.body}</p>
-                {confirmDeleteId === comment.id && (
-                  <div className="br-comment-delete-confirm">
-                    <p>
-                      Remover seu comentário? Ele deixará de aparecer para os
-                      leitores. Esta ação não pode ser desfeita.
-                    </p>
-                    <div className="br-comment-actions">
-                      <Button
-                        size="sm"
-                        disabled={Boolean(deletingId) || sending}
-                        onClick={() => void remove(comment)}
-                      >
-                        {deletingId === comment.id
-                          ? "Removendo…"
-                          : "Confirmar remoção"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={Boolean(deletingId)}
-                        onClick={() => setConfirmDeleteId("")}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </li>
-            );
-          })}
+                      {confirmDeleteId === comment.id && (
+                        <div className="br-comment-delete-confirm">
+                          <p>
+                            Remover seu comentário? Ele deixará de aparecer para
+                            os leitores. Esta ação não pode ser desfeita.
+                          </p>
+                          <div className="br-comment-actions">
+                            <Button
+                              size="sm"
+                              disabled={Boolean(deletingId) || sending}
+                              onClick={() => void remove(comment)}
+                            >
+                              {deletingId === comment.id
+                                ? "Removendo…"
+                                : "Confirmar remoção"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={Boolean(deletingId)}
+                              onClick={() => setConfirmDeleteId("")}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {children > 0 && (
+                    <button
+                      type="button"
+                      className="br-comment-report"
+                      aria-expanded={!collapsed.has(comment.id)}
+                      onClick={() =>
+                        setCollapsed((current) => {
+                          const next = new Set(current);
+                          if (next.has(comment.id)) next.delete(comment.id);
+                          else next.add(comment.id);
+                          return next;
+                        })
+                      }
+                    >
+                      {collapsed.has(comment.id)
+                        ? "Mostrar respostas"
+                        : "Ocultar respostas"}{" "}
+                      ({children})
+                    </button>
+                  )}
+                </li>
+              );
+            },
+          )}
         </ol>
       )}
     </Drawer>

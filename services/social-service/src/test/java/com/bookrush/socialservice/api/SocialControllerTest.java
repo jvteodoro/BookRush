@@ -170,4 +170,40 @@ class SocialControllerTest {
         () -> controller.followers("x".repeat(201), principal)).getStatusCode().value());
   }
 
+  @Test
+  void replyRejectsMissingOrHiddenParent() {
+    UUID book = UUID.randomUUID();
+    UUID parent = UUID.randomUUID();
+    var input = new SocialController.Comment("reply", parent);
+    var request = mock(HttpServletRequest.class);
+    assertEquals(409, assertThrows(ResponseStatusException.class,
+        () -> controller.comment(book, input, principal, request)).getStatusCode().value());
+    when(jdbc.queryForList(contains("FOR UPDATE"), eq(parent), eq(book)))
+        .thenReturn(java.util.List.of(new java.util.HashMap<>()));
+    when(jdbc.queryForObject(contains("comment_moderation_state"), eq(String.class), eq(parent)))
+        .thenReturn("HIDDEN");
+    assertEquals(409, assertThrows(ResponseStatusException.class,
+        () -> controller.comment(book, input, principal, request)).getStatusCode().value());
+  }
+
+  @Test
+  void listingRedactsOnlyAncestorsOfVisibleReplies() {
+    UUID book = UUID.randomUUID(), parent = UUID.randomUUID(), child = UUID.randomUUID(), unused = UUID.randomUUID();
+    var hidden = new java.util.HashMap<String, Object>();
+    hidden.put("id", parent); hidden.put("available", false); hidden.put("body", "secret");
+    var reply = new java.util.HashMap<String, Object>();
+    reply.put("id", child); reply.put("parent_comment_id", parent); reply.put("available", true);
+    reply.put("subject_key", "reader"); reply.put("body", "reply");
+    var other = new java.util.HashMap<String, Object>();
+    other.put("id", unused); other.put("available", false);
+    when(jdbc.queryForList(contains("ORDER BY c.created_at"), eq(book)))
+        .thenReturn(java.util.List.of(hidden, reply, other));
+    @SuppressWarnings("unchecked")
+    var result = (java.util.List<Map<String, Object>>) controller.comments(book, null, principal, true);
+    assertEquals(2, result.size());
+    assertEquals(Map.of("id", parent, "available", false), result.get(0).entrySet().stream()
+        .filter(entry -> entry.getValue() != null).collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    assertEquals(1, ((java.util.List<?>) controller.comments(book, null, principal, false)).size());
+  }
+
 }
