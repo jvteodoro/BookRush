@@ -170,3 +170,7 @@ Os cartões do feed carregam os contadores persistidos de likes e comentários p
 O endpoint de likes também retorna `liked` para o subject autenticado. O feed usa esse campo para restaurar o estado do coração após reload e enviar `DELETE` quando o usuário já curtiu, evitando curtidas duplicadas.
 
 O contador exibido é sempre o `count` persistido retornado pelo serviço. O estado visual `liked` não é somado novamente ao contador, evitando exibir dois likes quando existe apenas um registro.
+
+A tela inicial anterior ao login apresenta a planta de leitura no estágio 5 como
+mascote e usa os tokens visuais do frontend em um layout responsivo. As ações de
+entrar e cadastrar continuam usando os fluxos existentes do Keycloak.
