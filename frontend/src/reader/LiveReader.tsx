@@ -14,6 +14,10 @@ import { BookDetailsDrawer, type DetailsBook } from "./BookDetailsDrawer";
 import "../styles/ratings.css";
 import "../styles/book-details.css";
 import { CommentsDrawer } from "./CommentsDrawer";
+import { Drawer } from "../components/ui/Drawer";
+import { Button } from "../components/ui/Button";
+import { loadSharedBook } from "./sharedBook";
+import { readerSessionOrigin } from "./readerSessionOrigin";
 import { AccountPage } from "./AccountPages";
 import type { FeedExcerpt } from "../app/types";
 
@@ -71,6 +75,7 @@ type Runtime = {
       id: string,
       query?: string,
       fromRecommendation?: boolean,
+      direct?: boolean,
     ) => Promise<void>;
     openComments: (id: string) => Promise<void>;
     openShare: (id: string) => void;
@@ -82,12 +87,14 @@ const runtime = () => window as unknown as Runtime;
 
 export function LiveReader({
   visible,
+  bookPath,
   userName,
   onLegacy,
   initialTab = "feed",
   legacyQuery = "",
 }: {
   visible: boolean;
+  bookPath: string | null;
   userName: string;
   onLegacy: () => void;
   initialTab?: "feed" | "library" | "search" | "recommendations";
@@ -135,6 +142,46 @@ export function LiveReader({
   );
   const [pending, setPending] = useState<string[]>([]);
   const [detailsBook, setDetailsBook] = useState<DetailsBook | null>(null);
+  const [sharedLoading, setSharedLoading] = useState(false);
+  const [sharedError, setSharedError] = useState("");
+  const [sharedAttempt, setSharedAttempt] = useState(0);
+  useEffect(() => {
+    if (bookPath === null) {
+      setSharedLoading(false);
+      setSharedError("");
+      setDetailsBook(null);
+      return;
+    }
+    const controller = new AbortController();
+    setDetailsBook(null);
+    setSharedError("");
+    setSharedLoading(true);
+    void loadSharedBook(bookPath, controller.signal)
+      .then((book) => {
+        if (!controller.signal.aborted) setDetailsBook(book);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setSharedError(
+            error instanceof Error && error.message !== "Failed to fetch"
+              ? error.message
+              : "Não foi possível carregar o livro. Tente novamente.",
+          );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSharedLoading(false);
+      });
+    return () => controller.abort();
+  }, [bookPath, sharedAttempt]);
+  const leaveSharedBook = () => {
+    if (bookPath === null) return;
+    if (window.history.state?.bookrushBookEntry) window.history.back();
+    else {
+      window.history.replaceState({}, "", "/");
+      window.dispatchEvent(new Event("bookrush:path-changed"));
+    }
+  };
+
   useEffect(() => {
     const open = (event: Event) => {
       const id = (event as CustomEvent<string>).detail;
@@ -345,7 +392,11 @@ export function LiveReader({
   };
   const streak =
     plant?.streakDays ?? runtime().__BOOKRUSH_STREAK__?.currentDays;
-  const openCatalogBook = (book: LibraryBook, fromRecommendation = false) =>
+  const openCatalogBook = (
+    book: LibraryBook,
+    fromRecommendation = false,
+    direct = false,
+  ) =>
     void action(book.id, async () => {
       // The existing reader resolves IDs from its catalog array. Register books
       // saved outside the feed before delegating, retaining their actual metadata.
@@ -367,6 +418,7 @@ export function LiveReader({
         book.id,
         query,
         fromRecommendation,
+        direct,
       );
       onLegacy();
     });
@@ -479,6 +531,23 @@ export function LiveReader({
           }}
         />
       )}
+      {bookPath !== null && (sharedLoading || sharedError) && (
+        <Drawer title="Livro compartilhado" onClose={leaveSharedBook}>
+          {sharedLoading ? (
+            <p role="status">Carregando livro…</p>
+          ) : (
+            <>
+              <p role="alert">{sharedError}</p>
+              <Button onClick={() => setSharedAttempt((value) => value + 1)}>
+                Tentar novamente
+              </Button>
+              <Button variant="ghost" onClick={leaveSharedBook}>
+                Voltar ao feed
+              </Button>
+            </>
+          )}
+        </Drawer>
+      )}
       {detailsBook && (
         <BookDetailsDrawer
           key={detailsBook.id}
@@ -489,6 +558,11 @@ export function LiveReader({
           onSave={() => save(detailsBook.id)}
           onRead={() => {
             const book = detailsBook;
+            const shared = bookPath !== null;
+            if (shared) {
+              readerSessionOrigin.clear();
+              leaveSharedBook();
+            }
             setDetailsBook(null);
             void openCatalogBook(
               {
@@ -501,14 +575,20 @@ export function LiveReader({
                 coverUrl: book.coverUrl || book.thumbnailUrl || undefined,
                 available: true,
               },
-              tab === "feed" || tab === "recommendations",
+              bookPath === null &&
+                (tab === "feed" || tab === "recommendations"),
+              shared,
             );
           }}
           onComments={() => {
+            if (bookPath !== null) leaveSharedBook();
             setCommentsBook({ id: detailsBook.id, title: detailsBook.title });
             setDetailsBook(null);
           }}
-          onClose={() => setDetailsBook(null)}
+          onClose={() => {
+            if (bookPath !== null) leaveSharedBook();
+            setDetailsBook(null);
+          }}
         />
       )}
       {commentsBook && (
