@@ -14,7 +14,7 @@ const bundled = await build({
 });
 const { loadLibrary } = await import(`data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`);
 const response = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
-const loadWithTransport = transport => loadLibrary(undefined, transport);
+const loadWithTransport = transport => loadLibrary(undefined, transport, transport);
 
 test('saved books outside the feed are resolved by ID with real progress; duplicate IDs are fetched once', async () => {
   const requests = [];
@@ -23,8 +23,8 @@ test('saved books outside the feed are resolved by ID with real progress; duplic
     if (url === '/api/v1/reader/library') return response([{ book_id: 'outside-feed' }, { bookId: 'outside-feed' }]);
     if (url === '/api/v1/reader/recent') return response([{ book_id: 'recent-only' }]);
     if (url.endsWith('/progress')) return response([{ percent: url.includes('outside-feed') ? 37 : 8 }]);
-    if (url === '/api/v1/reader/books/outside-feed') return response({ book: { canonicalTitle: 'Livro salvo', authors: ['Machado de Assis'], firstPublicationYear: 1899, originalLanguage: 'pt', thumbnailUrl: '/cover.png' } });
-    if (url === '/api/v1/reader/books/recent-only') return response({ book: { canonicalTitle: 'Livro recente', originalLanguage: 'pt', thumbnailUrl: '/cover.png' } });
+    if (url === '/api/v1/books/outside-feed') return response({ canonicalTitle: 'Livro salvo', authors: ['Machado de Assis'], firstPublicationYear: 1899, originalLanguage: 'pt', thumbnailUrl: '/cover.png' });
+    if (url === '/api/v1/books/recent-only') return response({ canonicalTitle: 'Livro recente', originalLanguage: 'pt', thumbnailUrl: '/cover.png' });
     return response({ canonicalTitle: 'Livro inesperado' });
   };
   const result = await loadWithTransport(transport);
@@ -37,7 +37,7 @@ test('saved books outside the feed are resolved by ID with real progress; duplic
   assert.equal(result.books[1].firstPublicationYear, null);
   assert.equal(result.books[0].progress, 37);
   assert.equal(result.books[0].available, true);
-  assert.equal(requests.filter(url => url === '/api/v1/reader/books/outside-feed').length, 1);
+  assert.equal(requests.filter(url => url === '/api/v1/books/outside-feed').length, 1);
   assert.deepEqual(result.warnings, []);
 });
 
@@ -71,19 +71,49 @@ test('metadata requests use bounded concurrency for a large saved library', asyn
   assert.ok(maximum <= 6);
 });
 
-test('book metadata is fetched through the authenticated reader BFF', async () => {
-  const requests = [];
-  const result = await loadLibrary(undefined, async url => {
-    requests.push(url);
-    assert.ok(url.startsWith('/api/v1/reader/'), 'Library requests must stay in the product realm');
+test('library and progress stay authenticated while metadata uses the public catalog', async () => {
+  const authenticated = [];
+  const controller = new globalThis.AbortController();
+  const result = await loadLibrary(controller.signal, async url => {
+    authenticated.push(url);
+    assert.ok(url.startsWith('/api/v1/reader/'));
     if (url === '/api/v1/reader/library') return response([{ book_id: 'saved-book' }]);
     if (url === '/api/v1/reader/recent') return response([]);
-    if (url === '/api/v1/reader/books/saved-book') return response({ book: { canonicalTitle: 'Livro acessível', originalLanguage: 'pt' } });
-    if (url === '/api/v1/reader/books/saved-book/progress') return response([]);
-    return response(null, 404);
+    if (url === '/api/v1/reader/books/saved-book/progress') return response([{ percent: 23 }]);
+    assert.fail(`Unexpected authenticated request: ${url}`);
+  }, async (url, init) => {
+    assert.equal(url, '/api/v1/books/saved-book');
+    assert.equal(init.signal, controller.signal);
+    assert.equal(init.headers, undefined);
+    return response({ canonicalTitle: 'Livro acessível', originalLanguage: 'pt' });
   });
   assert.equal(result.books[0].available, true);
   assert.equal(result.books[0].title, 'Livro acessível');
-  assert.ok(requests.includes('/api/v1/reader/books/saved-book'));
-  assert.ok(requests.includes('/api/v1/reader/books/saved-book/progress'));
+  assert.equal(result.books[0].progress, 23);
+  assert.ok(authenticated.includes('/api/v1/reader/books/saved-book/progress'));
+});
+
+test('a saved book beyond the first100 catalog entries keeps its metadata through the public ID lookup', async () => {
+  const id = 'f0fe263e-a019-417c-8ee0-bea610b59497';
+  const title = 'The Extraordinary Adventures of Arsène Lupin, Gentleman-Burglar';
+  const publicRequests = [];
+  const result = await loadLibrary(undefined, async url => {
+    if (url === '/api/v1/reader/library') return response([{ book_id: id }]);
+    if (url === '/api/v1/reader/recent' || url.endsWith('/progress')) return response([]);
+    return response({ bookId: id, status: 'CONTENT_NOT_AVAILABLE' });
+  }, async (url, init) => {
+    publicRequests.push(url);
+    assert.equal(init.credentials, 'same-origin');
+    assert.equal(init.headers, undefined, 'Product bearer must not be sent to the public catalog');
+    return response({ id, canonicalTitle: title, authors: ['Leblanc, Maurice'],
+      thumbnailUrl: `/api/v1/books/${id}/thumbnail`, status: 'REVIEW_REQUIRED',
+      categories: [{ id: 'category', name: 'Crime Fiction', scheme: 'GUTENBERG' }] });
+  });
+  assert.equal(result.books[0].available, true);
+  assert.equal(result.books[0].title, title);
+  assert.equal(result.books[0].author, 'Leblanc, Maurice');
+  assert.equal(result.books[0].coverUrl, `/api/v1/books/${id}/thumbnail`);
+  assert.equal(result.books[0].genre, 'Crime Fiction');
+  assert.deepEqual(publicRequests, [`/api/v1/books/${id}`]);
+  assert.deepEqual(result.warnings, []);
 });
