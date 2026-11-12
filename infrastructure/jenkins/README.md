@@ -5,9 +5,18 @@ O contrato `scripts/test-book-metadata-e2e.sh` também cobre o ciclo de bibliote
 pelo gateway versionado, com PostgreSQL e dois leitores Keycloak descartáveis.
 Valida idempotência, isolamento, CORS e persistência após restart. O roteador
 Traefik deve incluir tanto a rota exata da listagem quanto o prefixo
-`/api/v1/reader/library/` das mutações, ambos para o reader-bff. No deploy,
-confirme que o reverse-proxy usa o `infrastructure/traefik/dynamic.yaml` da
-revisão publicada; o Compose já monta esse arquivo e inclui o reverse-proxy.
+`/api/v1/reader/library/` das mutações, ambos para o reader-bff. O deploy lê
+`infrastructure/traefik/dynamic.yaml` do workspace da revisão selecionada e
+injeta seu conteúdo na variável interna `BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG` do
+reverse-proxy. Não configure essa variável no `.env`: ela é gerada pelo deploy.
+O entrypoint materializa `/tmp/bookrush-traefik-dynamic.yaml` a cada inicialização
+e preserva os demais argumentos do Traefik. Assim, o checkout fixo do host pode
+estar antigo sem substituir as rotas da branch. Não há escrita nesse checkout.
+O deploy confere o arquivo efetivo no container e executa
+`infrastructure/jenkins/probe-reader-library.sh` para validar o preflight
+GET/PUT/DELETE pelo gateway. Falha aciona rollback, que também restaura o
+conteúdo das rotas anteriores quando disponível. O E2E usa o override real
+com arquivo antigo de rotas e reinicia o gateway para cobrir essa regressão.
 O smoke público deve salvar um livro, abrir **Biblioteca → Salvos**, recarregar
 a página e remover o livro, confirmando isolamento em uma segunda sessão.
 

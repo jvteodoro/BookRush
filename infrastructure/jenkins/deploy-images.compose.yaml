@@ -1,4 +1,25 @@
 services:
+  reverse-proxy:
+    environment:
+      BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG: ${BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG:?Configuração de rotas da revisão ausente}
+    # The daemon sees the stable host checkout, not the Jenkins workspace.
+    # Materialize the selected revision inside the container instead of using
+    # the stale host bind mount. Preserve all other proxy command arguments.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        : "$${BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG:?Routing configuration missing}"
+        printf '%s\n' "$$BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG" > /tmp/bookrush-traefik-dynamic.yaml
+        for argument in "$$@"; do
+          shift
+          case "$$argument" in
+            --providers.file.filename=*) ;;
+            *) set -- "$$@" "$$argument" ;;
+          esac
+        done
+        exec /entrypoint.sh "$$@" --providers.file.filename=/tmp/bookrush-traefik-dynamic.yaml
+      - bookrush-gateway
   behavior-service:
     image: ${BEHAVIOR_IMAGE:?Imagem behavior ausente}
     environment:
