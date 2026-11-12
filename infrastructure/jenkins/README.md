@@ -1,5 +1,16 @@
 # Jenkins BookRush
 
+O contrato `scripts/test-book-metadata-e2e.sh` também cobre o ciclo de biblioteca
+`PUT /api/v1/reader/library/{bookId}` → `GET /api/v1/reader/library` → `DELETE`
+pelo gateway versionado, com PostgreSQL e dois leitores Keycloak descartáveis.
+Valida idempotência, isolamento, CORS e persistência após restart. O roteador
+Traefik deve incluir tanto a rota exata da listagem quanto o prefixo
+`/api/v1/reader/library/` das mutações, ambos para o reader-bff. No deploy,
+confirme que o reverse-proxy usa o `infrastructure/traefik/dynamic.yaml` da
+revisão publicada; o Compose já monta esse arquivo e inclui o reverse-proxy.
+O smoke público deve salvar um livro, abrir **Biblioteca → Salvos**, recarregar
+a página e remover o livro, confirmando isolamento em uma segunda sessão.
+
 O job `bookrush-deploy` é criado no primeiro boot. O Jenkins mantém o assistente
 inicial e a autenticação; não há acesso anônimo ao deploy. Somente usuários
 confiáveis devem ter acesso ao job, pois ele usa o Docker do servidor.

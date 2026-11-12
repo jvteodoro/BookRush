@@ -102,7 +102,7 @@ public class ReaderBffController {
   }
 
   @PutMapping("/library/{bookId}")
-  public Object saveLibrary(@PathVariable UUID bookId, @RequestBody Object body, Principal principal,
+  public Object saveLibrary(@PathVariable UUID bookId, @RequestBody(required = false) Object body, Principal principal,
       HttpServletRequest request) {
     requireReader(principal);
     return mutate(state, HttpMethod.PUT, "/api/v1/reader/library/" + bookId, request, body);

@@ -17,7 +17,8 @@ def request(path, token=None, data=None, method='GET'):
                                  data=json.dumps(data).encode() if data is not None else None)
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
-            return response.status, json.load(response)
+            body = response.read()
+            return response.status, json.loads(body) if body else None
     except urllib.error.HTTPError as error:
         return error.code, None
 
@@ -42,9 +43,22 @@ import sys
 BOOK = '11111111-1111-4111-8111-111111111111'
 OTHER = '22222222-2222-4222-8222-222222222222'
 PATH = '/api/v1/reader/books/seen?bookIds=' + BOOK + ',' + OTHER
+LIBRARY = '/api/v1/reader/library'
+SAVED_BOOK = LIBRARY + '/' + BOOK
+
+
+def saved_ids(reader):
+    status, rows = request(LIBRARY, reader)
+    assert status == 200, ('library', status)
+    return [row['book_id'] for row in rows]
+
+
 ana, bruno = token('ana.reader'), token('bruno.reader')
 if '--state-down' in sys.argv:
     assert request(PATH, ana)[0] == 502
+    for method, path in [('GET', LIBRARY), ('PUT', SAVED_BOOK), ('DELETE', SAVED_BOOK)]:
+        assert request(path, ana, method=method)[0] == 502, (method, path)
+    print('Library E2E: dependency failures are reported, never treated as a successful save or empty library')
     print('Book metadata E2E: unavailable state is reported as 502, not unseen')
     raise SystemExit(0)
 for attempt in range(180):
@@ -57,11 +71,19 @@ if '--history' in sys.argv:
     recent = request('/api/v1/reader/recent', ana)[1]
     assert len(recent) == 50 and all(item['book_id'] != BOOK for item in recent)
     assert request(PATH, ana)[1]['items'][0]['bookId'] == BOOK
+    assert saved_ids(ana) == [BOOK]
     print('Book metadata E2E: seen status survives recent-history truncation')
     raise SystemExit(0)
 if '--restart' in sys.argv:
     assert request(PATH, ana)[1]['items'][0]['bookId'] == BOOK
     assert request(PATH, bruno)[1] == {'items': []}
+    assert saved_ids(ana) == [BOOK] and saved_ids(bruno) == [BOOK]
+    assert request(SAVED_BOOK, ana, method='DELETE')[0] == 200
+    assert request(SAVED_BOOK, ana, method='DELETE')[0] == 200
+    assert saved_ids(ana) == [] and saved_ids(bruno) == [BOOK]
+    assert request(SAVED_BOOK, bruno, method='DELETE')[0] == 200
+    assert saved_ids(bruno) == []
+    print('Library E2E: saved books survive restart; removal is idempotent and isolated per reader')
     print('Book metadata E2E: persisted seen status, isolation and Flyway validation after restart OK')
     raise SystemExit(0)
 category = dict(id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', name='Adventure', scheme='LCSH')
@@ -77,15 +99,32 @@ assert request(PATH, ana)[1] == {'items': []}
 for path in ['/api/v1/reader/books/seen', '/api/v1/reader/books/seen?bookIds=bad', '/api/v1/reader/books/seen?bookIds=',
              '/api/v1/reader/books/seen?bookIds=' + ','.join([BOOK] * 101)]:
     assert request(path, ana)[0] == 400, path
-for method, path in [('GET', PATH), ('POST', '/api/v1/reader/books/' + BOOK + '/opened')]:
+for method, path in [('GET', PATH), ('POST', '/api/v1/reader/books/' + BOOK + '/opened'),
+                     ('GET', LIBRARY), ('PUT', SAVED_BOOK), ('DELETE', SAVED_BOOK)]:
     headers = {'Origin': ORIGIN, 'Access-Control-Request-Method': method,
                'Access-Control-Request-Headers': 'authorization,content-type'}
     with urllib.request.urlopen(urllib.request.Request(BASE + path, headers=headers, method='OPTIONS')) as response:
         assert response.status == 200 and response.headers['Access-Control-Allow-Origin'] == ORIGIN
-try:
-    urllib.request.urlopen(urllib.request.Request(BASE + PATH, headers={**headers, 'Origin': 'https://untrusted.test'}, method='OPTIONS'))
-    raise AssertionError('Untrusted origin accepted')
-except urllib.error.HTTPError as error: assert error.code == 403
+for path in [PATH, LIBRARY, SAVED_BOOK]:
+    try:
+        urllib.request.urlopen(urllib.request.Request(BASE + path, headers={**headers, 'Origin': 'https://untrusted.test'}, method='OPTIONS'))
+        raise AssertionError('Untrusted origin accepted: ' + path)
+    except urllib.error.HTTPError as error: assert error.code == 403
+assert request(LIBRARY)[0] == 401
+for method in ['PUT', 'DELETE']:
+    assert request(SAVED_BOOK, method=method)[0] == 401
+    assert request(SAVED_BOOK, 'invalid', method=method)[0] == 401
+    assert request(LIBRARY + '/invalid-uuid', ana, method=method)[0] == 400
+assert saved_ids(ana) == [] and saved_ids(bruno) == []
+assert request(SAVED_BOOK, ana, {'subject': 'another-reader'}, 'PUT') == (200, {'bookId': BOOK, 'saved': True})
+assert request(SAVED_BOOK, ana, method='PUT')[0] == 200
+assert saved_ids(ana) == [BOOK] and saved_ids(bruno) == []
+assert request(SAVED_BOOK, bruno, method='PUT')[0] == 200
+assert request(SAVED_BOOK, ana, method='DELETE')[0] == 200
+assert saved_ids(ana) == [] and saved_ids(bruno) == [BOOK]
+assert request(SAVED_BOOK, ana, method='PUT')[0] == 200
+assert request(PATH, ana)[1] == {'items': []}, 'Saving alone must not mark a book as seen'
+print('Library E2E: gateway save/list/remove, idempotency, JWT, UUID validation, CORS and ownership OK')
 assert request('/api/v1/reader/books/' + BOOK + '/opened', method='POST')[0] == 401
 assert request('/api/v1/reader/books/' + BOOK + '/opened', ana, {'subject': 'another-reader'}, 'POST')[0] == 200
 first = request(PATH, ana)[1]['items']

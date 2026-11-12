@@ -323,6 +323,10 @@ fornece as
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
 fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
+Salvar e remover usam `PUT` e `DELETE /api/v1/reader/library/{bookId}` pelo
+mesmo BFF da consulta. Após salvar no feed, busca ou detalhes, a aba **Salvos**
+deve mostrar o livro mesmo após recarregar a página e mesmo fora do feed atual.
+O salvamento pertence ao usuário autenticado e não marca o livro como visto.
 As áreas administrativas e de publicação não são consultadas durante o
 bootstrap do leitor: elas pertencem ao realm `bookrush-platform` e devem ser
 abertas pela console `admin-web`, que obtém o token administrativo correto.
