@@ -13,6 +13,10 @@ trap 'rm -f "$mode_env_file"' EXIT
 printf 'FEED_PERSONALIZED_MODE=%s\n' "$FEED_PERSONALIZED_MODE" > "$mode_env_file"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
+# Pass versioned routes through the container configuration. A workspace bind
+# mount would resolve on the Docker host and could point at another checkout.
+BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$(cat "${repo_dir}/infrastructure/traefik/dynamic.yaml")"
+export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG
 
 # Uma definição antiga do job pode não conhecer os serviços adicionados pela
 # branch selecionada. Preserve registry/tag e construa a revisão do checkout,
@@ -127,8 +131,16 @@ old_reader_profile="$(docker inspect --format '{{.Config.Image}}' bookrush-reade
 old_social="$(docker inspect --format '{{.Config.Image}}' bookrush-social-service-1 2>/dev/null || true)"
 old_admin_service="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-service-1 2>/dev/null || true)"
 old_admin_web="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-web-1 2>/dev/null || true)"
+old_gateway_config="$(docker exec bookrush-reverse-proxy-1 sh -ec '
+  if [ -s /tmp/bookrush-traefik-dynamic.yaml ]; then
+    cat /tmp/bookrush-traefik-dynamic.yaml
+  else
+    cat /etc/traefik/dynamic.yaml
+  fi
+' 2>/dev/null || true)"
 keycloak_state="$(docker inspect --format '{{.State.Status}}' bookrush-keycloak-1 2>/dev/null || true)"
 diagnose() {
+  docker logs --tail=70 bookrush-reverse-proxy-1 >&2 || true
   for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-behavior-service-1 bookrush-recommendation-service-1 bookrush-reader-bff-service-1 bookrush-reader-state-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-frontend-1; do
     echo "--- diagnóstico $service ---" >&2
     docker inspect --format 'state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} image={{.Config.Image}}' "$service" >&2 || true
@@ -335,6 +347,16 @@ verify_admin_runtime_config() {
   echo 'Configuração Keycloak efetiva do admin-service: OK' >&2
 }
 
+verify_gateway_routes() {
+  local actual
+  actual="$(docker exec bookrush-reverse-proxy-1 cat /tmp/bookrush-traefik-dynamic.yaml 2>/dev/null)" || return 1
+  if [[ "$actual" != "$BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG" ]]; then
+    echo 'Configuração de rotas do gateway diverge da revisão selecionada.' >&2
+    return 1
+  fi
+  echo 'Configuração de rotas efetiva do gateway: OK' >&2
+}
+
 probe_catalog() {
   local attempt
   for attempt in {1..12}; do
@@ -349,6 +371,10 @@ probe_catalog() {
 
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
+  if [[ -n "$old_gateway_config" ]]; then
+    BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$old_gateway_config"
+    export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG
+  fi
   if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
@@ -366,6 +392,20 @@ printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMA
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.
 if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"; then
   echo 'Falha ao iniciar ou aguardar os serviços novos.' >&2
+  diagnose
+  rollback
+  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  exit 1
+fi
+
+if ! verify_gateway_routes; then
+  diagnose
+  rollback
+  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  exit 1
+fi
+
+if ! bash "${script_dir}/probe-reader-library.sh"; then
   diagnose
   rollback
   echo 'Rollback concluído; o deploy será marcado como falho.' >&2

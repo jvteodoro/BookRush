@@ -87,16 +87,43 @@ for attempt in {1..180}; do
   sleep 1
 done
 docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush < scripts/fixtures/book-metadata.sql >/dev/null
-docker create --name "$gateway" --network "$network" --network-alias gateway traefik:v3.5.3 \
-  --providers.docker=false --providers.file.filename=/dynamic.yaml --providers.file.watch=false --entrypoints.web.address=:80 >/dev/null
-docker cp infrastructure/traefik/dynamic.yaml "$gateway:/dynamic.yaml" >/dev/null
+# Simulate the stable host checkout missing a feature route. Exercise the real
+# deploy override so tests cannot pass merely by copying the branch file to
+# Traefik while production still reads the old host mount.
+export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$(cat infrastructure/traefik/dynamic.yaml)"
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE BEHAVIOR_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+  export "$variable=unused/deploy-contract:fixture"
+done
+cat > "$work_dir/gateway.compose.yaml" <<YAML
+services:
+  reverse-proxy:
+    image: traefik:v3.5.3
+    container_name: $gateway
+    command: [--providers.docker=false, --providers.file.filename=/dynamic.yaml, --providers.file.watch=false, --entrypoints.web.address=:80]
+    networks:
+      default:
+        aliases: [gateway, reverse-proxy]
+networks:
+  default:
+    external: true
+    name: $network
+YAML
+docker compose --project-name "$network" --env-file .env.example \
+  -f "$work_dir/gateway.compose.yaml" -f infrastructure/jenkins/deploy-images.compose.yaml \
+  create --no-build --pull never reverse-proxy >/dev/null
+sed 's@ || PathPrefix(`/api/v1/reader/library/`)@@' infrastructure/traefik/dynamic.yaml > "$work_dir/stale-routes.yaml"
+docker cp "$work_dir/stale-routes.yaml" "$gateway:/dynamic.yaml" >/dev/null
 docker start "$gateway" >/dev/null
 docker run -d --name "$probe" --network "$network" python:3.12-slim sleep 900 >/dev/null
 docker exec -i "$probe" python3 - < scripts/test-book-metadata-e2e.py
+[[ "$(docker exec "$gateway" cat /tmp/bookrush-traefik-dynamic.yaml)" == "$BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG" ]]
+bash infrastructure/jenkins/probe-reader-library.sh "$network"
 # Ensure the marker is not derived from the 50 most-recent entries.
 docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush -c "INSERT INTO reader_state.recent(subject_key,book_id,last_opened_at) SELECT seen.subject_key,('99999999-9999-4999-8999-'||lpad(n::text,12,'0'))::uuid,clock_timestamp()+interval '1 minute' FROM reader_state.seen_book seen CROSS JOIN generate_series(1,55) n WHERE seen.book_id='11111111-1111-4111-8111-111111111111'" >/dev/null
 docker exec -i "$probe" python3 - --history < scripts/test-book-metadata-e2e.py
 docker restart "$state" >/dev/null
+docker restart "$gateway" >/dev/null
 docker exec -i "$probe" python3 - --restart < scripts/test-book-metadata-e2e.py
+[[ "$(docker exec "$gateway" cat /tmp/bookrush-traefik-dynamic.yaml)" == "$BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG" ]]
 docker stop "$state" >/dev/null
 docker exec -i "$probe" python3 - --state-down < scripts/test-book-metadata-e2e.py
