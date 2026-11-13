@@ -34,7 +34,7 @@ paths:
                     impressions: {type: integer, format: int64, minimum: 0}
                     opens: {type: integer, format: int64, minimum: 0}
                     reads: {type: integer, format: int64, minimum: 0}
-                    likes: {type: integer, format: int64, minimum: 0}
+                    likes: {type: integer, format: int64, minimum: 0, description: "BOOK_LIKE events in this day; BOOK_UNLIKE does not increment this counter. Not the current balance of active likes."}
                     shares: {type: integer, format: int64, minimum: 0}
                     comments: {type: integer, format: int64, minimum: 0}
         '400': {description: Invalid book ID or days}
