@@ -195,8 +195,8 @@ export function SearchPage({
                   </h2>
                   <p>
                     {book.author}
-                    {book.firstPublicationYear != null
-                      ? ` · ${book.firstPublicationYear}`
+                    {book.publicationYear != null
+                      ? ` · ${book.publicationYear}`
                       : ""}{" "}
                     · {book.genre}
                   </p>

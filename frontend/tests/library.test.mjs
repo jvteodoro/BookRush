@@ -32,9 +32,9 @@ test('saved books outside the feed are resolved by ID with real progress; duplic
   assert.deepEqual(result.recent, ['recent-only']);
   assert.equal(result.books[0].title, 'Livro salvo');
   assert.equal(result.books[0].author, 'Machado de Assis');
-  assert.equal(result.books[0].firstPublicationYear, 1899);
+  assert.equal(result.books[0].publicationYear, 1899);
   assert.equal(result.books[1].author, 'Autor não informado');
-  assert.equal(result.books[1].firstPublicationYear, null);
+  assert.equal(result.books[1].publicationYear, null);
   assert.equal(result.books[0].progress, 37);
   assert.equal(result.books[0].available, true);
   assert.equal(requests.filter(url => url === '/api/v1/books/outside-feed').length, 1);

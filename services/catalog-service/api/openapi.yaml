@@ -710,6 +710,7 @@ components:
           description: Work authors in credit order (AUTHOR role only); empty when unknown.
           items: {type: string}
         firstPublicationYear: {type: integer, format: int32, nullable: true, description: Year of first publication of the work; not the edition or ingestion year.}
+        publicationYear: {type: integer, format: int32, nullable: true, description: "Known work year, or earliest known edition year when firstPublicationYear is absent. Never the digital release or ingestion year."}
         description: {type: string, nullable: true}
         thumbnailUrl: {type: string, format: uri, nullable: true}
         categories:

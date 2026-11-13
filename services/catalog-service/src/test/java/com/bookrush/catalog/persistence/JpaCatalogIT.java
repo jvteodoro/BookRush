@@ -23,11 +23,27 @@ class JpaCatalogIT {
   @Autowired EntityManager em;
   @Autowired com.bookrush.catalog.book.BookAuthorQuery authorQuery;
   @Autowired BookRepository books;
+  @Autowired com.bookrush.catalog.book.BookPublicationYearQuery publicationYears;
   @Autowired BookAssetRepository assets;
   @Autowired BookAssetVersionRepository versions;
 
   private UUID id(String prefix, int n) {
     return UUID.fromString(prefix + "0000000-0000-4000-8000-00000000000" + n);
+  }
+
+  @Test
+  void readsEarliestKnownEditionYearInOneBatchWithoutGuessingMissingYears() {
+    Book work = new Book(); work.setCanonicalTitle("Dated editions"); books.saveAndFlush(work);
+    Book unknown = new Book(); unknown.setCanonicalTitle("Undated"); books.saveAndFlush(unknown);
+    for (Short year : new Short[] {1912, null, 1899}) {
+      Edition edition = new Edition(); edition.setBookId(work.getId());
+      edition.setPublicationYear(year); em.persist(edition);
+    }
+    em.flush();
+    assertEquals(Map.of(work.getId(), (short) 1899),
+        publicationYears.forBooks(java.util.List.of(work.getId(), unknown.getId())));
+    assertTrue(publicationYears.forBooks(java.util.List.of()).isEmpty());
+    assertNull(books.findById(work.getId()).orElseThrow().getFirstPublicationYear());
   }
 
   @Test

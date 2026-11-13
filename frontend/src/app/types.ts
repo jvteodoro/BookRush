@@ -35,6 +35,7 @@ export type CatalogBook = {
   canonicalTitle: string;
   authors?: string[] | null;
   firstPublicationYear?: number | null;
+  publicationYear?: number | null;
   categories?: BookCategory[];
   originalLanguage?: string | null;
   description?: string | null;
@@ -57,7 +58,7 @@ export type PageLoopBook = {
   id: string;
   title: string;
   author: string;
-  firstPublicationYear?: number | null;
+  publicationYear?: number | null;
   genre: string;
   categories?: BookCategory[];
   language?: string | null;
