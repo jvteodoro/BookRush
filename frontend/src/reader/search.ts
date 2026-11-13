@@ -14,6 +14,7 @@ type CatalogBook = {
   canonicalTitle: string;
   authors?: string[] | null;
   firstPublicationYear?: number | null;
+  publicationYear?: number | null;
   originalTitle?: string;
   originalLanguage?: string;
   categories?: BookCategory[];

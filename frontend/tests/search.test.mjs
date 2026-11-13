@@ -32,5 +32,5 @@ test('search delegates query and pagination to the catalog API', async () => {
   assert.equal(result.totalItems, 21);
   assert.equal(result.books[0].title, 'Frankenstein');
   assert.equal(result.books[0].author, 'Mary Shelley');
-  assert.equal(result.books[0].firstPublicationYear, 1818);
+  assert.equal(result.books[0].publicationYear, 1818);
 });

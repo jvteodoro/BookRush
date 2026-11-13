@@ -6,7 +6,7 @@ import { OverflowTitle } from '../ui/OverflowTitle';
 import { AuthenticatedImage } from './AuthenticatedImage';
 import type { FeedExcerpt } from '../../app/types';
 
-export type ReaderBook = { id: string; title: string; author: string; firstPublicationYear?: number | null; genre: string; categories?: BookCategory[]; language?: string | null; seen?: boolean; progress: number; minutes: number; description: string; excerpt?: FeedExcerpt | null; coverUrl?: string };
+export type ReaderBook = { id: string; title: string; author: string; publicationYear?: number | null; genre: string; categories?: BookCategory[]; language?: string | null; seen?: boolean; progress: number; minutes: number; description: string; excerpt?: FeedExcerpt | null; coverUrl?: string };
 export function BookCard({ book, onOpen, disabled = false }: { book: ReaderBook; onOpen: (book: ReaderBook) => void; disabled?: boolean }) {
   const [failedCover, setFailedCover] = useState<string>();
   const palette = [...book.id].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 3;
@@ -14,7 +14,7 @@ export function BookCard({ book, onOpen, disabled = false }: { book: ReaderBook;
     <div className={`br-book-cover br-book-cover--${palette}`}>
       {book.coverUrl && failedCover !== book.coverUrl ? <AuthenticatedImage src={book.coverUrl} alt="" loading="lazy" onError={() => setFailedCover(book.coverUrl)} /> : <><span className="br-book-cover__edition">BOOKRUSH · CLÁSSICOS</span><span className="br-book-cover__title" title={book.title}>{book.title}</span><span className="br-book-cover__author">{book.author}</span></>}
     </div>
-    <div className="br-book-card__meta"><OverflowTitle as="strong" text={book.title} /><span className="br-book-card__author" title={book.author}>{book.author}</span><span className="br-book-card__category" title={book.genre || "Sem categoria"}>{book.genre || "Sem categoria"}</span>{book.firstPublicationYear != null && <span className="br-book-card__year">{book.firstPublicationYear}</span>}<SeenBadge seen={book.seen} />
+    <div className="br-book-card__meta"><OverflowTitle as="strong" text={book.title} /><span className="br-book-card__author" title={book.author}>{book.author}</span><span className="br-book-card__category" title={book.genre || "Sem categoria"}>{book.genre || "Sem categoria"}</span>{book.publicationYear != null && <span className="br-book-card__year">{book.publicationYear}</span>}<SeenBadge seen={book.seen} />
       {book.progress > 0 ? <><ProgressBar value={book.progress} label={`Progresso em ${book.title}`} /><small>{book.progress}% concluído</small></> : book.minutes > 0 ? <small>{book.minutes} min de leitura</small> : null}
     </div>
   </button>;

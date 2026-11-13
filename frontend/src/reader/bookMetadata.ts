@@ -1,6 +1,7 @@
 export type BibliographicMetadata = {
   authors?: string[] | null;
   firstPublicationYear?: number | null;
+  publicationYear?: number | null;
 };
 
 /** Missing metadata must never be replaced with an invented author or date. */
@@ -10,8 +11,8 @@ export function bookMetadata(book: BibliographicMetadata) {
   ];
   return {
     author: authors.join(" · ") || "Autor não informado",
-    firstPublicationYear: Number.isInteger(book.firstPublicationYear)
+    publicationYear: Number.isInteger(book.firstPublicationYear)
       ? book.firstPublicationYear
-      : null,
+      : Number.isInteger(book.publicationYear) ? book.publicationYear : null,
   };
 }
