@@ -1,7 +1,7 @@
 package com.bookrush.behaviorservice;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,7 +29,7 @@ public class BehaviorMaintenance {
   public void run() {
     if (!enabled) return;
     rebuildNow();
-    Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
+    OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusDays(retentionDays);
     jdbc.update("DELETE FROM behavior.rejects WHERE received_at < ?", cutoff);
     jdbc.update("DELETE FROM behavior.outbox WHERE published_at IS NOT NULL AND created_at < ?", cutoff);
   }
@@ -41,7 +41,7 @@ public class BehaviorMaintenance {
         SELECT occurred_at::date, book_id,
           count(*) FILTER (WHERE event_type = 'EXCERPT_IMPRESSION'),
           count(*) FILTER (WHERE event_type = 'BOOK_OPEN'),
-          count(*) FILTER (WHERE event_type IN ('BOOK_LIKE', 'BOOK_UNLIKE')),
+          count(*) FILTER (WHERE event_type = 'BOOK_LIKE'),
           count(*) FILTER (WHERE event_type IN ('READ_PROGRESS', 'BOOK_COMPLETE')),
           count(*) FILTER (WHERE event_type = 'BOOK_SHARE'),
           count(*) FILTER (WHERE event_type = 'BOOK_COMMENT')

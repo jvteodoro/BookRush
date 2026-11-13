@@ -6,6 +6,15 @@ maintenance job rebuilds derived aggregates and retention only. Set
 delivery; failed deliveries remain pending and increment `attempts` with an
 error, rather than being marked as published.
 
+O job executa agregação e retenção na mesma transação. Seu cutoff UTC usa
+`OffsetDateTime`, compatível com `timestamptz` no PostgreSQL; não passe `Instant`
+diretamente como parâmetro JDBC, pois uma falha de retenção reverte os totais.
+Nos agregados diários usados pelo publicador, `likes` conta apenas `BOOK_LIKE`,
+sem aumentar quando há `BOOK_UNLIKE`; não é um saldo de curtidas ativas.
+Execute `BehaviorMaintenancePostgresIT` com `TEST_DATABASE_URL` em uma base
+descartável para validar o job completo, o commit dos totais, a retenção e a
+reexecução idempotente. Consulte [as evidências e o fluxo de estatísticas](../../../docs/productization/publisher-book-statistics.md).
+
 Append-only behavioral events and aggregates. Este serviço é um bounded context independente; contratos e ownership estão no ADR 0034.
 
 Migrations V2/V3 store idempotent append-only events and rebuildable daily book aggregates.
