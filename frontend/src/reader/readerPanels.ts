@@ -2,6 +2,10 @@
 export function mountReaderPanels(root: HTMLElement) {
   const entries = [
     {
+      panel: root.querySelector<HTMLElement>("#bookmarksPanel")!,
+      button: root.querySelector<HTMLButtonElement>("#bookmarksBtn")!,
+    },
+    {
       panel: root.querySelector<HTMLElement>("#tocPanel")!,
       button: root.querySelector<HTMLButtonElement>("#tocBtn")!,
     },

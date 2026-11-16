@@ -564,7 +564,9 @@
               ].join(" · ") || "Autor não informado",
             publicationYear: Number.isInteger(i.firstPublicationYear)
               ? i.firstPublicationYear
-              : Number.isInteger(i.publicationYear) ? i.publicationYear : null,
+              : Number.isInteger(i.publicationYear)
+                ? i.publicationYear
+                : null,
             genre:
               [
                 ...new Set(
@@ -783,7 +785,8 @@
     const content = `<div class="reader-shell" id="readerShell">
       <div class="reader-overlay reader-overlay-left"><button class="reader-back" data-route="${getMode() === "app" ? "feed" : "library"}" aria-label="Voltar">${icon("chevron", "icon-sm")}<span>Voltar</span></button></div>
       <div class="reader-overlay reader-overlay-center"><span class="reader-title">${esc(b.title)}</span></div>
-      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="bookDetailsBtn" aria-label="Sobre o livro e avaliações">★</button><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir aparência" aria-controls="settingsPanel" aria-expanded="false">Aa</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição">${icon("bookmark", "icon-sm")}</button></div>
+      <div class="reader-overlay reader-overlay-right reader-controls"><button class="reader-tool" id="bookDetailsBtn" aria-label="Sobre o livro e avaliações">★</button><button class="reader-tool" id="tocBtn" aria-label="Abrir sumário">☰</button><button class="reader-tool" id="settingsBtn" aria-label="Abrir aparência" aria-controls="settingsPanel" aria-expanded="false">Aa</button><button class="reader-tool" id="bookmarksBtn" aria-label="Abrir marcações">▤</button><button class="reader-bookmark" id="bookmarkBtn" aria-label="Marcar posição" disabled>${icon("bookmark", "icon-sm")}</button></div>
+      <aside class="reader-panel reader-settings" id="bookmarksPanel" role="region" aria-label="Marcações da leitura" hidden><div class="reader-panel-heading"><strong>Marcações</strong><button class="reader-panel-close" aria-label="Fechar">×</button></div><div id="readerBookmarks" aria-live="polite"></div></aside>
       <aside class="reader-panel reader-toc" id="tocPanel" hidden><div class="reader-panel-heading"><strong>Sumário</strong><button class="reader-panel-close" data-reader-close="tocPanel" aria-label="Fechar">×</button></div><nav>${chapterItems(chapters) || emptyChapterItems}</nav></aside>
       <aside class="reader-panel reader-settings" id="settingsPanel" role="region" aria-label="Aparência da leitura" hidden><div class="reader-panel-heading"><strong>Aparência</strong><button class="reader-panel-close" data-reader-close="settingsPanel" aria-label="Fechar">×</button></div>
         <div id="readerAppearance"></div>
@@ -833,6 +836,67 @@
       );
     const host = document.getElementById("readium-reader");
     const readingBookId = state.readerBook;
+    let bookmarks = [];
+    const bookmarkButton = document.getElementById("bookmarkBtn");
+    const bookmarksList = document.getElementById("readerBookmarks");
+    const stillReading = () =>
+      host?.isConnected && state.readerBook === readingBookId;
+    const renderBookmarks = () => {
+      bookmarksList.replaceChildren();
+      if (!bookmarks.length) {
+        bookmarksList.textContent =
+          "Você ainda não marcou nenhuma posição neste livro.";
+      }
+      bookmarks.forEach((bookmark, index) => {
+        const button = document.createElement("button");
+        button.className = "reader-chapter";
+        const locator = bookmark.locator;
+        const progression = locator?.locations?.totalProgression;
+        button.textContent = locator
+          ? `${locator.title || `Marcação ${index + 1}`}${typeof progression === "number" ? ` · ${Math.round(progression * 100)}%` : ""}`
+          : "Marcação antiga sem posição recuperável";
+        button.disabled = !locator;
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            if (!(await window.__BOOKRUSH_READIUM__.goToLocator(locator)))
+              throw new Error(
+                "Esta marcação não está disponível nesta versão do livro.",
+              );
+            if (stillReading()) readerPanels?.close();
+          } catch (error) {
+            if (stillReading())
+              toast(error.message || "Não foi possível abrir a marcação.");
+          } finally {
+            button.disabled = false;
+          }
+        });
+        bookmarksList.append(button);
+      });
+    };
+    let loadingBookmarks = false;
+    const loadBookmarks = async () => {
+      if (loadingBookmarks) return;
+      loadingBookmarks = true;
+      bookmarksList.textContent = "Carregando marcações…";
+      try {
+        const items = await window.__BOOKRUSH_API__.bookmarks(readingBookId);
+        if (!stillReading()) return;
+        bookmarks = items;
+        renderBookmarks();
+      } catch (error) {
+        if (stillReading())
+          bookmarksList.textContent =
+            error.message ||
+            "Não foi possível carregar as marcações. Abra o painel para tentar novamente.";
+      } finally {
+        loadingBookmarks = false;
+      }
+    };
+    document.getElementById("bookmarksBtn").addEventListener("click", () => {
+      if (document.getElementById("bookmarksPanel").dataset.open === "true")
+        void loadBookmarks();
+    });
     if (host && window.__BOOKRUSH_READIUM__) {
       window.__BOOKRUSH_READIUM__
         .mount(readingBookId, host, (p) => {
@@ -851,6 +915,7 @@
             state.readerBook !== readingBookId
           )
             return;
+          bookmarkButton.disabled = false;
           try {
             await window.__BOOKRUSH_API__?.open?.(readingBookId);
           } catch (error) {
@@ -874,12 +939,22 @@
     document
       .getElementById("bookmarkBtn")
       ?.addEventListener("click", async () => {
-        await window.__BOOKRUSH_API__?.bookmark?.(
-          state.readerBook,
-          Math.round(state.readerPage),
-        );
-        save();
-        toast(`Página marcada em ${state.readerPage}%`);
+        bookmarkButton.disabled = true;
+        try {
+          const locator = window.__BOOKRUSH_READIUM__?.currentLocator();
+          if (!locator)
+            throw new Error("Aguarde o carregamento da posição de leitura.");
+          await window.__BOOKRUSH_API__.bookmark(readingBookId, locator);
+          if (!stillReading()) return;
+          toast("Posição marcada.");
+          if (document.getElementById("bookmarksPanel").dataset.open === "true")
+            await loadBookmarks();
+        } catch (error) {
+          if (stillReading())
+            toast(error.message || "Não foi possível salvar a marcação.");
+        } finally {
+          bookmarkButton.disabled = false;
+        }
       });
   }
 

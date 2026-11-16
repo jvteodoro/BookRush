@@ -35,7 +35,7 @@ function setup() {
     },
   });
   const nodes = {};
-  for (const name of ["toc", "settings"]) {
+  for (const name of ["toc", "settings", "bookmarks"]) {
     const close = node(`${name}Close`);
     const panel = node(`${name}Panel`);
     panel.querySelector = () => close;
@@ -51,7 +51,7 @@ function setup() {
 
 test("each toolbar button toggles its panel and rapid clicks preserve the final state", () => {
   const { nodes } = setup();
-  for (const name of ["toc", "settings"]) {
+  for (const name of ["toc", "settings", "bookmarks"]) {
     const button = nodes[`#${name}Btn`];
     const panel = nodes[`#${name}Panel`];
     assert.equal(panel.inert, true);

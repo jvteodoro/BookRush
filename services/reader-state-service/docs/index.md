@@ -100,3 +100,44 @@ Validação: `bash scripts/test-book-metadata-e2e.sh` usa serviços/imagens reai
 Keycloak e PostgreSQL 16 descartáveis com gateway Traefik versionado. Não usa
 `.env` nem dados persistentes existentes. Inclui upgrade V8→V9 e segundo boot
 Flyway, isolamento por perfil e marca preservada além dos 50 recentes.
+
+## Marca??es de leitura (Readium)
+
+`GET` e `POST /api/v1/reader/books/{bookId}/bookmarks` pertencem ao
+reader-state-service e s?o expostos pelo reader-bff-service. O principal do
+bearer do realm `bookrush` (audience `account`, sem scope adicional) define o
+dono; o corpo n?o pode selecionar outro leitor. O gateway Traefik encaminha
+`PathPrefix(/api/v1/reader/books)` ao BFF. CORS usa as origens expl?citas de
+`BOOKRUSH_CORS_ALLOWED_ORIGINS` e os m?todos existentes GET/POST/OPTIONS com
+Authorization/Content-Type; n?o foi necess?rio abrir novas origens.
+
+O POST aceita `{ "locator": { "href": "...", "type": "text/html",
+"locations": { "progression": 0.4321 } } }`, com os demais campos Readium
+preservados. N?o arredonde progression e n?o envie percentual como codepoint.
+A migration V10 separa a unicidade de posi??es antigas da identidade JSONB do
+locator. Repetir o mesmo locator retorna o ID persistido; posi??es pr?ximas
+com o mesmo percentual arredondado permanecem distintas. O href inclui a
+vers?o do conte?do. A retomada s? aceita recursos presentes na publica??o
+aberta, para evitar navegar para uma vers?o diferente silenciosamente.
+
+O GET retorna marca??es da conta/livro em ordem de cria??o decrescente; locator
+? JSON serializado em string (ausente/null nas marca??es antigas). O frontend
+converte a string antes de chamar o Readium. POSTs legados com
+positionCodepoint continuam aceitos, mas o percentual incorreto de marca??es
+antigas n?o permite reconstruir sua posi??o: elas aparecem indispon?veis.
+Respostas: 200 sucesso, 400 corpo/UUID inv?lido, 401 autentica??o, 403
+origem/autoriza??o, 502 depend?ncia indispon?vel atrav?s do BFF.
+
+Valida??o de banco: execute `BookmarkDatabaseTest` com
+`BOOKMARK_TEST_JDBC_URL` apontando exclusivamente para PostgreSQL descart?vel
+vazio, usu?rio `postgres`, senha de fixture `bookrush-test`. O teste aplica at?
+V9, grava marca??o antiga, aplica V10, revalida e cobre ID est?vel, posi??es
+pr?ximas, isolamento por leitor, UUID, JSON e timestamptz.
+
+Para validar a revis?o implantada, publique a branch e use o fluxo Jenkins
+autorizado; verifique a imagem efetiva de reader-state e frontend. No gateway
+p?blico, use sess?o/token novo e a origem real para testar 401 sem bearer,
+401 com bearer inv?lido, 200 com bearer v?lido, preflight e origem rejeitada.
+Na interface, marque duas posi??es pr?ximas, reabra o livro/sess?o, liste e
+retome ambas; simule API indispon?vel e confirme que n?o h? toast de sucesso.
+N?o se considera validado em produ??o somente pelo build ou teste unit?rio.

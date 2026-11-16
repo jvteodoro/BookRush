@@ -450,3 +450,16 @@ com opção de retornar ao feed; falhas transitórias podem ser tentadas novamen
 O histórico e a recarga preservam a rota. Para validar a integração, execute os
 testes do frontend e teste uma nova aba, login, recarga, Voltar e leitura de um
 livro fora do feed no ambiente implantado.
+
+## Marca??es de posi??o
+
+O bot?o ?Marcar posi??o? fica dispon?vel ap?s carregar o Readium. Salva o
+locator completo atrav?s do cliente autenticado, mant?m a precis?o e s?
+confirma ap?s resposta HTTP de sucesso. O painel ?Marca??es? busca novamente
+os dados ao abrir e permite retomar posi??es ap?s reabrir o livro ou a sess?o.
+O painel trata carregamento, vazio e falhas; a nova abertura permite repetir
+uma consulta que falhou. Salvamentos repetidos retornam a mesma marca??o.
+Marca??es antigas sem locator aparecem indispon?veis, pois o percentual
+armazenado anteriormente n?o identifica uma posi??o textual. Uma marca??o de
+uma vers?o que n?o integra a publica??o aberta produz uma mensagem expl?cita.
+A mudan?a n?o altera o fluxo separado de progresso autom?tico da leitura.

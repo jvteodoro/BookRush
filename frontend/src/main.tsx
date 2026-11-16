@@ -22,6 +22,7 @@ import "./styles/search.css";
 import "./styles/recommendations.css";
 import "./styles/comments.css";
 import { readiumBridge } from "./reader/readiumBridge";
+import { createBookmarksClient } from "./reader/bookmarks";
 import { AuthenticatedShell } from "./app/AuthenticatedShell";
 import { AuthLanding } from "./app/AuthLanding";
 import {
@@ -545,13 +546,14 @@ function App() {
               body: JSON.stringify({ percent, positionCodepoint }),
             });
           },
-          bookmark: async (id: string, positionCodepoint: number) => {
-            await authClient.fetch(apiRoutes.reader.bookmarks(id), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ positionCodepoint }),
-            });
-          },
+          bookmarks: createBookmarksClient(
+            (url, init) => authClient.fetch(url, init),
+            apiRoutes.reader.bookmarks,
+          ).list,
+          bookmark: createBookmarksClient(
+            (url, init) => authClient.fetch(url, init),
+            apiRoutes.reader.bookmarks,
+          ).save,
           open: async (id: string, fromRecommendation = false) => {
             const headers = fromRecommendation ? correlationHeaders(id) : {};
             if (fromRecommendation) {
@@ -623,7 +625,7 @@ function App() {
         });
         const script = document.createElement("script");
         script.dataset.bookrushPageloop = "true";
-        script.src = "/pageloop.js?v=20261019-reader-appearance";
+        script.src = "/pageloop.js?v=20261116-reader-bookmarks";
         script.async = true;
         script.onload = () => {
           if (active) setFeedReady(true);

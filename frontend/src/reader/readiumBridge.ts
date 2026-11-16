@@ -1,4 +1,4 @@
-import { HttpFetcher, Manifest, Publication } from "@readium/shared";
+import { HttpFetcher, Locator, Manifest, Publication } from "@readium/shared";
 import { WebPubNavigator, WebPubPreferences } from "@readium/navigator";
 import { authClient } from "../auth";
 import { startReadingTimer } from "./readingTimer";
@@ -102,6 +102,23 @@ function applyPreferences(next: ReaderPreferences) {
 }
 
 export const readiumBridge: ReadiumBridge = {
+  currentLocator() {
+    return navigator?.currentLocator?.serialize() ?? null;
+  },
+  async goToLocator(value) {
+    const locator = Locator.deserialize(value);
+    if (
+      !locator ||
+      !navigator ||
+      !publication?.readingOrder.items.some(
+        (link) => link.href.split("#")[0] === locator.href.split("#")[0],
+      )
+    )
+      return false;
+    return new Promise<boolean>((resolve) =>
+      navigator.go(locator, false, (ok: boolean) => resolve(Boolean(ok))),
+    );
+  },
   async mount(bookId, nextContainer, onLocatorChanged) {
     const originHeaders = sessionCorrelation(bookId);
     await this.unmount();

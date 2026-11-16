@@ -53,3 +53,14 @@ com items, 400 para lote inválido, 401 para token ausente/inválido, 403 por or
 CORS indevida e 502 se o reader-state estiver indisponível.
 Não há retorno silencioso de lista vazia em caso de falha da dependência.
 O gateway Traefik existente já roteia `/api/v1/reader` para este BFF.
+
+## Marca??es de leitura
+
+GET/POST `/api/v1/reader/books/{bookId}/bookmarks` encaminham o bearer e o
+locator Readium ao reader-state, propriet?rio do dado. GET retorna locator
+serializado como string JSON; POST retorna a identidade persistida, inclusive
+em salvamentos repetidos. O contrato OpenAPI descreve sucesso e erros. Os
+status 4xx do servi?o s?o preservados e falhas de depend?ncia viram 502.
+As origens CORS e a rota p?blica existentes continuam sendo usadas.
+Consulte a se??o de marca??es do reader-state para migration V10, compatibilidade
+com clientes antigos e valida??o atrav?s do gateway.

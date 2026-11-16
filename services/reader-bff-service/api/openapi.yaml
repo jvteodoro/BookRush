@@ -64,8 +64,8 @@ paths:
                         bookId: {type: string, format: uuid}
                         firstSeenAt: {type: string, format: date-time}
                         lastSeenAt: {type: string, format: date-time}
-        '400': {description: Missing, malformed or oversized book ID batch}
-        '401': {description: Missing, invalid, expired or wrong-audience product token}
+        '400': {description: "Missing, malformed or oversized book ID batch"}
+        '401': {description: "Missing, invalid, expired or wrong-audience product token"}
         '403': {description: Disallowed CORS origin}
         '502': {description: Reader state service unavailable at the gateway}
 
@@ -75,7 +75,7 @@ paths:
       parameters:
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
-        '200': { description: Composed analytics-ready recommendation feed; when analytics ranking is enabled, books without an eligible score and non-empty excerpt are omitted }
+        '200': { description: "Composed analytics-ready recommendation feed; when analytics ranking is enabled, books without an eligible score and non-empty excerpt are omitted" }
         '401': { description: Authentication required }
         '502': { description: Recommendation service unavailable }
   /api/v1/reader/recommendations:
@@ -89,7 +89,7 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       responses:
-        '200': { description: Saved books for the authenticated reader, including books outside the current feed }
+        '200': { description: "Saved books for the authenticated reader, including books outside the current feed" }
         '401': { description: Authentication required }
         '502': { description: Reader state service unavailable }
   /api/v1/reader/library/{bookId}:
@@ -140,20 +140,47 @@ paths:
         '401': { description: Authentication required }
         '502': { description: Reader state service unavailable }
   /api/v1/reader/books/{bookId}/bookmarks:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
     get:
+      summary: List the authenticated reader's bookmarks, newest first
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200': { description: Book bookmarks }
+        '200':
+          description: Bookmarks; legacy entries have a null locator
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Bookmark' } }
+        '400': { description: Invalid book UUID }
         '401': { description: Authentication required }
-        '502': { description: Reader state service unavailable }
+        '403': { description: Forbidden origin or token authorization }
+        '502': { description: Reader state service unavailable (public BFF) }
     post:
+      summary: Save a Readium locator, returning the existing ID on repeated saves
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              anyOf:
+                - required: [locator]
+                - required: [positionCodepoint]
+              properties:
+                locator: { $ref: '#/components/schemas/BookmarkLocator' }
+                positionCodepoint: { type: integer, format: int64, minimum: 0, deprecated: true, description: Legacy codepoint; never send a percentage here }
+                note: { type: string }
       responses:
-        '200': { description: Bookmark saved }
+        '200':
+          description: Persisted bookmark (including its stable ID)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bookmark' }
+        '400': { description: Missing position or invalid Readium locator }
         '401': { description: Authentication required }
-        '502': { description: Reader state service unavailable }
+        '403': { description: Forbidden origin or token authorization }
+        '502': { description: Reader state service unavailable (public BFF) }
   /api/v1/reader/books/{bookId}/opened:
     post:
       summary: Record reading after content loads successfully
@@ -222,3 +249,29 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    BookmarkLocator:
+      type: object
+      required: [href, type, locations]
+      properties:
+        href: { type: string, minLength: 1, description: Resource href from the versioned publication manifest }
+        type: { type: string, minLength: 1 }
+        title: { type: string }
+        locations:
+          type: object
+          required: [progression]
+          properties:
+            progression: { type: number, minimum: 0, maximum: 1 }
+            totalProgression: { type: number, minimum: 0, maximum: 1 }
+            position: { type: integer, minimum: 1 }
+        text: { type: object }
+    Bookmark:
+      type: object
+      required: [id, position_codepoint, note, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        book_id: { type: string, format: uuid }
+        position_codepoint: { type: integer, format: int64, minimum: 0, description: Zero for locator-only bookmarks }
+        note: { type: string }
+        locator: { type: string, nullable: true, description: Serialized BookmarkLocator JSON; null for legacy bookmarks }
+        created_at: { type: string, format: date-time }

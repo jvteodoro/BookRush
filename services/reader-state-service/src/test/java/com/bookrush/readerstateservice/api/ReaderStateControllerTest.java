@@ -28,6 +28,44 @@ class ReaderStateControllerTest {
   private final Principal user = () -> "iss:subject-1";
 
   @Test
+  void bookmarkReturnsPersistedIdentityAndLocatorForRepeatedWrites() {
+    UUID book = UUID.randomUUID();
+    UUID persistedId = UUID.randomUUID();
+    var locator = Map.of("href", "/versions/v1/chapters/c1/content", "type", "text/html",
+        "locations", Map.of("progression", 0.4321));
+    when(jdbc.queryForMap(anyString(), any(Object[].class)))
+        .thenReturn(Map.of("id", persistedId));
+    var first = controller.bookmark(book, Map.of("locator", locator), user);
+    var second = controller.bookmark(book, Map.of("locator", locator), user);
+    org.junit.jupiter.api.Assertions.assertEquals(persistedId, first.get("id"));
+    org.junit.jupiter.api.Assertions.assertEquals(first, second);
+    verify(jdbc, org.mockito.Mockito.times(2)).queryForMap(
+        org.mockito.ArgumentMatchers.contains("md5(locator::text)) WHERE locator IS NOT NULL"),
+        any(UUID.class), eq("iss:subject-1"), eq(book), eq(0L), eq(""),
+        org.mockito.ArgumentMatchers.contains("0.4321"));
+  }
+
+  @Test
+  void bookmarksRejectMissingIdentityAndMalformedLocators() {
+    UUID book = UUID.randomUUID();
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book, Map.of(), user));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book,
+        Map.of("locator", Map.of("href", "x", "type", "text/html", "locations", Map.of("progression", 2))), user));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book,
+        Map.of("locator", Map.of()), user));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book, Map.of(), null));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmarks(book, null));
+  }
+
+  @Test
+  void bookmarkListIsScopedToReaderAndIncludesLocator() {
+    UUID book = UUID.randomUUID();
+    controller.bookmarks(book, user);
+    verify(jdbc).queryForList(org.mockito.ArgumentMatchers.contains("locator::text AS locator"),
+        eq("iss:subject-1"), eq(book));
+  }
+
+  @Test
   void openedUsesValidTwoParameterUpsert() {
     UUID bookId = UUID.randomUUID();
     controller.opened(bookId, user, null);

@@ -132,11 +132,12 @@ const readerCode = legacy.slice(legacy.indexOf('function renderReader('), legacy
 function readerSetup() {
   const state = { readerBook: 'book', route: 'reader', readerPage: 0 };
   const host = { isConnected: true, innerHTML: '' };
+  const controls = Object.fromEntries(['bookmarkBtn', 'bookmarksBtn', 'bookmarksPanel', 'readerBookmarks'].map(id => [id, { addEventListener() {}, dataset: {}, replaceChildren() {} }]));
   let resolveLoad; let rejectLoad; let opens = 0;
   const loaded = new Promise((resolve, reject) => { resolveLoad = resolve; rejectLoad = reject; });
   const context = { state, book: () => ({ id: 'book', title: 'Book' }),
     esc: String, icon: () => '', getMode: () => 'app', shell() {}, render() {}, toast() {},
-    document: { getElementById: id => id === 'readium-reader' ? host : null, querySelector: () => null, querySelectorAll: () => [] },
+    document: { getElementById: id => id === 'readium-reader' ? host : controls[id] || null, querySelector: () => null, querySelectorAll: () => [] },
     window: { __BOOKRUSH_API__: { open: async () => { opens++; }, viewable: async () => {}, chapters: async () => [] },
       __BOOKRUSH_READIUM__: { mount: () => loaded, chapters: async () => [] }, __BOOKRUSH_PANELS__: { mount() {} } },
   };

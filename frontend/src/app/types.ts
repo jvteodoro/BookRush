@@ -17,6 +17,8 @@ export type ReaderChapter = {
 };
 
 export type ReadiumBridge = {
+  currentLocator: () => Record<string, unknown> | null;
+  goToLocator: (locator: unknown) => Promise<boolean>;
   mount: (
     bookId: string,
     container: HTMLElement,

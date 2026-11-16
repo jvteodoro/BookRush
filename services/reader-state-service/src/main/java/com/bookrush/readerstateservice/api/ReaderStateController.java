@@ -225,19 +225,41 @@ public class ReaderStateController {
   @PostMapping("/books/{bookId}/bookmarks")
   public Map<String, Object> bookmark(@PathVariable UUID bookId, @RequestBody Map<String, Object> body,
       Principal principal) {
-    long position = integerValue(body, "positionCodepoint");
+    String reader = subject(principal);
+    long position = body.get("positionCodepoint") instanceof Number number ? number.longValue() : 0;
     String note = String.valueOf(body.getOrDefault("note", ""));
-    UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, note) "
-        + "VALUES (?, ?, ?, ?, ?) ON CONFLICT (subject_key, book_id, position_codepoint) "
-        + "DO UPDATE SET note = EXCLUDED.note", id, subject(principal), bookId, position, note);
-    return Map.of("id", id, "bookId", bookId, "positionCodepoint", position, "note", note);
+    String locatorJson = null;
+    if (body.containsKey("locator")) {
+      if (!(body.get("locator") instanceof Map<?, ?> locator)
+          || !(locator.get("href") instanceof String href) || href.isBlank()
+          || !(locator.get("type") instanceof String type) || type.isBlank()
+          || !(locator.get("locations") instanceof Map<?, ?> locations)
+          || !(locations.get("progression") instanceof Number progression)
+          || !Double.isFinite(progression.doubleValue())
+          || progression.doubleValue() < 0 || progression.doubleValue() > 1) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
+      }
+      try {
+        locatorJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(locator);
+      } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
+      }
+    } else if (!(body.get("positionCodepoint") instanceof Number number) || number.longValue() < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "locator or positionCodepoint required");
+    }
+    String conflict = locatorJson == null
+        ? "(subject_key, book_id, position_codepoint) WHERE locator IS NULL "
+        : "(subject_key, book_id, md5(locator::text)) WHERE locator IS NOT NULL ";
+    return jdbc.queryForMap("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, note, locator) "
+        + "VALUES (?, ?, ?, ?, ?, ?::jsonb) ON CONFLICT " + conflict
+        + "DO UPDATE SET note = EXCLUDED.note RETURNING id, book_id, position_codepoint, note, locator::text AS locator, created_at",
+        UUID.randomUUID(), reader, bookId, position, note, locatorJson);
   }
 
   @GetMapping("/books/{bookId}/bookmarks")
   public Object bookmarks(@PathVariable UUID bookId, Principal principal) {
-    return jdbc.queryForList("SELECT id, position_codepoint, note, created_at FROM reader_state.bookmarks "
-        + "WHERE subject_key = ? AND book_id = ? ORDER BY position_codepoint", subject(principal), bookId);
+    return jdbc.queryForList("SELECT id, position_codepoint, note, locator::text AS locator, created_at FROM reader_state.bookmarks "
+        + "WHERE subject_key = ? AND book_id = ? ORDER BY created_at DESC, id", subject(principal), bookId);
   }
 
   @GetMapping("/books/{bookId}/progress")
