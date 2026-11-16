@@ -1,7 +1,11 @@
 export type ReadingLocator = {
   href: string;
   type: string;
-  locations: { progression: number; totalProgression?: number };
+  locations: {
+    progression: number;
+    totalProgression?: number;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 };
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
@@ -39,6 +43,7 @@ export function createReadingProgress({
   path,
   headers = {},
   onError = () => {},
+  capture,
   documentRef = document,
   windowRef = window,
   schedule = (callback: () => void) => setTimeout(callback, 300),
@@ -48,6 +53,7 @@ export function createReadingProgress({
   path: string;
   headers?: Record<string, string>;
   onError?: () => void;
+  capture?: () => ReadingLocator | null;
   documentRef?: Pick<
     Document,
     "visibilityState" | "addEventListener" | "removeEventListener"
@@ -61,6 +67,10 @@ export function createReadingProgress({
   let timer: ReturnType<typeof setTimeout> | undefined;
   let closed = false;
   let warned = false;
+  function checkpoint() {
+    const locator = capture?.();
+    if (locator) pending = JSON.parse(JSON.stringify(locator));
+  }
   function flush(): Promise<void> {
     if (timer !== undefined) {
       cancel(timer);
@@ -102,9 +112,13 @@ export function createReadingProgress({
     return inFlight;
   }
   const onHidden = () => {
-    if (documentRef.visibilityState === "hidden") void flush();
+    if (documentRef.visibilityState === "hidden") {
+      checkpoint();
+      void flush();
+    }
   };
   const onPagehide = () => {
+    checkpoint();
     void flush();
   };
   documentRef.addEventListener("visibilitychange", onHidden);
@@ -120,6 +134,7 @@ export function createReadingProgress({
     },
     flush,
     async close() {
+      checkpoint();
       closed = true;
       documentRef.removeEventListener("visibilitychange", onHidden);
       windowRef.removeEventListener("pagehide", onPagehide);

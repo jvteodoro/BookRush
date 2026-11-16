@@ -482,3 +482,30 @@ p?gina permanecer aberta. Encerramento for?ado do navegador e aus?ncia de rede
 podem impedir o ?ltimo envio. Progresso antigo sem locator come?a do in?cio;
 uma posi??o de outra vers?o tamb?m come?a do in?cio com aviso. A retomada n?o
 cria marca??es manuais e n?o exige usar o bot?o de marca??o.
+
+## Precis?o da retomada no viewport
+
+O locator inclui `locations.bookrushViewport`, uma extens?o opcional com o
+seletor do elemento, ?ndice do n? de texto, deslocamento UTF-16 do primeiro
+caractere vis?vel, contexto de 32 caracteres e posi??o vertical da linha. O
+schema Readium existente aceita extens?es e o backend persiste o JSON completo;
+esta corre??o n?o altera API, autentica??o, CORS nem banco.
+
+A restaura??o aguarda as prefer?ncias do SDK, o carregamento das fontes e dois
+frames de layout antes de resolver a ?ncora no texto. O contexto precisa
+corresponder ao n? encontrado; uma ?ncora incompat?vel mant?m o fallback do
+Readium. Posi??es antigas sem ?ncora s?o reaplicadas ap?s a tipografia final,
+para evitar o deslocamento causado pelo layout intermedi?rio. Progresso e
+marca??es manuais usam a mesma captura/restaura??o. Ao ocultar/fechar o leitor,
+a posi??o ? capturada diretamente do documento, mesmo antes do pr?ximo evento
+ass?ncrono de progresso do SDK.
+
+`npm run test:reader-layout` executa o Readium real em Chromium headless com um
+livro fict?cio servido localmente. Reutiliza o Playwright de `admin-web` (instale
+suas depend?ncias antes de executar); `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`
+pode indicar um Chrome local, ou use o Chromium instalado pelo Playwright.
+A regress?o compara par?grafo, caractere inicial e deslocamento vertical ap?s
+reabrir, repetir aberturas, navegar por marca??o manual, fechar imediatamente
+ap?s rolar e trocar largura/fonte. Mant?m tamb?m compatibilidade com progresso
+legado. A fixture n?o usa dados ou credenciais de produ??o; o smoke autenticado
+na revis?o implantada permanece uma verifica??o separada.

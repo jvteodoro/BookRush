@@ -31,6 +31,7 @@ const stubs = {
       async load() { this.listeners.positionChanged(this.beginning); this.listeners.positionChanged(this.currentLocator); }
       async destroy() { this.destroyed = true; }
       async submitPreferences() {}
+      go(locator, animated, callback) { this.currentLocator = locator; this.listeners.positionChanged(locator); callback(true); }
     }
   `,
   "../auth": `export const authClient = {fetch: (...args) => globalThis.__resume.fetch(...args)};`,

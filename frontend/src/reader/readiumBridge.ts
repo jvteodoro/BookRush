@@ -5,6 +5,11 @@ import { startReadingTimer } from "./readingTimer";
 import { createReaderSessionLifecycle } from "./readerSession";
 import { readerSessionOrigin } from "./readerSessionOrigin";
 import { createReadingProgress, loadReadingPosition } from "./readingProgress";
+import {
+  captureViewportLocator,
+  restoreViewportLocator,
+  waitForReaderLayout,
+} from "./viewportLocator";
 import { apiRoutes, readerApiPath } from "../app/apiRoutes";
 import type {
   ReadiumBridge,
@@ -28,6 +33,9 @@ let frame: HTMLIFrameElement | undefined;
 let frameWindow: Window | undefined;
 let preferences = { ...defaults };
 let readingProgress: ReturnType<typeof createReadingProgress> | undefined;
+let preferencesApplied: Promise<void> = Promise.resolve();
+let restoringPosition = false;
+let recordViewport: (() => void) | undefined;
 let lifecycleVersion = 0;
 let lifecycleQueue: Promise<void> = Promise.resolve();
 
@@ -43,6 +51,8 @@ async function releaseReader() {
   const progress = readingProgress;
   readingProgress = undefined;
   await progress?.close();
+  restoringPosition = false;
+  recordViewport = undefined;
   await readerSession.end();
   if (navigator) await navigator.destroy();
   navigator = undefined;
@@ -85,7 +95,7 @@ function applyPreferences(next: ReaderPreferences) {
   preferences = next;
   container?.style.setProperty("background", next.background);
   if (navigator?.submitPreferences) {
-    void navigator
+    preferencesApplied = navigator
       .submitPreferences(
         new WebPubPreferences({
           fontFamily: fonts[next.fontFamily].family,
@@ -130,21 +140,44 @@ function applyPreferences(next: ReaderPreferences) {
 
 export const readiumBridge: ReadiumBridge = {
   currentLocator() {
-    return navigator?.currentLocator?.serialize() ?? null;
+    const locator = navigator?.currentLocator?.serialize();
+    return locator ? captureViewportLocator(frameWindow, locator) : null;
   },
   async goToLocator(value) {
     const locator = Locator.deserialize(value);
     if (
       !locator ||
+      restoringPosition ||
       !navigator ||
       !publication?.readingOrder.items.some(
         (link) => link.href.split("#")[0] === locator.href.split("#")[0],
       )
     )
       return false;
-    return new Promise<boolean>((resolve) =>
-      navigator.go(locator, false, (ok: boolean) => resolve(Boolean(ok))),
-    );
+    const version = lifecycleVersion;
+    restoringPosition = true;
+    try {
+      const ok = await new Promise<boolean>((resolve) =>
+        navigator.go(locator, false, (value: boolean) =>
+          resolve(Boolean(value)),
+        ),
+      );
+      if (!ok || version !== lifecycleVersion) return false;
+      await preferencesApplied;
+      await waitForReaderLayout(frameWindow);
+      if (version !== lifecycleVersion) return false;
+      if (!restoreViewportLocator(frameWindow, locator.serialize())) {
+        await new Promise<void>((resolve) =>
+          navigator.go(locator, false, () => resolve()),
+        );
+      }
+      return true;
+    } finally {
+      if (version === lifecycleVersion) {
+        restoringPosition = false;
+        recordViewport?.();
+      }
+    }
   },
   async mount(bookId, nextContainer, onLocatorChanged, onNotice) {
     const version = ++lifecycleVersion;
@@ -195,17 +228,35 @@ export const readiumBridge: ReadiumBridge = {
         window.location.origin,
       );
       publication = new Publication({ manifest: parsedManifest, fetcher });
+      let ready = false;
+      let lastCaptured = "";
+      const capture = () => {
+        if (!ready || restoringPosition || !navigator?.currentLocator)
+          return null;
+        const value = captureViewportLocator(
+          frameWindow,
+          navigator.currentLocator.serialize(),
+        );
+        const signature = JSON.stringify(value);
+        if (signature === lastCaptured) return null;
+        lastCaptured = signature;
+        return value;
+      };
       const progress = createReadingProgress({
         fetcher: (url, init) => authClient.fetch(url, init),
         path: apiRoutes.reader.progress(bookId),
         headers: originHeaders,
+        capture,
         onError: () =>
           onNotice?.(
             "Não foi possível salvar sua posição de leitura. Verifique a conexão e tente novamente antes de sair.",
           ),
       });
       readingProgress = progress;
-      let ready = false;
+      recordViewport = () => {
+        const value = capture();
+        if (value) progress.record(value);
+      };
       navigator = new WebPubNavigator(
         nextContainer,
         publication,
@@ -218,7 +269,7 @@ export const readiumBridge: ReadiumBridge = {
           },
           positionChanged: (locator: any) => {
             if (version !== lifecycleVersion) return;
-            if (ready) progress.record(locator.serialize());
+            recordViewport?.();
             onLocatorChanged?.(
               locator.locations?.totalProgression ??
                 locator.locations?.progression ??
@@ -241,9 +292,23 @@ export const readiumBridge: ReadiumBridge = {
       );
       await navigator.load();
       if (version !== lifecycleVersion) return;
-      ready = true;
-      progress.record(navigator.currentLocator.serialize());
       applyPreferences(preferences);
+      await preferencesApplied;
+      await waitForReaderLayout(frameWindow);
+      if (version !== lifecycleVersion) return;
+      if (
+        !restoreViewportLocator(frameWindow, compatible ? saved : null) &&
+        initialPosition
+      ) {
+        // Existing ratio-only positions must also be applied after final typography.
+        await new Promise<void>((resolve) =>
+          navigator.go(initialPosition, false, () => resolve()),
+        );
+      }
+      await waitForReaderLayout(frameWindow);
+      if (version !== lifecycleVersion) return;
+      ready = true;
+      recordViewport?.();
       stopReadingTimer = startReadingTimer();
     });
   },

@@ -611,7 +611,7 @@ function App() {
         });
         const script = document.createElement("script");
         script.dataset.bookrushPageloop = "true";
-        script.src = "/pageloop.js?v=20261116-reader-auto-resume";
+        script.src = "/pageloop.js?v=20261116-reader-viewport-anchor";
         script.async = true;
         script.onload = () => {
           if (active) setFeedReady(true);
