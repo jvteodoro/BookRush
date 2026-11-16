@@ -899,15 +899,17 @@
     });
     if (host && window.__BOOKRUSH_READIUM__) {
       window.__BOOKRUSH_READIUM__
-        .mount(readingBookId, host, (p) => {
-          const percent = Math.round((p || 0) * 100);
-          if (percent > 0) {
+        .mount(
+          readingBookId,
+          host,
+          (p) => {
+            const percent = Math.round((p || 0) * 100);
             state.readerPage = percent;
-            window.__BOOKRUSH_API__
-              ?.progress?.(state.readerBook, percent, percent)
-              .catch(() => {});
-          }
-        })
+          },
+          (message) => {
+            if (stillReading()) toast(message);
+          },
+        )
         .then(async () => {
           if (
             !host.isConnected ||

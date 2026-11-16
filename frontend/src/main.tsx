@@ -532,20 +532,6 @@ function App() {
               throw new Error("Não foi possível finalizar o upload.");
             return complete.json();
           },
-          progress: async (
-            id: string,
-            percent: number,
-            positionCodepoint: number,
-          ) => {
-            await authClient.fetch(apiRoutes.reader.progress(id), {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                ...readerSessionOrigin.activeFor(id),
-              },
-              body: JSON.stringify({ percent, positionCodepoint }),
-            });
-          },
           bookmarks: createBookmarksClient(
             (url, init) => authClient.fetch(url, init),
             apiRoutes.reader.bookmarks,
@@ -625,7 +611,7 @@ function App() {
         });
         const script = document.createElement("script");
         script.dataset.bookrushPageloop = "true";
-        script.src = "/pageloop.js?v=20261116-reader-bookmarks";
+        script.src = "/pageloop.js?v=20261116-reader-auto-resume";
         script.async = true;
         script.onload = () => {
           if (active) setFeedReady(true);

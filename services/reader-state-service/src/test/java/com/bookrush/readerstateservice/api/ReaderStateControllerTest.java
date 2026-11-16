@@ -28,6 +28,32 @@ class ReaderStateControllerTest {
   private final Principal user = () -> "iss:subject-1";
 
   @Test
+  void progressPersistsPreciseLocatorForTheAuthenticatedReader() {
+    UUID book = UUID.randomUUID();
+    Map<String, Object> locator = Map.of("href", "/versions/v1/chapter", "type", "text/html",
+        "locations", Map.of("progression", 0.432123));
+    controller.progress(book, new ReaderStateController.Progress(0L, 43.2123, locator), user, null);
+    verify(jdbc).update(org.mockito.ArgumentMatchers.contains("locator = EXCLUDED.locator"),
+        eq(user.getName()), eq(book), eq(0L), eq(43.2123), org.mockito.ArgumentMatchers.contains("0.432123"));
+    controller.getProgress(book, user);
+    verify(jdbc).queryForList(org.mockito.ArgumentMatchers.contains("locator::text AS locator"), eq(user.getName()), eq(book));
+    assertThrows(ResponseStatusException.class, () -> controller.getProgress(book, null));
+    assertThrows(ResponseStatusException.class, () -> controller.progress(book,
+        new ReaderStateController.Progress(0L, 43.2123, locator), null, null));
+  }
+
+  @Test
+  void progressRejectsMalformedLocatorsAndOutOfRangePercent() {
+    UUID book = UUID.randomUUID();
+    assertThrows(ResponseStatusException.class, () -> controller.progress(book,
+        new ReaderStateController.Progress(0L, 20d, Map.of("href", "x")), user, null));
+    for (double percent : new double[] { -1, 101, Double.NaN, Double.POSITIVE_INFINITY }) {
+      assertThrows(ResponseStatusException.class, () -> controller.progress(book,
+          new ReaderStateController.Progress(0L, percent), user, null));
+    }
+  }
+
+  @Test
   void bookmarkReturnsPersistedIdentityAndLocatorForRepeatedWrites() {
     UUID book = UUID.randomUUID();
     UUID persistedId = UUID.randomUUID();

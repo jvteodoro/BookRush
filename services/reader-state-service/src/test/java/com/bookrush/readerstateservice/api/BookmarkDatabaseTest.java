@@ -48,5 +48,18 @@ class BookmarkDatabaseTest {
     var other = controller.bookmark(book, Map.of("locator", locator), () -> "another-reader");
     assertNotEquals(first.get("id"), other.get("id"));
     assertEquals(legacyId, controller.bookmark(book, Map.of("positionCodepoint", 43L), () -> reader).get("id"));
+
+    var progressController = new ReaderStateController(jdbc,
+        org.mockito.Mockito.mock(com.bookrush.readerstateservice.BehaviorEventPublisher.class), null);
+    Map<String, Object> savedPosition = Map.of("href", "/versions/v1/chapters/c1/content", "type", "text/html",
+        "locations", Map.of("progression", 0.432123));
+    progressController.progress(book, new ReaderStateController.Progress(0L, 43.2123, savedPosition), () -> reader, null);
+    var rows = (List<?>) progressController.getProgress(book, () -> reader);
+    assertEquals(1, rows.size());
+    assertTrue(((Map<?, ?>) rows.get(0)).get("locator").toString().contains("0.432123"));
+    assertEquals(0, ((List<?>) progressController.getProgress(book, () -> "another-reader")).size());
+    progressController.progress(book, new ReaderStateController.Progress(0L, 0d), () -> reader, null);
+    rows = (List<?>) progressController.getProgress(book, () -> reader);
+    assertNull(((Map<?, ?>) rows.get(0)).get("locator"));
   }
 }

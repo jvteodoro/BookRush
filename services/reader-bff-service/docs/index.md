@@ -64,3 +64,13 @@ status 4xx do servi?o s?o preservados e falhas de depend?ncia viram 502.
 As origens CORS e a rota p?blica existentes continuam sendo usadas.
 Consulte a se??o de marca??es do reader-state para migration V10, compatibilidade
 com clientes antigos e valida??o atrav?s do gateway.
+
+## Retomada autom?tica
+
+GET/PUT `/api/v1/reader/books/{bookId}/progress` encaminham o bearer e o locator
+completo ao reader-state. GET retorna zero ou uma linha com locator JSON string;
+PUT aceita percent de 0 a 100 e locator opcional para compatibilidade legada.
+O frontend usa essa posi??o para retomar sem uma marca??o manual. Servi?o dono,
+roteamento, audience e origens CORS permanecem os mesmos; 4xx s?o preservados e
+falhas upstream resultam em 502. Consulte o OpenAPI e a se??o de progresso do
+reader-state para contrato e valida??o p?blica.

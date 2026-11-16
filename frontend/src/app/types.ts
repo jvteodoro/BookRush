@@ -23,6 +23,7 @@ export type ReadiumBridge = {
     bookId: string,
     container: HTMLElement,
     onLocatorChanged?: (progression: number) => void,
+    onNotice?: (message: string) => void,
   ) => Promise<void>;
   unmount: () => Promise<void>;
   goToChapter: (chapterId: string) => Promise<boolean>;

@@ -463,3 +463,22 @@ Marca??es antigas sem locator aparecem indispon?veis, pois o percentual
 armazenado anteriormente n?o identifica uma posi??o textual. Uma marca??o de
 uma vers?o que n?o integra a publica??o aberta produz uma mensagem expl?cita.
 A mudan?a n?o altera o fluxo separado de progresso autom?tico da leitura.
+
+## Retomada autom?tica da leitura
+
+A abertura consulta GET `/api/v1/reader/books/{bookId}/progress` com autentica??o
+e sem cache. Um locator compat?vel com a publica??o ? passado como posi??o
+inicial do Readium, antes de carregar o conte?do. O progresso grava o locator
+completo sem arredondamento; percent ? apenas um resumo para a biblioteca.
+As mudan?as s?o agrupadas por 300 ms e enviadas em ordem, com envio imediato
+ao sair do livro, ocultar a aba ou receber pagehide (keepalive). Cada fila pertence
+a um livro/conta e a pr?xima abertura aguarda o fechamento anterior. Respostas
+atrasadas de aberturas canceladas n?o iniciam outra leitura nem gravam o in?cio.
+
+Uma falha ao recuperar a posi??o impede a abertura e oferece tentar novamente,
+para n?o substituir a posi??o anterior pelo in?cio silenciosamente. Uma falha
+ao salvar ? informada e a posi??o fica pendente para o pr?ximo envio enquanto a
+p?gina permanecer aberta. Encerramento for?ado do navegador e aus?ncia de rede
+podem impedir o ?ltimo envio. Progresso antigo sem locator come?a do in?cio;
+uma posi??o de outra vers?o tamb?m come?a do in?cio com aviso. A retomada n?o
+cria marca??es manuais e n?o exige usar o bot?o de marca??o.

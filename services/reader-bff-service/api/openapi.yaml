@@ -125,20 +125,56 @@ paths:
         '401': { description: Authentication required }
         '502': { description: Reader state service unavailable }
   /api/v1/reader/books/{bookId}/progress:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
     get:
+      summary: Read the authenticated reader's last position for automatic resume
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
-        '200': { description: Book progress }
+        '200':
+          description: Empty array for a new reader/book; otherwise one saved progress record
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 1
+                items: { $ref: '#/components/schemas/ReadingProgress' }
+        '400': { description: Invalid book UUID }
         '401': { description: Authentication required }
-        '502': { description: Reader state service unavailable }
+        '403': { description: Forbidden origin or token authorization }
+        '502': { description: Reader state unavailable through the public BFF }
     put:
+      summary: Save the latest reading position and publish progress outcomes
       security: [{ bearerAuth: [] }]
-      parameters: [{ name: bookId, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters:
+        - { name: X-BookRush-Recommendation-Item, in: header, schema: { type: string, format: uuid } }
+        - { name: X-BookRush-Impression, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [positionCodepoint, percent]
+              properties:
+                positionCodepoint: { type: integer, format: int64, minimum: 0, description: Zero for locator-based progress; never a rounded percentage }
+                percent: { type: number, minimum: 0, maximum: 100 }
+                locator: { $ref: '#/components/schemas/BookmarkLocator' }
       responses:
-        '200': { description: Progress updated }
+        '200':
+          description: Last position updated (including backwards navigation)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bookId, percent]
+                properties:
+                  bookId: { type: string, format: uuid }
+                  percent: { type: number, minimum: 0, maximum: 100 }
+        '400': { description: Invalid progress or locator }
         '401': { description: Authentication required }
-        '502': { description: Reader state service unavailable }
+        '403': { description: Forbidden origin or token authorization }
+        '502': { description: Reader state unavailable through the public BFF }
   /api/v1/reader/books/{bookId}/bookmarks:
     parameters:
       - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -250,6 +286,14 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    ReadingProgress:
+      type: object
+      required: [position_codepoint, percent, updated_at]
+      properties:
+        position_codepoint: { type: integer, format: int64, minimum: 0 }
+        percent: { type: number, minimum: 0, maximum: 100 }
+        locator: { type: string, nullable: true, description: Serialized Readium locator JSON; absent/null for legacy progress }
+        updated_at: { type: string, format: date-time }
     BookmarkLocator:
       type: object
       required: [href, type, locations]

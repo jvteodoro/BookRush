@@ -141,3 +141,22 @@ p?blico, use sess?o/token novo e a origem real para testar 401 sem bearer,
 Na interface, marque duas posi??es pr?ximas, reabra o livro/sess?o, liste e
 retome ambas; simule API indispon?vel e confirme que n?o h? toast de sucesso.
 N?o se considera validado em produ??o somente pelo build ou teste unit?rio.
+
+## Progresso para retomada autom?tica
+
+GET/PUT `/api/v1/reader/books/{bookId}/progress` retornam e gravam o locator
+Readium por principal/livro. A coluna JSONB j? existe desde V5; nenhuma migration
+nova ? necess?ria. PUT preserva os campos Readium e aceita percent entre 0 e 100,
+inclusive movimentos para tr?s. Codepoint ? zero para o novo cliente e n?o deve
+receber percentual. Clientes legados sem locator continuam aceitos e limpam o
+locator antigo, evitando retomar uma refer?ncia desatualizada.
+
+GET mant?m a resposta de zero ou uma linha e inclui locator como JSON string.
+Os status, autoriza??o (realm bookrush, audience account, sem scope adicional),
+rota BFF e origens CORS s?o os mesmos documentados para marca??es, com PUT no
+lugar de POST. READ_PROGRESS e BOOK_COMPLETE mant?m seus eventos e correla??o.
+A valida??o local cobre persist?ncia JDBC via mocks e a retomada no frontend;
+a valida??o PostgreSQL usa BookmarkDatabaseTest em banco descart?vel. O smoke
+p?blico deve testar sair/reabrir, duas contas, nova sess?o, progresso zero, erros
+HTTP e posi??o de uma vers?o anterior com token novo/origem real. Deploy e
+imagem efetiva precisam ser verificados antes de afirmar valida??o em produ??o.

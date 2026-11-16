@@ -68,7 +68,27 @@ public class ReaderStateController {
     return value instanceof Number number ? Math.max(0, number.intValue()) : 0;
   }
 
-  public record Progress(@NotNull Long positionCodepoint, @NotNull Double percent) {}
+  public record Progress(@NotNull @jakarta.validation.constraints.Min(0) Long positionCodepoint,
+      @NotNull @jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("100") Double percent,
+      Map<String, Object> locator) {
+    public Progress(Long positionCodepoint, Double percent) { this(positionCodepoint, percent, null); }
+  }
+
+  private String serializeLocator(Map<?, ?> locator) {
+    if (!(locator.get("href") instanceof String href) || href.isBlank()
+        || !(locator.get("type") instanceof String type) || type.isBlank()
+        || !(locator.get("locations") instanceof Map<?, ?> locations)
+        || !(locations.get("progression") instanceof Number progression)
+        || !Double.isFinite(progression.doubleValue())
+        || progression.doubleValue() < 0 || progression.doubleValue() > 1) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
+    }
+    try {
+      return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(locator);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
+    }
+  }
 
   @Transactional
   @PostMapping("/books/{bookId}/opened")
@@ -206,10 +226,15 @@ public class ReaderStateController {
   public Map<String, Object> progress(@PathVariable UUID bookId, @Valid @RequestBody Progress value,
       Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
-    jdbc.update("INSERT INTO reader_state.progress(subject_key, book_id, position_codepoint, percent) "
-        + "VALUES (?, ?, ?, ?) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
-        + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, updated_at = now()",
-        subject, bookId, value.positionCodepoint(), value.percent());
+    if (value.percent() == null || !Double.isFinite(value.percent()) || value.percent() < 0 || value.percent() > 100
+        || value.positionCodepoint() == null || value.positionCodepoint() < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid reading progress");
+    }
+    String locator = value.locator() == null ? null : serializeLocator(value.locator());
+    jdbc.update("INSERT INTO reader_state.progress(subject_key, book_id, position_codepoint, percent, locator) "
+        + "VALUES (?, ?, ?, ?, ?::jsonb) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
+        + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, locator = EXCLUDED.locator, updated_at = now()",
+        subject, bookId, value.positionCodepoint(), value.percent(), locator);
     Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
     payload.put("percent", value.percent());
     behavior.publish("READ_PROGRESS", bookId, payload, authorization(request));
@@ -230,20 +255,10 @@ public class ReaderStateController {
     String note = String.valueOf(body.getOrDefault("note", ""));
     String locatorJson = null;
     if (body.containsKey("locator")) {
-      if (!(body.get("locator") instanceof Map<?, ?> locator)
-          || !(locator.get("href") instanceof String href) || href.isBlank()
-          || !(locator.get("type") instanceof String type) || type.isBlank()
-          || !(locator.get("locations") instanceof Map<?, ?> locations)
-          || !(locations.get("progression") instanceof Number progression)
-          || !Double.isFinite(progression.doubleValue())
-          || progression.doubleValue() < 0 || progression.doubleValue() > 1) {
+      if (!(body.get("locator") instanceof Map<?, ?> locator)) {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
       }
-      try {
-        locatorJson = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(locator);
-      } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
-      }
+      locatorJson = serializeLocator(locator);
     } else if (!(body.get("positionCodepoint") instanceof Number number) || number.longValue() < 0) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "locator or positionCodepoint required");
     }
@@ -264,7 +279,7 @@ public class ReaderStateController {
 
   @GetMapping("/books/{bookId}/progress")
   public Object getProgress(@PathVariable UUID bookId, Principal principal) {
-    return jdbc.queryForList("SELECT position_codepoint, percent, updated_at FROM reader_state.progress "
+    return jdbc.queryForList("SELECT position_codepoint, percent, locator::text AS locator, updated_at FROM reader_state.progress "
         + "WHERE subject_key = ? AND book_id = ?", subject(principal), bookId);
   }
 }
