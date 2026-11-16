@@ -20,18 +20,27 @@ const locator = {
   locations: { progression: 0.4321 },
 };
 
-async function setup({ save, list } = {}) {
+async function setup({
+  save,
+  list,
+  rename,
+  remove,
+  cancelDialog = false,
+} = {}) {
   const nodes = {};
   const makeNode = () => ({
     dataset: {},
     children: [],
     listeners: {},
     isConnected: true,
+    setAttribute(name, value) {
+      this[name] = value;
+    },
     addEventListener(event, callback) {
       this.listeners[event] = callback;
     },
-    append(child) {
-      this.children.push(child);
+    append(...children) {
+      this.children.push(...children);
     },
     replaceChildren() {
       this.children = [];
@@ -69,6 +78,18 @@ async function setup({ save, list } = {}) {
       createElement: () => makeNode(),
     },
     window: {
+      __BOOKRUSH_BOOKMARK_DIALOGS__: {
+        name: async (_title, _initial, submit) => {
+          if (cancelDialog) return null;
+          await submit("Meu trecho");
+          return "Meu trecho";
+        },
+        remove: async (_name, submit) => {
+          if (cancelDialog) return false;
+          await submit();
+          return true;
+        },
+      },
       __BOOKRUSH_APPEARANCE__: {
         mount() {},
         panels: () => ({
@@ -81,6 +102,10 @@ async function setup({ save, list } = {}) {
         open: async () => {},
         bookmark: save ?? (async () => ({ id: "mark-1" })),
         bookmarks: list ?? (async () => [{ id: "mark-1", locator }]),
+        renameBookmark:
+          rename ??
+          (async () => ({ id: "mark-1", name: "Meu trecho", locator })),
+        deleteBookmark: remove ?? (async () => {}),
       },
       __BOOKRUSH_READIUM__: {
         mount: async () => {},
@@ -119,7 +144,7 @@ test("reader saves the current locator and resumes a listed bookmark", async () 
   ui.nodes.bookmarksPanel.dataset.open = "true";
   ui.nodes.bookmarksBtn.listeners.click();
   await tick();
-  await ui.nodes.readerBookmarks.children[0].listeners.click();
+  await ui.nodes.readerBookmarks.children[0].children[0].listeners.click();
   assert.deepEqual(ui.destination(), locator);
   assert.equal(ui.closed(), 1);
 });
@@ -154,7 +179,7 @@ test("a failed list can be retried and legacy marks cannot navigate", async () =
   assert.match(ui.nodes.readerBookmarks.textContent, /HTTP 401/);
   ui.nodes.bookmarksBtn.listeners.click();
   await tick();
-  assert.equal(ui.nodes.readerBookmarks.children[0].disabled, true);
+  assert.equal(ui.nodes.readerBookmarks.children[0].children[0].disabled, true);
 });
 
 test("late save completion cannot confirm a different book", async () => {
@@ -170,4 +195,37 @@ test("late save completion cannot confirm a different book", async () => {
   finish();
   await pending;
   assert.deepEqual(ui.messages, []);
+});
+
+test("cancelling the name dialog does not create a bookmark", async () => {
+  let writes = 0;
+  const ui = await setup({
+    cancelDialog: true,
+    save: async () => {
+      writes++;
+    },
+  });
+  await ui.nodes.bookmarkBtn.listeners.click();
+  assert.equal(writes, 0);
+  assert.deepEqual(ui.messages, []);
+});
+
+test("pencil renames by ID and trash removes the confirmed bookmark", async () => {
+  let removed;
+  const ui = await setup({
+    remove: async (book, id) => {
+      removed = { book, id };
+    },
+  });
+  ui.nodes.bookmarksPanel.dataset.open = "true";
+  ui.nodes.bookmarksBtn.listeners.click();
+  await tick();
+  await ui.nodes.readerBookmarks.children[0].children[1].listeners.click();
+  assert.match(
+    ui.nodes.readerBookmarks.children[0].children[0].textContent,
+    /Meu trecho/,
+  );
+  await ui.nodes.readerBookmarks.children[0].children[2].listeners.click();
+  assert.deepEqual(removed, { book: "book-1", id: "mark-1" });
+  assert.equal(ui.nodes.readerBookmarks.children.length, 0);
 });

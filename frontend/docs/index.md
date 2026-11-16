@@ -509,3 +509,21 @@ reabrir, repetir aberturas, navegar por marca??o manual, fechar imediatamente
 ap?s rolar e trocar largura/fonte. Mant?m tamb?m compatibilidade com progresso
 legado. A fixture n?o usa dados ou credenciais de produ??o; o smoke autenticado
 na revis?o implantada permanece uma verifica??o separada.
+
+## Nomes e gerenciamento das marca??es
+
+?Marcar posi??o? captura o trecho antes de abrir um di?logo para informar um
+nome de 1 a 120 caracteres. Cancelar ou usar Escape n?o cria uma marca??o.
+A lista mostra o nome e os bot?es de l?pis e lixeira com r?tulos acess?veis.
+O l?pis edita somente o nome; a lixeira pede confirma??o e inicia com o foco em
+Cancelar. As a??es s? atualizam a lista ap?s confirma??o da API. Em caso de
+erro, o di?logo mant?m o texto digitado e permite repetir a opera??o. Durante
+uma requisi??o, os controles ficam desabilitados para evitar duplica??es.
+Nomes antigos vazios usam o t?tulo do cap?tulo como fallback. Marca??es antigas
+sem locator podem ser renomeadas ou exclu?das mesmo sem permitir navega??o.
+
+`npm run test:bookmarks-browser` usa o Playwright de admin-web e um Chromium
+headless, com fixture local e a interface real do leitor. Cobre nomes vazios,
+cria??o, edi??o sem mudar posi??o, cancelamento, Escape, exclus?o e erros HTTP
+com nova tentativa. A vari?vel PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH permite usar
+um Chrome j? instalado, como no teste de layout do leitor.

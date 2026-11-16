@@ -75,3 +75,47 @@ test("network errors propagate and legacy or corrupt locators are unavailable", 
     assert.equal(parseBookmark({ id: "legacy", locator: value }).locator, null);
   }
 });
+
+test("named bookmarks save and rename with trimmed names; deletion accepts an empty 204", async () => {
+  const calls = [];
+  const client = createBookmarksClient(async (url, init) => {
+    calls.push({ url, init });
+    if (init.method === "DELETE") return new Response(null, { status: 204 });
+    return Response.json({
+      id: "mark-1",
+      name: JSON.parse(init.body).name,
+      locator,
+    });
+  }, path);
+  assert.equal(
+    (await client.save("book-1", locator, "  Meu trecho  ")).name,
+    "Meu trecho",
+  );
+  assert.equal(
+    (await client.rename("book-1", "mark-1", " Novo nome ")).name,
+    "Novo nome",
+  );
+  await client.remove("book-1", "mark-1");
+  assert.equal(calls[1].url, path("book-1") + "/mark-1");
+  assert.equal(calls[1].init.method, "PUT");
+  assert.equal(calls[2].init.method, "DELETE");
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    locator,
+    name: "Meu trecho",
+  });
+});
+
+test("empty or oversized names never send a mutation; rejected edits and deletes remain failures", async () => {
+  let calls = 0;
+  const client = createBookmarksClient(async () => {
+    calls++;
+    return new Response(null, { status: 403 });
+  }, path);
+  for (const name of ["", "  ", "x".repeat(121)]) {
+    await assert.rejects(client.save("book-1", locator, name), /1 a 120/);
+    await assert.rejects(client.rename("book-1", "mark-1", name), /1 a 120/);
+  }
+  assert.equal(calls, 0);
+  await assert.rejects(client.rename("book-1", "mark-1", "Trecho"), /HTTP 403/);
+  await assert.rejects(client.remove("book-1", "mark-1"), /HTTP 403/);
+});

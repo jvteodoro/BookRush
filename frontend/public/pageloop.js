@@ -63,6 +63,8 @@
   );
 
   const ICONS = {
+    pencil: '<path d="m16 3 5 5-12 12-6 1 1-6Z"/><path d="m14 5 5 5"/>',
+    trash: '<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-7h6v7"/>',
     sparkle:
       '<path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8L12 3Z"/><path d="M18.5 15.5 19.3 18l2.2.8-2.2.8-.8 2.4-.8-2.4-2.2-.8 2.2-.8.8-2.5Z"/>',
@@ -848,13 +850,17 @@
           "Você ainda não marcou nenhuma posição neste livro.";
       }
       bookmarks.forEach((bookmark, index) => {
+        const row = document.createElement("div");
+        row.className = "reader-bookmark-row";
         const button = document.createElement("button");
         button.className = "reader-chapter";
         const locator = bookmark.locator;
         const progression = locator?.locations?.totalProgression;
+        const label =
+          bookmark.name || locator?.title || `Marcação ${index + 1}`;
         button.textContent = locator
-          ? `${locator.title || `Marcação ${index + 1}`}${typeof progression === "number" ? ` · ${Math.round(progression * 100)}%` : ""}`
-          : "Marcação antiga sem posição recuperável";
+          ? `${label}${typeof progression === "number" ? ` · ${Math.round(progression * 100)}%` : ""}`
+          : `${label} · posição indisponível`;
         button.disabled = !locator;
         button.addEventListener("click", async () => {
           button.disabled = true;
@@ -871,7 +877,67 @@
             button.disabled = false;
           }
         });
-        bookmarksList.append(button);
+        row.append(button);
+        const edit = document.createElement("button");
+        edit.className = "reader-bookmark-action";
+        edit.setAttribute("aria-label", `Editar nome de ${label}`);
+        edit.innerHTML = icon("pencil", "icon-sm");
+        edit.addEventListener("click", async () => {
+          edit.disabled = true;
+          let updated;
+          try {
+            const name = await window.__BOOKRUSH_BOOKMARK_DIALOGS__.name(
+              "Editar nome",
+              bookmark.name || "",
+              async (name) => {
+                updated = await window.__BOOKRUSH_API__.renameBookmark(
+                  readingBookId,
+                  bookmark.id,
+                  name,
+                );
+              },
+            );
+            if (name === null || !stillReading()) return;
+            bookmarks = bookmarks.map((item) =>
+              item.id === bookmark.id ? updated : item,
+            );
+            renderBookmarks();
+            toast("Nome atualizado.");
+          } catch (error) {
+            if (stillReading())
+              toast(error.message || "Não foi possível editar o nome.");
+          } finally {
+            edit.disabled = false;
+          }
+        });
+        const remove = document.createElement("button");
+        remove.className = "reader-bookmark-action";
+        remove.setAttribute("aria-label", `Excluir ${label}`);
+        remove.innerHTML = icon("trash", "icon-sm");
+        remove.addEventListener("click", async () => {
+          remove.disabled = true;
+          try {
+            const deleted = await window.__BOOKRUSH_BOOKMARK_DIALOGS__.remove(
+              label,
+              () =>
+                window.__BOOKRUSH_API__.deleteBookmark(
+                  readingBookId,
+                  bookmark.id,
+                ),
+            );
+            if (!deleted || !stillReading()) return;
+            bookmarks = bookmarks.filter((item) => item.id !== bookmark.id);
+            renderBookmarks();
+            toast("Marcação excluída.");
+          } catch (error) {
+            if (stillReading())
+              toast(error.message || "Não foi possível excluir a marcação.");
+          } finally {
+            remove.disabled = false;
+          }
+        });
+        row.append(edit, remove);
+        bookmarksList.append(row);
       });
     };
     let loadingBookmarks = false;
@@ -946,7 +1012,13 @@
           const locator = window.__BOOKRUSH_READIUM__?.currentLocator();
           if (!locator)
             throw new Error("Aguarde o carregamento da posição de leitura.");
-          await window.__BOOKRUSH_API__.bookmark(readingBookId, locator);
+          const name = await window.__BOOKRUSH_BOOKMARK_DIALOGS__.name(
+            "Salvar marcação",
+            "",
+            (name) =>
+              window.__BOOKRUSH_API__.bookmark(readingBookId, locator, name),
+          );
+          if (name === null) return;
           if (!stillReading()) return;
           toast("Posição marcada.");
           if (document.getElementById("bookmarksPanel").dataset.open === "true")

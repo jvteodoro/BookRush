@@ -24,11 +24,18 @@ class BookmarkDatabaseTest {
     var legacyId = UUID.randomUUID();
     jdbc.update("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint) VALUES (?,?,?,?)",
         legacyId, reader, book, 43L);
+    Flyway.configure().dataSource(ds).schemas("reader_state").target("10").load().migrate();
+    UUID upgradeBook = UUID.randomUUID();
+    jdbc.update("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, locator) VALUES (?,?,?,?,?::jsonb)",
+        UUID.randomUUID(), reader, upgradeBook, 0L, "{\"href\":\"chapter\",\"type\":\"text/html\",\"locations\":{\"progression\":0.25}}");
     var latest = Flyway.configure().dataSource(ds).schemas("reader_state").load();
     latest.migrate();
     latest.validate();
     latest.migrate();
     var controller = new ReaderStateController(jdbc, null, null);
+    var upgraded = (List<?>) controller.bookmarks(upgradeBook, () -> reader);
+    assertEquals("", ((Map<?, ?>) upgraded.get(0)).get("name"));
+    assertTrue(((Map<?, ?>) upgraded.get(0)).get("locator").toString().contains("0.25"));
     var locator = Map.of("href", "/versions/v1/chapters/c1/content", "type", "text/html",
         "locations", Map.of("progression", 0.4321));
     var first = controller.bookmark(book, Map.of("locator", locator), () -> reader);
@@ -48,6 +55,19 @@ class BookmarkDatabaseTest {
     var other = controller.bookmark(book, Map.of("locator", locator), () -> "another-reader");
     assertNotEquals(first.get("id"), other.get("id"));
     assertEquals(legacyId, controller.bookmark(book, Map.of("positionCodepoint", 43L), () -> reader).get("id"));
+    UUID firstId = (UUID) first.get("id");
+    var renamed = controller.renameBookmark(book, firstId, Map.of("name", "  Meu trecho  "), () -> reader);
+    assertEquals("Meu trecho", renamed.get("name"));
+    assertEquals(first.get("locator"), renamed.get("locator"));
+    assertEquals(first.get("created_at"), renamed.get("created_at"));
+    assertEquals("Meu trecho", controller.bookmark(book, Map.of("locator", locator), () -> reader).get("name"));
+    assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        () -> controller.renameBookmark(book, firstId, Map.of("name", "Outro"), () -> "another-reader"));
+    assertThrows(org.springframework.web.server.ResponseStatusException.class,
+        () -> controller.deleteBookmark(UUID.randomUUID(), firstId, () -> reader));
+    controller.deleteBookmark(book, firstId, () -> reader);
+    assertEquals(2, ((List<?>) controller.bookmarks(book, () -> reader)).size());
+    assertEquals(1, ((List<?>) controller.bookmarks(book, () -> "another-reader")).size());
 
     var progressController = new ReaderStateController(jdbc,
         org.mockito.Mockito.mock(com.bookrush.readerstateservice.BehaviorEventPublisher.class), null);

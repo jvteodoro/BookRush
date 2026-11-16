@@ -4,6 +4,105 @@
   background: var(--reader-background, #f7f4ee);
   color: var(--reader-foreground, #29261f);
 }
+
+#readerShell .reader-bookmark-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  align-items: center;
+  border-top: 1px solid currentColor;
+}
+#readerShell .reader-bookmark-row .reader-chapter {
+  border: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+#readerShell .reader-bookmark-action {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+#readerShell .reader-bookmark-action:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+.reader-bookmark-dialog {
+  width: min(420px, calc(100vw - 48px));
+  box-sizing: border-box;
+  border: 1px solid #b8b0a3;
+  border-radius: 16px;
+  padding: 24px;
+  color: var(--reader-foreground, #29261f);
+  background: var(--reader-background, #f7f4ee);
+}
+.reader-bookmark-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.reader-bookmark-dialog form {
+  display: grid;
+  gap: 12px;
+}
+.reader-bookmark-dialog h2,
+.reader-bookmark-dialog p {
+  margin: 0;
+}
+.reader-bookmark-dialog h2 {
+  font-size: 20px;
+}
+.reader-bookmark-dialog .bookmark-dialog-description {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.reader-bookmark-dialog label {
+  font-weight: 600;
+}
+.reader-bookmark-dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #8a8070;
+  border-radius: 8px;
+  background: var(--reader-background, #fff);
+  color: var(--reader-foreground, #29261f);
+  padding: 12px;
+  font-size: 16px;
+}
+.reader-bookmark-dialog .bookmark-dialog-error {
+  color: #a12424;
+  font-size: 14px;
+}
+.bookmark-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.bookmark-dialog-actions button {
+  background: transparent;
+  color: inherit;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid #8a8070;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.bookmark-dialog-actions .bookmark-dialog-save {
+  background: #29261f;
+  color: white;
+}
+.bookmark-dialog-actions .bookmark-dialog-delete {
+  background: #a12424;
+  color: white;
+  border-color: #a12424;
+}
+.reader-bookmark-dialog button:disabled,
+#readerShell .reader-bookmark-action:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
 #readerShell .reader-settings {
   width: min(380px, calc(100vw - 32px));
   box-sizing: border-box;

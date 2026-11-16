@@ -160,3 +160,27 @@ a valida??o PostgreSQL usa BookmarkDatabaseTest em banco descart?vel. O smoke
 p?blico deve testar sair/reabrir, duas contas, nova sess?o, progresso zero, erros
 HTTP e posi??o de uma vers?o anterior com token novo/origem real. Deploy e
 imagem efetiva precisam ser verificados antes de afirmar valida??o em produ??o.
+
+## Nomes e exclus?o de marca??es
+
+V11 adiciona `bookmarks.name` (VARCHAR(120), NOT NULL, default vazio). POST
+`/api/v1/reader/books/{bookId}/bookmarks` aceita name opcional para manter clientes
+antigos compat?veis; se fornecido deve ter entre 1 e 120 caracteres ap?s trim.
+Repetir a mesma posi??o sem name mant?m o nome existente. A coluna note conserva
+sua finalidade anterior, separada do nome.
+
+PUT `/api/v1/reader/books/{bookId}/bookmarks/{bookmarkId}` exige `{ "name": "..." }`
+e retorna 200 com a marca??o atualizada. S? altera name, preservando ID, locator
+e created_at. DELETE no mesmo caminho retorna 204 vazio. Ambas opera??es filtram
+por ID, livro e principal autenticado. Aus?ncia, conta diferente ou livro errado
+retornam 404; nome/UUID inv?lido retorna 400 e aus?ncia de autentica??o retorna
+401. O BFF preserva esses status e traduz falhas upstream para 502.
+
+O contrato p?blico mant?m realm bookrush, audience account e nenhuma permiss?o
+adicional. O gateway encaminha o prefixo de livros para reader-bff; CORS p?blico
+j? permite PUT/DELETE, Authorization e Content-Type nas origens expl?citas
+configuradas. N?o h? mudan?a de Keycloak ou abertura de novas origens.
+A valida??o de banco est? em BookmarkDatabaseTest e exige PostgreSQL descart?vel;
+consulte database/bookmark-names.md. Para smoke p?blico ap?s deploy, criar com
+nome, listar, renomear, relistar, excluir, confirmar 204 e testar dois usu?rios,
+livro errado, nome inv?lido e preflight com a origem real e token novo.

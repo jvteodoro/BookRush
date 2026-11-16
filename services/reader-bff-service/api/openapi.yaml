@@ -175,6 +175,43 @@ paths:
         '401': { description: Authentication required }
         '403': { description: Forbidden origin or token authorization }
         '502': { description: Reader state unavailable through the public BFF }
+  /api/v1/reader/books/{bookId}/bookmarks/{bookmarkId}:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: bookmarkId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      summary: Rename a bookmark owned by the authenticated reader
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120, description: Trimmed display name; whitespace-only values are rejected }
+      responses:
+        '200':
+          description: Bookmark renamed without changing its position or creation date
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Bookmark' }
+        '400': { description: Invalid UUID or name }
+        '401': { description: Authentication required }
+        '403': { description: Forbidden origin or token authorization }
+        '404': { description: Bookmark not found for this reader and book }
+        '502': { description: Reader state service unavailable through public BFF }
+    delete:
+      summary: Delete a bookmark owned by the authenticated reader
+      security: [{ bearerAuth: [] }]
+      responses:
+        '204': { description: Bookmark deleted }
+        '400': { description: Invalid UUID }
+        '401': { description: Authentication required }
+        '403': { description: Forbidden origin or token authorization }
+        '404': { description: Bookmark not found for this reader and book }
+        '502': { description: Reader state service unavailable through public BFF }
   /api/v1/reader/books/{bookId}/bookmarks:
     parameters:
       - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -206,6 +243,7 @@ paths:
               properties:
                 locator: { $ref: '#/components/schemas/BookmarkLocator' }
                 positionCodepoint: { type: integer, format: int64, minimum: 0, deprecated: true, description: Legacy codepoint; never send a percentage here }
+                name: { type: string, minLength: 1, maxLength: 120, description: Optional for legacy clients; nonblank when supplied }
                 note: { type: string }
       responses:
         '200':
@@ -316,6 +354,7 @@ components:
         id: { type: string, format: uuid }
         book_id: { type: string, format: uuid }
         position_codepoint: { type: integer, format: int64, minimum: 0, description: Zero for locator-only bookmarks }
+        name: { type: string, maxLength: 120, description: Empty for unnamed legacy bookmarks }
         note: { type: string }
         locator: { type: string, nullable: true, description: Serialized BookmarkLocator JSON; null for legacy bookmarks }
         created_at: { type: string, format: date-time }

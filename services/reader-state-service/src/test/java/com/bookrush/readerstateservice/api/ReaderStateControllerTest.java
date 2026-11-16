@@ -68,7 +68,38 @@ class ReaderStateControllerTest {
     verify(jdbc, org.mockito.Mockito.times(2)).queryForMap(
         org.mockito.ArgumentMatchers.contains("md5(locator::text)) WHERE locator IS NOT NULL"),
         any(UUID.class), eq("iss:subject-1"), eq(book), eq(0L), eq(""),
-        org.mockito.ArgumentMatchers.contains("0.4321"));
+        org.mockito.ArgumentMatchers.contains("0.4321"), eq(null), eq(null));
+  }
+
+  @Test
+  void bookmarkRenameAndDeleteAreScopedToTheReaderAndBook() {
+    UUID book = UUID.randomUUID();
+    UUID id = UUID.randomUUID();
+    when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of("id", id, "name", "Trecho")));
+    var result = controller.renameBookmark(book, id, Map.of("name", "  Trecho  "), user);
+    org.junit.jupiter.api.Assertions.assertEquals("Trecho", result.get("name"));
+    verify(jdbc).queryForList(org.mockito.ArgumentMatchers.contains("WHERE id = ? AND subject_key = ? AND book_id = ?"),
+        eq("Trecho"), eq(id), eq(user.getName()), eq(book));
+    when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+    controller.deleteBookmark(book, id, user);
+    verify(jdbc).update(eq("DELETE FROM reader_state.bookmarks WHERE id = ? AND subject_key = ? AND book_id = ?"),
+        eq(id), eq(user.getName()), eq(book));
+    assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of("name", "Trecho"), null));
+    assertThrows(ResponseStatusException.class, () -> controller.deleteBookmark(book, id, null));
+  }
+
+  @Test
+  void bookmarkNamesAreRequiredForRenameAndMissingBookmarksReturnNotFound() {
+    UUID book = UUID.randomUUID(); UUID id = UUID.randomUUID();
+    for (String name : List.of("", "   ", "x".repeat(121))) {
+      assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of("name", name), user));
+      assertThrows(ResponseStatusException.class, () -> controller.bookmark(book, Map.of("name", name, "positionCodepoint", 0), user));
+    }
+    assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of(), user));
+    var missing = assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of("name", "Trecho"), user));
+    org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, missing.getStatusCode());
+    var deleted = assertThrows(ResponseStatusException.class, () -> controller.deleteBookmark(book, id, user));
+    org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, deleted.getStatusCode());
   }
 
   @Test

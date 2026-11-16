@@ -251,6 +251,7 @@ public class ReaderStateController {
   public Map<String, Object> bookmark(@PathVariable UUID bookId, @RequestBody Map<String, Object> body,
       Principal principal) {
     String reader = subject(principal);
+    String name = bookmarkName(body, false);
     long position = body.get("positionCodepoint") instanceof Number number ? number.longValue() : 0;
     String note = String.valueOf(body.getOrDefault("note", ""));
     String locatorJson = null;
@@ -265,15 +266,46 @@ public class ReaderStateController {
     String conflict = locatorJson == null
         ? "(subject_key, book_id, position_codepoint) WHERE locator IS NULL "
         : "(subject_key, book_id, md5(locator::text)) WHERE locator IS NOT NULL ";
-    return jdbc.queryForMap("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, note, locator) "
-        + "VALUES (?, ?, ?, ?, ?, ?::jsonb) ON CONFLICT " + conflict
-        + "DO UPDATE SET note = EXCLUDED.note RETURNING id, book_id, position_codepoint, note, locator::text AS locator, created_at",
-        UUID.randomUUID(), reader, bookId, position, note, locatorJson);
+    return jdbc.queryForMap("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, note, locator, name) "
+        + "VALUES (?, ?, ?, ?, ?, ?::jsonb, COALESCE(?, '')) ON CONFLICT " + conflict
+        + "DO UPDATE SET note = EXCLUDED.note, name = COALESCE(?, bookmarks.name) "
+        + "RETURNING id, book_id, position_codepoint, name, note, locator::text AS locator, created_at",
+        UUID.randomUUID(), reader, bookId, position, note, locatorJson, name, name);
+  }
+
+  private String bookmarkName(Map<String, Object> body, boolean required) {
+    if (!required && !body.containsKey("name")) return null;
+    if (!(body.get("name") instanceof String value) || value.strip().isEmpty() || value.strip().length() > 120) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bookmark name must have 1 to 120 characters");
+    }
+    return value.strip();
+  }
+
+  @PutMapping("/books/{bookId}/bookmarks/{bookmarkId}")
+  public Map<String, Object> renameBookmark(@PathVariable UUID bookId, @PathVariable UUID bookmarkId,
+      @RequestBody Map<String, Object> body, Principal principal) {
+    String reader = subject(principal);
+    String name = bookmarkName(body, true);
+    var rows = jdbc.queryForList("UPDATE reader_state.bookmarks SET name = ? "
+        + "WHERE id = ? AND subject_key = ? AND book_id = ? "
+        + "RETURNING id, book_id, position_codepoint, name, note, locator::text AS locator, created_at",
+        name, bookmarkId, reader, bookId);
+    if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "bookmark not found");
+    return rows.get(0);
+  }
+
+  @DeleteMapping("/books/{bookId}/bookmarks/{bookmarkId}")
+  @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteBookmark(@PathVariable UUID bookId, @PathVariable UUID bookmarkId, Principal principal) {
+    if (jdbc.update("DELETE FROM reader_state.bookmarks WHERE id = ? AND subject_key = ? AND book_id = ?",
+        bookmarkId, subject(principal), bookId) == 0) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "bookmark not found");
+    }
   }
 
   @GetMapping("/books/{bookId}/bookmarks")
   public Object bookmarks(@PathVariable UUID bookId, Principal principal) {
-    return jdbc.queryForList("SELECT id, position_codepoint, note, locator::text AS locator, created_at FROM reader_state.bookmarks "
+    return jdbc.queryForList("SELECT id, position_codepoint, name, note, locator::text AS locator, created_at FROM reader_state.bookmarks "
         + "WHERE subject_key = ? AND book_id = ? ORDER BY created_at DESC, id", subject(principal), bookId);
   }
 
