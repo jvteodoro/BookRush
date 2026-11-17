@@ -68,7 +68,8 @@ itens, impressões, viewability, livros únicos e percentis de rank.
 
 `V14__reporting_event_quality_daily.sql` agrega eventos aceitos/rejeitados e
 estado do outbox por dia, expondo somente contagens, tentativas e idade do item
-pendente.
+pendente. Eventos aceitos são agrupados pelo dia de recebimento (`received_at`),
+mantendo o período de ocorrência como limite de leitura da fonte.
 
 `V15__reporting_moderation_publisher_rights.sql` cria snapshots agregados para
 aging de moderação, funil editorial/publicação e decisões de direitos/licenças.

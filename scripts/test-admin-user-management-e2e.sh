@@ -251,9 +251,16 @@ docker exec -i "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush >/dev
 CREATE SCHEMA behavior;
 CREATE TABLE behavior.events (
   id UUID PRIMARY KEY, event_key TEXT UNIQUE, occurred_at TIMESTAMPTZ NOT NULL,
-  identity_issuer TEXT,
+  received_at TIMESTAMPTZ NOT NULL DEFAULT now(), identity_issuer TEXT,
   identity_subject TEXT, book_id UUID, event_type TEXT NOT NULL,
   payload JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE TABLE behavior.rejects (
+  id UUID PRIMARY KEY, received_at TIMESTAMPTZ NOT NULL DEFAULT now(), reason TEXT NOT NULL
+);
+CREATE TABLE behavior.outbox (
+  id UUID PRIMARY KEY, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  published_at TIMESTAMPTZ, attempts INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE behavior.daily_book (
   day DATE NOT NULL, book_id UUID NOT NULL,
@@ -684,6 +691,25 @@ suppressed_trends_json="$(docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh 
 [[ "$(jq -r '.status' <<<"$suppressed_trends_json")" == NO_DATA ]]
 [[ "$(jq -r '.population' <<<"$suppressed_trends_json")" == SUPPRESSED_BELOW_MIN_SAMPLE ]]
 echo 'Book engagement trends E2E: 401/200, daily book/language series and minReaders suppression OK'
+event_quality_json=''
+for _ in $(seq 1 30); do
+  event_quality_json="$(docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh -c '
+    curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
+      "http://admin-service:8100/api/admin/v1/reporting/quality/events?days=7"
+  ' 2>/dev/null || true)"
+  [[ "$(jq -r '.status // empty' <<<"$event_quality_json")" == UNTRUSTED \
+      && "$(jq -r '[.series[].accepted_events] | add // 0' <<<"$event_quality_json")" -gt 0 ]] && break
+  sleep 1
+done
+if [[ "$(jq -r '.status // empty' <<<"$event_quality_json")" != UNTRUSTED ]]; then
+  echo 'Event quality projection did not become available.' >&2
+  docker exec "$postgres" psql -U bookrush -d bookrush -c \
+    "SELECT projection_name, refresh_status, last_error_code, record_count FROM reporting.projection_health WHERE projection_name = 'event_quality_daily'" >&2 || true
+  docker logs --tail=120 "$service" >&2
+  echo "$event_quality_json" >&2
+  exit 1
+fi
+echo 'Event quality E2E: accepted-event daily projection and received_at grouping OK'
 content_supply_unauthenticated_status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
   'http://admin-service:8100/api/admin/v1/reporting/content-supply?days=1')"
 [[ "$content_supply_unauthenticated_status" == 401 ]]

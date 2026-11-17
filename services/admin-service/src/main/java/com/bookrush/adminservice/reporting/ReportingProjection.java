@@ -1899,7 +1899,7 @@ public class ReportingProjection {
               max(received_at) AS source_watermark
           FROM behavior.events
           WHERE occurred_at >= current_date - INTERVAL '366 days'
-          GROUP BY occurred_at::date
+          GROUP BY received_at::date
         ), rejected AS (
           SELECT received_at::date AS day, count(*) AS rejected_events,
               count(*) FILTER (WHERE reason ILIKE '%duplicate%') AS duplicate_rejections,
