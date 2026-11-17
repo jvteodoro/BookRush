@@ -1,3 +1,4 @@
+import { Notice } from "@bookrush/ui/Notice";
 import { useEffect, useState } from "react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -66,7 +67,9 @@ export function UserSearchResults({
         <p role="status">Buscando pessoas…</p>
       ) : error ? (
         <Card className="br-live-empty">
-          <p role="alert">{error}</p>
+          <Notice as="p" role="alert">
+            {error}
+          </Notice>
           <Button onClick={() => setAttempt((current) => current + 1)}>
             Tentar novamente
           </Button>
@@ -91,9 +94,13 @@ export function UserSearchResults({
           </div>
           <div className="br-search-results">
             {data.items.map((user) => (
-              <Card key={user.subject}>
-                <h2>{user.displayName || user.username || "Leitor"}</h2>
-                {user.username && <p className="br-muted">@{user.username}</p>}
+              <Card className="br-person-result" key={user.subject}>
+                <div className="br-person-result__identity">
+                  <h2>{user.displayName || user.username || "Leitor"}</h2>
+                  {user.username && (
+                    <p className="br-muted">@{user.username}</p>
+                  )}
+                </div>
                 <Button
                   variant="secondary"
                   onClick={() => onProfile(user.subject)}

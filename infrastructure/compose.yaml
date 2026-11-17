@@ -670,6 +670,9 @@ services:
       STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}
+      PUBLISHER_METRICS_TOKEN_URI: ${PUBLISHER_METRICS_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+      PUBLISHER_METRICS_CLIENT_ID: ${PUBLISHER_METRICS_CLIENT_ID:-bookrush-publisher-metrics-s2s}
+      PUBLISHER_METRICS_CLIENT_SECRET: ${PUBLISHER_METRICS_CLIENT_SECRET:-}
       PUBLISHER_BEHAVIOR_URL: ${PUBLISHER_BEHAVIOR_URL:-http://behavior-service:8097}
       PUBLISHER_BEHAVIOR_METRICS_TOKEN_URI: ${PUBLISHER_BEHAVIOR_METRICS_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
       PUBLISHER_BEHAVIOR_METRICS_CLIENT_ID: ${PUBLISHER_BEHAVIOR_METRICS_CLIENT_ID:-bookrush-publisher-behavior-s2s}
@@ -753,7 +756,8 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE:-bookrush/frontend:local}
     build:
-      context: ../frontend
+      context: ..
+      dockerfile: frontend/Dockerfile
     depends_on:
       catalog-service:
         condition: service_healthy
@@ -764,7 +768,8 @@ services:
   admin-web:
     image: ${ADMIN_WEB_IMAGE:-bookrush/admin-web:local}
     build:
-      context: ../admin-web
+      context: ..
+      dockerfile: admin-web/Dockerfile
       args:
         VITE_USE_MOCKS: ${ADMIN_WEB_USE_MOCKS:-false}
         VITE_GRAFANA_URL: ${ADMIN_WEB_GRAFANA_URL:-https://grafana-bookrush.jteodoro.tec.br}

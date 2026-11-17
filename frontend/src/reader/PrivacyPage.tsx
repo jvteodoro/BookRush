@@ -1,3 +1,4 @@
+import { Notice } from "@bookrush/ui/Notice";
 import { useEffect, useState } from "react";
 import { authClient } from "../auth";
 import { Button } from "../components/ui/Button";
@@ -194,12 +195,13 @@ export function PrivacyPage({ onBack }: { onBack: () => void }) {
           </div>
         )}
         {error && (
-          <p
+          <Notice
+            as="p"
             className="br-account-status br-account-status--error"
             role="alert"
           >
             {error}
-          </p>
+          </Notice>
         )}
         {message && (
           <p className="br-account-status" role="status">

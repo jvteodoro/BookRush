@@ -55,4 +55,34 @@ class GutenbergRdfParserTest {
     assertEquals("https://example.test/book.epub.noimages", record.epubUrl());
   }
 
+  @Test
+  void readsBibliographicYearInsteadOfDigitalReleaseAndResetsBetweenRecords() throws Exception {
+    var records = parsePublication("<pgterms:marc260>London: Example Publisher, 1899.</pgterms:marc260>");
+    assertEquals(1899, records.getFirst().publicationYear());
+    assertEquals("2008-08-26", records.getFirst().digitalReleaseDate());
+    assertNull(records.get(1).publicationYear());
+  }
+
+  @Test
+  void unknownAmbiguousAndDigitalDatesAreNotPublicationYears() throws Exception {
+    for (String statement : new String[] {"", "Unknown", "London, 1899?", "1899-1900", "2008-08-26", "18999", "London, ca. 1899", "London, circa 1899"}) {
+      assertNull(parsePublication("<pgterms:marc260>" + statement + "</pgterms:marc260>")
+          .getFirst().publicationYear(), statement);
+    }
+    assertEquals(1899, parsePublication("<pgterms:marc260>London: Publisher, [1899].</pgterms:marc260>")
+        .getFirst().publicationYear());
+  }
+
+  private java.util.List<GutenbergRdfParser.GutenbergRecord> parsePublication(String publication) throws Exception {
+    String xml = """
+        <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+          xmlns:dcterms="http://purl.org/dc/terms/" xmlns:pgterms="http://www.gutenberg.org/2009/pgterms/">
+          <pgterms:ebook rdf:about="ebooks/1"><dcterms:issued>2008-08-26</dcterms:issued>%s</pgterms:ebook>
+          <pgterms:ebook rdf:about="ebooks/2"><dcterms:issued>2020-01-01</dcterms:issued></pgterms:ebook>
+        </rdf:RDF>
+        """.formatted(publication);
+    return new GutenbergRdfParser().parse(new java.io.ByteArrayInputStream(
+        xml.getBytes(java.nio.charset.StandardCharsets.UTF_8)), 10);
+  }
+
 }

@@ -1,7 +1,12 @@
+import { Notice } from "@bookrush/ui/Notice";
+import { SearchField } from "@bookrush/ui/SearchField";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Surface } from "@bookrush/ui/Surface";
+import { Button } from "../../components/ui/Button";
 import { CommentModeration } from "./CommentModeration";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, ShieldAlert, UserCheck, UserX } from "lucide-react";
+import { ShieldAlert, UserCheck, UserX } from "lucide-react";
 import { services, type AdminReport } from "../../lib/services";
 
 const reportStatus = {
@@ -87,7 +92,7 @@ export function OperationsPage() {
   };
   return (
     <section>
-      <header className="pagehead">
+      <PageHeader className="">
         <div>
           <span className="eyebrow">PLATFORM OPERATIONS</span>
           <h1>Users & moderation</h1>
@@ -95,7 +100,7 @@ export function OperationsPage() {
             Dados reais do admin-service, com ações protegidas e auditáveis.
           </p>
         </div>
-      </header>
+      </PageHeader>
       {kpis.data && (
         <div className="stats">
           {Object.entries(kpis.data).map(([key, value]) => (
@@ -107,7 +112,7 @@ export function OperationsPage() {
           ))}
         </div>
       )}
-      <div className="panel">
+      <Surface as="div" className="panel">
         <h2>Usuários</h2>
         <form
           className="user-search"
@@ -119,24 +124,21 @@ export function OperationsPage() {
         >
           <label className="user-search-label">
             <span>Buscar por usuário, nome ou e-mail</span>
-            <span className="user-search-field">
-              <Search size={18} aria-hidden="true" />
-              <input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Nome, usuário ou e-mail"
-                maxLength={200}
-              />
-            </span>
+            <SearchField
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Nome, usuário ou e-mail"
+              maxLength={200}
+            />
           </label>
-          <button type="submit" className="primary-action">
+          <Button variant="primary" type="submit" className="primary-action">
             Buscar
-          </button>
+          </Button>
         </form>
         {users.isLoading ? (
           <p>Carregando…</p>
         ) : users.isError ? (
-          <div className="user-load-error" role="alert">
+          <Notice as="div" className="user-load-error" role="alert">
             <div>
               <strong>Não foi possível carregar os usuários.</strong>
               <span>
@@ -145,14 +147,15 @@ export function OperationsPage() {
                   : "Verifique a integração com o Keycloak e tente novamente."}
               </span>
             </div>
-            <button
+            <Button
+              variant="ghost"
               type="button"
               className="secondary-action"
               onClick={() => void users.refetch()}
             >
               Tentar novamente
-            </button>
-          </div>
+            </Button>
+          </Notice>
         ) : users.data?.items.length === 0 ? (
           <p>Nenhum usuário encontrado.</p>
         ) : (
@@ -173,7 +176,8 @@ export function OperationsPage() {
                   {user.enabled ? "Ativo" : "Banido"}
                 </span>
               </span>
-              <button
+              <Button
+                variant="secondary"
                 className="secondary-action"
                 disabled={userMutation.isPending}
                 onClick={() => {
@@ -198,39 +202,41 @@ export function OperationsPage() {
                   <UserX size={15} />
                 )}
                 {user.enabled === false ? "Desbanir" : "Banir"}
-              </button>
+              </Button>
             </div>
           ))
         )}
         {userMutation.isError && (
-          <p role="alert">
+          <Notice as="p" role="alert">
             Não foi possível alterar o usuário. Verifique sua permissão e tente
             novamente.
-          </p>
+          </Notice>
         )}
         {users.data && users.data.totalItems > 0 && (
           <div className="review-asset-actions">
-            <button
+            <Button
+              variant="secondary"
               className="secondary-action"
               disabled={page === 0}
               onClick={() => setPage((value) => value - 1)}
             >
               Anterior
-            </button>
+            </Button>
             <span>
               Página {page + 1} · {users.data.totalItems} usuários
             </span>
-            <button
+            <Button
+              variant="secondary"
               className="secondary-action"
               disabled={users.data.last}
               onClick={() => setPage((value) => value + 1)}
             >
               Próxima
-            </button>
+            </Button>
           </div>
         )}
-      </div>
-      <div className="panel">
+      </Surface>
+      <Surface as="div" className="panel">
         <div className="moderation-section-heading">
           <div>
             <h2>Denúncias</h2>
@@ -243,9 +249,9 @@ export function OperationsPage() {
         {reports.isLoading ? (
           <p>Carregando denúncias…</p>
         ) : reports.isError ? (
-          <p role="alert" className="moderation-error">
+          <Notice as="p" role="alert" className="moderation-error">
             Não foi possível carregar as denúncias.
-          </p>
+          </Notice>
         ) : reports.data?.length ? (
           reports.data.map((report) => {
             const state =
@@ -288,7 +294,8 @@ export function OperationsPage() {
                     {pending ? "Atualizando…" : state.label}
                   </span>
                   {report.commentId && (
-                    <button
+                    <Button
+                      variant="ghost"
                       type="button"
                       className="secondary-action"
                       onClick={() => {
@@ -302,44 +309,48 @@ export function OperationsPage() {
                       }}
                     >
                       Moderar comentário
-                    </button>
+                    </Button>
                   )}
                   {report.status === "OPEN" && (
-                    <button
+                    <Button
+                      variant="secondary"
                       className="secondary-action"
                       disabled={reportMutation.isPending}
                       onClick={() => changeReportStatus(report.id, "IN_REVIEW")}
                     >
                       Analisar
-                    </button>
+                    </Button>
                   )}
                   {actionable && (
-                    <button
+                    <Button
+                      variant="secondary"
                       className="secondary-action"
                       disabled={reportMutation.isPending}
                       onClick={() => changeReportStatus(report.id, "RESOLVED")}
                     >
                       Resolver
-                    </button>
+                    </Button>
                   )}
                   {actionable && (
-                    <button
+                    <Button
+                      variant="secondary"
                       className="secondary-action"
                       disabled={reportMutation.isPending}
                       onClick={() => changeReportStatus(report.id, "DISMISSED")}
                     >
                       Ignorar
-                    </button>
+                    </Button>
                   )}
                   {(report.status === "RESOLVED" ||
                     report.status === "DISMISSED") && (
-                    <button
+                    <Button
+                      variant="secondary"
                       className="secondary-action"
                       disabled={reportMutation.isPending}
                       onClick={() => changeReportStatus(report.id, "OPEN")}
                     >
                       Reabrir
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -349,12 +360,12 @@ export function OperationsPage() {
           <p>Nenhuma denúncia registrada.</p>
         )}
         {reportMutation.isError && (
-          <p role="alert" className="moderation-error">
+          <Notice as="p" role="alert" className="moderation-error">
             Não foi possível atualizar a denúncia. Informe uma justificativa
             válida e tente novamente.
-          </p>
+          </Notice>
         )}
-      </div>
+      </Surface>
       <CommentModeration
         key={commentNavigation.revision}
         initialSearch={commentNavigation.id}

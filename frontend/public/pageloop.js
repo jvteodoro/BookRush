@@ -91,7 +91,6 @@
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     type: '<path d="M4 6V4h16v2M12 4v16M8 20h8"/>',
     arrow: '<path d="m5 12 14 0M13 6l6 6-6 6"/>',
-    menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
     bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',
   };
 
@@ -157,20 +156,10 @@
   function shell(content, title = "BookRush") {
     const app = document.getElementById("app");
     app.innerHTML = `<div class="app-shell">
-      <aside class="sidebar">
-        <div class="logo"><span class="brand-badge">B</span><span class="logo-text">BookRush</span></div>
-        <nav class="nav-list">${NAV.map(([r, i, l]) => `<button class="nav-item ${state.route === r ? "active" : ""}" data-route="${r}"><span class="nav-icon-wrap">${icon(i)}</span><span class="nav-label">${l}</span></button>`).join("")}
-          <button class="nav-item admin-link ${state.route === "admin" ? "active" : ""}" data-route="admin">${icon("admin")}<span class="nav-label">Administração</span></button>
-          <button class="nav-item publisher-link ${state.route === "publisher" ? "active" : ""}" data-route="publisher">${icon("upload")}<span class="nav-label">Publicador</span></button>
-        </nav>
-        <div class="sidebar-spacer"></div>
-        <button class="nav-item" data-switch-mode>${icon("menu")}<span class="nav-label">Versão mobile</span></button>
-        <div class="profile-mini"><div class="avatar">JV</div><div><strong>João Victor</strong><span>@joaovictor</span></div></div>
-      </aside>
+      <div id="bookrush-sidebar-slot" data-active-route="${state.route}"></div>
       <section class="main-area">
         <header class="topbar"><div class="topbar-title">${title}</div><div class="topbar-actions"><button class="icon-btn" data-action="notify" aria-label="Notificações">${icon("bell")}</button><button class="icon-btn" data-route="profile" aria-label="Perfil">${icon("user")}</button></div></header>
         ${content}
-        ${mobileNav()}
       </section>
       <div class="toast-stack"></div>
     </div>
@@ -183,18 +172,6 @@
       window.dispatchEvent(
         new CustomEvent("bookrush:legacy-search", { detail: state.search }),
       );
-    updateModeSwitcher();
-  }
-
-  function mobileNav() {
-    const items = [
-      ["feed", "home", "Início"],
-      ["recommendations", "sparkle", "Descobrir"],
-      ["search", "search", "Buscar"],
-      ["library", "library", "Biblioteca"],
-      ["profile", "user", "Perfil"],
-    ];
-    return `<nav class="mobile-nav">${items.map(([r, i, l]) => `<button data-route="${r}" class="${state.route === r ? "active" : ""}">${icon(i)}<span>${l}</span></button>`).join("")}</nav>`;
   }
 
   function bindCommon() {
@@ -210,41 +187,15 @@
           toast("Você está em dia. Nenhuma notificação nova."),
         ),
       );
-    document
-      .querySelectorAll("[data-switch-mode]")
-      .forEach((el) => el.addEventListener("click", () => setMode("app")));
   }
-  function setMode(next) {
-    document.body.dataset.mode = next;
-    const url = new URL(window.location.href);
-    if (next === "app") url.searchParams.set("mode", "app");
-    else url.searchParams.delete("mode");
-    window.history.replaceState(window.history.state, "", url);
+  window.addEventListener("bookrush:navigate", (event) => {
     if (
-      next === "app" &&
-      (state.route === "admin" || state.route === "publisher")
+      [...NAV.map((item) => item[0]), "admin", "publisher"].includes(
+        event.detail,
+      )
     )
-      state.route = "feed";
-    render();
-  }
-  function updateModeSwitcher() {
-    let el = document.querySelector(".prototype-switcher");
-    if (state.route === "reader") {
-      el?.remove();
-      return;
-    }
-    if (!el) {
-      el = document.createElement("div");
-      el.className = "prototype-switcher";
-      el.innerHTML = '<button type="button" class="prototype-pill"></button>';
-      el.firstChild.addEventListener("click", () =>
-        setMode(getMode() === "app" ? "web" : "app"),
-      );
-      document.body.appendChild(el);
-    }
-    el.firstChild.textContent =
-      getMode() === "app" ? "BookRush Web" : "BookRush Mobile";
-  }
+      go(event.detail);
+  });
   function go(route) {
     if (window.location.pathname.startsWith("/usuarios/"))
       window.history.pushState({ route }, "", "/");
@@ -520,7 +471,7 @@
   window.addEventListener("resize", scheduleFeedQuoteFit, { passive: true });
 
   function bookCard(b) {
-    return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank ? `posição ${b.rank}` : "disponível"}</span></div></article>`;
+    return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}${b.publicationYear != null ? ` · ${esc(b.publicationYear)}` : ""}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank ? `posição ${b.rank}` : "disponível"}</span></div></article>`;
   }
 
   function renderRecommendations() {
@@ -600,7 +551,15 @@
           const book = {
             id: i.id,
             title: i.canonicalTitle,
-            author: "Catálogo BookRush",
+            author:
+              [
+                ...new Set(
+                  (i.authors || []).map((name) => name.trim()).filter(Boolean),
+                ),
+              ].join(" · ") || "Autor não informado",
+            publicationYear: Number.isInteger(i.firstPublicationYear)
+              ? i.firstPublicationYear
+              : Number.isInteger(i.publicationYear) ? i.publicationYear : null,
             genre:
               [
                 ...new Set(
@@ -635,8 +594,9 @@
 
   function openLuckyPrompt() {
     modal(
-      `<div class="eyebrow">ESTOU COM SORTE</div><h2>Quer dar uma dica?</h2><p>Digite uma palavra (ex.: <em>campo</em>, <em>amor</em>, <em>Machado</em>) e eu sorteio um livro relacionado. Deixe em branco para uma surpresa total.</p><input id="luckyTerm" class="lucky-input" maxlength="60" placeholder="Uma palavra, título ou autor…" autocomplete="off" autofocus/>`,
-      `<button class="secondary-btn" data-close-modal>Cancelar</button><button class="primary-btn" id="luckyGo">${icon("sparkle", "icon-sm")} Sortear</button>`,
+      `<div class="eyebrow">ESTOU COM SORTE</div><h2>Quer dar uma dica?</h2><p>Digite uma palavra (ex.: <em>campo</em>, <em>amor</em>, <em>Machado</em>) e eu sorteio um livro relacionado. Deixe em branco para uma surpresa total.</p><input id="luckyTerm" class="lucky-input" aria-label="Uma palavra, título ou autor" maxlength="60" placeholder="Uma palavra, título ou autor…" autocomplete="off" autofocus/>`,
+      `<button class="br-button br-button--ghost br-button--sm" data-close-modal>Cancelar</button><button class="br-button br-button--primary br-button--sm" id="luckyGo">${icon("sparkle", "icon-sm")} Sortear</button>`,
+      "lucky-modal",
     );
     const input = document.getElementById("luckyTerm");
     const go = () => pickLucky(input.value.trim());
@@ -674,8 +634,9 @@
 
   function openLucky(b, term = "", note = "") {
     modal(
-      `<div class="eyebrow">ESTOU COM SORTE${term && !note ? ` · “${esc(term)}”` : ""}</div><h2>${esc(b.title)}</h2>${note ? `<p class="notice">${esc(note)}</p>` : ""}<p>${esc(b.quote)}</p><div style="display:flex;gap:10px;align-items:center;margin-top:18px"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"></div><div><strong>${esc(b.author)}</strong><div class="muted tiny">${esc(b.genre)}${b.pages ? ` • ${b.pages} páginas` : ""}</div></div></div>`,
-      `<button class="ghost-btn" data-lucky-change>Mudar palavra</button><button class="secondary-btn" data-lucky-again>Outra vez</button><button class="primary-btn" data-modal-open="${b.id}">Ler este livro ${icon("arrow", "icon-sm")}</button>`,
+      `<div class="eyebrow">ESTOU COM SORTE${term && !note ? ` · “${esc(term)}”` : ""}</div><h2>${esc(b.title)}</h2>${note ? `<p class="notice">${esc(note)}</p>` : ""}<p>${esc(b.quote)}</p><div class="lucky-result"><div class="result-cover" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"></div><div class="lucky-result-meta"><strong>${esc(b.author)}</strong><div class="lucky-result-details">${esc(b.genre)}${b.publicationYear != null ? ` • ${esc(b.publicationYear)}` : ""}${b.pages ? ` • ${b.pages} páginas` : ""}</div></div></div>`,
+      `<button class="br-button br-button--ghost br-button--sm" data-lucky-change>Mudar palavra</button><button class="br-button br-button--secondary br-button--sm" data-lucky-again>Outra vez</button><button class="br-button br-button--primary br-button--sm" data-modal-open="${b.id}">Ler este livro ${icon("arrow", "icon-sm")}</button>`,
+      "lucky-modal",
     );
     document.querySelector("[data-lucky-again]").onclick = () => {
       document.querySelector(".modal-wrap")?.remove();
@@ -766,12 +727,14 @@
     });
   }
 
-  async function openBook(id, fromRecommendation = false) {
+  async function openBook(id, fromRecommendation, direct = false) {
     const item = book(id);
     const recommendationOrigin =
       fromRecommendation ||
-      (state.route === "feed" && Boolean(item?.recommendationItemId));
-    if (item?.excerpt)
+      (!direct &&
+        state.route === "feed" &&
+        Boolean(item?.recommendationItemId));
+    if (!direct && item?.excerpt)
       window.__BOOKRUSH_API__?.trackExcerpt?.(
         "BOOK_OPEN_FROM_EXCERPT",
         id,
@@ -780,7 +743,7 @@
     state.readerBook = id;
     state.route = "reader";
     try {
-      await window.__BOOKRUSH_API__?.viewable?.(id);
+      if (!direct) await window.__BOOKRUSH_API__?.viewable?.(id);
       if (recommendationOrigin) await window.__BOOKRUSH_API__?.open?.(id, true);
       window.__BOOKRUSH_CHAPTERS__ =
         (await window.__BOOKRUSH_API__?.chapters?.(id)) || [];
@@ -929,7 +892,7 @@
           : (state.recent || []).map(book);
     const content = `<main class="content"><div class="page-heading"><div><div class="eyebrow">SUA ESTANTE</div><h1>Minha biblioteca</h1><p>Livros salvos, leituras em andamento e itens abertos recentemente.</p></div></div>
       <div class="tab-row">${tabs.map(([id, l]) => `<button class="tab-btn ${state.libraryTab === id ? "active" : ""}" data-tab="${id}">${l}</button>`).join("")}</div>
-      <div class="library-grid">${list.map((b) => `<article class="library-item" data-open-book="${b.id}" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"><div class="library-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="library-progress"><span style="width:${b.progress || 12}%"></span></div><span class="library-percent">${b.progress || 12}% lido</span></div></article>`).join("") || `<div class="panel-card"><h3>Nada aqui ainda</h3><p class="muted">Salve livros no feed para vê-los nesta seção.</p></div>`}</div>
+      <div class="library-grid">${list.map((b) => `<article class="library-item" data-open-book="${b.id}" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}"><div class="library-cover"></div><div><h3>${esc(b.title)}</h3><p>${esc(b.author)}${b.publicationYear != null ? ` · ${esc(b.publicationYear)}` : ""}</p><div class="library-progress"><span style="width:${b.progress || 12}%"></span></div><span class="library-percent">${b.progress || 12}% lido</span></div></article>`).join("") || `<div class="panel-card"><h3>Nada aqui ainda</h3><p class="muted">Salve livros no feed para vê-los nesta seção.</p></div>`}</div>
       <div class="section-row"><h2>Retomar rapidamente</h2></div><div class="book-grid">${BOOKS.filter(
         (b) => b.progress > 20,
       )
@@ -1381,11 +1344,11 @@
     );
   }
 
-  function modal(body, actions = "") {
+  function modal(body, actions = "", modalClass = "") {
     document.querySelector(".modal-wrap")?.remove();
     const wrap = document.createElement("div");
     wrap.className = "modal-wrap";
-    wrap.innerHTML = `<section class="modal">${body}<div class="modal-actions">${actions || '<button class="primary-btn" data-close-modal>Fechar</button>'}</div></section>`;
+    wrap.innerHTML = `<section class="modal ${modalClass}">${body}<div class="modal-actions">${actions || '<button class="primary-btn" data-close-modal>Fechar</button>'}</div></section>`;
     document.body.appendChild(wrap);
     wrap.addEventListener("click", (e) => {
       if (e.target === wrap) wrap.remove();
@@ -1469,26 +1432,90 @@
   }
 
   function openShare(id) {
-    const label = id === "profile" ? "este perfil" : `“${book(id).title}”`;
-    modal(
-      `<div class="eyebrow">COMPARTILHAR</div><h2>Envie ${label}</h2><p>Escolha uma opção para compartilhar.</p><div class="share-grid"><button class="share-choice" data-share-choice><strong>↗</strong>Copiar link</button><button class="share-choice" data-share-choice><strong>•••</strong>Mais</button></div>`,
-      `<button class="secondary-btn" data-close-modal>Cancelar</button>`,
-    );
-    document.querySelectorAll("[data-share-choice]").forEach(
-      (b) =>
-        (b.onclick = async () => {
+    document.querySelector(".br-share-dialog")?.close();
+    const trigger = document.activeElement;
+    const profile = window.__BOOKRUSH_PROFILE__ || {};
+    const isProfile = id === "profile";
+    const title = isProfile
+      ? profile.display_name || profile.displayName || "Perfil BookRush"
+      : book(id).title;
+    const subject = profile.subject_key || profile.subject;
+    const url = `${window.location.origin}${isProfile && subject ? `/usuarios/${encodeURIComponent(subject)}` : `/book/${encodeURIComponent(id)}`}`;
+    const dialog = document.createElement("dialog");
+    dialog.className = "br-share-dialog";
+    dialog.setAttribute("aria-labelledby", "br-share-title");
+    dialog.setAttribute("aria-describedby", "br-share-description");
+    dialog.innerHTML = `
+      <header class="br-share-dialog__header">
+        <span class="br-share-dialog__symbol">${icon("share")}</span>
+        <button type="button" class="br-button br-button--ghost br-button--sm br-share-dialog__close" aria-label="Fechar compartilhamento">${icon("close")}</button>
+      </header>
+      <span class="br-share-dialog__eyebrow">BOAS HISTÓRIAS MERECEM COMPANHIA</span>
+      <h2 id="br-share-title">Compartilhar ${isProfile ? "perfil" : "livro"}</h2>
+      <p id="br-share-description">${isProfile ? "Convide alguém para conhecer este perfil." : "Envie sua próxima descoberta para alguém."}</p>
+      <div class="br-share-dialog__preview">${icon(isProfile ? "user" : "library")}<div><small>${isProfile ? "PERFIL" : "LIVRO"}</small><strong>${esc(title)}</strong></div></div>
+      <label class="br-share-dialog__label" for="br-share-url">Link para compartilhar</label>
+      <div class="br-share-dialog__link">
+        <input id="br-share-url" type="text" readonly value="${esc(url)}" spellcheck="false" />
+        <button type="button" class="br-button br-button--primary br-button--md" data-copy-share>Copiar link</button>
+      </div>
+      <p class="br-share-dialog__status" role="status" aria-live="polite"></p>
+      <footer class="br-share-dialog__footer"><button type="button" class="br-button br-button--ghost br-button--sm" data-close-share>Fechar</button></footer>`;
+    document.body.appendChild(dialog);
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      if (trigger instanceof HTMLElement && trigger.isConnected)
+        trigger.focus();
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target !== dialog) return;
+      const bounds = dialog.getBoundingClientRect();
+      if (
+        event.clientX < bounds.left ||
+        event.clientX > bounds.right ||
+        event.clientY < bounds.top ||
+        event.clientY > bounds.bottom
+      )
+        dialog.close();
+    });
+    dialog
+      .querySelectorAll(".br-share-dialog__close, [data-close-share]")
+      .forEach((button) => {
+        button.onclick = () => dialog.close();
+      });
+    const input = dialog.querySelector("input");
+    input.onfocus = () => input.select();
+    const copy = dialog.querySelector("[data-copy-share]");
+    const status = dialog.querySelector("[role=status]");
+    copy.onclick = async () => {
+      if (copy.disabled) return;
+      copy.disabled = true;
+      status.textContent = "";
+      try {
+        if (!navigator.clipboard?.writeText)
+          throw new Error("Selecione e copie o link acima para compartilhar.");
+        await navigator.clipboard.writeText(url);
+        copy.textContent = "Copiado!";
+        status.textContent = "Link copiado. Agora é só enviar!";
+        if (!isProfile) {
           try {
             await window.__BOOKRUSH_API__?.share?.(id);
-            await navigator.clipboard?.writeText(
-              `${window.location.origin}/book/${id}`,
-            );
-            toast("Compartilhamento registrado");
-          } catch (e) {
-            toast(e.message || "Não foi possível compartilhar");
+          } catch {
+            status.textContent =
+              "Link copiado. Não foi possível registrar o compartilhamento agora.";
           }
-          document.querySelector(".modal-wrap")?.remove();
-        }),
-    );
+        }
+      } catch (error) {
+        copy.textContent = "Copiar link";
+        status.textContent =
+          error.message ||
+          "Não foi possível copiar. Selecione e copie o link acima.";
+        input.focus();
+      } finally {
+        copy.disabled = false;
+      }
+    };
+    dialog.showModal();
   }
 
   window.addEventListener("keydown", (e) => {
@@ -1506,22 +1533,17 @@
   window.__BOOKRUSH_LEGACY__ = {
     navigate: (route, query = "") => {
       if (
-        ![
-          ...NAV.map((item) => item[0]),
-          "admin",
-          "publisher",
-          "prototype",
-        ].includes(route)
+        ![...NAV.map((item) => item[0]), "admin", "publisher"].includes(route)
       )
         return;
       syncReactFeed();
       if (route === "search") state.search = query;
-      go(route === "prototype" ? "feed" : route);
+      go(route);
     },
-    openBook: async (id, query, fromRecommendation = false) => {
+    openBook: async (id, query, fromRecommendation, direct = false) => {
       if (typeof query === "string") state.search = query;
       syncReactFeed();
-      await openBook(id, fromRecommendation);
+      await openBook(id, fromRecommendation, direct);
     },
     openComments,
     openShare,

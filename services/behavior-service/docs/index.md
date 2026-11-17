@@ -6,6 +6,15 @@ maintenance job rebuilds derived aggregates and retention only. Set
 delivery; failed deliveries remain pending and increment `attempts` with an
 error, rather than being marked as published.
 
+O job executa agregação e retenção na mesma transação. Seu cutoff UTC usa
+`OffsetDateTime`, compatível com `timestamptz` no PostgreSQL; não passe `Instant`
+diretamente como parâmetro JDBC, pois uma falha de retenção reverte os totais.
+Nos agregados diários usados pelo publicador, `likes` conta apenas `BOOK_LIKE`,
+sem aumentar quando há `BOOK_UNLIKE`; não é um saldo de curtidas ativas.
+Execute `BehaviorMaintenancePostgresIT` com `TEST_DATABASE_URL` em uma base
+descartável para validar o job completo, o commit dos totais, a retenção e a
+reexecução idempotente. Consulte [as evidências e o fluxo de estatísticas](../../../docs/productization/publisher-book-statistics.md).
+
 Append-only behavioral events and aggregates. Este serviço é um bounded context independente; contratos e ownership estão no ADR 0034.
 
 Migrations V2/V3 store idempotent append-only events and rebuildable daily book aggregates.
@@ -130,14 +139,13 @@ Eventos aceitos entram na outbox e são enviados pelo dispatcher para
 entre os serviços usa `BEHAVIOR_OUTBOX_SINK_TOKEN`, mantido somente no `.env`
 protegido. A linha só recebe `published_at` depois de uma resposta 2xx.
 
-## Métricas de publisher
+## Métricas de publicações
 
 `GET /api/internal/v1/publisher/metrics/books/{bookId}?days=N` é uma rota
 somente S2S, autorizada pelo audience `bookrush-behavior` e scope dedicado
-`bookrush.publisher.metrics.read`. O serviço retorna métricas diárias e comparação entre
-os últimos 30 dias e os 30 dias anteriores. Métricas diárias são suprimidas
-abaixo de cinco leitores distintos com leitura; a comparação inteira é
-suprimida se qualquer período estiver abaixo do mesmo limiar. A resposta nunca
-inclui identidade de leitores. O cliente `bookrush-publisher-behavior-s2s` é
-separado do cliente de recommendation, usa somente esse scope e mantém o segredo
-no ambiente protegido.
+`bookrush.publisher.metrics.read`. O período aceita 1–365 dias e lê agregados
+diários de impressões, aberturas, leituras, curtidas, compartilhamentos e
+comentários da projeção `behavior.daily_book`, atualizada pelo job de
+manutenção. O publisher-service valida a propriedade da publicação antes de
+chamar a rota. A resposta não inclui identidades de leitores. O segredo da
+identidade S2S permanece no ambiente protegido.

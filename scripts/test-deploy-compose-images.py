@@ -189,5 +189,64 @@ class ClientTokenTest(unittest.TestCase):
                 self.assertEqual(output, '')
                 self.assertTrue(errors)
 
+class GatewayRoutesTest(unittest.TestCase):
+    def test_library_probe_rejects_cors_and_dependency_failures_without_mutating_books(self):
+        with tempfile.TemporaryDirectory(prefix='bookrush-library-probe-') as directory:
+            folder = Path(directory)
+            docker = folder / 'docker'
+            docker.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nprintf "%s" "$HTTP_STATUS"\n')
+            docker.chmod(0o755)
+            sleep = folder / 'sleep'
+            sleep.write_text('#!/bin/bash\nexit 0\n')
+            sleep.chmod(0o755)
+            for status, expected_status, requests in [('200', 0, 3), ('403', 1, 1), ('502', 1, 12)]:
+                with self.subTest(status=status):
+                    log = folder / ('calls-' + status)
+                    env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}',
+                               CALL_LOG=str(log), HTTP_STATUS=status)
+                    result = subprocess.run(['bash', str(ROOT / 'infrastructure/jenkins/probe-reader-library.sh'),
+                                             'fixture-network'], env=env, text=True, capture_output=True)
+                    self.assertEqual(result.returncode, expected_status, result.stderr)
+                    calls = log.read_text().splitlines()
+                    self.assertEqual(len(calls), requests)
+                    self.assertTrue(all('-X OPTIONS ' in call for call in calls))
+                    if status == '200':
+                        for method in ('GET', 'PUT', 'DELETE'):
+                            self.assertTrue(any('Access-Control-Request-Method: ' + method in call for call in calls))
+
+    def test_gateway_file_must_match_the_selected_revision(self):
+        function = SCRIPT.read_text().split('verify_gateway_routes() {', 1)[1].split('\n}\n', 1)[0]
+        with tempfile.TemporaryDirectory(prefix='bookrush-gateway-contract-') as directory:
+            folder = Path(directory)
+            docker = folder / 'docker'
+            docker.write_text('#!/bin/bash\nprintf "%s" "$ACTUAL_ROUTES"\n')
+            docker.chmod(0o755)
+            for actual, expected_status in [('selected revision', 0), ('stale host routes', 1)]:
+                with self.subTest(actual=actual):
+                    env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}',
+                               ACTUAL_ROUTES=actual, BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG='selected revision')
+                    result = subprocess.run(['bash', '-c', 'verify_gateway_routes() {' + function + '\n}\nverify_gateway_routes'],
+                                            env=env, text=True, capture_output=True)
+                    self.assertEqual(result.returncode, expected_status, result.stderr)
+
+    def test_rollback_restores_previous_routes_before_recreating_services(self):
+        function = SCRIPT.read_text().split('rollback() {', 1)[1].split('\n}\n', 1)[0]
+        with tempfile.TemporaryDirectory(prefix='bookrush-gateway-rollback-') as directory:
+            folder = Path(directory)
+            compose = folder / 'compose'
+            compose.write_text('#!/bin/bash\nprintf "%s" "$BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG" > "$OUTPUT_ROUTES"\n')
+            compose.chmod(0o755)
+            old_routes = 'http:\n  routers:\n    previous: {}'
+            env = dict(os.environ, BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG='new routes',
+                       old_gateway_config=old_routes, TEST_COMPOSE=str(compose), OUTPUT_ROUTES=str(folder / 'routes'))
+            for service in ('backend', 'frontend', 'ingestion', 'analytics', 'analytics_runtime', 'behavior',
+                            'recommendation', 'reader_bff', 'reader_state', 'reader_profile', 'social', 'admin_service', 'admin_web'):
+                env['old_' + service] = 'fixture/' + service + ':previous'
+            result = subprocess.run(['bash', '-c', 'compose=("$TEST_COMPOSE"); compose_services=(reverse-proxy frontend);\n'
+                                     + 'rollback() {' + function + '\n}\nrollback'], env=env, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((folder / 'routes').read_text(), old_routes)
+
+
 if __name__ == '__main__':
     unittest.main()

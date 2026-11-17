@@ -1,3 +1,6 @@
+import { Surface } from "@bookrush/ui/Surface";
+import { PageHeader } from "@bookrush/ui/PageHeader";
+import { Button } from "../../components/ui/Button";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -53,12 +56,16 @@ export function AnalyticsItemPage() {
     refetchInterval: 3000,
   });
   if (detail.isLoading)
-    return <section className="panel">Carregando detalhe do item…</section>;
+    return (
+      <Surface as="section" className="panel">
+        Carregando detalhe do item…
+      </Surface>
+    );
   if (detail.isError || !detail.data)
     return (
-      <section className="panel import-error">
+      <Surface as="section" className="panel import-error">
         Não foi possível consultar o item.
-      </section>
+      </Surface>
     );
   const { item, phases, statistics, remainingPhases } = detail.data;
   const phasesByAttempt = phases.reduce<Map<number, typeof phases>>(
@@ -90,7 +97,7 @@ export function AnalyticsItemPage() {
         </Link>
         <span>/ item {itemId.slice(0, 8)}</span>
       </div>
-      <header className="pagehead analytics-pagehead">
+      <PageHeader className="analytics-pagehead">
         <div>
           <span className="eyebrow">ITEM TRACE</span>
           <h1>{item.book_title ?? "Livro sem título"}</h1>
@@ -103,7 +110,7 @@ export function AnalyticsItemPage() {
             {item.job_id ?? jobId}
           </small>
         </div>
-      </header>
+      </PageHeader>
       <div className="analytics-summary-strip">
         <b>{statistics.excerpts ?? 0}</b>
         <span>excerpts</span>
@@ -115,7 +122,7 @@ export function AnalyticsItemPage() {
         <span>Atualização: {formatDate(item.progress_updated_at)}</span>
       </div>
       <div className="detail-grid">
-        <div className="panel compact-panel">
+        <Surface as="div" className="panel compact-panel">
           <div className="panelhead">
             <div>
               <h2>Fases</h2>
@@ -134,7 +141,8 @@ export function AnalyticsItemPage() {
                 (phase) => phase.status === "FAILED",
               );
               return (
-                <button
+                <Button
+                  variant="ghost"
                   className={`phase-tab ${
                     activeAttempt === attempt ? "active" : ""
                   }`}
@@ -149,7 +157,7 @@ export function AnalyticsItemPage() {
                     {attempt === item.attempt_count ? "atual" : "histórico"}
                     {failed ? " · falhou" : ""}
                   </small>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -171,8 +179,8 @@ export function AnalyticsItemPage() {
               <p className="muted">Nenhuma fase registrada.</p>
             )}
           </div>
-        </div>
-        <div className="panel compact-panel">
+        </Surface>
+        <Surface as="div" className="panel compact-panel">
           <h2>A fazer</h2>
           <div className="remaining-list">
             {remainingPhases.map((phase) => (
@@ -191,7 +199,7 @@ export function AnalyticsItemPage() {
               {item.error_code}: {item.error_message}
             </p>
           )}
-        </div>
+        </Surface>
       </div>
     </section>
   );
@@ -228,7 +236,8 @@ function PhaseEntry({
 
   return (
     <div className={`phase-entry ${expanded ? "expanded" : ""}`}>
-      <button
+      <Button
+        variant="ghost"
         className="phase-row"
         onClick={onToggle}
         type="button"
@@ -244,7 +253,7 @@ function PhaseEntry({
         </div>
         <b>{formatDuration(phase.duration_ms)}</b>
         <span className="phase-expand">{expanded ? "−" : "+"}</span>
-      </button>
+      </Button>
       {expanded && (
         <div className="phase-details">
           {progress && (

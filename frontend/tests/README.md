@@ -32,3 +32,6 @@ interromper o feed. Para diagnosticar o endpoint público e o proxy S3, consulte
 - `user-search.test.mjs`: busca autenticada de pessoas, query literal e
   paginação, erros de sessão/permissão, abertura do perfil, estados vazios/retry
   e cancelamento de resultados antigos.
+
+- `shared-book.test.mjs`: reconhecimento de links de livros, resolução por ID,
+  falhas de HTTP, IDs inválidos e cancelamento sem fallback para outro livro.

@@ -1,4 +1,6 @@
-import { categoryLabel, type BookCategory } from "./bookCategories";
+import { bookMetadata } from "./bookMetadata";
+import { categoryLabel } from "./bookCategories";
+import type { CatalogBook } from "../app/types";
 import { authClient } from "../auth";
 import type { ReaderBook } from "../components/book/BookCard";
 
@@ -22,6 +24,7 @@ const ids = (rows: Row[]) => [
 export async function loadLibrary(
   signal?: AbortSignal,
   fetcher: Fetcher = authClient.fetch.bind(authClient),
+  catalogFetcher: Fetcher = fetch,
 ): Promise<LibraryData> {
   const savedResponse = await fetcher(apiRoutes.reader.library(), { signal });
   if (!savedResponse.ok)
@@ -52,28 +55,15 @@ export async function loadLibrary(
         const index = cursor++;
         const id = allIds[index];
         try {
-          // The catalog route belongs to the platform realm. Resolve metadata
-          // through the authenticated reader BFF, which forwards the product
-          // bearer to book-content-service and keeps the browser in one realm.
-          const response = await fetcher(apiRoutes.reader.book(id), {
+          // Public bibliographic metadata is independent of published reading
+          // content. Resolve the exact ID, as search/shared details do, without
+          // forwarding the product bearer to the catalog's platform realm.
+          const response = await catalogFetcher(apiRoutes.catalog.book(id), {
+            credentials: "same-origin",
             signal,
           });
           if (!response.ok) throw new Error();
-          const payload = (await response.json()) as {
-            book?: {
-              canonicalTitle?: string;
-              originalLanguage?: string;
-              categories?: BookCategory[];
-              description?: string;
-              thumbnailUrl?: string;
-            };
-            canonicalTitle: string;
-            originalLanguage?: string;
-            categories?: BookCategory[];
-            description?: string;
-            thumbnailUrl?: string;
-          };
-          const book = payload.book ?? payload;
+          const book = (await response.json()) as CatalogBook;
           if (!book.canonicalTitle) throw new Error();
           let progress = 0;
           try {
@@ -94,12 +84,12 @@ export async function loadLibrary(
           books[index] = {
             id,
             title: book.canonicalTitle,
-            author: "Catálogo BookRush",
+            ...bookMetadata(book),
             genre: categoryLabel(book.categories),
             categories: book.categories ?? [],
             language: book.originalLanguage,
             description: book.description ?? "",
-            coverUrl: book.thumbnailUrl,
+            coverUrl: book.thumbnailUrl ?? undefined,
             minutes: 0,
             progress,
             available: true,

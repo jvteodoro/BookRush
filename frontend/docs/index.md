@@ -10,6 +10,44 @@ privacidade, planta, administração e publicador.
 
 ## Capacidades atuais
 
+### Detalhes dos livros e ajustes de navegação
+
+`reader/BookDetailsDrawer.tsx` apresenta um modal central e responsivo com
+capa autenticada, descrição do catálogo, categorias, idioma, progresso e
+avaliações reais. Permite começar/continuar a leitura, salvar na biblioteca
+e acessar os comentários. A descrição pode estar ausente ou conter metadados
+legados da ingestão; esta mudança não importa nem traduz sinopses.
+
+No Para você, **Ver livro** abre o modal; **Ler agora** abre o leitor diretamente,
+sem seta e com espaçamento entre as ações. Na Biblioteca e em Recomendações,
+o clique no livro abre os detalhes, sem botão adicional. No Buscar, a faixa
+do resultado abre o modal por clique ou teclado, com hover discreto e respeito
+a movimento reduzido. Salvar e Ler agora mantêm ações independentes.
+
+Os resultados de pessoas usam `br-person-result`: nome e @usuário quebram
+textos longos dentro do card; em telas pequenas, Ver perfil fica abaixo da
+identidade. O popup Compartilhar em `public/pageloop.js` usa diálogo nativo,
+tokens e botões do design system nos dois temas, campo de link selecionável,
+confirmação de cópia e mensagens de falha. Escape, botão e clique no fundo
+fecham o diálogo e restauram o foco. A cópia de livros mantém o registro no
+social-service; perfis usam o caminho `/usuarios/<subject>`.
+
+Validação local: build e 68 testes do frontend passaram. A conferência em
+Chrome cobriu os cliques independentes, teclado e layouts de 320/390 px,
+incluindo nomes longos e falhas de clipboard/registro do compartilhamento.
+`admin-web/tests/book-details.e2e.mjs` verifica o modal com dados simulados;
+`frontend/tests/fixtures/book-details.html` permite revisar o visual no Vite.
+Estas evidências não representam deploy nem smoke autenticado em produção.
+O teste de navegador importa `URL` explicitamente de `node:url`, conforme o
+lint do admin, que também é executado no build da imagem usada pelo E2E.
+O mock HTTP dos testes de moderação reconhece separadores Windows e Linux;
+formatação, lint, testes, cobertura e build do admin foram verificados localmente.
+
+Antes de publicar mudanças do frontend, execute o change gate com documentação
+incluída: `bash scripts/validate-change.sh --staged` e, após o commit,
+`bash scripts/validate-change.sh --ci`. Jenkins compara a branch com
+`origin/main` quando disponível; documentação somente local não entra no gate.
+
 Comentários usam `reader/CommentsDrawer.tsx` e o componente reutilizável
 `components/ui/Drawer.tsx`, um diálogo modal com foco contido, fechamento por
 Escape, botão ou clique no fundo e restauração de foco pelo navegador. O painel
@@ -61,8 +99,12 @@ A Biblioteca (`reader/LibraryPage.tsx`) consulta a estante e os recentes reais,
 resolve os metadados pelo ID de cada livro e busca progresso no reader-state.
 
 A tela Minha planta consulta `GET /api/v1/reader/plant` no reader-state-service.
-Ela exibe o estágio e os minutos acumulados da projeção versionada
-`reading-minutes-v1`; não usa métricas demonstrativas locais.
+Ela exibe o estágio, a sequência e o tempo acumulado no dia da projeção
+`daily-reading-v2`, sem limitar a exibição à meta de 15 minutos. O tempo usa
+minutos completos e, a partir de uma hora, horas e minutos (por exemplo,
+`1h15min`). O dia segue o fuso America/Sao_Paulo; o histórico continua sendo
+usado para calcular o crescimento da planta. A tela não exibe o total histórico
+de leitura nem a quantidade de livros salvos.
 Metadados do catálogo usam GET público sem Bearer, pois o catálogo valida o
 realm de plataforma; biblioteca, recentes e progresso usam o token do leitor.
 Ela não limita a estante aos livros do feed.
@@ -287,13 +329,21 @@ inicie uma nova tentativa a partir de `/`, sem recarregar a URL antiga de
 
 O shell visual é `frontend/public/pageloop.js` e seu CSS de referência.
 `frontend/src/main.tsx` faz a ponte autenticada: injeta os livros retornados
-por `GET /api/v1/books` no contexto administrativo, carrega a biblioteca em
-`/api/v1/reader/library` e resolve os metadados dos livros salvos por
-`GET /api/v1/reader/books/{bookId}` através do BFF autenticado. O cliente
-fornece as
+por `GET /api/v1/books` e carrega a biblioteca em `/api/v1/reader/library`.
+A biblioteca resolve os metadados públicos de cada livro salvo por
+`GET /api/v1/books/{bookId}`, a mesma consulta dos links de detalhes, sem enviar
+bearer de produto ao catálogo. Isso inclui livros fora dos primeiros 100
+resultados e livros em revisão visíveis na busca, independentemente da
+disponibilidade do conteúdo para leitura. Estante, recentes e progresso
+continuam usando o BFF autenticado. Livros removidos retornam indisponível,
+preservando o ID salvo para permitir sua remoção da estante. O cliente fornece as
 ações de salvar/abrir para o shell. O cliente não usa livros fictícios como
 fallback e não usa `localStorage` como fonte de dados; estado transitório da
 interface permanece em memória e dados de produto ficam no backend.
+Salvar e remover usam `PUT` e `DELETE /api/v1/reader/library/{bookId}` pelo
+mesmo BFF da consulta. Após salvar no feed, busca ou detalhes, a aba **Salvos**
+deve mostrar o livro mesmo após recarregar a página e mesmo fora do feed atual.
+O salvamento pertence ao usuário autenticado e não marca o livro como visto.
 As áreas administrativas e de publicação não são consultadas durante o
 bootstrap do leitor: elas pertencem ao realm `bookrush-platform` e devem ser
 abertas pela console `admin-web`, que obtém o token administrativo correto.
@@ -403,3 +453,13 @@ mensagem com retry, sem bloquear a leitura ou fingir que o servidor confirmou
 uma marca. Navegação durante um carregamento ignora a conclusão obsoleta.
 
 Cards de livros usam linhas de altura automática para título, autor, categorias, selo Visto e progresso. Categorias longas são limitadas a duas linhas no card, com texto completo no painel de informações. Valores MIME, tipo RDF Text e códigos legados Gutenberg não são apresentados como categorias; o prefixo técnico Category: das prateleiras é removido somente da legenda.
+
+## Links compartilhados de livros
+
+`/book/{id}` mantém o destino durante o login e abre os detalhes após consultar
+`GET /api/v1/books/{id}`. O livro não precisa constar das recomendações ou da
+biblioteca. Links inválidos, livros ausentes e falhas de rede exibem mensagens
+com opção de retornar ao feed; falhas transitórias podem ser tentadas novamente.
+O histórico e a recarga preservam a rota. Para validar a integração, execute os
+testes do frontend e teste uma nova aba, login, recarga, Voltar e leitura de um
+livro fora do feed no ambiente implantado.

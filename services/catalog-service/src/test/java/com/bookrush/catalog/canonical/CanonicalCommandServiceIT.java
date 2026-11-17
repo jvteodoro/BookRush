@@ -15,6 +15,7 @@ class CanonicalCommandServiceIT {
   @Autowired CanonicalCommandService service;
   @Autowired JdbcTemplate jdbc;
   @Autowired ObjectMapper mapper;
+  @Autowired com.bookrush.catalog.book.BookQueryController books;
 
   @Test
   void replayIsNoOpAndProvenanceKeepsPreviousValue() {
@@ -33,12 +34,15 @@ class CanonicalCommandServiceIT {
             "First description",
             metadata,
             null,
-            null,
+            1899,
             "Fixture Author",
             "AUTHOR");
 
     var created = service.apply(command);
     assertEquals("CREATED", created.get("result"));
+    var view = books.get((UUID) created.get("bookId")).getBody();
+    assertEquals((short) 1899, view.publicationYear());
+    org.junit.jupiter.api.Assertions.assertNull(view.firstPublicationYear());
     var firstCount =
         jdbc.queryForObject(
             "SELECT count(*) FROM catalog.field_provenance WHERE entity_id=?",

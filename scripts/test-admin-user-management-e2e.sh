@@ -57,7 +57,7 @@ docker run -d --name "$postgres" --network "$network" --network-alias postgres \
   postgres:16-alpine >/dev/null
 # Reproduce the Compose deployment order that exposed the production race:
 # admin-web must remain running even while admin-service has no DNS record yet.
-docker build -q -t "$web_image" "$repo_dir/admin-web" >/dev/null
+docker build -q -t "$web_image" -f "$repo_dir/admin-web/Dockerfile" "$repo_dir" >/dev/null
 docker run -d --name "$web" --network "$network" --network-alias admin-web \
   "$web_image" >/dev/null
 sleep 1

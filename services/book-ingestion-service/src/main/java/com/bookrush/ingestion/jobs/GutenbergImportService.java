@@ -97,11 +97,14 @@ public class GutenbergImportService {
                 + "\u0000"
                 + record.creator()
                 + "\u0000"
-                + record.language());
+                + record.language()
+                + "\u0000"
+                + record.publicationYear());
     var canonicalMetadata = new LinkedHashMap<String, Object>();
     canonicalMetadata.put("rdfUrl", rdfUri.toString());
     canonicalMetadata.put("snapshotSha256", snapshot.sha256());
     canonicalMetadata.put("rights", record.rights());
+    canonicalMetadata.put("publicationYear", record.publicationYear());
     canonicalMetadata.put("thumbnailUrl", thumbnailUri(id).toString());
     var result =
         catalog.apply(
@@ -117,7 +120,7 @@ public class GutenbergImportService {
                 record.rights(),
                 canonicalMetadata,
                 null,
-                null,
+                record.publicationYear(),
                 record.creator(),
                 "AUTHOR"));
     var sourceId =
@@ -129,6 +132,7 @@ public class GutenbergImportService {
             .put("title", record.title())
             .put("language", record.language())
             .put("creator", record.creator())
+            .put("publicationYear", record.publicationYear())
             .put("rights", record.rights())
             .put("rdfUrl", rdfUri.toString())
             .put("thumbnailUrl", thumbnailUri(id).toString());

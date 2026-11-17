@@ -71,8 +71,8 @@ public class BehaviorSecurityConfiguration {
     s2sDecoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
         JwtValidators.createDefaultWithIssuer(s2sIssuer), audience));
     AuthenticationManager s2s = manager(s2sDecoder, converter);
-    return request -> request.getRequestURI().startsWith("/api/internal/v1/recommendation/")
-        || request.getRequestURI().startsWith("/api/internal/v1/publisher/")
+    return request -> (request.getRequestURI().startsWith("/api/internal/v1/recommendation/")
+        || request.getRequestURI().startsWith("/api/internal/v1/publisher/metrics/"))
         ? s2s : product;
   }
 

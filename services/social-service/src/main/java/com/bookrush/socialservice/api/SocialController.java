@@ -6,6 +6,9 @@ import jakarta.validation.constraints.Size;
 import java.security.Principal;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.UUID;
@@ -239,40 +242,82 @@ public class SocialController {
             Long.class, bookId), "liked", liked);
   }
 
-  public record Comment(@NotBlank @Size(max = 2000) String body) {}
+  public record Comment(@NotBlank @Size(max = 2000) String body, UUID parentCommentId) {}
 
   @PostMapping("/books/{bookId}/comments")
+  @Transactional
   public Object comment(@PathVariable UUID bookId, @Valid @RequestBody Comment comment,
       Principal principal, HttpServletRequest request) {
     UUID id = UUID.randomUUID();
     String identity = subject(principal);
+    if (comment.parentCommentId() != null) {
+      var parents = jdbc.queryForList("SELECT author_deleted_at FROM social.comments "
+          + "WHERE id=? AND book_id=? FOR UPDATE", comment.parentCommentId(), bookId);
+      if (parents.isEmpty() || parents.get(0).get("author_deleted_at") != null) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "parent comment unavailable");
+      }
+      String visibility = jdbc.queryForObject("SELECT COALESCE((SELECT visibility FROM social.comment_moderation_state "
+          + "WHERE comment_id=?), 'VISIBLE')", String.class, comment.parentCommentId());
+      if (!"VISIBLE".equals(visibility)) {
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "parent comment unavailable");
+      }
+    }
     String author = profileDisplayName(identity, request);
-    jdbc.update("INSERT INTO social.comments(id, subject_key, author_display_name, book_id, body) "
-        + "VALUES (?, ?, ?, ?, ?)", id, identity, author == null ? displayName(principal) : author, bookId,
-        comment.body());
+    jdbc.update("INSERT INTO social.comments(id, subject_key, author_display_name, book_id, body, parent_comment_id) "
+        + "VALUES (?, ?, ?, ?, ?, ?)", id, identity, author == null ? displayName(principal) : author, bookId,
+        comment.body(), comment.parentCommentId());
     jdbc.update("INSERT INTO social.comment_moderation_state(comment_id) VALUES (?) ON CONFLICT DO NOTHING", id);
     activity(identity, "COMMENT", bookId, id, null);
     behavior.publish("BOOK_COMMENT", bookId, Map.of(), request.getHeader(HttpHeaders.AUTHORIZATION));
-    return Map.of("id", id, "bookId", bookId, "body", comment.body(),
-        "subject_key", identity, "canDelete", true);
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("id", id); result.put("bookId", bookId); result.put("body", comment.body());
+    result.put("subject_key", identity); result.put("canDelete", true);
+    result.put("parentCommentId", comment.parentCommentId()); result.put("available", true);
+    return result;
   }
 
   @GetMapping("/books/{bookId}/comments")
-  public Object comments(@PathVariable UUID bookId, HttpServletRequest request, Principal principal) {
-    var rows = jdbc.queryForList("SELECT c.id, c.subject_key, c.author_display_name, c.body, c.created_at "
+  public Object comments(@PathVariable UUID bookId, HttpServletRequest request, Principal principal,
+      @RequestParam(defaultValue = "false") boolean includeUnavailable) {
+    var rows = jdbc.queryForList("SELECT c.id, c.parent_comment_id, c.subject_key, c.author_display_name, c.body, c.created_at, "
+        + "(c.author_deleted_at IS NULL AND COALESCE(m.visibility, 'VISIBLE') = 'VISIBLE') AS available "
         + "FROM social.comments c LEFT JOIN social.comment_moderation_state m ON m.comment_id=c.id "
-        + "WHERE c.book_id = ? AND c.author_deleted_at IS NULL "
-        + "AND COALESCE(m.visibility, 'VISIBLE') = 'VISIBLE' ORDER BY c.created_at, c.id", bookId);
-    rows.forEach(row -> {
-      String identity = String.valueOf(row.get("subject_key"));
-      row.put("canDelete", principal != null && identity.equals(principal.getName()));
-      String profileName = profileDisplayName(identity, request);
-      Object stored = row.get("author_display_name");
-      row.put("authorName", profileName != null ? profileName
-          : stored instanceof String value && !value.isBlank() ? value : "Leitor");
-      row.remove("author_display_name");
-    });
-    return rows;
+        + "WHERE c.book_id = ? ORDER BY c.created_at, c.id", bookId);
+    Map<Object, Map<String, Object>> byId = new HashMap<>();
+    rows.forEach(row -> byId.put(row.get("id"), row));
+    Set<Object> needed = new HashSet<>();
+    for (var row : rows) {
+      if (!Boolean.TRUE.equals(row.get("available"))) continue;
+      Object parent = row.get("parent_comment_id");
+      while (parent != null && needed.add(parent)) {
+        var ancestor = byId.get(parent);
+        parent = ancestor == null ? null : ancestor.get("parent_comment_id");
+      }
+    }
+    Map<String, String> names = new HashMap<>();
+    var result = new ArrayList<Map<String, Object>>();
+    for (var row : rows) {
+      boolean available = Boolean.TRUE.equals(row.get("available"));
+      if (!available && (!includeUnavailable || !needed.contains(row.get("id")))) continue;
+      Map<String, Object> item = new LinkedHashMap<>();
+      item.put("id", row.get("id")); item.put("parentCommentId", row.get("parent_comment_id"));
+      item.put("available", available);
+      if (available) {
+        String identity = String.valueOf(row.get("subject_key"));
+        String profileName = names.computeIfAbsent(identity, key -> {
+          String name = profileDisplayName(key, request);
+          return name == null ? "" : name;
+        });
+        Object stored = row.get("author_display_name");
+        item.put("subject_key", identity); item.put("body", row.get("body"));
+        item.put("created_at", row.get("created_at"));
+        item.put("canDelete", principal != null && identity.equals(principal.getName()));
+        item.put("authorName", !profileName.isBlank() ? profileName
+            : stored instanceof String value && !value.isBlank() ? value : "Leitor");
+      }
+      result.add(item);
+    }
+    return result;
   }
 
   @DeleteMapping("/comments/{commentId}")

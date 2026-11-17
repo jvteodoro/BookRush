@@ -20,3 +20,6 @@ mesmo que um estado legado de moderação ainda seja `VISIBLE`.
 `followed` para contar seguidores recebidos, preservando idempotência de seguir
 e deixar de seguir. A privacidade é lida das tabelas já existentes de
 `reader_profile` antes de revelar um agregado de outro usuário.
+
+`social.comments.parent_comment_id` aponta para comentário do mesmo livro; NULL
+identifica uma raiz. A remoção lógica preserva as relações e os descendentes.

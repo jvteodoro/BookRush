@@ -124,7 +124,11 @@ O layout atual do leitor usa uma única coluna responsiva: um cabeçalho compact
 O leitor ocupa a viewport inteira para preservar a área útil do Readium. Os comandos externos ficam ocultos até foco/hover e funcionam como uma camada mínima de retorno e marcador, deixando o conteúdo e a paginação sob responsabilidade do navegador Readium.
 
 
-A tela de leitura também suprime o seletor global do protótipo enquanto o Readium está aberto, evitando que o modo mobile/web apareça sobre a publicação.
+A navegação web usa o mesmo layout responsivo em telas de desktop e celular,
+sem controles de alternância entre versões ou opção de menu do protótipo. A
+barra lateral não exibe um usuário fixo; os perfis públicos continuam usando
+os dados retornados pelo serviço de perfis. A navegação para perfis de outros
+leitores continua acessível pela busca e pelos comentários.
 
 
 Ao sair da rota de leitura, o frontend destrói explicitamente o `WebPubNavigator` antes de uma nova abertura. Isso evita manter um iframe/blob antigo e garante que uma reabertura recrie o fetcher autenticado e a publicação atual.
@@ -165,8 +169,35 @@ e usa os contratos existentes `PUT`/`DELETE` para alterá-lo. Se a consulta
 social falhar, o nome e a biografia públicos ainda aparecem, mas o botão fica
 indisponível.
 
+O painel de comentários apresenta respostas em threads, com ações para responder,
+expandir ou recolher cada conversa. O formulário identifica o comentário escolhido
+e permite cancelar a resposta; se ele se tornar indisponível, o texto é preservado
+e a conversa pode ser atualizada. Comentários removidos ou ocultados pela moderação
+aparecem como marcadores sem conteúdo quando há descendentes visíveis. O recuo
+visual é limitado em telas estreitas, sem limitar a profundidade das respostas.
+
+A listagem do painel solicita `includeUnavailable=true` ao `social-service` e
+monta a hierarquia a partir de `parentCommentId`. A contagem inclui comentários
+e respostas visíveis, mas não os marcadores de comentários indisponíveis. Clientes
+antigos continuam recebendo somente comentários visíveis sem esse parâmetro.
+
 Os cartões do feed carregam os contadores persistidos de likes e comentários pelos endpoints do `social-service`. Depois de uma curtida ou comentário, o frontend consulta novamente esses contadores e atualiza o cartão; os valores não são mantidos como números locais do protótipo.
 
 O endpoint de likes também retorna `liked` para o subject autenticado. O feed usa esse campo para restaurar o estado do coração após reload e enviar `DELETE` quando o usuário já curtiu, evitando curtidas duplicadas.
 
 O contador exibido é sempre o `count` persistido retornado pelo serviço. O estado visual `liked` não é somado novamente ao contador, evitando exibir dois likes quando existe apenas um registro.
+
+A tela inicial anterior ao login apresenta a planta de leitura no estágio 5 como
+mascote e usa os tokens visuais do frontend em um layout responsivo. As ações de
+entrar e cadastrar continuam usando os fluxos existentes do Keycloak.
+
+Links compartilhados `/book/{id}` abrem os detalhes do livro após o login. O
+frontend preserva o caminho no retorno OIDC e busca os metadados por ID em
+`GET /api/v1/books/{id}`, sem depender do feed. IDs inválidos, livros ausentes
+e falhas de rede mostram uma mensagem; fechar uma entrada direta leva ao feed.
+A leitura e a biblioteca usam as ações existentes, sem atribuir a abertura
+compartilhada a uma recomendação.
+
+O cliente de links respeita a resposta do catálogo e não aplica um filtro local
+de status diferente daquele usado pela busca e pelo feed. O catálogo informa
+livros inexistentes por HTTP 404.

@@ -21,12 +21,48 @@ import org.springframework.transaction.annotation.Transactional;
 @Sql("/catalog-fixture.sql")
 class JpaCatalogIT {
   @Autowired EntityManager em;
+  @Autowired com.bookrush.catalog.book.BookAuthorQuery authorQuery;
   @Autowired BookRepository books;
+  @Autowired com.bookrush.catalog.book.BookPublicationYearQuery publicationYears;
   @Autowired BookAssetRepository assets;
   @Autowired BookAssetVersionRepository versions;
 
   private UUID id(String prefix, int n) {
     return UUID.fromString(prefix + "0000000-0000-4000-8000-00000000000" + n);
+  }
+
+  @Test
+  void readsEarliestKnownEditionYearInOneBatchWithoutGuessingMissingYears() {
+    Book work = new Book(); work.setCanonicalTitle("Dated editions"); books.saveAndFlush(work);
+    Book unknown = new Book(); unknown.setCanonicalTitle("Undated"); books.saveAndFlush(unknown);
+    for (Short year : new Short[] {1912, null, 1899}) {
+      Edition edition = new Edition(); edition.setBookId(work.getId());
+      edition.setPublicationYear(year); em.persist(edition);
+    }
+    em.flush();
+    assertEquals(Map.of(work.getId(), (short) 1899),
+        publicationYears.forBooks(java.util.List.of(work.getId(), unknown.getId())));
+    assertTrue(publicationYears.forBooks(java.util.List.of()).isEmpty());
+    assertNull(books.findById(work.getId()).orElseThrow().getFirstPublicationYear());
+  }
+
+  @Test
+  void readsOnlyAuthorsInCreditOrderAndHandlesMissingCredits() {
+    Book work = new Book(); work.setCanonicalTitle("Coauthored work");
+    books.saveAndFlush(work);
+    for (int position : new int[] {3, 1, 2}) {
+      Author author = new Author(); author.setName("Credit " + position); em.persist(author);
+      BookAuthor credit = new BookAuthor();
+      credit.setBookId(work.getId()); credit.setAuthorId(author.getId());
+      credit.setRole(position == 2 ? BookAuthorRole.TRANSLATOR : BookAuthorRole.AUTHOR);
+      credit.setPosition(position); em.persist(credit);
+    }
+    em.flush();
+    UUID unknown = UUID.randomUUID();
+    var result = authorQuery.forBooks(java.util.List.of(work.getId(), unknown));
+    assertEquals(java.util.List.of("Credit 1", "Credit 3"), result.get(work.getId()));
+    assertFalse(result.containsKey(unknown));
+    assertTrue(authorQuery.forBooks(java.util.List.of()).isEmpty());
   }
 
   @Test

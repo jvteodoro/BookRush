@@ -13,8 +13,12 @@ export KEYCLOAK_ADMIN_BASE=http://keycloak:8080/admin/realms/bookrush
 export KEYCLOAK_ADMIN_CLIENT_ID=bookrush-admin-service
 # Fixture only. Never use the local/protected env file in this test.
 export KEYCLOAK_ADMIN_CLIENT_SECRET=compose-contract-fixture
+export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$(cat infrastructure/traefik/dynamic.yaml)"
 cat > "$workspace/old.compose.yaml" <<'YAML'
 services:
+  reverse-proxy:
+    image: traefik:v3.5.3
+    command: [--providers.file.filename=/old-checkout/dynamic.yaml, --ping=true]
   admin-service:
     image: old/admin:stale
     environment:
@@ -27,6 +31,13 @@ for base in infrastructure/compose.yaml "$workspace/old.compose.yaml"; do
     docker run --rm -i --network none python:3.12-slim python3 -c '
 import json, sys
 services = json.load(sys.stdin)["services"]
+gateway = services["reverse-proxy"]
+routes = gateway["environment"]["BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG"]
+assert "PathPrefix(`/api/v1/reader/library/`)" in routes
+assert gateway["entrypoint"][:2] == ["/bin/sh", "-ec"]
+assert "exec /entrypoint.sh" in gateway["entrypoint"][2]
+assert "--providers.file.filename=/tmp/bookrush-traefik-dynamic.yaml" in gateway["entrypoint"][2]
+assert "--ping=true" in gateway["command"]
 env = services["admin-service"]["environment"]
 expected = {
     "KEYCLOAK_ADMIN_TOKEN_URI": "http://keycloak:8080/realms/bookrush/protocol/openid-connect/token",
@@ -47,6 +58,6 @@ for variable, service in {
     "SOCIAL_IMAGE": "social-service", "ADMIN_SERVICE_IMAGE": "admin-service", "ADMIN_WEB_IMAGE": "admin-web",
 }.items():
     assert services[service]["image"] == "contract/bookrush/" + variable.lower() + ":revision", service
-print("Compose merge: imagens e configuração administrativa OK")
+print("Compose merge: imagens, configuração administrativa e rotas da revisão OK")
 '
 done

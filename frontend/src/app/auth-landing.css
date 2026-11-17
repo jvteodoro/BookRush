@@ -1,0 +1,62 @@
+.auth-landing {
+  min-height: 100vh;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  background: var(--br-bg);
+  color: var(--br-content);
+  font-family: var(--br-font-sans);
+}
+.auth-landing__header {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: var(--br-font-display);
+  font-size: 1.35rem;
+}
+.auth-landing__hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: clamp(2rem, 6vw, 6rem);
+  max-width: 1200px;
+  min-height: min(700px, calc(100vh - 150px));
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+.auth-landing__content { min-width: 0; }
+.auth-landing__eyebrow, .auth-landing__mascot-label {
+  font-size: .75rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+.auth-landing__eyebrow { color: var(--br-teal); }
+:root[data-bookrush-theme='dark'] .auth-landing__eyebrow { color: #6bcbd4; }
+.auth-landing h1 {
+  margin: 1rem 0;
+  font: 400 clamp(2.3rem, 5vw, 4.5rem)/1.12 var(--br-font-display);
+  overflow-wrap: anywhere;
+}
+.auth-landing__content > p { max-width: 34rem; color: var(--br-content-dim); line-height: 1.7; }
+.auth-landing__actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 2rem; }
+.auth-landing__register { text-decoration: none; }
+.auth-landing__actions :focus-visible { outline: 3px solid var(--br-teal); outline-offset: 4px; }
+.auth-landing__content .auth-landing__security { margin-top: 1.5rem; font-size: .8rem; }
+.auth-landing__mascot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 2.5rem 1.5rem 1rem;
+  border: 2px solid var(--br-outline);
+  border-radius: var(--br-radius-card);
+  background: var(--br-surface-2);
+  box-shadow: var(--br-shadow);
+}
+.auth-landing__mascot-label { color: var(--br-content); text-align: center; }
+.auth-landing__mascot img { display: block; width: min(100%, 480px); height: auto; object-fit: contain; }
+@media (max-width: 720px) {
+  .auth-landing__hero { grid-template-columns: 1fr; gap: 2rem; min-height: 0; padding: 2.5rem 0; }
+  .auth-landing__mascot img { width: min(100%, 320px); }
+  .auth-landing__actions > * { flex: 1 1 10rem; }
+}

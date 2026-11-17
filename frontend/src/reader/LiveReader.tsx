@@ -12,7 +12,12 @@ import { SearchPage } from "./SearchPage";
 import { RecommendationsPage } from "./RecommendationsPage";
 import { BookDetailsDrawer, type DetailsBook } from "./BookDetailsDrawer";
 import "../styles/ratings.css";
+import "../styles/book-details.css";
 import { CommentsDrawer } from "./CommentsDrawer";
+import { Drawer } from "../components/ui/Drawer";
+import { Button } from "../components/ui/Button";
+import { loadSharedBook } from "./sharedBook";
+import { readerSessionOrigin } from "./readerSessionOrigin";
 import { AccountPage } from "./AccountPages";
 import type { FeedExcerpt } from "../app/types";
 
@@ -20,10 +25,12 @@ type SourceBook = {
   id: string;
   title: string;
   author: string;
+  publicationYear?: number | null;
   genre: string;
   categories?: BookCategory[];
   language?: string | null;
   quote: string;
+  description?: string;
   progress: number;
   likes?: number;
   comments?: number;
@@ -68,6 +75,7 @@ type Runtime = {
       id: string,
       query?: string,
       fromRecommendation?: boolean,
+      direct?: boolean,
     ) => Promise<void>;
     openComments: (id: string) => Promise<void>;
     openShare: (id: string) => void;
@@ -79,12 +87,14 @@ const runtime = () => window as unknown as Runtime;
 
 export function LiveReader({
   visible,
+  bookPath,
   userName,
   onLegacy,
   initialTab = "feed",
   legacyQuery = "",
 }: {
   visible: boolean;
+  bookPath: string | null;
   userName: string;
   onLegacy: () => void;
   initialTab?: "feed" | "library" | "search" | "recommendations";
@@ -132,11 +142,51 @@ export function LiveReader({
   );
   const [pending, setPending] = useState<string[]>([]);
   const [detailsBook, setDetailsBook] = useState<DetailsBook | null>(null);
+  const [sharedLoading, setSharedLoading] = useState(false);
+  const [sharedError, setSharedError] = useState("");
+  const [sharedAttempt, setSharedAttempt] = useState(0);
+  useEffect(() => {
+    if (bookPath === null) {
+      setSharedLoading(false);
+      setSharedError("");
+      setDetailsBook(null);
+      return;
+    }
+    const controller = new AbortController();
+    setDetailsBook(null);
+    setSharedError("");
+    setSharedLoading(true);
+    void loadSharedBook(bookPath, controller.signal)
+      .then((book) => {
+        if (!controller.signal.aborted) setDetailsBook(book);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setSharedError(
+            error instanceof Error && error.message !== "Failed to fetch"
+              ? error.message
+              : "Não foi possível carregar o livro. Tente novamente.",
+          );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSharedLoading(false);
+      });
+    return () => controller.abort();
+  }, [bookPath, sharedAttempt]);
+  const leaveSharedBook = () => {
+    if (bookPath === null) return;
+    if (window.history.state?.bookrushBookEntry) window.history.back();
+    else {
+      window.history.replaceState({}, "", "/");
+      window.dispatchEvent(new Event("bookrush:path-changed"));
+    }
+  };
+
   useEffect(() => {
     const open = (event: Event) => {
       const id = (event as CustomEvent<string>).detail;
       const book = runtime().__BOOKRUSH_BOOKS__.find((item) => item.id === id);
-      if (book) setDetailsBook({ ...book, description: book.quote });
+      if (book) setDetailsBook(book);
     };
     window.addEventListener("bookrush:open-book-details", open);
     return () => window.removeEventListener("bookrush:open-book-details", open);
@@ -209,13 +259,14 @@ export function LiveReader({
         id: book.id,
         title: book.title,
         author: book.author,
+        publicationYear: book.publicationYear,
         genre: book.genre,
         categories: book.categories,
         language: book.language,
         seen: seenState.seen.has(book.id),
         progress: book.progress,
         minutes: 0,
-        description: book.excerpt?.text ?? "",
+        description: book.description ?? "",
         excerpt: book.excerpt ?? null,
         coverUrl: book.thumbnailUrl ?? undefined,
       })),
@@ -367,7 +418,11 @@ export function LiveReader({
   };
   const streak =
     plant?.streakDays ?? runtime().__BOOKRUSH_STREAK__?.currentDays;
-  const openCatalogBook = (book: LibraryBook) =>
+  const openCatalogBook = (
+    book: LibraryBook,
+    fromRecommendation = false,
+    direct = false,
+  ) =>
     void action(book.id, async () => {
       // The existing reader resolves IDs from its catalog array. Register books
       // saved outside the feed before delegating, retaining their actual metadata.
@@ -385,7 +440,12 @@ export function LiveReader({
           pages: 0,
           match: 0,
         } as SourceBook);
-      await runtime().__BOOKRUSH_LEGACY__.openBook(book.id, query);
+      await runtime().__BOOKRUSH_LEGACY__.openBook(
+        book.id,
+        query,
+        fromRecommendation,
+        direct,
+      );
       onLegacy();
     });
   return (
@@ -453,24 +513,11 @@ export function LiveReader({
           onDetails={setDetailsBook}
           onDiscover={() => navigate("feed")}
         />
-      ) : [
-          "plant",
-          "profile",
-          "privacy",
-          "admin",
-          "publisher",
-          "prototype",
-        ].includes(tab) ? (
+      ) : ["plant", "profile", "privacy", "admin", "publisher"].includes(
+          tab,
+        ) ? (
         <AccountPage
-          tab={
-            tab as
-              | "plant"
-              | "profile"
-              | "privacy"
-              | "admin"
-              | "publisher"
-              | "prototype"
-          }
+          tab={tab as "plant" | "profile" | "privacy" | "admin" | "publisher"}
           userName={userName}
           savedCount={saved.length}
           streak={streak}
@@ -512,11 +559,64 @@ export function LiveReader({
           }}
         />
       )}
+      {bookPath !== null && (sharedLoading || sharedError) && (
+        <Drawer title="Livro compartilhado" onClose={leaveSharedBook}>
+          {sharedLoading ? (
+            <p role="status">Carregando livro…</p>
+          ) : (
+            <>
+              <p role="alert">{sharedError}</p>
+              <Button onClick={() => setSharedAttempt((value) => value + 1)}>
+                Tentar novamente
+              </Button>
+              <Button variant="ghost" onClick={leaveSharedBook}>
+                Voltar ao feed
+              </Button>
+            </>
+          )}
+        </Drawer>
+      )}
       {detailsBook && (
         <BookDetailsDrawer
           key={detailsBook.id}
           book={detailsBook}
-          onClose={() => setDetailsBook(null)}
+          saved={saved.includes(detailsBook.id)}
+          pending={pending.includes(detailsBook.id)}
+          actionMessage={message}
+          onSave={() => save(detailsBook.id)}
+          onRead={() => {
+            const book = detailsBook;
+            const shared = bookPath !== null;
+            if (shared) {
+              readerSessionOrigin.clear();
+              leaveSharedBook();
+            }
+            setDetailsBook(null);
+            void openCatalogBook(
+              {
+                ...book,
+                author: book.author ?? "",
+                genre: book.genre ?? "",
+                description: book.description ?? "",
+                progress: book.progress ?? 0,
+                minutes: 0,
+                coverUrl: book.coverUrl || book.thumbnailUrl || undefined,
+                available: true,
+              },
+              bookPath === null &&
+                (tab === "feed" || tab === "recommendations"),
+              shared,
+            );
+          }}
+          onComments={() => {
+            if (bookPath !== null) leaveSharedBook();
+            setCommentsBook({ id: detailsBook.id, title: detailsBook.title });
+            setDetailsBook(null);
+          }}
+          onClose={() => {
+            if (bookPath !== null) leaveSharedBook();
+            setDetailsBook(null);
+          }}
         />
       )}
       {commentsBook && (

@@ -247,98 +247,9 @@
   width: 100%;
   height: 100%;
 }
-.br-shell svg {
-  flex-shrink: 0;
-}
-.br-sidebar__top {
-  display: flex;
-  align-items: center;
-  position: relative;
-  min-height: 44px;
-}
-.br-sidebar__brand {
-  gap: 0.5rem;
-  font-size: 1rem;
-}
-.br-sidebar-toggle {
-  position: absolute;
-  right: -8px;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 36px;
-  background: var(--br-bg);
-  color: var(--br-content-dim);
-  border-radius: 8px;
-  opacity: 0;
-  pointer-events: none;
-}
-.br-sidebar:hover .br-sidebar-toggle,
-.br-sidebar:focus-within .br-sidebar-toggle,
-.br-sidebar-toggle:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-.br-shell--collapsed .br-sidebar-toggle {
-  position: static;
-  opacity: 1;
-  pointer-events: auto;
-  width: 44px;
-  height: 44px;
-}
-.br-shell--collapsed .br-sidebar__brand {
-  display: none;
-}
-.br-shell--collapsed .br-sidebar__top {
-  justify-content: center;
-}
-.br-sidebar__nav .br-nav-separator {
-  border-top: 1px solid var(--br-outline-soft);
-  border-radius: 0;
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-}
-.br-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 520px) minmax(0, 1fr);
-}
-.br-header__actions {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  justify-self: end;
-}
-.br-header__title {
-  font-size: 0.85rem;
-}
-.br-header__center {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  min-width: 0;
-}
-.br-home-shortcut {
-  width: 44px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--br-surface-2);
-  color: var(--br-content);
-  flex-shrink: 0;
-}
-.br-header__search {
-  display: flex;
-  min-width: 0;
-  max-width: none;
-  margin: 0;
-  width: 100%;
-}
 .br-theme-toggle {
   justify-self: end;
 }
-.br-shell .br-header__search input:focus,
-.br-shell .br-header__search input:focus-visible,
 .br-shell .br-search-input:focus,
 .br-shell .br-search-input:focus-visible {
   outline: none;
@@ -384,121 +295,9 @@
   box-shadow: var(--br-shadow-soft);
 }
 @media (hover: none) {
-  .br-sidebar-toggle {
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-@media (hover: none) {
   .br-book-row__edge--visible {
     opacity: 1;
   }
-}
-.br-home-shortcut {
-  transition:
-    background 200ms,
-    color 200ms,
-    transform 180ms;
-}
-.br-home-shortcut svg {
-  transition:
-    transform 220ms,
-    fill 220ms;
-}
-.br-home-shortcut[aria-current="page"] {
-  background: var(--br-content);
-  color: var(--br-bg);
-}
-.br-home-shortcut[aria-current="page"] svg {
-  fill: currentColor;
-  transform: scale(1.12);
-}
-.br-home-shortcut:hover svg {
-  transform: translateY(-2px) scale(1.15) rotate(-6deg);
-}
-.br-home-shortcut:active {
-  transform: scale(0.93);
-}
-.br-sidebar {
-  transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.br-sidebar__nav {
-  position: relative;
-}
-.br-sidebar__nav button {
-  position: relative;
-  z-index: 1;
-  transition:
-    color 180ms,
-    padding 280ms;
-}
-.br-sidebar__nav button[aria-current] {
-  background: transparent;
-  box-shadow: none;
-}
-.br-nav-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  border-radius: 12px;
-  background: var(--br-surface-2);
-  pointer-events: none;
-  transition:
-    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
-    height 250ms;
-}
-.br-nav-indicator::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 25%;
-  bottom: 25%;
-  width: 4px;
-  border-radius: 4px;
-  background: var(--br-red);
-}
-.br-sidebar-toggle {
-  transition:
-    opacity 180ms,
-    background 180ms,
-    color 180ms,
-    transform 180ms,
-    right 280ms,
-    width 280ms,
-    height 280ms;
-}
-.br-shell--collapsed .br-sidebar-toggle {
-  position: absolute;
-  right: calc(50% - 22px);
-}
-.br-sidebar-toggle:hover {
-  color: var(--br-content);
-  background: var(--br-surface-2);
-}
-.br-sidebar-toggle:active {
-  transform: scale(0.9);
-}
-.br-sidebar-toggle svg {
-  transition: transform 240ms;
-}
-.br-sidebar-toggle:hover svg {
-  transform: translateX(-2px);
-}
-.br-shell--collapsed .br-sidebar-toggle:hover svg {
-  transform: translateX(2px);
-}
-.br-panel-arrow {
-  transform-origin: 14.5px 12px;
-  transition: transform 280ms;
-}
-.br-shell--collapsed .br-panel-arrow {
-  transform: scaleX(-1);
-}
-.br-sidebar .br-nav-label {
-  overflow: hidden;
-  white-space: nowrap;
-  transition: opacity 140ms;
 }
 @media (prefers-reduced-motion: reduce) {
   .br-action-rail button > span {
@@ -519,24 +318,6 @@
   }
   .br-book-row__edge {
     transition: none;
-  }
-  .br-sidebar,
-  .br-sidebar__nav button,
-  .br-nav-indicator,
-  .br-sidebar-toggle,
-  .br-sidebar-toggle svg,
-  .br-panel-arrow,
-  .br-sidebar .br-nav-label,
-  .br-home-shortcut,
-  .br-home-shortcut svg {
-    transition: none;
-  }
-  .br-home-shortcut:hover svg,
-  .br-sidebar-toggle:hover svg,
-  .br-shell--collapsed .br-sidebar-toggle:hover svg,
-  .br-home-shortcut:active,
-  .br-sidebar-toggle:active {
-    transform: none;
   }
 }
 
@@ -810,29 +591,7 @@
     text-align: center;
   }
 }
-@media (max-width: 1100px) {
-  .br-header {
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 2fr) minmax(0, 1fr);
-    gap: 0.75rem;
-  }
-  .br-header__title {
-    max-width: 110px;
-    white-space: normal;
-  }
-}
 @media (max-width: 767px) {
-  .br-header {
-    display: flex;
-  }
-  .br-header__center {
-    display: none;
-  }
-  .br-header__title {
-    margin-right: auto;
-  }
-  .br-mobile-logo {
-    margin-right: 0;
-  }
   .br-feed-scroll {
     height: max(460px, calc(100dvh - 250px));
     overflow-y: auto;
@@ -870,24 +629,6 @@
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-}
-.br-shell--feed .br-shell__body {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.br-shell--feed .br-header {
-  flex-shrink: 0;
-}
-.br-shell--feed .br-reader-main {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  margin: 0 auto;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
 }
 .br-shell--feed .br-demo-notice {
   flex-shrink: 0;

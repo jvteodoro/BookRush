@@ -50,6 +50,11 @@ const DashboardHub = lazy(() =>
     default: m.DashboardHub,
   })),
 );
+const PublisherStatisticsPage = lazy(() =>
+  import("../features/publisher/PublisherStatisticsPage").then((m) => ({
+    default: m.PublisherStatisticsPage,
+  })),
+);
 
 function lazyElement(Page: LazyExoticComponent<ComponentType>) {
   return (
@@ -86,6 +91,7 @@ export function createAdminRouter() {
           },
           { path: "feed-lab", element: lazyElement(FeedLabPage) },
           { path: "training", element: lazyElement(TrainingPage) },
+          { path: "publisher", element: lazyElement(PublisherStatisticsPage) },
           { path: "operations", element: lazyElement(OperationsPage) },
           { path: "dashboards", element: lazyElement(DashboardHub) },
         ],

@@ -3,62 +3,6 @@ info:
   title: publisher-service
   version: 0.1.0
 paths:
-  /api/v1/publisher/submissions/{id}/metrics:
-    get:
-      summary: Read protected publisher metrics for an owned submission
-      description: The submission is scoped by subject_key; behavior metrics are loaded with S2S auth and daily values are suppressed below five unique readers.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: {type: string, format: uuid}
-      responses:
-        '200':
-          description: Submission metrics or NOT_LINKED state
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [submissionId, status]
-                properties:
-                  submissionId: {type: string, format: uuid}
-                  catalogBookId: {type: string, format: uuid}
-                  status: {type: string, enum: [READY, NOT_LINKED]}
-                  days: {type: integer, maximum: 366}
-                  minReaders: {type: integer, minimum: 5}
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      required: [day, suppressed]
-                      properties:
-                        day: {type: string, format: date}
-                        suppressed: {type: boolean}
-                        uniqueReaders: {type: integer, minimum: 5}
-                        impressions: {type: integer, format: int64}
-                        opens: {type: integer, format: int64}
-                        reads: {type: integer, format: int64}
-                  growth:
-                    type: object
-                    required: [windowDays, suppressed]
-                    properties:
-                      windowDays: {type: integer, enum: [30]}
-                      suppressed: {type: boolean}
-                      currentReaders: {type: integer, minimum: 5}
-                      previousReaders: {type: integer, minimum: 5}
-                      current_impressions: {type: integer, format: int64}
-                      previous_impressions: {type: integer, format: int64}
-                      impressions_change_percent: {type: number, nullable: true}
-                      current_opens: {type: integer, format: int64}
-                      previous_opens: {type: integer, format: int64}
-                      opens_change_percent: {type: number, nullable: true}
-                      current_reads: {type: integer, format: int64}
-                      previous_reads: {type: integer, format: int64}
-                      reads_change_percent: {type: number, nullable: true}
-        '401': {description: Missing or invalid bearer token}
-        '404': {description: Submission does not belong to the authenticated subject}
   /api/internal/v1/publisher/submissions/{submissionId}/catalog-link:
     post:
       summary: Link a submission after canonical ingestion
@@ -88,9 +32,47 @@ paths:
         '200': {description: Link applied}
         '401': {description: Invalid callback credential}
         '409': {description: Conflicting existing link}
+  /api/v1/publisher/submissions/{id}/metrics:
+    get:
+      summary: Daily statistics for the authenticated publisher's own published book
+      description: Requires platform bearer (issuer bookrush-platform, audience bookrush-ingestion). Ownership is verified against submission and published_work. No reader identities are exposed. A draft's user-supplied catalog ID does not grant metrics access.
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: days, in: query, schema: {type: integer, minimum: 1, maximum: 365, default: 30}}
+      responses:
+        '200':
+          description: Published-book daily metrics, or NOT_LINKED when no verified published work exists. Empty AVAILABLE items means no activity in the requested window.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [submissionId, status, days, items]
+                properties:
+                  submissionId: {type: string, format: uuid}
+                  catalogBookId: {type: string, format: uuid}
+                  status: {type: string, enum: [AVAILABLE, NOT_LINKED]}
+                  days: {type: integer, minimum: 1, maximum: 365}
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DailyMetrics'
+        '400': {description: Invalid days or UUID}
+        '401': {description: Missing or invalid bearer}
+        '404': {description: Submission absent or owned by another publisher}
+        '503': {description: Metrics service or dedicated credential unavailable; never reported as zero activity}
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+    publisherBearer: {type: http, scheme: bearer, bearerFormat: JWT}
+  schemas:
+    DailyMetrics:
+      type: object
+      required: [day, impressions, opens, reads, likes, shares, comments]
+      properties:
+        day: {type: string, format: date}
+        impressions: {type: integer, format: int64, minimum: 0}
+        opens: {type: integer, format: int64, minimum: 0}
+        reads: {type: integer, format: int64, minimum: 0}
+        likes: {type: integer, format: int64, minimum: 0}
+        shares: {type: integer, format: int64, minimum: 0}
+        comments: {type: integer, format: int64, minimum: 0}

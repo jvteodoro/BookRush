@@ -564,18 +564,47 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "clientAuthenticatorType": "client-secret",
-      "protocolMappers": [{
-        "name": "behavior-audience",
-        "protocol": "openid-connect",
-        "protocolMapper": "oidc-audience-mapper",
-        "config": {
-          "included.client.audience": "bookrush-behavior",
-          "access.token.claim": "true",
-          "id.token.claim": "false",
-          "userinfo.token.claim": "false"
+      "protocolMappers": [
+        {
+          "name": "behavior-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-behavior",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
         }
-      }],
-      "defaultClientScopes": ["bookrush.publisher.metrics.read"]
+      ],
+      "defaultClientScopes": [
+        "bookrush.publisher.metrics.read"
+      ]
+    },
+    {
+      "clientId": "bookrush-publisher-metrics-s2s",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "protocolMappers": [
+        {
+          "name": "behavior-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "bookrush-behavior",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "defaultClientScopes": [
+        "bookrush.publisher.metrics.read"
+      ]
     },
     {
       "clientId": "bookrush-seaweedfs",

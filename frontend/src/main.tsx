@@ -1,3 +1,4 @@
+import { bookMetadata } from "./reader/bookMetadata";
 import { categoryLabel } from "./reader/bookCategories";
 import { recordOpenedBook } from "./reader/seen";
 import { loadFollowerStats } from "./reader/followers";
@@ -15,6 +16,8 @@ import { DesignSystemPreview } from "./design-system/DesignSystemPreview";
 import { HomePreview } from "./design-system/HomePreview";
 import "./styles/reader-shell.css";
 import "./styles/reader-refinements.css";
+import "@bookrush/ui/sidebar.css";
+import "@bookrush/ui/layout.css";
 import "./styles/search.css";
 import "./styles/recommendations.css";
 import "./styles/comments.css";
@@ -37,7 +40,7 @@ function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [error, setError] = useState("");
   const [feedReady, setFeedReady] = useState(false);
-  const { legacyQuery, legacyVisible, readerTab, showLegacy } =
+  const { bookPath, legacyQuery, legacyVisible, readerTab, showLegacy } =
     useLegacyNavigation();
   useEffect(() => {
     let active = true;
@@ -46,6 +49,7 @@ function App() {
         if (window.location.pathname === "/auth/callback") {
           const callback = await authClient.callback();
           window.history.replaceState({}, "", callback.returnTo);
+          window.dispatchEvent(new Event("bookrush:path-changed"));
           if (active) setAuth({ status: "authenticated", user: callback.user });
           return;
         }
@@ -87,7 +91,7 @@ function App() {
           });
           if (!response.ok) throw new Error("telemetry rejected");
         });
-        const recommendations = await loadRecommendationFeed();
+        const recommendations = await loadRecommendationFeed().catch(() => []);
         if (!active) return;
         const recommendationFor = (bookId: string) =>
           recommendations.find((item) => item.book?.id === bookId);
@@ -123,10 +127,11 @@ function App() {
             return {
               id: book.id,
               title: book.canonicalTitle,
-              author: "Catálogo BookRush",
+              ...bookMetadata(book),
               genre: categoryLabel(book.categories),
               categories: book.categories ?? [],
               language: book.originalLanguage,
+              description: book.description ?? "",
               keywords: [],
               match: Math.max(70, 96 - index * 2),
               a: palettes[index % palettes.length][0],
@@ -662,6 +667,7 @@ function App() {
     return (
       <AuthenticatedShell
         error={error}
+        bookPath={bookPath}
         feedReady={feedReady}
         legacyQuery={legacyQuery}
         legacyVisible={legacyVisible}

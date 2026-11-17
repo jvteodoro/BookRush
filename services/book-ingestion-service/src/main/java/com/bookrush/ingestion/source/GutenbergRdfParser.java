@@ -28,6 +28,7 @@ public final class GutenbergRdfParser {
         creator = null, formatUrl = null, currentFileAbout = null,
         subjectValue = null, subjectVocabulary = null;
     var subjects = new ArrayList<String>();
+    Integer publicationYear = null;
     try {
       while (reader.hasNext() && records.size() < maxRecords) {
         int event = reader.next();
@@ -39,6 +40,7 @@ public final class GutenbergRdfParser {
             id = reader.getAttributeValue(RDF, "about");
             title = language = rights = issued = creator = formatUrl = null;
             subjects.clear();
+            publicationYear = null;
           } else if (element.equals(new QName(PG, "file"))) {
             currentFileAbout = reader.getAttributeValue(RDF, "about");
           } else if (element.equals(new QName(DC, "subject"))) {
@@ -56,6 +58,7 @@ public final class GutenbergRdfParser {
             if (element.equals(new QName(DC, "title"))) title = value;
             else if (element.equals(new QName(DC, "rights"))) rights = value;
             else if (element.equals(new QName(DC, "issued"))) issued = value;
+            else if (element.equals(new QName(PG, "marc260"))) publicationYear = publicationYear(value);
             else if (element.equals(new QName(PG, "name"))
                 && path.contains(new QName(DC, "creator"))) creator = value;
             else if (element.equals(new QName(RDF, "value"))) {
@@ -78,7 +81,7 @@ public final class GutenbergRdfParser {
           }
           if (element.equals(new QName(PG, "ebook")) && id != null) {
             records.add(new GutenbergRecord(id, title, language, creator, rights, issued,
-                formatUrl, List.copyOf(subjects)));
+                formatUrl, List.copyOf(subjects), publicationYear));
           }
           path.pop();
           text.setLength(0);
@@ -90,6 +93,19 @@ public final class GutenbergRdfParser {
     return List.copyOf(records);
   }
 
+  /** Only a single explicit bibliographic year is safe; ranges/uncertain dates stay unknown. */
+  private static Integer publicationYear(String statement) {
+    var match = java.util.regex.Pattern.compile("(?<![0-9])([1-9][0-9]{3})(?![0-9])").matcher(statement);
+    if (!match.find()) return null;
+    if (statement.contains("?") || statement.substring(0, match.start())
+        .matches("(?is).*\\b(?:circa|ca\\.?|c\\.|approximately)\\s*$")) return null;
+    int year = Integer.parseInt(match.group(1));
+    int end = match.end();
+    if (match.find()) return null;
+    String suffix = statement.substring(end).trim();
+    return suffix.matches("[\\] .]*") ? year : null;
+  }
+
   public record GutenbergRecord(
       String externalId,
       String title,
@@ -98,5 +114,6 @@ public final class GutenbergRdfParser {
       String rights,
       String digitalReleaseDate,
       String epubUrl,
-      List<String> subjects) {}
+      List<String> subjects,
+      Integer publicationYear) {}
 }

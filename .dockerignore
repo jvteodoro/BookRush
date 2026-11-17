@@ -5,6 +5,9 @@
 **/node_modules
 **/.venv
 **/dist
+**/artifacts
+**/*.tsbuildinfo
+.worktrees
 **/target
 **/site
 **/app-config.local.yaml

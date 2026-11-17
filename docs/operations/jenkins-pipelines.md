@@ -172,3 +172,14 @@ Em uma instalação existente, é necessário reconstruir/recriar somente o
 container Jenkins para que o `init.groovy.d` e os Jenkinsfiles novos sejam
 carregados; o volume `jenkins_home` é preservado. Os jobs existentes não são
 apagados nem têm histórico alterado.
+
+## Build das interfaces com UI compartilhada
+
+Leitor e admin consomem `packages/ui` por dependência local. Os Dockerfiles
+agora recebem a raiz do repositório como contexto: `docker build -f
+frontend/Dockerfile .` e `docker build -f admin-web/Dockerfile .`. Compose,
+pipeline principal, job dedicado e fallback do deploy usam esse contrato.
+Os estágios verificam também lint e formatação do pacote compartilhado.
+Consulte [componentes compartilhados](../development/shared-ui.md) para o teste
+comparativo de navegação e estilos no navegador. Essas validações não fazem
+deploy nem substituem smoke autenticado pelo gateway.

@@ -7,12 +7,12 @@ import { build } from 'esbuild';
 async function load(entry, hooks = false) {
   const bundle = await build({
     entryPoints: [fileURLToPath(new URL(entry, import.meta.url))], bundle: true,
-    write: false, platform: 'browser', format: 'esm', jsx: 'automatic',
+    write: false, platform: 'browser', format: 'esm', jsx: 'automatic', preserveSymlinks: true,
     plugins: [{ name: 'user-search-transport', setup(builder) {
       builder.onResolve({ filter: /auth$/ }, () => ({ path: 'auth', namespace: 'test' }));
       builder.onLoad({ filter: /.*/, namespace: 'test' }, () => ({ contents: 'export const authClient = { fetch(...args) { return globalThis.__searchFetch(...args); } };' }));
       if (hooks) {
-        builder.onResolve({ filter: /^react$/ }, args => args.importer.includes('/node_modules/') ? undefined : ({ path: 'react', namespace: 'hooks' }));
+        builder.onResolve({ filter: /^react$/ }, args => args.importer.replaceAll('\\', '/').includes('/node_modules/') ? undefined : ({ path: 'react', namespace: 'hooks' }));
         builder.onLoad({ filter: /.*/, namespace: 'hooks' }, () => ({ contents: `
           export const forwardRef = fn => fn;
           export function useState() { const value = globalThis.__searchStates.shift(); return [value, next => globalThis.__searchUpdates.push(next)]; }

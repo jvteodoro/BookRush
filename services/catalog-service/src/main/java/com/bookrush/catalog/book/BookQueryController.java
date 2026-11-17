@@ -28,10 +28,14 @@ public class BookQueryController {
   private final BookRepository books;
 
   private final BookCategoryQuery categories;
+  private final BookAuthorQuery authors;
+  private final BookPublicationYearQuery publicationYears;
 
-  public BookQueryController(BookRepository books, BookCategoryQuery categories) {
+  public BookQueryController(BookRepository books, BookCategoryQuery categories, BookAuthorQuery authors, BookPublicationYearQuery publicationYears) {
     this.books = books;
     this.categories = categories;
+    this.authors = authors;
+    this.publicationYears = publicationYears;
   }
 
   @GetMapping
@@ -47,14 +51,15 @@ public class BookQueryController {
         q.isBlank()
             ? books.findAll(PageRequest.of(page, size, Sort.by("canonicalTitle").ascending()))
             : books.search(q.trim(), PageRequest.of(page, size));
-    return BookPage.from(result, categories.forBooks(result.getContent().stream().map(Book::getId).toList()));
+    var ids = result.getContent().stream().map(Book::getId).toList();
+    return BookPage.from(result, categories.forBooks(ids), authors.forBooks(ids), publicationYears.forBooks(ids));
   }
 
   @GetMapping("/{bookId}")
   public ResponseEntity<BookView> get(@PathVariable UUID bookId) {
     return books
         .findById(bookId)
-        .map(book -> ResponseEntity.ok(BookView.from(book, categories.forBooks(List.of(bookId)).getOrDefault(bookId, List.of()))))
+        .map(book -> ResponseEntity.ok(BookView.from(book, categories.forBooks(List.of(bookId)).getOrDefault(bookId, List.of()), authors.forBooks(List.of(bookId)).getOrDefault(bookId, List.of()), publicationYears.forBooks(List.of(bookId)).get(bookId))))
         .orElseGet(() -> ResponseEntity.notFound().build());
   }
 
@@ -65,9 +70,9 @@ public class BookQueryController {
       long totalItems,
       int totalPages,
       boolean last) {
-    static BookPage from(Page<Book> page, Map<UUID, List<Category>> categories) {
+    static BookPage from(Page<Book> page, Map<UUID, List<Category>> categories, Map<UUID, List<String>> authors, Map<UUID, Short> publicationYears) {
       return new BookPage(
-          page.map(book -> BookView.from(book, categories.getOrDefault(book.getId(), List.of()))).getContent(),
+          page.map(book -> BookView.from(book, categories.getOrDefault(book.getId(), List.of()), authors.getOrDefault(book.getId(), List.of()), publicationYears.get(book.getId()))).getContent(),
           page.getNumber(),
           page.getSize(),
           page.getTotalElements(),
@@ -82,19 +87,23 @@ public class BookQueryController {
       String originalTitle,
       String originalLanguage,
       Short firstPublicationYear,
+      Short publicationYear,
+      List<String> authors,
       String description,
       String thumbnailUrl,
       List<Category> categories,
       String status,
       Instant createdAt,
       Instant updatedAt) {
-    static BookView from(Book book, List<Category> categories) {
+    static BookView from(Book book, List<Category> categories, List<String> authors, Short editionPublicationYear) {
       return new BookView(
           book.getId(),
           book.getCanonicalTitle(),
           book.getOriginalTitle(),
           book.getOriginalLanguage(),
           book.getFirstPublicationYear(),
+          book.getFirstPublicationYear() != null ? book.getFirstPublicationYear() : editionPublicationYear,
+          authors,
           book.getDescription(),
           "/api/v1/books/" + book.getId() + "/thumbnail",
           categories,

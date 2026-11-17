@@ -1,5 +1,25 @@
 # Jenkins BookRush
 
+O contrato `scripts/test-book-metadata-e2e.sh` também cobre o ciclo de biblioteca
+`PUT /api/v1/reader/library/{bookId}` → `GET /api/v1/reader/library` → `DELETE`
+pelo gateway versionado, com PostgreSQL e dois leitores Keycloak descartáveis.
+Valida idempotência, isolamento, CORS e persistência após restart. O roteador
+Traefik deve incluir tanto a rota exata da listagem quanto o prefixo
+`/api/v1/reader/library/` das mutações, ambos para o reader-bff. O deploy lê
+`infrastructure/traefik/dynamic.yaml` do workspace da revisão selecionada e
+injeta seu conteúdo na variável interna `BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG` do
+reverse-proxy. Não configure essa variável no `.env`: ela é gerada pelo deploy.
+O entrypoint materializa `/tmp/bookrush-traefik-dynamic.yaml` a cada inicialização
+e preserva os demais argumentos do Traefik. Assim, o checkout fixo do host pode
+estar antigo sem substituir as rotas da branch. Não há escrita nesse checkout.
+O deploy confere o arquivo efetivo no container e executa
+`infrastructure/jenkins/probe-reader-library.sh` para validar o preflight
+GET/PUT/DELETE pelo gateway. Falha aciona rollback, que também restaura o
+conteúdo das rotas anteriores quando disponível. O E2E usa o override real
+com arquivo antigo de rotas e reinicia o gateway para cobrir essa regressão.
+O smoke público deve salvar um livro, abrir **Biblioteca → Salvos**, recarregar
+a página e remover o livro, confirmando isolamento em uma segunda sessão.
+
 O job `bookrush-deploy` é criado no primeiro boot. O Jenkins mantém o assistente
 inicial e a autenticação; não há acesso anônimo ao deploy. Somente usuários
 confiáveis devem ter acesso ao job, pois ele usa o Docker do servidor.
@@ -75,6 +95,10 @@ remota participam do build. Alterações locais deste diretório não são impla
 O SHA da revisão aparece na descrição do build e nas tags das imagens.
 O backend é testado em um container Maven/Java 21; o frontend é compilado em
 seu estágio Docker Node. Não é necessário instalar Maven/Node no Jenkins.
+Frontend e admin compartilham `packages/ui`; seus builds usam o repositório
+como contexto (`docker build -f frontend/Dockerfile .` e
+`docker build -f admin-web/Dockerfile .`). Veja o
+[contrato dos componentes compartilhados](../../docs/development/shared-ui.md).
 O estágio `Validação Mobile` executa `npm ci`, `npm run typecheck` e
 `EXPO_NO_TELEMETRY=1 EXPO_NO_DOCTOR=1 npm run export` em `mobile/` usando
 `node:20-bookworm`. O bundle Android em `mobile/dist/` é arquivado como

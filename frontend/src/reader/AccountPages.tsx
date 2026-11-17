@@ -1,3 +1,4 @@
+import { Notice } from "@bookrush/ui/Notice";
 import { ReadingSummary } from "./ReadingSummary";
 import { FollowerCount } from "./FollowerCount";
 import type { ReactNode } from "react";
@@ -48,7 +49,7 @@ const accountRuntime = () => window as unknown as AccountRuntime;
 type Props = {
   tab: Extract<
     ReaderTab,
-    "plant" | "profile" | "privacy" | "admin" | "publisher" | "prototype"
+    "plant" | "profile" | "privacy" | "admin" | "publisher"
   >;
   userName: string;
   savedCount: number;
@@ -95,6 +96,11 @@ export function AccountPage({
   const displayName = profile?.displayName?.trim() || userName;
   if (tab === "plant") {
     const stage = Math.max(0, Math.min(5, Math.trunc(plant?.stage ?? 0)));
+    const minutes = Math.floor((plant?.todaySeconds ?? 0) / 60);
+    const todayTime =
+      minutes < 60
+        ? `${minutes} minutos`
+        : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, "0")}min`;
     return (
       <section className="br-account-page">
         <PageHeading
@@ -105,16 +111,16 @@ export function AccountPage({
         <Card className="br-account-hero br-plant-card">
           {plantLoading && <p role="status">Carregando sua planta…</p>}
           {plantError && (
-            <p role="alert">
+            <Notice as="p" role="alert">
               Não foi possível atualizar sua planta. Tente abrir esta página
               novamente.
-            </p>
+            </Notice>
           )}
           {accountRuntime().__BOOKRUSH_PLANT_SAVE_ERROR__ && (
-            <p role="alert">
+            <Notice as="p" role="alert">
               Parte do tempo de leitura não pôde ser salva. Verifique sua
               conexão.
-            </p>
+            </Notice>
           )}
           {!plantLoading && !plantError && plant && (
             <>
@@ -135,8 +141,8 @@ export function AccountPage({
                 </p>
                 {typeof plant.todaySeconds === "number" && (
                   <p>
-                    Hoje: {Math.min(15, Math.floor(plant.todaySeconds / 60))} de
-                    15 minutos{plant.goalReached ? " — meta cumprida!" : ""}
+                    Hoje: {todayTime} de 15 minutos
+                    {plant.goalReached ? " — meta cumprida!" : ""}
                   </p>
                 )}
                 {stage === 5 && (
@@ -144,12 +150,6 @@ export function AccountPage({
                 )}
               </div>
               <div className="br-account-stats">
-                <span>
-                  <b>{savedCount}</b> livros salvos
-                </span>
-                <span>
-                  <b>{plant?.totalReadingMinutes ?? 0}</b> min lidos
-                </span>
                 <span>
                   <b>{plant?.stage ?? 0}</b>/5 estágio da planta
                 </span>
@@ -269,15 +269,14 @@ export function AccountPage({
           description="Acompanhe suas publicações e envie novas histórias."
         />
         <Card className="br-account-panel">
-          <h2>Suas publicações</h2>
-          <strong className="br-account-number">—</strong>
+          <h2>Desempenho das suas publicações</h2>
           <p className="br-muted">
-            O portal de publicações usa a console protegida do realm de
-            plataforma. Abra a console administrativa para continuar.
+            Entre com a conta usada para publicar seus livros e acompanhe
+            impressões, aberturas, leituras e interações de cada publicação.
           </p>
           <ActionRow>
-            <Button onClick={() => window.location.assign("/admin/")}>
-              Abrir console
+            <Button onClick={() => window.location.assign("/admin/publisher")}>
+              Ver estatísticas dos meus livros
             </Button>
             <Button variant="ghost" onClick={() => onNavigate("feed")}>
               Voltar para o feed
@@ -288,24 +287,5 @@ export function AccountPage({
     );
   }
 
-  return (
-    <section className="br-account-page">
-      <PageHeading
-        eyebrow="BOOKRUSH"
-        title="Menu do protótipo"
-        description="Explore as áreas construídas com o design system atual."
-      />
-      <Card className="br-account-panel">
-        <ActionRow>
-          <Button onClick={() => onNavigate("feed")}>Para você</Button>
-          <Button variant="ghost" onClick={() => onNavigate("admin")}>
-            Administração
-          </Button>
-          <Button variant="ghost" onClick={() => onNavigate("publisher")}>
-            Publicador
-          </Button>
-        </ActionRow>
-      </Card>
-    </section>
-  );
+  return null;
 }

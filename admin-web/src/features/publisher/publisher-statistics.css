@@ -1,0 +1,41 @@
+.publisher-statistics {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+.publisher-statistics__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+}
+.publisher-statistics__filters label {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+.publisher-statistics__filters select {
+  max-width: 100%;
+  padding: 0.65rem;
+  font: inherit;
+}
+.publisher-statistics__table {
+  overflow-x: auto;
+}
+.publisher-statistics__table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.publisher-statistics__table th,
+.publisher-statistics__table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--br-border, #ddd);
+}
+.publisher-statistics__table caption {
+  text-align: left;
+  padding-bottom: 0.75rem;
+}
+.publisher-statistics__legend {
+  max-width: 80ch;
+}

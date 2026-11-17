@@ -29,6 +29,19 @@ mock data. Upstream URLs are configured with `READER_STATE_URL` and
 on port `8093`; the BFF default and Compose override must remain aligned with
 that port.
 
+Library operations use `GET /api/v1/reader/library` and
+`PUT`/`DELETE /api/v1/reader/library/{bookId}`. The gateway routes the exact
+listing path and the `/api/v1/reader/library/` prefix to this BFF. Mutations
+forward the product bearer to reader-state, where the principal owns the saved
+entry; a request body or query parameter cannot select another reader. Saves
+and removals are idempotent. Invalid UUIDs return `400`, missing or invalid
+tokens return `401`, and upstream failures return `502`. CORS permits the
+configured reader origin for GET/PUT/DELETE and rejects untrusted origins.
+The book ID in the path is sufficient to save: PUT accepts an empty body,
+while remaining compatible with existing JSON clients.
+The metadata E2E in Jenkins covers save/list/remove, repeated mutations, two
+readers, persistence after a service restart and saving without marking seen.
+
 ## Estado de livros vistos
 
 `GET /api/v1/reader/books/seen?bookIds=<uuid>,<uuid>` encaminha uma lista validada de

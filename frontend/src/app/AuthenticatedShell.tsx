@@ -1,9 +1,11 @@
 import type { User } from "oidc-client-ts";
 import { LiveReader } from "../reader/LiveReader";
+import { LegacySidebar } from "./LegacySidebar";
 import type { ReaderTab } from "./useLegacyNavigation";
 
 type AuthenticatedShellProps = {
   error: string;
+  bookPath: string | null;
   feedReady: boolean;
   legacyQuery: string;
   legacyVisible: boolean;
@@ -15,6 +17,7 @@ type AuthenticatedShellProps = {
 
 export function AuthenticatedShell({
   error,
+  bookPath,
   feedReady,
   legacyQuery,
   legacyVisible,
@@ -39,6 +42,7 @@ export function AuthenticatedShell({
   return (
     <>
       <div id="app" hidden={!legacyVisible} />
+      <LegacySidebar />
       {!feedReady && (
         <div className="splash">
           <p>Preparando seu feed…</p>
@@ -48,10 +52,13 @@ export function AuthenticatedShell({
         <div hidden={legacyVisible}>
           <LiveReader
             visible={!legacyVisible}
+            bookPath={bookPath}
             initialTab={readerTab}
             legacyQuery={legacyQuery}
             userName={String(
-              user?.profile.name ?? user?.profile.preferred_username ?? "Leitor",
+              user?.profile.name ??
+                user?.profile.preferred_username ??
+                "Leitor",
             )}
             onLegacy={onShowLegacy}
           />

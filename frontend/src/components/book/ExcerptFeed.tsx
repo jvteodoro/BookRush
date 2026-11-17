@@ -223,8 +223,21 @@ export function ExcerptFeed({
                     )}
                   </span>
                   <div>
-                    <h2>{book.title}</h2>
-                    <p>{book.author}</p>
+                    <h2>
+                      <button
+                        type="button"
+                        className="br-book-details-trigger"
+                        onClick={() => (onDetails ?? onOpen)(book)}
+                      >
+                        {book.title}
+                      </button>
+                    </h2>
+                    <p>
+                      {book.author}
+                      {book.publicationYear != null
+                        ? ` · ${book.publicationYear}`
+                        : ""}
+                    </p>
                     <div className="br-excerpt-classification">
                       <span className="br-book-category" title={book.genre}>
                         {book.genre || "Sem categoria"}
