@@ -30,7 +30,9 @@ pipeline {
     }
     stage('Change gate e contratos') {
       steps {
-        sh 'bash scripts/validate-change.sh --ci'
+        timeout(time: 5, unit: 'MINUTES') {
+          sh(label: 'Change gate local e offline', script: 'bash scripts/validate-change.sh --ci --offline')
+        }
         sh 'bash scripts/validate-pipelines.sh'
         sh 'bash -n infrastructure/seaweedfs/start.sh'
         sh 'bash scripts/test-storage.sh'

@@ -10,6 +10,7 @@ test -f infrastructure/jenkins/bookrush.Jenkinsfile || fail 'cópia do Jenkinsfi
 cmp -s Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile || fail 'Jenkinsfiles principais divergem'
 if command -v python3 >/dev/null 2>&1; then
   python3 scripts/test-deploy-compose-images.py || fail 'contrato de imagens do deploy Compose inválido'
+  python3 scripts/test-change-gate.py || fail 'regressões do change gate inválidas'
 elif command -v docker >/dev/null 2>&1; then
   # O agente Jenkins tem Docker, mas não necessariamente Python. Envie apenas
   # os arquivos do teste por stdin: funciona também com daemon fora do agente,
@@ -38,6 +39,15 @@ for file in scripts/test-book-metadata-e2e.sh scripts/test-book-ratings-e2e.sh s
   test -f "$file" || fail "script referenciado não existe: $file"
   bash -n "$file" || fail "sintaxe inválida: $file"
 done
+
+for pipeline in Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile infrastructure/jenkins/backstage.Jenkinsfile infrastructure/jenkins/microservice.Jenkinsfile infrastructure/jenkins/vertical.Jenkinsfile infrastructure/jenkins/seaweedfs.Jenkinsfile; do
+  grep -Fq 'bash scripts/validate-change.sh --ci --offline' "$pipeline" || fail "$pipeline sem gate offline no agente"
+  grep -Fq "timeout(time: 5, unit: 'MINUTES')" "$pipeline" || fail "$pipeline sem limite de tempo no gate"
+  if grep 'validate-change.sh' "$pipeline" | grep -Eq 'docker run|apt-get|pip install'; then
+    fail "$pipeline instala dependências ou encapsula o gate em container efêmero"
+  fi
+done
+grep -Fq 'python3-yaml python3-jsonschema' infrastructure/jenkins/Dockerfile || fail 'imagem do agente sem dependências do gate analytics'
 
 grep -Fq 'bash scripts/validate-change.sh --ci' Jenkinsfile || fail 'Jenkinsfile principal sem change gate'
 grep -Fq 'bash scripts/test-portal.sh --validation-only' Jenkinsfile || fail 'pipeline principal exporta imagem Backstage durante validação'

@@ -24,6 +24,16 @@ O job `bookrush-deploy` é criado no primeiro boot. O Jenkins mantém o assisten
 inicial e a autenticação; não há acesso anônimo ao deploy. Somente usuários
 confiáveis devem ter acesso ao job, pois ele usa o Docker do servidor.
 
+## Dependências do change gate
+
+O gate roda no agente: `bash scripts/validate-change.sh --ci --offline`, com
+limite de cinco minutos. Não há `apt-get`, `pip install` nem container temporário
+nessa etapa. A imagem Jenkins inclui Git, Python 3, `python3-yaml` e
+`python3-jsonschema`; imagens antigas falham rápido se uma alteração de analytics
+exigir módulos ausentes. Atualizar a imagem deve preservar o volume Jenkins e as
+credenciais. O detalhe de diagnóstico de `durable task` está no
+[runbook do agente](../../docs/operations/jenkins-agent-runbook.md#change-gate-e-falha-de-durable-task).
+
 ## Instalação no servidor
 
 Configure `DOCKER_GID` no `.env` com `stat -c '%g' /var/run/docker.sock`.
