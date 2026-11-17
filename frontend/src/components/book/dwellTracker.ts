@@ -15,6 +15,9 @@ export function createDwellTracker(
   const startedAt = new Map<string, number>();
   const visitIds = new Map<string, string>();
   const visibleBooks = new Set<string>();
+  const newVisitId = () =>
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
   const finish = (bookId: string) => {
     const start = startedAt.get(bookId);
@@ -34,11 +37,7 @@ export function createDwellTracker(
         visibleBooks.add(bookId);
         if (!startedAt.has(bookId)) {
           startedAt.set(bookId, clock());
-          visitIds.set(
-            bookId,
-            globalThis.crypto?.randomUUID?.() ??
-              `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-          );
+          visitIds.set(bookId, newVisitId());
         }
       } else {
         visibleBooks.delete(bookId);
@@ -51,7 +50,10 @@ export function createDwellTracker(
         return;
       }
       for (const bookId of visibleBooks) {
-        if (!startedAt.has(bookId)) startedAt.set(bookId, clock());
+        if (!startedAt.has(bookId)) {
+          startedAt.set(bookId, clock());
+          visitIds.set(bookId, newVisitId());
+        }
       }
     },
     visitId(bookId: string) {
