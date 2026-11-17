@@ -58,3 +58,53 @@ export function metricTotals(rows: MetricRow[]): Record<Metric, number> {
     }
   return totals;
 }
+
+export function publicationFileType(file: Pick<File, "name" | "size">): string {
+  if (file.size === 0) throw new Error("O arquivo está vazio.");
+  if (/\.epub$/i.test(file.name)) return "application/epub+zip";
+  if (/\.pdf$/i.test(file.name)) return "application/pdf";
+  throw new Error("Escolha um livro em EPUB ou PDF.");
+}
+
+export const publishingApi = {
+  async create(title: string): Promise<Submission> {
+    const value = title.trim();
+    if (!value || value.length > 300)
+      throw new Error("Informe um título com até 300 caracteres.");
+    return (await http.post("/api/v1/publisher/submissions", { title: value }))
+      .data;
+  },
+  async upload(id: string, file: File): Promise<void> {
+    const contentType = publicationFileType(file);
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      await file.arrayBuffer(),
+    );
+    const sha256 = Array.from(new Uint8Array(digest), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+    const path = `/api/v1/publisher/submissions/${encodeURIComponent(id)}/upload`;
+    const { data } = await http.post<{ uploadId: string; url: string }>(path, {
+      filename: file.name,
+      contentType,
+    });
+    const result = await fetch(data.url, {
+      method: "PUT",
+      credentials: "omit",
+      headers: { "Content-Type": contentType },
+      body: file,
+    });
+    if (!result.ok)
+      throw new Error("Não foi possível enviar o arquivo. Tente novamente.");
+    await http.post(`${path}/${encodeURIComponent(data.uploadId)}/finalize`, {
+      sha256,
+    });
+  },
+  async submit(id: string): Promise<{ id: string; status: string }> {
+    return (
+      await http.post(
+        `/api/v1/publisher/submissions/${encodeURIComponent(id)}/submit`,
+      )
+    ).data;
+  },
+};

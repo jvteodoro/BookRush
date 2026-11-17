@@ -34,3 +34,14 @@ Veja `docs/ARCHITECTURE.md`, `docs/API-CONTRACTS.md` e `docs/KEYCLOAK.md`.
 A rota `/publisher` (publicada em `/admin/publisher`) mostra somente os livros da conta de publicação autenticada no realm de plataforma. Selecione uma publicação e o período de 7, 30, 90 ou 365 dias para consultar totais e tabela diária. Ausência de publicação confirmada, falta de atividade e falha de consulta têm estados distintos. A consulta sempre usa o HTTP client autenticado, sem dados de demonstração. O publisher-service precisa da identidade S2S descrita em `services/publisher-service/docs/api.md`.
 
 Teste do fluxo no Chromium: `node --test tests/publisher-statistics.e2e.mjs` (CHROMIUM_PATH pode selecionar um executável instalado). O teste usa API simulada e confirma bearer, troca de livro/período, totais, ausência de atividade e recuperação de erro; não substitui login e smoke no gateway real.
+
+### Enviar um livro próprio
+
+Em `/admin/publisher`, use **Publicar um livro**: salve um título, anexe EPUB/PDF e
+envie para revisão após a confirmação do arquivo. Rascunhos podem ser retomados
+após recarregar. Envio não implica aprovação automática; acompanhe o status na
+lista de livros. O storage e a integração de ingestão precisam estar habilitados
+conforme `services/publisher-service/docs/api.md`.
+
+Validação da interface: `npm run build`, `npm run lint`, `npm test` e
+`node --test tests/publisher-publishing.e2e.mjs tests/publisher-statistics.e2e.mjs`.

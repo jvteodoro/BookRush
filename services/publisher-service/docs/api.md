@@ -1,9 +1,10 @@
 # API de publisher
 
 `POST /api/v1/publisher/submissions` cria uma submissão DRAFT associada ao subject autenticado. `GET /api/v1/publisher/submissions` lista apenas as submissões do mesmo publisher.
-O título é obrigatório e limitado a 300 caracteres. O envio só aceita um
-rascunho pertencente ao subject atual; uma segunda tentativa retorna 404 e não
-altera uma submissão já enviada.
+O título é obrigatório e limitado a 300 caracteres. O envio exige uma submissão `UPLOADED` pertencente ao subject atual, upload
+`FINALIZED` e membership `ACTIVE`. Repetições em `SUBMITTED`/`PROCESSING` retornam
+o estado atual sem repetir ingestão. Rascunhos sem arquivo confirmado recebem
+409; uma submissão de outra conta recebe 404.
 
 Com `PUBLISHER_STORAGE_ENABLED=true`, `POST /api/v1/publisher/submissions/{id}/upload`
 cria uma intenção de upload no bucket privado de staging e devolve uma URL PUT
@@ -88,3 +89,35 @@ O publisher consulta `/api/internal/v1/publisher/metrics/books/{bookId}` por uma
 Para implantação, reconciliar o realm declarativo e configurar `PUBLISHER_METRICS_CLIENT_SECRET` de forma protegida, além de `PUBLISHER_METRICS_CLIENT_ID` e `PUBLISHER_METRICS_TOKEN_URI` se houver overrides. Sem essa credencial a interface indica indisponibilidade. Não inserir valores em Git. A rota pública existente é preservada pelo router publisher de `infrastructure/traefik/dynamic.yaml`; a rota interna não recebe router público próprio. CORS mantém as origens explícitas existentes da console.
 
 Nenhuma migration foi necessária: reutilizamos published_work e behavior.daily_book. Deploy, reconcile no ambiente real e smoke público com sessão real precisam ser executados no ambiente de destino antes de declarar validação em produção.
+
+## Envio de livros próprios pela console
+
+`/admin/publisher` oferece criação de rascunho, retomada após recarregar a página,
+seleção de EPUB/PDF, upload privado e envio para revisão. Arquivos vazios e
+extensões incompatíveis são recusados antes de reservar o upload. O MIME é
+normalizado pela extensão, inclusive quando o browser não informa `File.type`.
+O cliente calcula SHA-256, envia o arquivo pela URL assinada **sem bearer humano**
+e confirma o upload pela API autenticada. Não envia o livro para revisão antes
+da confirmação do arquivo. Uma falha mantém o rascunho e permite nova tentativa.
+
+A API restringe reserva/finalização aos rascunhos editáveis do dono com membership
+ativa; valida MIME, SHA-256 e presença de bytes no objeto. Um envio que falha na
+ingestão restaura `UPLOADED` somente se o callback ainda não avançou o estado.
+O sucesso registra uma revisão `PENDING`; decisões posteriores a retiram da fila.
+O status `PROCESSING` significa processamento/revisão, **não publicação aprovada**.
+A aprovação editorial e a ativação do catálogo continuam nos fluxos administrativos.
+
+Habilite `PUBLISHER_STORAGE_ENABLED=true` no ambiente com S3 disponível; configure
+`STORAGE_ENDPOINT`, `STORAGE_PUBLIC_ENDPOINT` acessível ao navegador,
+`STORAGE_BUCKET_STAGING=books-staging`, credenciais de storage e
+`PUBLISHER_INGESTION_CALLBACK_TOKEN` compartilhado com ingestion. O handoff usa o bucket de staging configurado.
+O bucket precisa aceitar PUT da origem explícita da console via CORS.
+O serviço permanece opt-in quando o storage não está configurado. O controller de
+upload é habilitado pela mesma propriedade do storage, sem depender da ordem de
+registro dos beans Spring.
+
+Não há migration nova. As rotas usam o gateway existente `/api/v1/publisher/**`,
+realm `bookrush-platform`, audience `bookrush-ingestion` e dono por subject;
+revisão editorial exige grupo `operators` ou `platform-admins`. A origem e os
+headers permanecem na configuração CORS existente. A validação pública com sessão
+real e o deploy da branch são necessários para confirmar funcionamento em produção.

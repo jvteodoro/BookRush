@@ -10,6 +10,7 @@ import {
   type Metric,
 } from "./publisherMetrics";
 import "./publisher-statistics.css";
+import { PublishBookForm } from "./PublishBookForm";
 
 const number = new Intl.NumberFormat("pt-BR");
 const keys = Object.keys(metricLabels) as Metric[];
@@ -35,10 +36,11 @@ export function PublisherStatisticsPage() {
       <PageHeader>
         <div>
           <p>PUBLICADOR</p>
-          <h1>Estatísticas dos meus livros</h1>
-          <p>Acompanhe o desempenho das suas publicações.</p>
+          <h1>Meus livros</h1>
+          <p>Envie seus livros para revisão e acompanhe suas publicações.</p>
         </div>
       </PageHeader>
+      {submissions.isSuccess && <PublishBookForm submissions={books} />}
       {submissions.isPending ? (
         <p role="status">Carregando suas publicações…</p>
       ) : submissions.isError ? (
