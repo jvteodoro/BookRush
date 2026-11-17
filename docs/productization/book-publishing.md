@@ -19,7 +19,7 @@ acompanha PROCESSING; ativação do catálogo e aprovação editorial permanecem
 ações administrativas existentes. O envio não equivale a publicação automática.
 
 As rotas e os requisitos de storage estão em
-[API do publicador](../../services/publisher-service/docs/api.md). O storage segue
+[API do publicador](https://github.com/jvteodoro/BookRush/blob/main/services/publisher-service/docs/api.md). O storage segue
 opt-in (`PUBLISHER_STORAGE_ENABLED=false` no exemplo); habilitar requer credenciais,
 URL pública de PUT, CORS da origem real e integração interna com ingestion.
 Nenhuma migration nova é necessária.
