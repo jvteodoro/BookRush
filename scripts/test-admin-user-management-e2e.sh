@@ -652,10 +652,24 @@ echo 'Executive summary E2E: overall daily user peak deduplicates identities acr
 trends_unauthenticated_status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
   'http://admin-service:8100/api/admin/v1/reporting/book-engagement-trends?days=7&minReaders=2')"
 [[ "$trends_unauthenticated_status" == 401 ]]
-trends_json="$(docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh -c '
-  curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
-    "http://admin-service:8100/api/admin/v1/reporting/book-engagement-trends?days=7&minReaders=2&top=5"
-')"
+trends_json=''
+for _ in $(seq 1 30); do
+  trends_json="$(docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh -c '
+    curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
+      "http://admin-service:8100/api/admin/v1/reporting/book-engagement-trends?days=7&minReaders=2&top=5"
+  ' 2>/dev/null || true)"
+  [[ "$(jq -r '.status // empty' <<<"$trends_json")" == UNTRUSTED \
+      && "$(jq -r '[.series[] | select(.aggregation_level == "BOOK")] | length' <<<"$trends_json")" == 2 ]] && break
+  sleep 1
+done
+if [[ "$(jq -r '.status // empty' <<<"$trends_json")" != UNTRUSTED ]]; then
+  echo 'Book engagement trends projection did not become available.' >&2
+  docker exec "$postgres" psql -U bookrush -d bookrush -c \
+    "SELECT projection_name, refresh_status, last_error_code, record_count FROM reporting.projection_health WHERE projection_name = 'book_engagement_daily'" >&2 || true
+  docker logs --tail=120 "$service" >&2
+  echo "$trends_json" >&2
+  exit 1
+fi
 [[ "$(jq -r '.status' <<<"$trends_json")" == UNTRUSTED ]]
 [[ "$(jq -r '[.series[] | select(.aggregation_level == "BOOK")] | length' <<<"$trends_json")" == 2 ]]
 [[ "$(jq -r '[.series[] | select(.aggregation_level == "BOOK") | .active_minutes] | @tsv' <<<"$trends_json")" == $'30\t12' ]]
