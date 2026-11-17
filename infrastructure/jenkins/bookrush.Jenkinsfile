@@ -77,7 +77,7 @@ pipeline {
     }
 
     stage('Contratos de infraestrutura') {
-      when { expression { return params.RUN_INFRA_CONTRACTS } }
+      when { expression { return params.RUN_INFRA_CONTRACTS != false } }
       steps {
         sh '''
           set -euo pipefail
