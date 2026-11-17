@@ -559,7 +559,9 @@
               ].join(" · ") || "Autor não informado",
             publicationYear: Number.isInteger(i.firstPublicationYear)
               ? i.firstPublicationYear
-              : Number.isInteger(i.publicationYear) ? i.publicationYear : null,
+              : Number.isInteger(i.publicationYear)
+                ? i.publicationYear
+                : null,
             genre:
               [
                 ...new Set(
