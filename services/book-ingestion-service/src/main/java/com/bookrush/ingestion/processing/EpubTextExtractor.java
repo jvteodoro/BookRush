@@ -224,12 +224,19 @@ public final class EpubTextExtractor {
     var factory = DocumentBuilderFactory.newInstance();
     factory.setNamespaceAware(true);
     factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-    factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    // EPUB 2 NCX documents may declare the standard NISO DTD. Accept the
+    // declaration, but never load its DTD or resolve entities from the source.
+    factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+    factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
     factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
     factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
     factory.setXIncludeAware(false);
     factory.setExpandEntityReferences(false);
-    return factory.newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
+    var builder = factory.newDocumentBuilder();
+    builder.setEntityResolver((publicId, systemId) ->
+        new org.xml.sax.InputSource(new java.io.StringReader("")));
+    return builder.parse(new ByteArrayInputStream(bytes));
   }
 
   private static String directory(String path) { int slash = path.lastIndexOf('/'); return slash < 0 ? "" : path.substring(0, slash + 1); }
