@@ -96,6 +96,57 @@ class EpubTextExtractorTest {
   }
 
   @Test
+  void acceptsStandardNcxDoctypeWithoutFetchingItsExternalDtd() throws Exception {
+    assertSafeNcx("""
+        <!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN"
+          "http://127.0.0.1:1/must-not-be-fetched.dtd">
+        """, "Chapter");
+  }
+
+  @Test
+  void doesNotExpandExternalEntitiesInNcx() throws Exception {
+    Path secret = Files.createTempFile("epub-entity-", ".txt");
+    try {
+      Files.writeString(secret, "PRIVATE_ENTITY_CONTENT");
+      assertSafeNcx("<!DOCTYPE ncx [<!ENTITY external SYSTEM \"" + secret.toUri() + "\">]>",
+          "Chapter &external;");
+    } finally {
+      Files.deleteIfExists(secret);
+    }
+  }
+
+  private void assertSafeNcx(String doctype, String label) throws Exception {
+    Path epub = Files.createTempFile("ncx-doctype-", ".epub");
+    try {
+      try (var output = new ZipOutputStream(Files.newOutputStream(epub))) {
+        put(output, "META-INF/container.xml", """
+            <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>
+              <rootfile full-path="OEBPS/content.opf"/></rootfiles></container>
+            """);
+        put(output, "OEBPS/content.opf", """
+            <package xmlns="http://www.idpf.org/2007/opf"><manifest>
+              <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+              <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+            </manifest><spine toc="ncx"><itemref idref="chapter"/></spine></package>
+            """);
+        put(output, "OEBPS/toc.ncx", doctype + """
+            <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap>
+              <navPoint><navLabel><text>%s</text></navLabel><content src="chapter.xhtml"/></navPoint>
+            </navMap></ncx>
+            """.formatted(label));
+        put(output, "OEBPS/chapter.xhtml", "<html><body><p>Book text.</p></body></html>");
+      }
+      var extracted = new EpubTextExtractor().extractStructured(epub);
+      assertEquals("Book text.\n", extracted.text());
+      assertEquals(1, extracted.chapters().size());
+      assertEquals("Chapter", extracted.chapters().getFirst().title());
+      assertFalse(extracted.toString().contains("PRIVATE_ENTITY_CONTENT"));
+    } finally {
+      Files.deleteIfExists(epub);
+    }
+  }
+
+  @Test
   void realGutenbergFixtureCanBeProcessedWhenPresent() throws Exception {
     Path epub = Path.of("/tmp/2641.epub");
     org.junit.jupiter.api.Assumptions.assumeTrue(Files.exists(epub));

@@ -54,7 +54,8 @@ class GutenbergPublicationYearTest {
     var service = new GutenbergImportService(jdbc, downloader, raw, catalog, new ObjectMapper(),
         mock(CatalogAssetClient.class), mock(TextProcessingService.class), mock(ProcessingLineageClient.class),
         mock(SubjectCatalogClient.class), new GutenbergProperties("https://example.test", false),
-        mock(PublisherSubmissionLinkClient.class));
+        mock(PublisherSubmissionLinkClient.class),
+        mock(com.bookrush.ingestion.observability.IngestionMetrics.class));
 
     service.process(lease);
 

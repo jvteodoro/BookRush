@@ -16,3 +16,17 @@ que permanece responsável pela política durável de tentativas.
 ## Assuntos RDF Gutenberg
 
 O parser respeita namespaces e o contexto RDF: idioma vem de dcterms:language, assuntos de dcterms:subject (LCSH ou sem vocabulário declarado) e categorias de pgterms:bookshelf. Classificação LCC, tipo de conteúdo e formatos MIME não são assuntos. Valores XML fragmentados/CDATA são concatenados antes de interpretar título/assunto. Mantém bloqueio de DTD/entidades externas e preferência EPUB sem imagens. O catálogo filtra também representações técnicas já importadas, preservando dados e proveniência.
+
+## Compatibilidade de EPUB 2
+
+O extrator aceita a declaração `DOCTYPE` padrão do índice NCX de EPUB 2 sem
+baixar o DTD. DTDs e schemas externos, entidades externas e XInclude continuam
+bloqueados. Rejeitar a declaração inteira causava `SAXParseException` durante a
+extração e impedia concluir a importação com assets.
+
+A regressão é coberta por `EpubTextExtractorTest` (NCX com DTD externo inacessível
+e tentativa de entidade externa) e `GutenbergImportServiceTest` (RDF, extração
+EPUB, TXT e chapters.json reais, com catálogo, armazenamento e banco simulados).
+Execute `mvn -f services/book-ingestion-service/pom.xml verify` após instalar a
+plataforma. Esses testes locais não substituem a confirmação do job pelo gateway
+no ambiente implantado.
