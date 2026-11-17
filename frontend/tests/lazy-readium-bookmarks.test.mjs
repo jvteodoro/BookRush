@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { Buffer } from 'node:buffer';
 import { build } from 'esbuild';
 
 // Exercise the lazy boundary used by the app, without loading Readium or a DOM.
