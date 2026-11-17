@@ -36,8 +36,9 @@ As chamadas de navegador aceitam somente as origens configuradas em
 `BOOKRUSH_CORS_ALLOWED_ORIGINS` (registrado como `corsConfigurationSource`). O preflight `OPTIONS` é permitido sem bearer,
 mas todas as operações de negócio continuam exigindo um JWT válido com a
 audience e o scope do produto. A configuração inclui `Authorization`,
-`Content-Type`, `Idempotency-Key` e `X-Admin-Client` para que o browser não
-transforme uma rejeição de CORS em um erro de rede genérico.
+`Content-Type`, `Idempotency-Key`, `X-Admin-Client` e
+`X-BookRush-Platform`. Esse último encaminha somente a categoria coarse
+`web`/`mobile` ao recomendador; nenhum User-Agent é enviado ou persistido.
 
 O frontend concentra essas rotas em `frontend/src/app/apiRoutes.ts`. Assim,
 uma mudança de ownership ou prefixo é feita no mapa, sem espalhar URLs pelos

@@ -38,7 +38,7 @@ class AdminTokenValidationTest {
     server.start();
     try {
       var decoder = new AdminSecurityConfiguration().jwtDecoder(
-          "http://127.0.0.1:" + server.getAddress().getPort() + "/jwks", "https://issuer.test", "admin-api");
+          "http://127.0.0.1:" + server.getAddress().getPort() + "/jwks", "https://issuer.test", "admin-api", "");
       var encoder = new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(key)));
       var now = Instant.now();
       for (var scenario : List.of("valid", "expired", "future", "issuer", "audience")) {

@@ -85,3 +85,9 @@ As origens expl?citas e os m?todos PUT/DELETE j? fazem parte do CORS do BFF.
 O POST existente tamb?m encaminha name e mant?m compatibilidade sem esse campo.
 O OpenAPI descreve os limites do nome e as respostas. ReaderBookmarkTest cobre
 encaminhamento, bearer, resposta vazia da exclus?o e preserva??o de 404.
+
+## Inicialização e healthcheck
+
+O construtor de produção do controller é selecionado explicitamente pelo
+Spring para manter as URLs upstream injetadas no container. O endpoint
+`/actuator/health` permanece disponível para o healthcheck do Compose.

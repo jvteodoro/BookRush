@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 import javax.sql.DataSource;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,20 +18,35 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.core.io.ClassPathResource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 class UserBookSignalPostgresIT {
-  @Container
-  static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  private static PostgreSQLContainer<?> postgres;
+  private static DataSource dataSource;
 
   private JdbcTemplate jdbc;
 
+  @BeforeAll
+  static void startDatabase() {
+    String externalUrl = System.getenv("BOOKRUSH_TEST_POSTGRES_URL");
+    if (externalUrl != null && !externalUrl.isBlank()) {
+      dataSource = new DriverManagerDataSource(externalUrl,
+          System.getenv().getOrDefault("BOOKRUSH_TEST_POSTGRES_USER", "postgres"),
+          System.getenv().getOrDefault("BOOKRUSH_TEST_POSTGRES_PASSWORD", "test"));
+      return;
+    }
+    postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    postgres.start();
+    dataSource = new DriverManagerDataSource(
+        postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+  }
+
+  @AfterAll
+  static void stopDatabase() {
+    if (postgres != null) postgres.stop();
+  }
+
   @BeforeEach
   void setUp() {
-    DataSource dataSource = new DriverManagerDataSource(
-        POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
     jdbc = new JdbcTemplate(dataSource);
     jdbc.execute("DROP SCHEMA IF EXISTS behavior CASCADE");
     jdbc.execute("CREATE SCHEMA behavior");
@@ -48,6 +65,10 @@ class UserBookSignalPostgresIT {
         .execute(dataSource);
     new ResourceDatabasePopulator(new ClassPathResource("db/migration/V10__recommendation_outcome_correlation.sql"))
         .execute(dataSource);
+    new ResourceDatabasePopulator(new ClassPathResource("db/migration/V11__versioned_outcome_attribution.sql"))
+        .execute(dataSource);
+    new ResourceDatabasePopulator(new ClassPathResource("db/migration/V12__attribution_exposure_touch.sql"))
+        .execute(dataSource);
   }
 
   @Test
@@ -56,18 +77,24 @@ class UserBookSignalPostgresIT {
     UUID bookB = UUID.randomUUID();
     UUID recommendationItem = UUID.randomUUID();
     UUID impression = UUID.randomUUID();
+    UUID itemOnly = UUID.randomUUID();
     Instant base = Instant.parse("2026-10-20T10:00:00Z");
     insert("user-a", bookA, "BOOK_LIKE", "{}", base.plusSeconds(1));
     insert("user-a", bookA, "BOOK_UNLIKE", "{}", base.plusSeconds(2));
     insert("user-a", bookA, "BOOK_SAVE", "{}", base.plusSeconds(3));
     insert("user-a", bookA, "BOOK_UNSAVE", "{}", base.plusSeconds(4));
     insert("user-a", bookA, "EXCERPT_IMPRESSION", viewableCorrelationPayload(recommendationItem, impression), base.plusSeconds(5));
+    // A client retry/server reconciliation can produce a second event key for
+    // the same impression. It must remain one logical exposure.
+    insert("user-a", bookA, "EXCERPT_IMPRESSION", correlationPayload(recommendationItem, impression), base.plusSeconds(5));
     insert("user-a", bookA, "BOOK_OPEN", correlationPayload(recommendationItem, impression), base.plusSeconds(6));
     insert("user-a", bookA, "READ_PROGRESS", "{\"percent\":42.5}", base.plusSeconds(7));
     insert("user-a", bookA, "READ_SESSION", "{\"activeSeconds\":120}", base.plusSeconds(8));
     insert("user-a", bookA, "BOOK_COMPLETE", "{}", base.plusSeconds(9));
+    insert("user-a", bookA, "EXCERPT_IMPRESSION", itemOnlyPayload(itemOnly), base.plusSeconds(10));
+    insert("user-a", bookA, "READ_PROGRESS", itemOnlyPayload(itemOnly), base.plusSeconds(11));
     insert("user-b", bookB, "BOOK_LIKE", "{}", base.plusSeconds(10));
-    insert("user-b", bookB, "BOOK_OPEN", "{}", base.plusSeconds(11));
+    insert("user-b", bookB, "BOOK_OPEN", "{}", base.plusSeconds(12));
 
     BehaviorMaintenance maintenance = new BehaviorMaintenance(jdbc, true, 30);
     maintenance.rebuildNow();
@@ -85,16 +112,18 @@ class UserBookSignalPostgresIT {
     assertEquals(1, body.total());
     assertEquals(false, first.get("liked"));
     assertEquals(false, first.get("saved"));
-    assertEquals(1L, first.get("impression_count"));
-    assertEquals(1L, first.get("viewable_impression_count"));
+    assertEquals(2L, first.get("impression_count"));
+    assertEquals(2L, first.get("viewable_impression_count"));
     assertEquals(1L, first.get("open_count"));
-    assertEquals(1L, first.get("progress_event_count"));
+    assertEquals(2L, first.get("progress_event_count"));
     assertEquals(1L, first.get("completion_count"));
     assertEquals(120L, first.get("active_seconds"));
     assertEquals("42.50", first.get("max_progress").toString());
     assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM behavior.user_book_signal", Integer.class));
     assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND recommendation_item_id = ? AND impression_id = ?", Integer.class, recommendationItem, impression));
     assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND outcome_type = 'BOOK_OPEN' AND recommendation_item_id = ?", Integer.class, recommendationItem));
+    assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND outcome_type = 'READ_PROGRESS' AND recommendation_item_id = ? AND attribution_status = 'ATTRIBUTED' AND exposure_event_id IS NOT NULL", Integer.class, itemOnly));
+    assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-a' AND outcome_type = 'BOOK_OPEN' AND exposure_event_id IS NOT NULL", Integer.class));
     assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM behavior.outcome_attribution WHERE subject_key = 'user-b' AND outcome_type = 'BOOK_OPEN' AND recommendation_item_id IS NULL AND impression_id IS NULL", Integer.class));
 
     insert("user-b", bookB, "BOOK_LIKE", correlationPayload(recommendationItem, impression), base.plusSeconds(12));
@@ -109,6 +138,10 @@ class UserBookSignalPostgresIT {
 
   private String viewableCorrelationPayload(UUID itemId, UUID impressionId) {
     return "{\"recommendationItemId\":\"" + itemId + "\",\"impressionId\":\"" + impressionId + "\",\"viewable\":true}";
+  }
+
+  private String itemOnlyPayload(UUID itemId) {
+    return "{\"recommendationItemId\":\"" + itemId + "\",\"viewable\":true}";
   }
 
   private void insert(String subject, UUID bookId, String type, String payload, Instant occurredAt) {

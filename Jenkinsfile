@@ -311,4 +311,17 @@ pipeline {
       }
     }
   }
+
+  post {
+    always {
+      script {
+        def buildStatus = currentBuild.currentResult == 'SUCCESS' ? 'SUCCESS' :
+          (currentBuild.currentResult == 'ABORTED' ? 'ABORTED' :
+            (currentBuild.currentResult == 'UNSTABLE' ? 'UNSTABLE' : 'FAILURE'))
+        withEnv(["RELEASE_BUILD_STATUS=${buildStatus}", "RELEASE_BUILD_DURATION_MS=${currentBuild.duration}"]) {
+          sh 'bash scripts/publish-release-event.sh BUILD "$RELEASE_BUILD_STATUS" || echo "Build event reporting failed; preserving Jenkins result." >&2'
+        }
+      }
+    }
+  }
 }

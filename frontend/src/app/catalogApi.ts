@@ -1,6 +1,7 @@
 import { authClient } from "../auth";
 import type { CatalogBook, RecommendationItem } from "./types";
 import { apiRoutes } from "./apiRoutes";
+import { clientPlatform } from "./clientPlatform";
 
 export async function loadCatalog(): Promise<CatalogBook[]> {
   const response = await fetch(apiRoutes.catalog.list(), {
@@ -42,7 +43,9 @@ export async function loadRecent(): Promise<string[]> {
 }
 
 export async function loadRecommendationFeed(): Promise<RecommendationItem[]> {
-  const response = await authClient.fetch(apiRoutes.reader.feed());
+  const response = await authClient.fetch(apiRoutes.reader.feed(), {
+    headers: { "X-BookRush-Platform": clientPlatform() },
+  });
   if (!response.ok) return [];
   const payload = (await response.json()) as { items?: RecommendationItem[] };
   return payload.items ?? [];

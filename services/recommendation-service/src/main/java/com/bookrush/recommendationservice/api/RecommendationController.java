@@ -38,6 +38,7 @@ import com.bookrush.recommendationservice.fatigue.ExposureFatigue;
 import com.bookrush.recommendationservice.retrieval.CandidateRetriever;
 import com.bookrush.recommendationservice.retrieval.CandidateUnionBuilder;
 import com.bookrush.recommendationservice.retrieval.CandidateSet;
+import com.bookrush.recommendationservice.experiment.FeedExperimentAssignment;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
@@ -60,6 +61,7 @@ public class RecommendationController {
   private final ExplorationPolicy explorationPolicy;
   private final PersonalizedFeedSelector personalizedFeedSelector;
   private final PersonalizedDecisionReplay decisionReplay;
+  private final FeedExperimentAssignment experimentAssignment;
 
   public RecommendationController(
       CandidateRetriever candidateRetriever,
@@ -78,7 +80,8 @@ public class RecommendationController {
       BookDiversityMmr bookDiversityMmr,
       ExplorationPolicy explorationPolicy,
       PersonalizedFeedSelector personalizedFeedSelector,
-      PersonalizedDecisionReplay decisionReplay) {
+      PersonalizedDecisionReplay decisionReplay,
+      FeedExperimentAssignment experimentAssignment) {
     this.candidateRetriever = candidateRetriever;
     this.candidateUnionBuilder = candidateUnionBuilder;
     this.jdbc = jdbc;
@@ -96,6 +99,7 @@ public class RecommendationController {
     this.explorationPolicy = explorationPolicy;
     this.personalizedFeedSelector = personalizedFeedSelector;
     this.decisionReplay = decisionReplay;
+    this.experimentAssignment = experimentAssignment;
   }
 
   private String subject(Principal principal) {
@@ -127,8 +131,12 @@ public class RecommendationController {
     var profileResult = personalizedFeedGate.mode() == PersonalizedFeedGate.Mode.OFF
         ? new PersonalizedProfileService.Result(null, false, false, List.of(), Map.of())
         : feedMetrics.time("personalized_profile", () -> personalizedProfiles.load(subject));
-    var personalizationDecision = personalizedFeedGate.decide(profileResult.profile(),
+    var assignment = experimentAssignment.assign(subject);
+    var gateDecision = personalizedFeedGate.decide(profileResult.profile(),
         profileResult.behaviorAvailable(), profileResult.snapshotAvailable(), subject);
+    var personalizationDecision = assignment.control()
+        ? new PersonalizedFeedGate.Decision(PersonalizedFeedGate.Path.FALLBACK, "experiment-control")
+        : gateDecision;
     boolean personalized = personalizationDecision.path() == PersonalizedFeedGate.Path.PERSONALIZED;
     var candidateSnapshots = personalizationDecision.path() == PersonalizedFeedGate.Path.FALLBACK
         ? Map.<UUID, AnalyticsScoreClient.BookFeatureSnapshot>of()
@@ -230,13 +238,29 @@ public class RecommendationController {
         ? new ArrayList<>(FeedEligibility.retainAnalyticsReady(candidates))
         : candidates;
     final var ledgerPersonalizedRanking = personalizedRanking;
+    var candidateIdSet = candidateIds.stream().map(UUID::toString)
+        .collect(java.util.stream.Collectors.toSet());
+    int candidateCount = candidateIdSet.size();
+    int scoredCandidateCount = (int) scoreById.keySet().stream()
+        .filter(candidateIdSet::contains)
+        .distinct().count();
+    int selectedCount = rankedBooks.size();
+    String platform = normalizePlatform(request.getHeader("X-BookRush-Platform"));
     feedMetrics.time("ledger_persist", () -> {
-      jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, context) VALUES (?, ?, ?, ?, ?, ?::jsonb)",
+      jdbc.update("INSERT INTO recommendation.request(id, subject_key, model_version, strategy, random_seed, candidate_count, scored_candidate_count, selected_count, context) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)",
           requestId, subject, modelVersion, strategy, requestId.getLeastSignificantBits(),
+          candidateCount, scoredCandidateCount, selectedCount,
           mapper.createObjectNode()
               .put("candidateSetHash", candidateSetHash)
               .put("personalizationPath", personalizationDecision.path().name())
               .put("personalizationReason", personalizationDecision.reason())
+              .put("platform", platform)
+              .put("profileConfidenceBucket", profileConfidenceBucket(profileResult))
+              .put("profileSizeBucket", profileSizeBucket(profileResult.signals().size(),
+                  profileResult.profile() != null))
+              .put("fatigueCoverageBucket", fatigueCoverageBucket(fatigueById,
+                  candidateIdSet, Instant.now()))
+              .put("coldStart", selectedStrategy == Strategy.COLD_START)
               .put("personalizationModel", personalized ? PersonalizedRankerV1.MODEL_VERSION : modelVersion)
               .put("personalizationRankerConfigHash",
                   personalized ? personalizedRanker.configurationHash() : "")
@@ -246,6 +270,9 @@ public class RecommendationController {
                   personalized ? bookDiversityMmr.configurationHash() : "")
               .put("personalizationExplorationPolicy",
                   personalized ? explorationPolicy.policyVersion() : "")
+              .put("experimentId", assignment.experimentId())
+              .put("experimentVariant", assignment.variant())
+              .put("assignmentVersion", assignment.assignmentVersion())
               .toString());
       jdbc.update("UPDATE recommendation.request SET candidate_set_hash=? WHERE id=?",
           candidateSetHash, requestId);
@@ -311,15 +338,24 @@ public class RecommendationController {
         (int) items.stream().filter(FeedEligibility::hasAnalyticsExcerpt).count());
     feedMetrics.recordResult(items.isEmpty() ? "empty" : "success");
     resultRecorded = true;
-    var personalizationMetadata = Map.of(
-        "path", personalizationDecision.path().name(),
-        "reason", personalizationDecision.reason(),
-        "profileVersion", profileResult.profile() == null ? "" : profileResult.profile().profileVersion(),
-        "profileCoverage", profileResult.profile() == null ? 0 : profileResult.profile().coverage(),
-        "profileConfidence", profileResult.profile() == null ? 0 : profileResult.profile().confidence(),
-        "rankerConfigHash", personalized ? personalizedRanker.configurationHash() : "",
-        "mmrConfigHash", personalized ? bookDiversityMmr.configurationHash() : "",
-        "explorationPolicy", personalized ? explorationPolicy.policyVersion() : "");
+    var personalizationMetadata = new java.util.LinkedHashMap<String, Object>();
+    personalizationMetadata.put("path", personalizationDecision.path().name());
+    personalizationMetadata.put("reason", personalizationDecision.reason());
+    personalizationMetadata.put("profileVersion",
+        profileResult.profile() == null ? "" : profileResult.profile().profileVersion());
+    personalizationMetadata.put("profileCoverage",
+        profileResult.profile() == null ? 0 : profileResult.profile().coverage());
+    personalizationMetadata.put("profileConfidence",
+        profileResult.profile() == null ? 0 : profileResult.profile().confidence());
+    personalizationMetadata.put("experimentId", assignment.experimentId());
+    personalizationMetadata.put("experimentVariant", assignment.variant());
+    personalizationMetadata.put("assignmentVersion", assignment.assignmentVersion());
+    personalizationMetadata.put("rankerConfigHash",
+        personalized ? personalizedRanker.configurationHash() : "");
+    personalizationMetadata.put("mmrConfigHash",
+        personalized ? bookDiversityMmr.configurationHash() : "");
+    personalizationMetadata.put("explorationPolicy",
+        personalized ? explorationPolicy.policyVersion() : "");
     return Map.of("requestId", requestId, "modelVersion", modelVersion,
         "rankingVersion", modelVersion, "strategy", strategy,
         "candidateSetHash", candidateSetHash, "personalization", personalizationMetadata,
@@ -461,7 +497,7 @@ public class RecommendationController {
     for (int i = 0; i < bookIds.size(); i++) args[i + 1] = bookIds.get(i);
     String sql = """
         SELECT i.book_id, count(*) FILTER (WHERE i.viewable) AS viewable_count,
-               max(i.shown_at) FILTER (WHERE i.viewable) AS last_viewable_at
+               max(i.viewable_at) FILTER (WHERE i.viewable) AS last_viewable_at
         FROM recommendation.impression i
         JOIN recommendation.request r ON r.id = i.request_id
         WHERE r.subject_key = ? AND i.book_id IN (""" + placeholders + """
@@ -482,6 +518,41 @@ public class RecommendationController {
     } catch (IllegalArgumentException ignored) {
       return null;
     }
+  }
+
+  private static String profileConfidenceBucket(PersonalizedProfileService.Result result) {
+    if (result.profile() == null) return "NO_PROFILE";
+    double confidence = result.profile().confidence();
+    if (!Double.isFinite(confidence) || confidence < .25) return "0-25";
+    if (confidence < .5) return "25-50";
+    if (confidence < .75) return "50-75";
+    return "75-100";
+  }
+
+  private static String normalizePlatform(String value) {
+    if ("web".equalsIgnoreCase(value)) return "web";
+    if ("mobile".equalsIgnoreCase(value)) return "mobile";
+    return "UNKNOWN";
+  }
+
+  private static String profileSizeBucket(int signalCount, boolean hasProfile) {
+    if (!hasProfile) return "NO_PROFILE";
+    if (signalCount == 0) return "EMPTY";
+    if (signalCount <= 3) return "SMALL";
+    if (signalCount <= 10) return "MEDIUM";
+    return "LARGE";
+  }
+
+  private String fatigueCoverageBucket(Map<String, ExposureFatigue.Signal> fatigueById,
+      java.util.Set<String> candidateIds, Instant now) {
+    if (candidateIds.isEmpty()) return "NO_CANDIDATES";
+    long fatigued = candidateIds.stream().filter(id ->
+        fatiguePolicy.penalty(fatigueById.get(id), now) > 0).count();
+    double coverage = (double) fatigued / candidateIds.size();
+    if (coverage == 0) return "NONE";
+    if (coverage < .25) return "LOW";
+    if (coverage < .75) return "MEDIUM";
+    return "HIGH";
   }
 
   private String json(Object value) {
@@ -509,7 +580,11 @@ public class RecommendationController {
     Map<String, Object> row = owned.get(0);
     UUID itemId = row.get("item_id") == null ? null : UUID.fromString(String.valueOf(row.get("item_id")));
     UUID bookId = row.get("book_id") == null ? null : UUID.fromString(String.valueOf(row.get("book_id")));
-    jdbc.update("UPDATE recommendation.impression SET viewable = true WHERE id = ?", impressionId);
+    jdbc.update("""
+        UPDATE recommendation.impression
+        SET viewable = true, viewable_at = COALESCE(viewable_at, now())
+        WHERE id = ?
+        """, impressionId);
     Map<String, Object> payload = new java.util.LinkedHashMap<>();
     payload.put("viewable", true);
     payload.put("impressionId", impressionId);

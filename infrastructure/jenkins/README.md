@@ -151,6 +151,33 @@ deploy Compose ou Kubernetes conforme `DEPLOY_TARGET`. A matriz,
 os nomes dos jobs e os comandos locais correspondentes estão em
 [`docs/operations/jenkins-pipelines.md`](../../docs/operations/jenkins-pipelines.md).
 
+### Pipeline de observabilidade
+
+O job `bookrush-observability` valida o Compose e pode implantar a stack com
+`DEPLOY=true`. O deploy usa o checkout escolhido em `BRANCH` e transmite a
+configuração versionada para um volume Docker nomeado; assim, o daemon não
+precisa acessar o workspace privado do agente. Antes do primeiro deploy,
+o bootstrap reconcilia o script SCM `infrastructure/jenkins/observability.Jenkinsfile`
+e materializa `BRANCH`, `DEPLOY` e os IDs das três credentials antes do primeiro
+build. Cadastre no Jenkins as credentials Secret text indicadas
+pelos parâmetros do job: senha de recuperação do Grafana, DSN read-only do
+postgres-exporter e segredo do client OIDC `bookrush-grafana`. O job gera um env-file temporário
+com permissão restrita e o remove ao terminar. Grafana usa Keycloak do realm
+`bookrush-platform`; o endpoint público também exige DNS, certificado e proxy
+Nginx configurados para `grafana-bookrush.jteodoro.tec.br`.
+Para adicionar somente o vhost Grafana ao Nginx, execute
+`sudo bash infrastructure/nginx/install-bookrush-grafana-vhost.sh`. Esse script
+apenas copia o arquivo HTTP para `/etc/nginx/conf.d/`; depois, emita/instale o
+certificado separadamente com
+`sudo certbot --nginx --redirect -d grafana-bookrush.jteodoro.tec.br`. O
+instalador geral `install-bookrush-vhosts.sh` valida todos os vhosts e pode
+depender de certificados de outros domínios.
+
+O job `bookrush-admin-web` carrega o script SCM
+`infrastructure/jenkins/admin-web.Jenkinsfile`; o bootstrap reconcilia esse
+caminho em jobs existentes. Para atualizar o link público do Grafana no hub,
+selecione a mesma branch e habilite `DEPLOY`.
+
 Para a pipeline completa de analytics no host com NVIDIA, o deploy deve usar o
 override `infrastructure/compose.analytics-gpu.yaml` e manter
 `ANALYTICS_NLI_ENABLED=true`, `ANALYTICS_NLI_BATCH_SIZE=8` e
@@ -427,6 +454,24 @@ emitem a claim OIDC `sub`, necessária para associar o actor autenticado às
 ações administrativas; após alterar o realm, gere token novo e valide `iss`,
 `aud`, `sub` e `groups` antes do smoke.
 protegidos.
+
+O histórico de releases usa uma credencial S2S separada do login humano do
+Jenkins. Configure `JENKINS_RELEASE_REPORTING_CLIENT_SECRET` somente no `.env`
+protegido e reconcilie o cliente declarativo `bookrush-jenkins-release-s2s`
+com `bash infrastructure/keycloak/reconcile.sh --env-file .env`. O client
+recebe audience `bookrush-admin-reporting` e scope
+`bookrush.reporting.release.write`; o Compose injeta o mesmo segredo no
+container Jenkins. Após alterar o `.env`, recrie somente o container Jenkins
+em janela controlada para carregar o novo valor. O endpoint exige audience e
+scope dedicados. Não reutilize cookies, crumbs ou o client OIDC interativo.
+
+O `Jenkinsfile` registra o resultado final do build. `deploy-compose.sh`
+registra por serviço os estados do deploy e, se a restauração das imagens
+anteriores terminar com sucesso, o evento de rollback com as referências e
+digests correspondentes. O envio usa `scripts/publish-release-event.sh`; falha
+na telemetria não altera o resultado do build nem interrompe deploy. O painel
+Admin Web só começa a mostrar eventos depois que a migration V41 estiver
+aplicada no Admin Service.
 
 O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
 Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh

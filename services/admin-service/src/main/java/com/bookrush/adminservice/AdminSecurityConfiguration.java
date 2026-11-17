@@ -26,13 +26,13 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
-@ConditionalOnProperty(name = "bookrush.security.enabled", havingValue = "true")
 public class AdminSecurityConfiguration {
   @Bean
+  @ConditionalOnProperty(name = "bookrush.security.enabled", havingValue = "true")
   SecurityFilterChain adminSecurity(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
     http.csrf(csrf -> csrf.disable()).cors(cors -> {})
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(groupsConverter())));
@@ -40,14 +40,29 @@ public class AdminSecurityConfiguration {
   }
 
   @Bean
+  @ConditionalOnProperty(
+      name = "bookrush.security.enabled", havingValue = "false", matchIfMissing = true)
+  SecurityFilterChain localSecurity(HttpSecurity http) throws Exception {
+    return http.csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .build();
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "bookrush.security.enabled", havingValue = "true")
   JwtDecoder jwtDecoder(
       @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}") String jwkSetUri,
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
-      @Value("${bookrush.security.audience}") String audience) {
+      @Value("${bookrush.security.audience}") String audience,
+      @Value("${bookrush.security.additional-audiences:}") String additionalAudiences) {
     NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
     OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
+    var acceptedAudiences = new java.util.HashSet<String>();
+    acceptedAudiences.add(audience);
+    Arrays.stream(additionalAudiences.split(",")).map(String::trim)
+        .filter(value -> !value.isBlank()).forEach(acceptedAudiences::add);
     OAuth2TokenValidator<Jwt> audienceValidator = token ->
-        token.getAudience().contains(audience)
+        token.getAudience().stream().anyMatch(acceptedAudiences::contains)
             ? OAuth2TokenValidatorResult.success()
             : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "required audience is missing", null));
     decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuerValidator, audienceValidator));

@@ -94,9 +94,78 @@ paths:
         '400': { description: Invalid limit }
         '401': { description: Missing or invalid S2S token }
         '403': { description: Missing S2S scope or audience }
+  /api/internal/v1/publisher/metrics/books/{bookId}:
+    get:
+      summary: Read thresholded daily metrics for one publisher book
+      description: >-
+        Internal S2S route. Requires the bookrush-platform audience
+        bookrush-behavior and the dedicated publisher metrics scope. Daily event counts
+        and 30-day growth are suppressed unless each relevant period contains
+        at least five distinct readers with reads. No reader identifiers are
+        returned. The caller requires the dedicated
+        bookrush.publisher.metrics.read scope.
+      operationId: readPublisherBookMetrics
+      security:
+        - publisherMetricsS2S: []
+      parameters:
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 366, default: 90 }
+      responses:
+        '200':
+          description: Daily metrics with low-sample suppression and growth summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [bookId, days, minReaders, items, growth]
+                properties:
+                  bookId: { type: string, format: uuid }
+                  days: { type: integer }
+                  minReaders: { type: integer, enum: [5] }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [day, suppressed]
+                      properties:
+                        day: { type: string, format: date }
+                        suppressed: { type: boolean }
+                        uniqueReaders: { type: integer, minimum: 5 }
+                        impressions: { type: integer, format: int64 }
+                        opens: { type: integer, format: int64 }
+                        reads: { type: integer, format: int64 }
+                  growth:
+                    type: object
+                    required: [windowDays, suppressed]
+                    properties:
+                      windowDays: { type: integer, enum: [30] }
+                      suppressed: { type: boolean }
+                      currentReaders: { type: integer, minimum: 5 }
+                      previousReaders: { type: integer, minimum: 5 }
+                      current_impressions: { type: integer, format: int64 }
+                      previous_impressions: { type: integer, format: int64 }
+                      impressions_change_percent: { type: number, nullable: true }
+                      current_opens: { type: integer, format: int64 }
+                      previous_opens: { type: integer, format: int64 }
+                      opens_change_percent: { type: number, nullable: true }
+                      current_reads: { type: integer, format: int64 }
+                      previous_reads: { type: integer, format: int64 }
+                      reads_change_percent: { type: number, nullable: true }
+        '400': { description: Days outside 1..366 }
+        '401': { description: Missing or invalid S2S token }
+        '403': { description: Missing S2S scope or audience }
 components:
   securitySchemes:
     behaviorSignalsS2S:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    publisherMetricsS2S:
       type: http
       scheme: bearer
       bearerFormat: JWT

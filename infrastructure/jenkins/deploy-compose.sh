@@ -154,6 +154,42 @@ diagnose() {
   done
 }
 compose_services=(reverse-proxy catalog-service book-ingestion-service book-content-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
+report_release_events() {
+  local event_type="$1" status="$2" use_previous="${3:-false}"
+  [[ -n "${JENKINS_RELEASE_REPORTING_CLIENT_SECRET:-}" ]] || return 0
+  local entry service variable previous_variable image_ref digest duration_ms=''
+  if [[ "$status" != STARTED && -n "${deploy_started_at_ms:-}" ]]; then
+    duration_ms=$(( $(date +%s%3N) - deploy_started_at_ms ))
+    (( duration_ms >= 0 )) || duration_ms=0
+  fi
+  local -a managed_images=(
+    'catalog-service|BACKEND_IMAGE|old_backend'
+    'frontend|FRONTEND_IMAGE|old_frontend'
+    'book-ingestion-service|INGESTION_IMAGE|old_ingestion'
+    'book-analytics-service|ANALYTICS_IMAGE|old_analytics'
+    'book-analytics-runtime|ANALYTICS_RUNTIME_IMAGE|old_analytics_runtime'
+    'behavior-service|BEHAVIOR_IMAGE|old_behavior'
+    'recommendation-service|RECOMMENDATION_IMAGE|old_recommendation'
+    'reader-bff-service|READER_BFF_IMAGE|old_reader_bff'
+    'reader-state-service|READER_STATE_IMAGE|old_reader_state'
+    'reader-profile-service|READER_PROFILE_IMAGE|old_reader_profile'
+    'social-service|SOCIAL_IMAGE|old_social'
+    'admin-service|ADMIN_SERVICE_IMAGE|old_admin_service'
+    'admin-web|ADMIN_WEB_IMAGE|old_admin_web'
+  )
+  for entry in "${managed_images[@]}"; do
+    IFS='|' read -r service variable previous_variable <<< "$entry"
+    if [[ "$use_previous" == true ]]; then
+      image_ref="${!previous_variable:-}"
+    else
+      image_ref="${!variable:-}"
+    fi
+    [[ -n "$image_ref" ]] || continue
+    digest="$(docker image inspect --format '{{.Id}}' "$image_ref" 2>/dev/null || true)"
+    "$repo_dir/scripts/publish-release-event.sh" "$event_type" "$status" "$service" "$image_ref" "$digest" "$duration_ms" \
+      || echo "Release reporting failed for $event_type $service; continuing deployment." >&2
+  done
+}
 if [[ -n "$keycloak_state" ]]; then
   if [[ "$keycloak_state" != running ]]; then
     docker start bookrush-keycloak-1 >/dev/null
@@ -371,17 +407,36 @@ probe_catalog() {
 
 rollback() {
   echo 'Deploy falhou; restaurando as imagens anteriores.' >&2
+  rollback_status=FAILURE
   if [[ -n "$old_gateway_config" ]]; then
     BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$old_gateway_config"
     export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG
   fi
-  if [[ -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
+  if [[ -n "$old_backend" && -n "$old_frontend" && -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}" || return $?
+    rollback_status=SUCCESS
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend || return $?
   else
     echo 'Não há imagens anteriores completas para rollback; mantendo a revisão solicitada para recuperar o stack.' >&2
-    "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"
+    "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}" || return $?
+  fi
+  return 0
+}
+
+report_rollback_result() {
+  local rollback_duration_ms=''
+  if [[ -n "${deploy_started_at_ms:-}" ]]; then
+    rollback_duration_ms=$(( $(date +%s%3N) - deploy_started_at_ms ))
+    (( rollback_duration_ms >= 0 )) || rollback_duration_ms=0
+  fi
+  if rollback && [[ "$rollback_status" == SUCCESS ]]; then
+    report_release_events ROLLBACK SUCCESS true
+    echo 'Rollback completo concluído; o deploy será marcado como falho.' >&2
+  else
+    "$repo_dir/scripts/publish-release-event.sh" ROLLBACK FAILURE bookrush "" "" "$rollback_duration_ms" \
+      || echo 'Release reporting failed for incomplete rollback; continuing failure handling.' >&2
+    echo 'Rollback não foi concluído integralmente; a recuperação será marcada como falha.' >&2
   fi
 }
 
@@ -390,11 +445,13 @@ printf '  %s\n' "${BACKEND_IMAGE}" "${INGESTION_IMAGE}" "${ANALYTICS_RUNTIME_IMA
 
 # Não usar somente trap ERR: docker compose pode falhar durante --wait e o
 # diagnóstico precisa ocorrer antes do rollback, preservando o exit code.
+deploy_started_at_ms="$(date +%s%3N)"
+report_release_events DEPLOY STARTED
 if ! "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}"; then
   echo 'Falha ao iniciar ou aguardar os serviços novos.' >&2
   diagnose
-  rollback
-  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  report_rollback_result
+  report_release_events DEPLOY FAILURE
   exit 1
 fi
 
@@ -414,24 +471,25 @@ fi
 
 if ! verify_admin_runtime_config; then
   diagnose
-  rollback
-  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  report_rollback_result
+  report_release_events DEPLOY FAILURE
   exit 1
 fi
 
 if ! probe_user_management; then
   echo 'Smoke test autenticado de gerenciamento de usuários falhou.' >&2
   diagnose
-  rollback
-  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  report_rollback_result
+  report_release_events DEPLOY FAILURE
   exit 1
 fi
 
 if ! probe_catalog; then
   echo 'Smoke test do catálogo pelo frontend falhou.' >&2
   diagnose
-  rollback
-  echo 'Rollback concluído; o deploy será marcado como falho.' >&2
+  report_rollback_result
+  report_release_events DEPLOY FAILURE
   exit 1
 fi
+report_release_events DEPLOY SUCCESS
 echo 'Deploy e smoke test concluídos.' >&2

@@ -7,3 +7,4 @@ boto3==1.38.46
 spacy==3.8.7
 transformers==4.52.4
 torch==2.6.0+cu124
+prometheus-client==0.22.1

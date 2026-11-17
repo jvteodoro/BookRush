@@ -2,6 +2,7 @@ package com.bookrush.ingestion.jobs;
 
 import com.bookrush.ingestion.retry.FailureClassifier;
 import com.bookrush.ingestion.config.IngestionProperties;
+import com.bookrush.ingestion.observability.IngestionMetrics;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.UUID;
@@ -31,6 +32,7 @@ public class IngestionDispatcher {
   private final GutenbergImportService gutenberg;
   private final Executor executor;
   private final IngestionProperties properties;
+  private final IngestionMetrics ingestionMetrics;
   private final ScheduledExecutorService heartbeatExecutor = Executors.newScheduledThreadPool(2);
 
   public IngestionDispatcher(
@@ -38,12 +40,14 @@ public class IngestionDispatcher {
       LeaseCoordinator leases,
       GutenbergImportService gutenberg,
       Executor ingestionExecutor,
-      IngestionProperties properties) {
+      IngestionProperties properties,
+      IngestionMetrics ingestionMetrics) {
     this.jdbc = jdbc;
     this.leases = leases;
     this.gutenberg = gutenberg;
     this.executor = ingestionExecutor;
     this.properties = properties;
+    this.ingestionMetrics = ingestionMetrics;
   }
 
   @PreDestroy
@@ -120,7 +124,7 @@ public class IngestionDispatcher {
                 try {
                   leases.heartbeat(lease.get(), Duration.ofSeconds(properties.leaseSeconds()));
                 } catch (RuntimeException failure) {
-                  log.warn("Ingestion task {} heartbeat failed", lease.get().taskId(), failure);
+                  log.warn("Ingestion heartbeat failed", failure);
                 }
               },
               properties.heartbeatSeconds(),
@@ -130,8 +134,10 @@ public class IngestionDispatcher {
         gutenberg.process(lease.get());
         leases.complete(lease.get(), "SUCCEEDED", "IMPORTED");
         updateCounters(jobId);
+        ingestionMetrics.processed();
       } catch (Exception failure) {
-        log.warn("Ingestion task {} failed: {}", lease.get().taskId(), failureDetail(failure));
+        log.warn("Ingestion task failed: {}", failureDetail(failure));
+        ingestionMetrics.attemptFailed();
         var failureClass = FailureClassifier.exception(failure);
         boolean retry = false;
         try {
@@ -139,6 +145,7 @@ public class IngestionDispatcher {
         } catch (RuntimeException ignored) {
         }
         if (retry) {
+          ingestionMetrics.retried();
           jdbc.update(
               "UPDATE catalog.ingestion_item SET status='PENDING', error_code=?, error_message=?,"
                   + " updated_at=clock_timestamp() WHERE id=(SELECT ingestion_item_id FROM"
@@ -153,7 +160,7 @@ public class IngestionDispatcher {
         } catch (RuntimeException ignored) {
         }
         String detail = failureDetail(failure);
-        jdbc.update(
+        int failedItems = jdbc.update(
             "UPDATE catalog.ingestion_item SET status='FAILED', error_code=?, error_message=?,"
                 + " started_at=COALESCE(started_at, clock_timestamp()),"
                 + " finished_at=clock_timestamp(), updated_at=clock_timestamp() WHERE id=(SELECT"
@@ -161,6 +168,7 @@ public class IngestionDispatcher {
             failure.getClass().getSimpleName(),
             detail,
             lease.get().taskId());
+        if (failedItems > 0) ingestionMetrics.failed();
         updateCounters(jobId);
       } finally {
         heartbeat.cancel(false);
@@ -192,15 +200,9 @@ UPDATE catalog.ingestion_job j SET
   }
 
   private static String failureDetail(Throwable failure) {
-    String message = failure.getMessage();
-    if (message == null || message.isBlank()) {
-      Throwable root = failure;
-      while (root.getCause() != null && root.getCause() != root) root = root.getCause();
-      message = root.getMessage() == null ? root.getClass().getSimpleName() : root.getMessage();
-    }
-    return (failure.getClass().getSimpleName() + ": " + message)
-        .substring(
-            0, Math.min(1000, failure.getClass().getSimpleName().length() + 2 + message.length()));
+    // Exception messages may contain object keys, URLs or upstream payloads.
+    // Keep the persisted diagnostic bounded and non-sensitive.
+    return failure.getClass().getSimpleName();
   }
 }
 

@@ -7,6 +7,7 @@ import com.bookrush.ingestion.catalog.PublisherSubmissionLinkClient;
 import com.bookrush.ingestion.catalog.SubjectCatalogClient;
 import com.bookrush.ingestion.processing.EpubTextExtractor;
 import com.bookrush.ingestion.processing.TextProcessingService;
+import com.bookrush.ingestion.observability.IngestionMetrics;
 import com.bookrush.ingestion.source.GutenbergProperties;
 import com.bookrush.ingestion.source.GutenbergRdfParser;
 import com.bookrush.ingestion.source.SnapshotDownloader;
@@ -37,6 +38,7 @@ public class GutenbergImportService {
   private final SubjectCatalogClient subjects;
   private final GutenbergProperties gutenberg;
   private final PublisherSubmissionLinkClient publisherLinks;
+  private final IngestionMetrics ingestionMetrics;
   private final Path staging = Path.of(System.getProperty("java.io.tmpdir"), "bookrush-ingestion");
   private final GutenbergRdfParser parser = new GutenbergRdfParser();
 
@@ -51,7 +53,8 @@ public class GutenbergImportService {
       ProcessingLineageClient lineage,
       SubjectCatalogClient subjects,
       GutenbergProperties gutenberg,
-      PublisherSubmissionLinkClient publisherLinks) {
+      PublisherSubmissionLinkClient publisherLinks,
+      IngestionMetrics ingestionMetrics) {
     this.jdbc = jdbc;
     this.downloader = downloader;
     this.raw = raw;
@@ -63,6 +66,7 @@ public class GutenbergImportService {
     this.subjects = subjects;
     this.gutenberg = gutenberg;
     this.publisherLinks = publisherLinks;
+    this.ingestionMetrics = ingestionMetrics;
   }
 
   public void process(LeaseCoordinator.Lease lease) throws Exception {
@@ -84,6 +88,7 @@ public class GutenbergImportService {
     if (records.isEmpty())
       throw new IllegalStateException("Gutenberg RDF did not contain item " + id);
     var record = records.getFirst();
+    ingestionMetrics.acquired();
     var requestHash =
         sha256(
             record.externalId()
@@ -212,6 +217,7 @@ public class GutenbergImportService {
               textVersionId,
               new String(normalized.normalizedTxt(), java.nio.charset.StandardCharsets.UTF_8),
               toChapterStructure(extracted.chapters()));
+      ingestionMetrics.normalized();
       Files.write(chaptersFile, finalProcessing.chaptersJson());
       var chaptersResult =
           assets.uploadDerived(bookId, editionId, sourceId, chaptersFile, "chapters.json", "JSON");

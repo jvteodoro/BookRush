@@ -52,3 +52,18 @@ Esses valores também são os defaults do Compose quando a configuração
 protegida não os substitui: NLI fica habilitado, com lote 8, e embeddings usam
 lote 4. O classificador de tópicos continua experimental e não é ativado no
 worker sem artefato `ACCEPTED` revisado.
+
+## Observabilidade do runtime
+
+O endpoint privado `GET /metrics` expõe somente métricas agregadas de baixa
+cardinalidade para o Prometheus. Ele não deve ser publicado pelo gateway e não
+recebe texto, identificadores de usuário, livro ou trecho como labels. As
+principais séries são `bookrush_analytics_runtime_requests_total`,
+`bookrush_analytics_runtime_request_duration_seconds`,
+`bookrush_analytics_runtime_model_state` e
+`bookrush_analytics_runtime_cuda_available`.
+
+O dashboard `PL-06` usa essas séries para latência por operação, estado dos
+modelos (`VALID`, `MODEL_UNAVAILABLE` ou `ERROR`) e disponibilidade CUDA. A
+ausência de artefato local permanece explícita como `MODEL_UNAVAILABLE`; não é
+convertida em zero ou em sucesso operacional.

@@ -29,4 +29,27 @@ class FeedMetricsTest {
     assertEquals(1, registry.timer("bookrush.feed.stage.duration", "stage", "total").count());
     assertEquals(1, registry.counter("bookrush.feed.requests", "outcome", "error").count());
   }
+
+  @Test
+  void recordsLowCardinalityPersonalizedPathsAndFallbackReasons() {
+    var registry = new SimpleMeterRegistry();
+    var metrics = new FeedMetrics(registry);
+
+    metrics.observePersonalization("FALLBACK", "disabled", 0, 0, 0, 0);
+    metrics.observePersonalization("SHADOW", "shadow", 0.4, 2, 1, 3);
+    metrics.observePersonalization("PERSONALIZED", "ready", 0.8, 4, 0, 0);
+
+    assertEquals(1, registry.counter("bookrush.feed.personalized.path",
+        "outcome", "fallback").count());
+    assertEquals(1, registry.counter("bookrush.feed.personalized.path",
+        "outcome", "shadow").count());
+    assertEquals(1, registry.counter("bookrush.feed.personalized.path",
+        "outcome", "personalized").count());
+    assertEquals(1, registry.counter("bookrush.feed.personalized.reason",
+        "outcome", "disabled").count());
+    assertEquals(1, registry.counter("bookrush.feed.personalized.reason",
+        "outcome", "shadow").count());
+    assertEquals(1, registry.counter("bookrush.feed.personalized.reason",
+        "outcome", "ready").count());
+  }
 }

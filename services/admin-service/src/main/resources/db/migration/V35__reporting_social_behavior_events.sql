@@ -1,0 +1,9 @@
+ALTER TABLE reporting.social_daily
+    ADD COLUMN IF NOT EXISTS behavior_like_events BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS behavior_unlike_events BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS behavior_save_events BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS behavior_unsave_events BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS behavior_share_events BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS behavior_comment_events BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS behavior_unique_actors BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS behavior_distinct_books BIGINT NOT NULL DEFAULT 0;

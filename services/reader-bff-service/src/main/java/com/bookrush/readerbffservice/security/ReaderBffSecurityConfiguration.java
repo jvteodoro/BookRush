@@ -24,7 +24,7 @@ public class ReaderBffSecurityConfiguration {
         .cors(cors -> {})
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
+                auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus")
                     .permitAll()
                     .requestMatchers(HttpMethod.OPTIONS, "/**")
                     .permitAll()
@@ -53,7 +53,7 @@ public class ReaderBffSecurityConfiguration {
             HttpMethod.OPTIONS.name()));
     configuration.setAllowedHeaders(
         List.of("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client",
-            "X-BookRush-Recommendation-Item", "X-BookRush-Impression"));
+            "X-BookRush-Recommendation-Item", "X-BookRush-Impression", "X-BookRush-Platform"));
     configuration.setAllowCredentials(false);
     configuration.setMaxAge(3600L);
 

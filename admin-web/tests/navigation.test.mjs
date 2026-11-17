@@ -29,6 +29,7 @@ test("admin navigation exposes every routed console area", () => {
       "/training",
       "/publisher",
       "/operations",
+      "/dashboards",
     ],
   );
   assert.equal(navigation.isAdminRoute("/review"), true);

@@ -8,7 +8,10 @@
     "./styles.css": "./src/styles/design-system.css",
     "./sidebar.css": "./src/styles/sidebar.css",
     "./layout.css": "./src/styles/layout.css",
-    "./vite": "./vite.mjs",
+    "./vite": {
+      "types": "./vite.d.mts",
+      "import": "./vite.mjs"
+    },
     "./theme": "./src/theme/ThemeProvider.tsx",
     "./quoteText": "./src/components/quoteText.ts",
     "./native-controls": "./src/native-controls.ts",

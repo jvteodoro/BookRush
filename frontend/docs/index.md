@@ -164,9 +164,22 @@ limitado a 60 segundos. A fila é perdida ao encerrar a sessão ou o processo;
 nenhum token, e-mail ou texto do livro entra nela.
 
 O web registra impressões somente quando o elemento atinge o limiar de
-visibilidade (`IntersectionObserver`) e mede `DWELL` com duração não negativa.
+visibilidade (`IntersectionObserver`) e mede `DWELL` por intervalos ativos do
+card. O intervalo é encerrado ao sair da área visível, ao esconder a aba ou ao
+desmontar o feed; durações menores que 250 ms são descartadas como ruído.
+Quando a aba volta a ficar visível, um novo intervalo com `visitId` próprio
+começa para cada card ainda visível, sem contabilizar o tempo em segundo plano.
+Para cards originados do feed, a viewability é confirmada pelo endpoint
+server-side do ledger (`/recommendations/impressions/{id}/viewable`); o web não
+envia um segundo `EXCERPT_IMPRESSION` para o mesmo `impressionId`. Impressões
+orgânicas sem ledger continuam usando o evento de telemetria. Isso evita que
+retry/reconciliação conte duas vezes o mesmo fato.
 O mobile expõe os mesmos eventos por `impression` e `dwell`, pois não possui
 um DOM; `BOOK_OPEN`, `BOOK_SAVED` e `BOOK_UNSAVED` são enfileirados pelo app.
+Cada evento web recebe somente a dimensão coarse `payload.platform` (`web` ou
+`mobile`); user-agent bruto, IP, sujeito e identificadores de livro não são
+persistidos como dimensão de reporting. Valores enviados pelo cliente para
+essa chave são descartados e substituídos pela classificação local.
 O envio chama `POST /api/v1/behavior/events` com o bearer apenas no cabeçalho.
 Os testes estão em `tests/telemetry.test.mjs` e cobrem sanitização, batching,
 retry, viewability e dwell.

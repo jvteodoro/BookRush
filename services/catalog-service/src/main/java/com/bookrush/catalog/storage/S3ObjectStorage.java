@@ -36,10 +36,8 @@ public final class S3ObjectStorage implements ObjectStorage {
     } catch (SdkException e) {
       result = "error";
       log.warn(
-          "storage operation failed operation={} bucket={} key={} exception={} status={}",
+          "storage operation failed operation={} exception={} status={}",
           operation,
-          location.bucket(),
-          location.key(),
           e.getClass().getSimpleName(),
           e instanceof S3Exception s ? s.statusCode() : "n/a");
       var kind =
@@ -55,11 +53,9 @@ public final class S3ObjectStorage implements ObjectStorage {
           .record(System.nanoTime() - start, java.util.concurrent.TimeUnit.NANOSECONDS);
       // Never log SDK exceptions, request headers or presigned URLs.
       log.info(
-          "storage operation={} result={} bucket={} key={} durationMs={}",
+          "storage operation={} result={} durationMs={}",
           operation,
           result,
-          location.bucket(),
-          location.key(),
           (System.nanoTime() - start) / 1_000_000);
     }
   }

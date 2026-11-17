@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
   application:
     name: book-ingestion-service
   main:

@@ -373,18 +373,44 @@ export function LiveReader({
     const book = runtime().__BOOKRUSH_BOOKS__.find((item) => item.id === id);
     if (!book) return;
     viewed.current.add(id);
-    if (book.excerpt)
-      runtime().__BOOKRUSH_API__.trackExcerpt(
-        "EXCERPT_IMPRESSION",
-        id,
-        book.excerpt,
-      );
-    if (book.impressionId)
+    // Recommendation impressions are recorded server-side after ownership
+    // validation. Do not emit a second client event with a different key.
+    if (book.impressionId) {
       void runtime()
         .__BOOKRUSH_API__.viewable(id)
         .catch(() => {
           viewed.current.delete(id);
         });
+    } else if (book.excerpt) {
+      runtime().__BOOKRUSH_API__.trackExcerpt(
+        "EXCERPT_IMPRESSION",
+        id,
+        book.excerpt,
+      );
+    }
+  }, []);
+  const onDwell = useCallback(
+    (id: string, durationMs: number, visitId: string) => {
+      const book = runtime().__BOOKRUSH_BOOKS__.find((item) => item.id === id);
+      if (!book?.excerpt || durationMs <= 0) return;
+      runtime().__BOOKRUSH_API__.trackExcerpt(
+        "EXCERPT_DWELL",
+        id,
+        book.excerpt,
+        {
+          durationMs,
+          visitId,
+        },
+      );
+    },
+    [],
+  );
+  const onSkip = useCallback((id: string, visitId: string) => {
+    const book = runtime().__BOOKRUSH_BOOKS__.find((item) => item.id === id);
+    if (!book?.excerpt) return;
+    runtime().__BOOKRUSH_API__.trackExcerpt("EXCERPT_SKIP", id, book.excerpt, {
+      visitId,
+    });
   }, []);
   const navigate = (nextTab: ReaderTab) => {
     setMessage("");
@@ -528,6 +554,8 @@ export function LiveReader({
             },
             onShare: (id) => runtime().__BOOKRUSH_LEGACY__.openShare(id),
             onViewable,
+            onDwell,
+            onSkip,
           }}
         />
       )}

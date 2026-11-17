@@ -1,0 +1,153 @@
+# Migrations do admin-service
+
+As migrations Flyway são append-only. `V5__reporting_reader_day.sql` cria o
+schema de leitura `reporting` sem alterar tabelas administrativas existentes:
+
+- `reporting.reader_day`: agregados diários derivados da fronteira de eventos,
+  com versão do cálculo, população, plataforma e watermark;
+- `reporting.projection_health`: estado, frescor, contagem e versão da
+  projeção.
+
+O job de projeção é idempotente por `(day, population, platform)` e limitado a
+366 dias. A população inicial é `UNCLASSIFIED`, portanto a API retorna
+`UNTRUSTED` até que a classificação de provenance seja disponibilizada. Não há
+payload bruto, subject ou texto de livro no snapshot.
+
+`V6__reporting_feed_and_pipeline.sql` adiciona:
+
+- `reporting.feed_daily`, com entrega do ledger, viewability e outcomes
+  atribuídos pela versão `attribution-v1`; a chave inclui dia, estratégia,
+  modelo, caminho, população e plataforma;
+- `reporting.pipeline_snapshot`, com estados de itens e fases de analytics,
+  idade do pending mais antigo, falhas, throughput na última hora e watermark.
+
+A projeção utiliza somente agregações limitadas aos últimos 366 dias e atualiza
+as linhas existentes por chave. Não há exclusão de fatos operacionais nem
+consultas SQL fornecidas pelo frontend.
+
+`V7__reporting_data_quality.sql` cria as projeções diárias de qualidade. Elas
+são reconstruídas apenas na janela materializada, possuem watermark e versão de
+cálculo, e alimentam os painéis DQ-03 (atribuição) e DQ-04 (reconciliação).
+
+`V8__reporting_reader_activity_windows.sql` adiciona as colunas de atividade
+semanal/mensal e recorrência ao snapshot diário sem reescrever migrations
+anteriores.
+
+Os eventos de comportamento com `payload.platform` validado (`web` ou
+`mobile`) alimentam linhas separadas de `reporting.reader_day`; valores
+ausentes ou não permitidos permanecem `UNKNOWN`. A dimensão é coarse e não
+contém user-agent, identidade ou identificador de dispositivo.
+
+`V9__reporting_social_publisher.sql` cria os agregados diários usados pelas
+áreas Social & Publisher. Ausência de registros retorna `NO_DATA` e não é
+convertida em atividade zero pelo frontend.
+
+`V10__reporting_content_supply_and_ingestion.sql` adiciona:
+
+- `reporting.content_supply_snapshot`, um snapshot temporal da oferta de livros
+  ativos, assets disponíveis, assets analisados e excerpts elegíveis/rankeados;
+- `reporting.ingestion_daily`, uma projeção diária de jobs e itens por estado,
+  incluindo descobertos, processados, sucesso e falhas.
+
+As consultas usam somente contagens agregadas dos bounded contexts catalog e
+analytics, preservam `source_watermark` e `calculation_version`, e não expõem
+IDs, conteúdo ou mensagens de erro brutas no contrato do dashboard.
+
+`V11__reporting_pipeline_phase_daily.sql` agrega `analysis_phase_timing` por
+dia, fase, estado e código de erro, calculando percentis diretamente sobre as
+durações observadas e contando tentativas, falhas e leases presos.
+
+`V12__reporting_reading_and_retention.sql` cria `reporting.reading_daily` para
+sessões, duração, livros e biblioteca, e `reporting.retention_cohort` para
+coortes D1/D7/D30. A coluna `mature` impede que uma coorte incompleta seja
+interpretada como retenção zero.
+
+`V13__reporting_recommendation_daily.sql` agrega o ledger de recommendation por
+modelo, estratégia, caminho e plataforma, preservando contagens de requests,
+itens, impressões, viewability, livros únicos e percentis de rank.
+
+`V14__reporting_event_quality_daily.sql` agrega eventos aceitos/rejeitados e
+estado do outbox por dia, expondo somente contagens, tentativas e idade do item
+pendente. Eventos aceitos são agrupados pelo dia de recebimento (`received_at`),
+mantendo o período de ocorrência como limite de leitura da fonte.
+
+`V15__reporting_moderation_publisher_rights.sql` cria snapshots agregados para
+aging de moderação, funil editorial/publicação e decisões de direitos/licenças.
+
+`V16__reporting_recommendation_quality_daily.sql` cria outcomes atribuídos do
+ledger de recomendações, preservando a versão de cálculo e o watermark.
+
+`V17__reporting_book_engagement_daily.sql` cria fatos agregados por obra e por
+idioma, com leitores distintos, minutos, aberturas, conclusões e interações.
+
+`V18__reporting_event_schema_daily.sql` cria agregados de schema/cliente e
+rejeições de telemetria, preservando apenas dimensões de baixa cardinalidade.
+
+`V19__reporting_recommendation_position_daily.sql` agrega outcomes atribuídos
+por bucket de rank para análise de relevância posicional.
+
+`V41__reporting_release_events.sql` cria o ledger de eventos de build, deploy e
+rollback recebidos do Jenkins. `event_id` fornece idempotência; reutilização do
+mesmo id com payload diferente é rejeitada. O schema guarda job, número/link do
+build, branch/commit, serviço, imagem/digest, estado, duração e horário, sem
+credenciais ou payloads de build.
+
+`V42__reporting_feed_visit_skip_metrics.sql` adiciona `skipped_visits` à
+projeção diária do feed. O valor conta visitas puladas por ação explícita de
+avançar no feed; a projeção não infere skip da ausência de abertura.
+
+`V43__reporting_feed_mature_viewable_ctr.sql` adiciona o denominador de
+impressões viewable maduras e as aberturas atribuídas nessa mesma coorte. A
+janela de atribuição é de sete dias desde a impressão viewable.
+
+`V44__reporting_experiment_mature_ctr.sql` acrescenta denominador viewable
+maduro e aberturas distintas por impressão à projeção dos experimentos; o CTR
+fica indisponível até cada impressão completar sete dias desde `viewable_at`.
+
+`V45__reporting_excerpt_mature_ctr.sql` acrescenta o mesmo denominador e
+numerador por impressão à análise de excerpt. Impressões legadas sem
+`viewable_at` não contam para o CTR elegível.
+
+`V46__reporting_recommendation_position_funnel.sql` cria o funil de impressão,
+viewability e abertura por faixa de rank, estratégia e modelo. Abreviaturas de
+usuário não são expostas; o CTR só inclui viewables com maturidade de sete dias.
+
+`V47__reporting_recommendation_repeat_coverage.sql` acrescenta repetição de
+livro por leitor entre impressões viewable numa janela móvel de 30 dias e a
+contagem diária de livros distintos que tiveram viewability.
+
+`V48__reporting_recommendation_candidate_funnel.sql` acrescenta as contagens
+diárias de candidatos, candidatos pontuados pelo analytics e seleções. Valores
+históricos permanecem nulos quando o request legado não carregava essas
+contagens.
+
+`V49__recommendation_profile_quality_daily.sql` cria a distribuição diária de
+confiança/tamanho de perfil, cobertura de fadiga e cold-start; publica apenas
+contagens por bucket.
+
+`V20__reporting_editorial_quality_daily.sql` cria o snapshot diário de
+qualidade editorial a partir das tabelas de campanhas de anotação. A projeção
+é limitada a 366 dias, idempotente e preserva watermark/versão; discordâncias
+e tempos são contagens/percentis agregados, sem texto ou identidade de
+annotator.
+
+`V21__reporting_excerpt_performance.sql` cria o snapshot diário protegido de
+desempenho por excerpt. A projeção reconcilia o ledger de impressões com
+outcomes `ATTRIBUTED`, preserva elegibilidade/modelo/estratégia e aplica
+supressão de amostras pequenas na API; texto do excerpt e sujeitos nunca são
+materializados no output.
+
+`V22__reporting_experiment_daily.sql` cria guardrails agregados por assignment
+persistido, variante e dia. A origem é o ledger de recommendation e a
+atribuição `ATTRIBUTED`; sem assignment ativo a API retorna `NO_DATA`, e os
+resultados continuam explicitamente observacionais.
+
+`V23__reporting_access_audit_daily.sql` materializa somente contagens do
+`admin.audit_log` por dia e ação. Subjects, targets e `details` não são
+copiados para a projeção, permitindo o painel DQ-08 sem divulgar valores
+individuais.
+
+`V50__expand_reporting_projection_version.sql` amplia para 120 caracteres a
+versão registrada em `reporting.projection_health`. O limite comporta os
+identificadores das definições das projeções; se uma origem estiver ausente,
+o erro fica registrado sem interromper a atualização das demais projeções.

@@ -26,6 +26,11 @@ def adminWebJob = instance.getItem('bookrush-admin-web')
 if (adminWebJob == null) {
     adminWebJob = instance.createProject(WorkflowJob, 'bookrush-admin-web')
 }
+def observabilityPipelineFile = new File('/opt/bookrush/observability.Jenkinsfile')
+def observabilityJob = instance.getItem('bookrush-observability')
+if (observabilityJob == null) {
+    observabilityJob = instance.createProject(WorkflowJob, 'bookrush-observability')
+}
 def microservicePipelineFile = new File('/opt/bookrush/microservice.Jenkinsfile')
 def verticalPipelineFile = new File('/opt/bookrush/vertical.Jenkinsfile')
 def replaceParameters = { WorkflowJob pipelineJob, List definitions ->
@@ -92,10 +97,25 @@ if (!(backstageJob.getDefinition() instanceof CpsScmFlowDefinition)) {
     backstageJob.setDefinition(scmFor(backstagePipelineFile.name))
     backstageJob.save()
 }
-if (!(adminWebJob.getDefinition() instanceof CpsScmFlowDefinition)) {
-    adminWebJob.setDefinition(scmFor(adminWebPipelineFile.name))
+def adminWebDefinition = adminWebJob.getDefinition()
+if (!(adminWebDefinition instanceof CpsScmFlowDefinition) ||
+    adminWebDefinition.getScriptPath() != 'infrastructure/jenkins/admin-web.Jenkinsfile') {
+    adminWebJob.setDefinition(scmFor('infrastructure/jenkins/admin-web.Jenkinsfile'))
     adminWebJob.save()
 }
+def observabilityDefinition = observabilityJob.getDefinition()
+if (!(observabilityDefinition instanceof CpsScmFlowDefinition) ||
+    observabilityDefinition.getScriptPath() != 'infrastructure/jenkins/observability.Jenkinsfile') {
+    observabilityJob.setDefinition(scmFor('infrastructure/jenkins/observability.Jenkinsfile'))
+    observabilityJob.save()
+}
+replaceParameters(observabilityJob, [
+    new StringParameterDefinition('BRANCH', 'main', 'Branch da stack de observabilidade.'),
+    new StringParameterDefinition('GRAFANA_ADMIN_CREDENTIAL_ID', 'observability-grafana-admin-password', 'Credential Jenkins Secret text da senha local de recuperação do Grafana.'),
+    new StringParameterDefinition('POSTGRES_EXPORTER_CREDENTIAL_ID', 'observability-postgres-exporter-dsn', 'Credential Jenkins Secret text do DSN read-only do exporter PostgreSQL.'),
+    new StringParameterDefinition('GRAFANA_OIDC_CREDENTIAL_ID', 'grafana-oidc-client-secret', 'Credential Jenkins Secret text do client OIDC Grafana.'),
+    new BooleanParameterDefinition('DEPLOY', false, 'Implantar a stack de observabilidade no Compose de produção.')
+])
 if (!(job.getDefinition() instanceof CpsScmFlowDefinition)) {
     job.setDefinition(scmFor('Jenkinsfile'))
     job.save()

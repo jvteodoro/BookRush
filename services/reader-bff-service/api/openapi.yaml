@@ -24,9 +24,19 @@ paths:
       requestBody:
         required: true
         content:
-          application/json: { schema: { type: object, required: [activeSeconds], properties: { activeSeconds: { type: integer, minimum: 0 } } } }
+          application/json: { schema: { type: object, required: [activeSeconds], properties: { activeSeconds: { type: integer, minimum: 0, description: Client reported active time; the reader-state service caps it to elapsed wall time and 24 hours. } } } }
       responses:
-        '200': { description: Reading session ended }
+        '200':
+          description: Reading session ended; the returned and published activeSeconds is capped by elapsed wall time and 86400 seconds.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, activeSeconds, plant]
+                properties:
+                  id: { type: string, format: uuid }
+                  activeSeconds: { type: integer, minimum: 0, maximum: 86400 }
+                  plant: { type: object, additionalProperties: true }
         '401': { description: Authentication required }
         '404': { description: Session not found }
         '502': { description: Reader state service unavailable }
@@ -74,6 +84,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: X-BookRush-Platform, in: header, description: "Optional coarse client family used for aggregate reporting; only web/mobile are accepted, no user-agent is retained", schema: { type: string, enum: [web, mobile] } }
       responses:
         '200': { description: "Composed analytics-ready recommendation feed; when analytics ranking is enabled, books without an eligible score and non-empty excerpt are omitted" }
         '401': { description: Authentication required }
@@ -81,6 +92,8 @@ paths:
   /api/v1/reader/recommendations:
     get:
       security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: X-BookRush-Platform, in: header, description: "Optional coarse client family used for aggregate reporting; only web/mobile are accepted, no user-agent is retained", schema: { type: string, enum: [web, mobile] } }
       responses:
         '200': { description: Recommendation feed }
         '401': { description: Authentication required }

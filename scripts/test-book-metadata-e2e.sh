@@ -116,6 +116,17 @@ docker cp "$work_dir/stale-routes.yaml" "$gateway:/dynamic.yaml" >/dev/null
 docker start "$gateway" >/dev/null
 docker run -d --name "$probe" --network "$network" python:3.12-slim sleep 900 >/dev/null
 docker exec -i "$probe" python3 - < scripts/test-book-metadata-e2e.py
+# Exercise session end through the public gateway and BFF. A fresh session
+# cannot accept more active time than elapsed; a long-lived row is capped at 24h.
+fast_session="$(docker exec -i "$probe" python3 - --start-session < scripts/test-book-metadata-e2e.py)"
+fast_active_seconds="$(docker exec -i "$probe" python3 - "$fast_session" --end-session < scripts/test-book-metadata-e2e.py)"
+(( fast_active_seconds <= 5 ))
+long_session="$(docker exec -i "$probe" python3 - --start-session < scripts/test-book-metadata-e2e.py)"
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush -c \
+  "UPDATE reader_state.session SET started_at = clock_timestamp() - INTERVAL '25 hours' WHERE id = '$long_session'" >/dev/null
+long_active_seconds="$(docker exec -i "$probe" python3 - "$long_session" --end-session < scripts/test-book-metadata-e2e.py)"
+[[ "$long_active_seconds" == 86400 ]]
+echo 'Reader session E2E: gateway/BFF elapsed-time cap and 24h maximum OK'
 [[ "$(docker exec "$gateway" cat /tmp/bookrush-traefik-dynamic.yaml)" == "$BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG" ]]
 bash infrastructure/jenkins/probe-reader-library.sh "$network"
 # Ensure the marker is not derived from the 50 most-recent entries.

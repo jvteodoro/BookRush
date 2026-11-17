@@ -21,7 +21,7 @@ import "@bookrush/ui/layout.css";
 import "./styles/search.css";
 import "./styles/recommendations.css";
 import "./styles/comments.css";
-import { readiumBridge } from "./reader/readiumBridge";
+import { readiumBridge } from "./reader/lazyReadiumBridge";
 import { createBookmarksClient } from "./reader/bookmarks";
 import { bookmarkDialogs } from "./reader/bookmarkDialogs";
 import { AuthenticatedShell } from "./app/AuthenticatedShell";

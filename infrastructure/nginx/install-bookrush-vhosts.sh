@@ -74,6 +74,7 @@ targets = {
     "seaweedfs-bookrush.jteodoro.tec.br",
     "seaweedfs-s3-bookrush.jteodoro.tec.br",
     "admin-web-bookrush.jteodoro.tec.br",
+    "grafana-bookrush.jteodoro.tec.br",
 }
 blocks = []
 cursor = 0

@@ -14,6 +14,12 @@ http:
       priority: 200
       service: keycloak
 
+    grafana:
+      rule: Host(`grafana-bookrush.jteodoro.tec.br`)
+      entryPoints: [web]
+      priority: 200
+      service: grafana
+
     seaweedfs-oauth:
       rule: Host(`seaweedfs-bookrush.jteodoro.tec.br`) && PathPrefix(`/oauth2`)
       entryPoints:
@@ -107,6 +113,12 @@ http:
       entryPoints: [web]
       priority: 135
       service: admin-api
+    admin-reporting-api:
+      rule: Host(`bookrush.jteodoro.tec.br`) && PathPrefix(`/api/admin`)
+      entryPoints: [web]
+      priority: 135
+      middlewares: [admin-reporting-rate-limit]
+      service: admin-api
     content:
       rule: PathPrefix(`/api/v1/content`)
       entryPoints: [web]
@@ -127,6 +139,11 @@ http:
       service: admin-web
 
   middlewares:
+    admin-reporting-rate-limit:
+      rateLimit:
+        average: 30
+        period: 1s
+        burst: 60
     ingestion-strip:
       stripPrefix:
         prefixes:
@@ -186,6 +203,10 @@ http:
       loadBalancer:
         servers:
           - url: http://keycloak:8080
+    grafana:
+      loadBalancer:
+        servers:
+          - url: http://grafana:3000
     seaweedfs-oauth:
       loadBalancer:
         servers:

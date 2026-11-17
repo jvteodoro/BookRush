@@ -120,9 +120,19 @@ paths:
               type: object
               required: [activeSeconds]
               properties:
-                activeSeconds: { type: integer, minimum: 0 }
+                activeSeconds: { type: integer, minimum: 0, description: Tempo ativo informado pelo cliente; o servidor limita ao tempo decorrido desde o início da sessão e a 24 horas. }
       responses:
-        '200': { description: Sessão encerrada e READ_SESSION publicado }
+        '200':
+          description: Sessão encerrada. activeSeconds na resposta e em READ_SESSION contém o menor valor entre o tempo informado, o tempo decorrido e 86400 segundos.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, activeSeconds, plant]
+                properties:
+                  id: { type: string, format: uuid }
+                  activeSeconds: { type: integer, minimum: 0, maximum: 86400 }
+                  plant: { type: object, additionalProperties: true }
         '401': { description: Token ausente ou inválido }
         '404': { description: Sessão inexistente ou não pertencente ao leitor }
   /api/v1/reader/books/{bookId}/progress:

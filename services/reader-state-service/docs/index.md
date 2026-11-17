@@ -60,7 +60,11 @@ inventada.
 `POST /api/v1/reader/sessions` starts a reading session with an optional
 `bookId`. Feed-origin sessions may include recommendation and impression
 headers; direct library/search sessions omit them. `POST /sessions/{id}/end`
-publishes `READ_SESSION` with the persisted session origin and active seconds.
+publishes `READ_SESSION` with the persisted session origin and accepted active
+seconds. The server caps that value to the smaller of the client-reported time,
+the elapsed wall time since `started_at`, and 24 hours; it uses the same
+accepted duration for the response, event and daily reading aggregate. The
+frontend pauses its active-time counter while the page is hidden.
 
 `PUT /books/{bookId}/progress` publishes `READ_PROGRESS` and, at 100%, an
 idempotent `BOOK_COMPLETE`; the frontend sends the correlation headers only
