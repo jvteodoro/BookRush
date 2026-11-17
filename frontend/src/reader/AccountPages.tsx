@@ -276,7 +276,7 @@ export function AccountPage({
           </p>
           <ActionRow>
             <Button onClick={() => window.location.assign("/admin/publisher")}>
-              Ver estatísticas dos meus livros
+              Publicar e acompanhar meus livros
             </Button>
             <Button variant="ghost" onClick={() => onNavigate("feed")}>
               Voltar para o feed

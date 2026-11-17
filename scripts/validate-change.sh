@@ -5,19 +5,31 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
 mode=working
 base_ref=""
+offline=false
 while (($#)); do
   case "$1" in
     --staged) mode=staged ;;
     --ci) mode=ci ;;
+    --offline) offline=true ;;
     --push) mode=push ;;
     --base) shift; test "$#" -gt 0 || { echo '--base exige uma referência Git' >&2; exit 2; }; base_ref="$1" ;;
-    --help) echo 'Uso: scripts/validate-change.sh [--staged|--push|--ci] [--base REF]'; exit 0 ;;
+    --help) echo 'Uso: scripts/validate-change.sh [--staged|--push|--ci] [--base REF] [--offline]'; exit 0 ;;
     *) echo "opção desconhecida: $1" >&2; exit 2 ;;
   esac
   shift
 done
 
-mapfile -t changed < <(
+if "$offline"; then
+  for tool in git python3; do
+    command -v "$tool" >/dev/null 2>&1 || {
+      echo "Change gate: $tool ausente no agente; atualize a imagem Jenkins antes de executar o gate offline." >&2
+      exit 2
+    }
+  done
+fi
+echo "Change gate: iniciando (modo=$mode, offline=$offline)."
+
+changed_paths="$(
   case "$mode" in
     staged) git diff --cached --name-only --diff-filter=ACMR ;;
     push)
@@ -42,7 +54,12 @@ mapfile -t changed < <(
       ;;
     working) git diff --name-only --diff-filter=ACMR ;;
   esac
-)
+)" || {
+  echo 'Change gate: não foi possível ler o diff Git; confira checkout, referência base e permissões do workspace.' >&2
+  exit 2
+}
+changed=()
+if [[ -n "$changed_paths" ]]; then mapfile -t changed <<< "$changed_paths"; fi
 
 if ((${#changed[@]} == 0)); then
   echo 'Change gate: nenhum arquivo alterado no intervalo analisado.'
@@ -109,6 +126,9 @@ fi
 if has_prefix services/book-analytics-service/config/ || has_prefix services/book-analytics-service/src/ || has_path scripts/validate-analytics-specs.py; then
   if python3 -c 'import yaml, jsonschema' >/dev/null 2>&1; then
     python3 scripts/validate-analytics-specs.py
+  elif "$offline"; then
+    echo 'Change gate: PyYAML/jsonschema ausentes no agente. Atualize a imagem Jenkins com python3-yaml e python3-jsonschema; nenhuma instalação em runtime foi iniciada.' >&2
+    exit 2
   elif command -v docker >/dev/null 2>&1 && [[ -n "${HOSTNAME:-}" ]]; then
     docker run --rm --volumes-from "$HOSTNAME" -w "$PWD" python:3.12-slim bash -lc \
       'python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema && python3 scripts/validate-analytics-specs.py'

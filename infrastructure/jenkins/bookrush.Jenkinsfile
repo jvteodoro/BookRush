@@ -57,7 +57,9 @@ pipeline {
 
     stage('Developer Portal e documentação') {
       steps {
-        sh 'docker run --rm --volumes-from "$HOSTNAME" -w "$PWD" python:3.12-slim bash -lc "apt-get update -qq && apt-get install -y -qq --no-install-recommends git >/dev/null && python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema && git config --global --add safe.directory \"$PWD\" && bash scripts/validate-change.sh --ci"'
+        timeout(time: 5, unit: 'MINUTES') {
+          sh(label: 'Change gate local e offline', script: 'bash scripts/validate-change.sh --ci --offline')
+        }
         sh 'bash scripts/test-portal.sh --validation-only'
       }
     }

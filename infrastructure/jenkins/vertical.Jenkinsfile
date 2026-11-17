@@ -40,7 +40,9 @@ pipeline {
     }
     stage('Change gate e testes da vertical') {
       steps {
-        sh 'bash scripts/validate-change.sh --ci'
+        timeout(time: 5, unit: 'MINUTES') {
+          sh(label: 'Change gate local e offline', script: 'bash scripts/validate-change.sh --ci --offline')
+        }
         sh 'bash scripts/test-vertical.sh "$SELECTED_VERTICAL"'
       }
     }
