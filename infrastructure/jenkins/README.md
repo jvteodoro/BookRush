@@ -316,15 +316,18 @@ Kubernetes exige registry e a credencial de kubeconfig descrita em
 
 ## Atualizar a definição do job
 
-`Jenkinsfile` é a fonte da pipeline. `bookrush.Jenkinsfile` é sua cópia de
-bootstrap e precisa permanecer idêntica. No startup, o script de inicialização
-reconcilia a definição inline e os parâmetros do job existente a partir desse
-arquivo. Isso evita que opções como `RUN_INFRA_CONTRACTS` desapareçam da
-definição persistida. Depois de publicar uma alteração, reinicie somente o
-container Jenkins quando não houver builds ativos e confirme a revisão e os
-parâmetros na API/UI antes de disparar o deploy. O job, seu histórico e o volume
-`jenkins_home` são preservados. A branch `main` fornece a definição da pipeline;
-**BRANCH** seleciona o código que será compilado e implantado.
+`Jenkinsfile` é a fonte da pipeline e `bookrush.Jenkinsfile` é a cópia de
+bootstrap que deve permanecer idêntica. O job `bookrush-deploy` carrega o
+`Jenkinsfile` de `main` via Pipeline from SCM, com Script Path `Jenkinsfile` e
+branch fixa `*/main`; **BRANCH** seleciona o código que será compilado e
+implantado. O bootstrap reconcilia essa definição e os parâmetros do job a cada
+startup, incluindo `RUN_INFRA_CONTRACTS`. O gate `scripts/validate-pipelines.sh`
+garante que a opção exista tanto na pipeline quanto no bootstrap. Depois de
+publicar alterações no bootstrap, aguarde não haver builds ativos e recrie
+somente o container Jenkins com `docker compose ... up -d --no-deps
+--force-recreate jenkins`; isso atualiza os bind mounts e preserva o job, o
+histórico e o volume `jenkins_home`. Confirme definição e parâmetros na API/UI
+antes de disparar o deploy.
 
 Se a definição carregada pela `main` (ou um script inline antigo) ainda não
 exportar `RECOMMENDATION_IMAGE`, `READER_BFF_IMAGE`, `READER_PROFILE_IMAGE` ou

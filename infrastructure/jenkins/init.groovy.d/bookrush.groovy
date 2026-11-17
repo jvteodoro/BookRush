@@ -2,7 +2,6 @@ import jenkins.model.Jenkins
 import jenkins.model.JenkinsLocationConfiguration
 import hudson.model.*
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
-import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
 import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
 import hudson.plugins.git.GitSCM
 import hudson.plugins.git.UserRemoteConfig
@@ -10,16 +9,10 @@ import hudson.plugins.git.BranchSpec
 
 def instance = Jenkins.get()
 JenkinsLocationConfiguration.get().setUrl('https://jenkins-bookrush.jteodoro.tec.br/')
-def pipelineFile = new File('/opt/bookrush/bookrush.Jenkinsfile')
 def job = instance.getItem('bookrush-deploy')
 if (job == null) {
     job = instance.createProject(WorkflowJob, 'bookrush-deploy')
 }
-if (!pipelineFile.isFile()) {
-    throw new IllegalStateException("Missing bookrush-deploy pipeline source: ${pipelineFile}")
-}
-job.setDefinition(new CpsFlowDefinition(pipelineFile.getText('UTF-8'), true))
-job.save()
 
 def backstagePipelineFile = new File('/opt/bookrush/backstage.Jenkinsfile')
 def backstageJob = instance.getItem('bookrush-backstage')
@@ -122,8 +115,19 @@ replaceParameters(observabilityJob, [
     new StringParameterDefinition('GRAFANA_OIDC_CREDENTIAL_ID', 'grafana-oidc-client-secret', 'Credential Jenkins Secret text do client OIDC Grafana.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Implantar a stack de observabilidade no Compose de produção.')
 ])
-if (!(job.getDefinition() instanceof CpsScmFlowDefinition)) {
-    job.setDefinition(scmFor('Jenkinsfile'))
+def mainScm = new GitSCM(
+    [new UserRemoteConfig('https://github.com/jvteodoro/BookRush.git', null, null, null)],
+    [new BranchSpec('*/main')], false, [], null, null, [])
+def mainPipelineDefinition = new CpsScmFlowDefinition(mainScm, 'Jenkinsfile')
+mainPipelineDefinition.setLightweight(false)
+def currentMainDefinition = job.getDefinition()
+def currentMainBranches = currentMainDefinition instanceof CpsScmFlowDefinition
+    ? currentMainDefinition.getScm().getBranches().collect { it.getName() }
+    : []
+if (!(currentMainDefinition instanceof CpsScmFlowDefinition) ||
+    currentMainDefinition.getScriptPath() != 'Jenkinsfile' ||
+    currentMainBranches != ['*/main']) {
+    job.setDefinition(mainPipelineDefinition)
     job.save()
 }
 def mainParameters = [

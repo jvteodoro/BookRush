@@ -8,6 +8,9 @@ fail() { echo "pipeline validation: $*" >&2; exit 1; }
 test -f Jenkinsfile || fail 'Jenkinsfile ausente'
 test -f infrastructure/jenkins/bookrush.Jenkinsfile || fail 'cópia do Jenkinsfile ausente'
 cmp -s Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile || fail 'Jenkinsfiles principais divergem'
+grep -Fq "booleanParam(name: 'RUN_INFRA_CONTRACTS'" Jenkinsfile || fail 'Jenkinsfile principal sem opção RUN_INFRA_CONTRACTS'
+grep -Fq "BooleanParameterDefinition('RUN_INFRA_CONTRACTS'" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bootstrap Jenkins sem definição persistente de RUN_INFRA_CONTRACTS'
+grep -Fq "new BranchSpec('*/main')" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bookrush-deploy não fixa a definição da pipeline em main'
 if command -v python3 >/dev/null 2>&1; then
   python3 scripts/test-deploy-compose-images.py || fail 'contrato de imagens do deploy Compose inválido'
 elif command -v docker >/dev/null 2>&1; then

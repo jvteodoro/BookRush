@@ -221,20 +221,22 @@ curl -fsS -b "$COOKIE_JAR" \
 Só considere concluído quando `building=false` e `result=SUCCESS`. Em caso de
 falha, leia `consoleText` do mesmo build antes de repetir.
 
-## Jobs inline e sincronização
+## Definição e parâmetros da pipeline
 
-Os jobs criados por `infrastructure/jenkins/init.groovy.d/bookrush.groovy`
-usam `CpsFlowDefinition`: são pipelines inline, não Multibranch. Portanto:
+O job `bookrush-deploy` usa `CpsScmFlowDefinition` com o repositório BookRush,
+branch fixa `*/main` e Script Path `Jenkinsfile`. A definição da pipeline fica
+sempre na `main`; o parâmetro `BRANCH` seleciona o código que será validado e
+implantado. Assim, executar uma branch antiga não remove parâmetros novos da
+definição do job.
 
-- fazer push do Jenkinsfile, por si só, não altera a definição já salva no Jenkins;
-- `checkout scm` não funciona nesses jobs;
-- a pipeline deve fazer checkout explícito do repositório e da branch;
-- no startup, o bootstrap copia `/opt/bookrush/bookrush.Jenkinsfile` para a
-  definição inline do job e reconcilia seus parâmetros. Depois de publicar
-  alterações na pipeline, reinicie somente o container Jenkins quando não
-  houver builds ativos e confirme a revisão e os parâmetros pela API/UI antes
-  de disparar o job;
-- sincronização não deve apagar o job, o histórico ou o volume `jenkins_home`.
+No startup, `infrastructure/jenkins/init.groovy.d/bookrush.groovy` reconcilia
+essa definição SCM e `ParametersDefinitionProperty`, incluindo
+`RUN_INFRA_CONTRACTS`. O gate `scripts/validate-pipelines.sh` falha se a opção
+existir no Jenkinsfile mas faltar no bootstrap (ou vice-versa). Após publicar
+mudanças no bootstrap, aguarde não haver builds ativos e recrie somente o
+container Jenkins com `docker compose ... up -d --no-deps --force-recreate
+jenkins`; o Compose preserva o job, o histórico e o volume `jenkins_home`.
+Confirme a definição e os parâmetros pela API/UI antes do próximo deploy.
 
 O bootstrap também deve atualizar a `ParametersDefinitionProperty` do
 `bookrush-admin-web` sempre que o Jenkinsfile ganhar parâmetros novos. Depois
