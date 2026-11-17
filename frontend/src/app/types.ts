@@ -17,10 +17,13 @@ export type ReaderChapter = {
 };
 
 export type ReadiumBridge = {
+  currentLocator: () => Record<string, unknown> | null;
+  goToLocator: (locator: unknown) => Promise<boolean>;
   mount: (
     bookId: string,
     container: HTMLElement,
     onLocatorChanged?: (progression: number) => void,
+    onNotice?: (message: string) => void,
   ) => Promise<void>;
   unmount: () => Promise<void>;
   goToChapter: (chapterId: string) => Promise<boolean>;

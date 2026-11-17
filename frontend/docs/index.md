@@ -463,3 +463,80 @@ com opção de retornar ao feed; falhas transitórias podem ser tentadas novamen
 O histórico e a recarga preservam a rota. Para validar a integração, execute os
 testes do frontend e teste uma nova aba, login, recarga, Voltar e leitura de um
 livro fora do feed no ambiente implantado.
+
+## Marca??es de posi??o
+
+O bot?o ?Marcar posi??o? fica dispon?vel ap?s carregar o Readium. Salva o
+locator completo atrav?s do cliente autenticado, mant?m a precis?o e s?
+confirma ap?s resposta HTTP de sucesso. O painel ?Marca??es? busca novamente
+os dados ao abrir e permite retomar posi??es ap?s reabrir o livro ou a sess?o.
+O painel trata carregamento, vazio e falhas; a nova abertura permite repetir
+uma consulta que falhou. Salvamentos repetidos retornam a mesma marca??o.
+Marca??es antigas sem locator aparecem indispon?veis, pois o percentual
+armazenado anteriormente n?o identifica uma posi??o textual. Uma marca??o de
+uma vers?o que n?o integra a publica??o aberta produz uma mensagem expl?cita.
+A mudan?a n?o altera o fluxo separado de progresso autom?tico da leitura.
+
+## Retomada autom?tica da leitura
+
+A abertura consulta GET `/api/v1/reader/books/{bookId}/progress` com autentica??o
+e sem cache. Um locator compat?vel com a publica??o ? passado como posi??o
+inicial do Readium, antes de carregar o conte?do. O progresso grava o locator
+completo sem arredondamento; percent ? apenas um resumo para a biblioteca.
+As mudan?as s?o agrupadas por 300 ms e enviadas em ordem, com envio imediato
+ao sair do livro, ocultar a aba ou receber pagehide (keepalive). Cada fila pertence
+a um livro/conta e a pr?xima abertura aguarda o fechamento anterior. Respostas
+atrasadas de aberturas canceladas n?o iniciam outra leitura nem gravam o in?cio.
+
+Uma falha ao recuperar a posi??o impede a abertura e oferece tentar novamente,
+para n?o substituir a posi??o anterior pelo in?cio silenciosamente. Uma falha
+ao salvar ? informada e a posi??o fica pendente para o pr?ximo envio enquanto a
+p?gina permanecer aberta. Encerramento for?ado do navegador e aus?ncia de rede
+podem impedir o ?ltimo envio. Progresso antigo sem locator come?a do in?cio;
+uma posi??o de outra vers?o tamb?m come?a do in?cio com aviso. A retomada n?o
+cria marca??es manuais e n?o exige usar o bot?o de marca??o.
+
+## Precis?o da retomada no viewport
+
+O locator inclui `locations.bookrushViewport`, uma extens?o opcional com o
+seletor do elemento, ?ndice do n? de texto, deslocamento UTF-16 do primeiro
+caractere vis?vel, contexto de 32 caracteres e posi??o vertical da linha. O
+schema Readium existente aceita extens?es e o backend persiste o JSON completo;
+esta corre??o n?o altera API, autentica??o, CORS nem banco.
+
+A restaura??o aguarda as prefer?ncias do SDK, o carregamento das fontes e dois
+frames de layout antes de resolver a ?ncora no texto. O contexto precisa
+corresponder ao n? encontrado; uma ?ncora incompat?vel mant?m o fallback do
+Readium. Posi??es antigas sem ?ncora s?o reaplicadas ap?s a tipografia final,
+para evitar o deslocamento causado pelo layout intermedi?rio. Progresso e
+marca??es manuais usam a mesma captura/restaura??o. Ao ocultar/fechar o leitor,
+a posi??o ? capturada diretamente do documento, mesmo antes do pr?ximo evento
+ass?ncrono de progresso do SDK.
+
+`npm run test:reader-layout` executa o Readium real em Chromium headless com um
+livro fict?cio servido localmente. Reutiliza o Playwright de `admin-web` (instale
+suas depend?ncias antes de executar); `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`
+pode indicar um Chrome local, ou use o Chromium instalado pelo Playwright.
+A regress?o compara par?grafo, caractere inicial e deslocamento vertical ap?s
+reabrir, repetir aberturas, navegar por marca??o manual, fechar imediatamente
+ap?s rolar e trocar largura/fonte. Mant?m tamb?m compatibilidade com progresso
+legado. A fixture n?o usa dados ou credenciais de produ??o; o smoke autenticado
+na revis?o implantada permanece uma verifica??o separada.
+
+## Nomes e gerenciamento das marca??es
+
+?Marcar posi??o? captura o trecho antes de abrir um di?logo para informar um
+nome de 1 a 120 caracteres. Cancelar ou usar Escape n?o cria uma marca??o.
+A lista mostra o nome e os bot?es de l?pis e lixeira com r?tulos acess?veis.
+O l?pis edita somente o nome; a lixeira pede confirma??o e inicia com o foco em
+Cancelar. As a??es s? atualizam a lista ap?s confirma??o da API. Em caso de
+erro, o di?logo mant?m o texto digitado e permite repetir a opera??o. Durante
+uma requisi??o, os controles ficam desabilitados para evitar duplica??es.
+Nomes antigos vazios usam o t?tulo do cap?tulo como fallback. Marca??es antigas
+sem locator podem ser renomeadas ou exclu?das mesmo sem permitir navega??o.
+
+`npm run test:bookmarks-browser` usa o Playwright de admin-web e um Chromium
+headless, com fixture local e a interface real do leitor. Cobre nomes vazios,
+cria??o, edi??o sem mudar posi??o, cancelamento, Escape, exclus?o e erros HTTP
+com nova tentativa. A vari?vel PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH permite usar
+um Chrome j? instalado, como no teste de layout do leitor.

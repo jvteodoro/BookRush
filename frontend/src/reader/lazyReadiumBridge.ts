@@ -1,11 +1,15 @@
 import type { ReadiumBridge, ReaderPreferences } from "../app/types";
 
+let loadedBridge: ReadiumBridge | undefined;
 let bridgePromise: Promise<ReadiumBridge> | undefined;
 
 function getBridge(): Promise<ReadiumBridge> {
   if (!bridgePromise) {
     bridgePromise = import("./readiumBridge")
-      .then((module) => module.readiumBridge)
+      .then((module) => {
+        loadedBridge = module.readiumBridge;
+        return loadedBridge;
+      })
       .catch((error: unknown) => {
         bridgePromise = undefined;
         throw error;
@@ -15,9 +19,12 @@ function getBridge(): Promise<ReadiumBridge> {
 }
 
 export const readiumBridge: ReadiumBridge = {
-  mount: (bookId, container, onLocatorChanged) =>
+  currentLocator: () => loadedBridge?.currentLocator() ?? null,
+  goToLocator: (locator) =>
+    getBridge().then((bridge) => bridge.goToLocator(locator)),
+  mount: (bookId, container, onLocatorChanged, onNotice) =>
     getBridge().then((bridge) =>
-      bridge.mount(bookId, container, onLocatorChanged),
+      bridge.mount(bookId, container, onLocatorChanged, onNotice),
     ),
   unmount: () => getBridge().then((bridge) => bridge.unmount()),
   goToChapter: (chapterId) =>

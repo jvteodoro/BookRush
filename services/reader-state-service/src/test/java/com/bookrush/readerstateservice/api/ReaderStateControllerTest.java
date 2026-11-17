@@ -28,6 +28,101 @@ class ReaderStateControllerTest {
   private final Principal user = () -> "iss:subject-1";
 
   @Test
+  void progressPersistsPreciseLocatorForTheAuthenticatedReader() {
+    UUID book = UUID.randomUUID();
+    Map<String, Object> locator = Map.of("href", "/versions/v1/chapter", "type", "text/html",
+        "locations", Map.of("progression", 0.432123));
+    controller.progress(book, new ReaderStateController.Progress(0L, 43.2123, locator), user, null);
+    verify(jdbc).update(org.mockito.ArgumentMatchers.contains("locator = EXCLUDED.locator"),
+        eq(user.getName()), eq(book), eq(0L), eq(43.2123), org.mockito.ArgumentMatchers.contains("0.432123"));
+    controller.getProgress(book, user);
+    verify(jdbc).queryForList(org.mockito.ArgumentMatchers.contains("locator::text AS locator"), eq(user.getName()), eq(book));
+    assertThrows(ResponseStatusException.class, () -> controller.getProgress(book, null));
+    assertThrows(ResponseStatusException.class, () -> controller.progress(book,
+        new ReaderStateController.Progress(0L, 43.2123, locator), null, null));
+  }
+
+  @Test
+  void progressRejectsMalformedLocatorsAndOutOfRangePercent() {
+    UUID book = UUID.randomUUID();
+    assertThrows(ResponseStatusException.class, () -> controller.progress(book,
+        new ReaderStateController.Progress(0L, 20d, Map.of("href", "x")), user, null));
+    for (double percent : new double[] { -1, 101, Double.NaN, Double.POSITIVE_INFINITY }) {
+      assertThrows(ResponseStatusException.class, () -> controller.progress(book,
+          new ReaderStateController.Progress(0L, percent), user, null));
+    }
+  }
+
+  @Test
+  void bookmarkReturnsPersistedIdentityAndLocatorForRepeatedWrites() {
+    UUID book = UUID.randomUUID();
+    UUID persistedId = UUID.randomUUID();
+    var locator = Map.of("href", "/versions/v1/chapters/c1/content", "type", "text/html",
+        "locations", Map.of("progression", 0.4321));
+    when(jdbc.queryForMap(anyString(), any(Object[].class)))
+        .thenReturn(Map.of("id", persistedId));
+    var first = controller.bookmark(book, Map.of("locator", locator), user);
+    var second = controller.bookmark(book, Map.of("locator", locator), user);
+    org.junit.jupiter.api.Assertions.assertEquals(persistedId, first.get("id"));
+    org.junit.jupiter.api.Assertions.assertEquals(first, second);
+    verify(jdbc, org.mockito.Mockito.times(2)).queryForMap(
+        org.mockito.ArgumentMatchers.contains("md5(locator::text)) WHERE locator IS NOT NULL"),
+        any(UUID.class), eq("iss:subject-1"), eq(book), eq(0L), eq(""),
+        org.mockito.ArgumentMatchers.contains("0.4321"), eq(null), eq(null));
+  }
+
+  @Test
+  void bookmarkRenameAndDeleteAreScopedToTheReaderAndBook() {
+    UUID book = UUID.randomUUID();
+    UUID id = UUID.randomUUID();
+    when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(Map.of("id", id, "name", "Trecho")));
+    var result = controller.renameBookmark(book, id, Map.of("name", "  Trecho  "), user);
+    org.junit.jupiter.api.Assertions.assertEquals("Trecho", result.get("name"));
+    verify(jdbc).queryForList(org.mockito.ArgumentMatchers.contains("WHERE id = ? AND subject_key = ? AND book_id = ?"),
+        eq("Trecho"), eq(id), eq(user.getName()), eq(book));
+    when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+    controller.deleteBookmark(book, id, user);
+    verify(jdbc).update(eq("DELETE FROM reader_state.bookmarks WHERE id = ? AND subject_key = ? AND book_id = ?"),
+        eq(id), eq(user.getName()), eq(book));
+    assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of("name", "Trecho"), null));
+    assertThrows(ResponseStatusException.class, () -> controller.deleteBookmark(book, id, null));
+  }
+
+  @Test
+  void bookmarkNamesAreRequiredForRenameAndMissingBookmarksReturnNotFound() {
+    UUID book = UUID.randomUUID(); UUID id = UUID.randomUUID();
+    for (String name : List.of("", "   ", "x".repeat(121))) {
+      assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of("name", name), user));
+      assertThrows(ResponseStatusException.class, () -> controller.bookmark(book, Map.of("name", name, "positionCodepoint", 0), user));
+    }
+    assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of(), user));
+    var missing = assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(book, id, Map.of("name", "Trecho"), user));
+    org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, missing.getStatusCode());
+    var deleted = assertThrows(ResponseStatusException.class, () -> controller.deleteBookmark(book, id, user));
+    org.junit.jupiter.api.Assertions.assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, deleted.getStatusCode());
+  }
+
+  @Test
+  void bookmarksRejectMissingIdentityAndMalformedLocators() {
+    UUID book = UUID.randomUUID();
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book, Map.of(), user));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book,
+        Map.of("locator", Map.of("href", "x", "type", "text/html", "locations", Map.of("progression", 2))), user));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book,
+        Map.of("locator", Map.of()), user));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmark(book, Map.of(), null));
+    assertThrows(ResponseStatusException.class, () -> controller.bookmarks(book, null));
+  }
+
+  @Test
+  void bookmarkListIsScopedToReaderAndIncludesLocator() {
+    UUID book = UUID.randomUUID();
+    controller.bookmarks(book, user);
+    verify(jdbc).queryForList(org.mockito.ArgumentMatchers.contains("locator::text AS locator"),
+        eq("iss:subject-1"), eq(book));
+  }
+
+  @Test
   void openedUsesValidTwoParameterUpsert() {
     UUID bookId = UUID.randomUUID();
     controller.opened(bookId, user, null);

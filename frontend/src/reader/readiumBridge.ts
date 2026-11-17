@@ -1,9 +1,15 @@
-import { HttpFetcher, Manifest, Publication } from "@readium/shared";
+import { HttpFetcher, Locator, Manifest, Publication } from "@readium/shared";
 import { WebPubNavigator, WebPubPreferences } from "@readium/navigator";
 import { authClient } from "../auth";
 import { startReadingTimer } from "./readingTimer";
 import { createReaderSessionLifecycle } from "./readerSession";
 import { readerSessionOrigin } from "./readerSessionOrigin";
+import { createReadingProgress, loadReadingPosition } from "./readingProgress";
+import {
+  captureViewportLocator,
+  restoreViewportLocator,
+  waitForReaderLayout,
+} from "./viewportLocator";
 import { apiRoutes, readerApiPath } from "../app/apiRoutes";
 import type {
   ReadiumBridge,
@@ -26,6 +32,37 @@ let container: HTMLElement | undefined;
 let frame: HTMLIFrameElement | undefined;
 let frameWindow: Window | undefined;
 let preferences = { ...defaults };
+let readingProgress: ReturnType<typeof createReadingProgress> | undefined;
+let preferencesApplied: Promise<void> = Promise.resolve();
+let restoringPosition = false;
+let recordViewport: (() => void) | undefined;
+let lifecycleVersion = 0;
+let lifecycleQueue: Promise<void> = Promise.resolve();
+
+function sequence(action: () => Promise<void>) {
+  const result = lifecycleQueue.then(action);
+  lifecycleQueue = result.catch(() => undefined);
+  return result;
+}
+
+async function releaseReader() {
+  stopReadingTimer?.();
+  stopReadingTimer = undefined;
+  const progress = readingProgress;
+  readingProgress = undefined;
+  await progress?.close();
+  restoringPosition = false;
+  recordViewport = undefined;
+  await readerSession.end();
+  if (navigator) await navigator.destroy();
+  navigator = undefined;
+  manifest = undefined;
+  publication = undefined;
+  frame = undefined;
+  frameWindow = undefined;
+  container = undefined;
+  readerSessionOrigin.clear();
+}
 
 function sessionCorrelation(bookId: string): Record<string, string> {
   return readerSessionOrigin.requestedFor(bookId);
@@ -58,7 +95,7 @@ function applyPreferences(next: ReaderPreferences) {
   preferences = next;
   container?.style.setProperty("background", next.background);
   if (navigator?.submitPreferences) {
-    void navigator
+    preferencesApplied = navigator
       .submitPreferences(
         new WebPubPreferences({
           fontFamily: fonts[next.fontFamily].family,
@@ -102,74 +139,183 @@ function applyPreferences(next: ReaderPreferences) {
 }
 
 export const readiumBridge: ReadiumBridge = {
-  async mount(bookId, nextContainer, onLocatorChanged) {
-    const originHeaders = sessionCorrelation(bookId);
-    await this.unmount();
-    container = nextContainer;
-    const response = await authClient.fetch(
-      apiRoutes.reader.publication(bookId),
-    );
-    if (!response.ok) {
-      throw new Error(`Publicação indisponível (HTTP ${response.status}).`);
-    }
-    const raw = await response.json();
-    manifest = raw;
-    const parsedManifest = Manifest.deserialize(raw);
-    if (!parsedManifest?.readingOrder?.items?.length) {
-      throw new Error("Este livro ainda não possui conteúdo reader-ready.");
-    }
-    await readerSession.start(bookId, originHeaders);
-    readerSessionOrigin.activate(bookId, originHeaders);
-    const fetcher = new HttpFetcher(
-      (input, init) =>
-        authClient.fetch(readerApiPath(String(input)), {
-          ...init,
-          cache: "no-store",
-        }),
-      window.location.origin,
-    );
-    publication = new Publication({ manifest: parsedManifest, fetcher });
-    navigator = new WebPubNavigator(nextContainer, publication, {
-      frameLoaded: (nextFrame: Window) => {
-        frameWindow = nextFrame;
-        frame = nextContainer.querySelector("iframe") ?? undefined;
-        applyPreferences(preferences);
-      },
-      positionChanged: (locator: any) =>
-        onLocatorChanged?.(
-          locator.locations?.totalProgression ??
-            locator.locations?.progression ??
-            0,
+  currentLocator() {
+    const locator = navigator?.currentLocator?.serialize();
+    return locator ? captureViewportLocator(frameWindow, locator) : null;
+  },
+  async goToLocator(value) {
+    const locator = Locator.deserialize(value);
+    if (
+      !locator ||
+      restoringPosition ||
+      !navigator ||
+      !publication?.readingOrder.items.some(
+        (link) => link.href.split("#")[0] === locator.href.split("#")[0],
+      )
+    )
+      return false;
+    const version = lifecycleVersion;
+    restoringPosition = true;
+    try {
+      const ok = await new Promise<boolean>((resolve) =>
+        navigator.go(locator, false, (value: boolean) =>
+          resolve(Boolean(value)),
         ),
-      timelineItemChanged: () => undefined,
-      tap: () => false,
-      click: () => false,
-      zoom: () => undefined,
-      scroll: () => undefined,
-      customEvent: () => undefined,
-      handleLocator: () => false,
-      textSelected: () => undefined,
-      contentProtection: () => undefined,
-      contextMenu: () => undefined,
-      peripheral: () => undefined,
-    } as any);
-    await navigator.load();
-    applyPreferences(preferences);
-    stopReadingTimer = startReadingTimer();
+      );
+      if (!ok || version !== lifecycleVersion) return false;
+      await preferencesApplied;
+      await waitForReaderLayout(frameWindow);
+      if (version !== lifecycleVersion) return false;
+      if (!restoreViewportLocator(frameWindow, locator.serialize())) {
+        await new Promise<void>((resolve) =>
+          navigator.go(locator, false, () => resolve()),
+        );
+      }
+      return true;
+    } finally {
+      if (version === lifecycleVersion) {
+        restoringPosition = false;
+        recordViewport?.();
+      }
+    }
+  },
+  async mount(bookId, nextContainer, onLocatorChanged, onNotice) {
+    const version = ++lifecycleVersion;
+    const originHeaders = sessionCorrelation(bookId);
+    return sequence(async () => {
+      await releaseReader();
+      if (version !== lifecycleVersion) return;
+      container = nextContainer;
+      const response = await authClient.fetch(
+        apiRoutes.reader.publication(bookId),
+      );
+      if (!response.ok) {
+        throw new Error(`Publicação indisponível (HTTP ${response.status}).`);
+      }
+      const raw = await response.json();
+      if (version !== lifecycleVersion) return;
+      manifest = raw;
+      const parsedManifest = Manifest.deserialize(raw);
+      if (!parsedManifest?.readingOrder?.items?.length) {
+        throw new Error("Este livro ainda não possui conteúdo reader-ready.");
+      }
+      const saved = await loadReadingPosition(
+        (url, init) => authClient.fetch(url, init),
+        apiRoutes.reader.progress(bookId),
+      );
+      if (version !== lifecycleVersion) return;
+      const compatible =
+        saved &&
+        parsedManifest.readingOrder.items.some(
+          (link) => link.href.split("#")[0] === saved.href.split("#")[0],
+        );
+      if (saved && !compatible)
+        onNotice?.(
+          "A posição salva pertence a outra versão do livro. A leitura começará do início.",
+        );
+      const initialPosition = compatible
+        ? Locator.deserialize(saved)
+        : undefined;
+      await readerSession.start(bookId, originHeaders);
+      if (version !== lifecycleVersion) return;
+      readerSessionOrigin.activate(bookId, originHeaders);
+      const fetcher = new HttpFetcher(
+        (input, init) =>
+          authClient.fetch(readerApiPath(String(input)), {
+            ...init,
+            cache: "no-store",
+          }),
+        window.location.origin,
+      );
+      publication = new Publication({ manifest: parsedManifest, fetcher });
+      let ready = false;
+      let lastCaptured = "";
+      const capture = () => {
+        if (!ready || restoringPosition || !navigator?.currentLocator)
+          return null;
+        const value = captureViewportLocator(
+          frameWindow,
+          navigator.currentLocator.serialize(),
+        );
+        const signature = JSON.stringify(value);
+        if (signature === lastCaptured) return null;
+        lastCaptured = signature;
+        return value;
+      };
+      const progress = createReadingProgress({
+        fetcher: (url, init) => authClient.fetch(url, init),
+        path: apiRoutes.reader.progress(bookId),
+        headers: originHeaders,
+        capture,
+        onError: () =>
+          onNotice?.(
+            "Não foi possível salvar sua posição de leitura. Verifique a conexão e tente novamente antes de sair.",
+          ),
+      });
+      readingProgress = progress;
+      recordViewport = () => {
+        const value = capture();
+        if (value) progress.record(value);
+      };
+      navigator = new WebPubNavigator(
+        nextContainer,
+        publication,
+        {
+          frameLoaded: (nextFrame: Window) => {
+            if (version !== lifecycleVersion) return;
+            frameWindow = nextFrame;
+            frame = nextContainer.querySelector("iframe") ?? undefined;
+            applyPreferences(preferences);
+          },
+          positionChanged: (locator: any) => {
+            if (version !== lifecycleVersion) return;
+            recordViewport?.();
+            onLocatorChanged?.(
+              locator.locations?.totalProgression ??
+                locator.locations?.progression ??
+                0,
+            );
+          },
+          timelineItemChanged: () => undefined,
+          tap: () => false,
+          click: () => false,
+          zoom: () => undefined,
+          scroll: () => undefined,
+          customEvent: () => undefined,
+          handleLocator: () => false,
+          textSelected: () => undefined,
+          contentProtection: () => undefined,
+          contextMenu: () => undefined,
+          peripheral: () => undefined,
+        } as any,
+        initialPosition,
+      );
+      await navigator.load();
+      if (version !== lifecycleVersion) return;
+      applyPreferences(preferences);
+      await preferencesApplied;
+      await waitForReaderLayout(frameWindow);
+      if (version !== lifecycleVersion) return;
+      if (
+        !restoreViewportLocator(frameWindow, compatible ? saved : null) &&
+        initialPosition
+      ) {
+        // Existing ratio-only positions must also be applied after final typography.
+        await new Promise<void>((resolve) =>
+          navigator.go(initialPosition, false, () => resolve()),
+        );
+      }
+      await waitForReaderLayout(frameWindow);
+      if (version !== lifecycleVersion) return;
+      ready = true;
+      recordViewport?.();
+      stopReadingTimer = startReadingTimer();
+    });
   },
 
   async unmount() {
-    stopReadingTimer?.();
-    stopReadingTimer = undefined;
-    await readerSession.end();
-    if (navigator) await navigator.destroy();
-    navigator = undefined;
-    manifest = undefined;
-    publication = undefined;
-    frame = undefined;
-    frameWindow = undefined;
-    container = undefined;
-    readerSessionOrigin.clear();
+    ++lifecycleVersion;
+    return sequence(releaseReader);
   },
 
   async chapters() {

@@ -22,6 +22,8 @@ import "./styles/search.css";
 import "./styles/recommendations.css";
 import "./styles/comments.css";
 import { readiumBridge } from "./reader/lazyReadiumBridge";
+import { createBookmarksClient } from "./reader/bookmarks";
+import { bookmarkDialogs } from "./reader/bookmarkDialogs";
 import { AuthenticatedShell } from "./app/AuthenticatedShell";
 import { AuthLanding } from "./app/AuthLanding";
 import {
@@ -243,6 +245,10 @@ function App() {
             window as Window & { __BOOKRUSH_PLANT__?: unknown }
           ).__BOOKRUSH_PLANT__ = null;
         }
+        const bookmarksClient = createBookmarksClient(
+          (url, init) => authClient.fetch(url, init),
+          apiRoutes.reader.bookmarks,
+        );
         (
           window as Window & { __BOOKRUSH_API__?: Record<string, unknown> }
         ).__BOOKRUSH_API__ = {
@@ -531,27 +537,10 @@ function App() {
               throw new Error("Não foi possível finalizar o upload.");
             return complete.json();
           },
-          progress: async (
-            id: string,
-            percent: number,
-            positionCodepoint: number,
-          ) => {
-            await authClient.fetch(apiRoutes.reader.progress(id), {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                ...readerSessionOrigin.activeFor(id),
-              },
-              body: JSON.stringify({ percent, positionCodepoint }),
-            });
-          },
-          bookmark: async (id: string, positionCodepoint: number) => {
-            await authClient.fetch(apiRoutes.reader.bookmarks(id), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ positionCodepoint }),
-            });
-          },
+          bookmarks: bookmarksClient.list,
+          bookmark: bookmarksClient.save,
+          renameBookmark: bookmarksClient.rename,
+          deleteBookmark: bookmarksClient.remove,
           open: async (id: string, fromRecommendation = false) => {
             const headers = fromRecommendation ? correlationHeaders(id) : {};
             if (fromRecommendation) {
@@ -616,6 +605,7 @@ function App() {
         thumbnailStyle.href = "/thumbnails.css?v=20261006-gutenberg";
         document.head.appendChild(thumbnailStyle);
         Object.assign(window, {
+          __BOOKRUSH_BOOKMARK_DIALOGS__: bookmarkDialogs,
           __BOOKRUSH_APPEARANCE__: {
             mount: mountAppearance,
             panels: mountReaderPanels,
@@ -623,7 +613,7 @@ function App() {
         });
         const script = document.createElement("script");
         script.dataset.bookrushPageloop = "true";
-        script.src = "/pageloop.js?v=20261019-reader-appearance";
+        script.src = "/pageloop.js?v=20261116-reader-named-bookmarks";
         script.async = true;
         script.onload = () => {
           if (active) setFeedReady(true);
