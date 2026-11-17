@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -23,6 +24,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 public class BehaviorController {
   private final JdbcTemplate jdbc;
   private final BehaviorMaintenance maintenance;
+  @Value("${bookrush.security.issuer}")
+  private String productIssuer = "https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush";
   public BehaviorController(JdbcTemplate jdbc, BehaviorMaintenance maintenance) {
     this.jdbc = jdbc;
     this.maintenance = maintenance;
@@ -48,6 +51,8 @@ public class BehaviorController {
     if (batch.events()==null || batch.events().size()>100) return ResponseEntity.badRequest().body(Map.of("error","batch must contain between 1 and 100 events"));
     String subject = identitySubject(principal);
     if (subject == null || subject.isBlank()) return ResponseEntity.status(401).body(Map.of("error","authentication required"));
+    String issuer = identityIssuer(principal);
+    String population = identityPopulation(principal, issuer);
     for (Event e: batch.events()) {
       String payload = e.payload()==null?"{}":e.payload().toString();
       try {
@@ -60,8 +65,8 @@ public class BehaviorController {
       }
       if (e.eventType().length()>80 || e.eventKey().length()>200 || payload.length()>16_384 || e.occurredAt().isAfter(Instant.now().plusSeconds(300))) { jdbc.update("insert into behavior.rejects(id,event_key,reason,payload) values(?,?,?,?::jsonb)",UUID.randomUUID(),e.eventKey(),"INVALID_EVENT",payload); duplicate++; continue; }
       UUID eventId = UUID.randomUUID();
-      int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
-        eventId,e.eventKey(),e.eventType(),null,subject,e.bookId(),payload,Timestamp.from(e.occurredAt()));
+      int n=jdbc.update("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,identity_population,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING",
+        eventId,e.eventKey(),e.eventType(),issuer,subject,population,e.bookId(),payload,Timestamp.from(e.occurredAt()));
       if(n==1) {
         jdbc.update("INSERT INTO behavior.outbox(id,event_id,event_type,payload,occurred_at) VALUES (?,?,?,?::jsonb,?)",
           UUID.randomUUID(),eventId,e.eventType(),payload,Timestamp.from(e.occurredAt()));
@@ -80,6 +85,23 @@ public class BehaviorController {
           authentication.getToken().getSubject()).toString();
     }
     return principal == null ? null : principal.getName();
+  }
+  private String identityIssuer(Principal principal) {
+    if (principal instanceof JwtAuthenticationToken authentication
+        && authentication.getToken().getIssuer() != null) {
+      return authentication.getToken().getIssuer().toString();
+    }
+    return null;
+  }
+
+  /** Population is derived only from signed, validated JWT claims and configured issuer. */
+  private String identityPopulation(Principal principal, String issuer) {
+    if (!(principal instanceof JwtAuthenticationToken authentication)) return "UNKNOWN";
+    Object signedPopulation = authentication.getToken().getClaims().get("bookrush_population");
+    if (signedPopulation instanceof String value
+        && List.of("PRODUCT", "ADMIN_SEED", "TEST").contains(value)) return value;
+    if (issuer != null && issuer.equals(productIssuer)) return "PRODUCT";
+    return "UNKNOWN";
   }
   @PostMapping("/aggregates/rebuild")
   public Map<String, Object> rebuild() {

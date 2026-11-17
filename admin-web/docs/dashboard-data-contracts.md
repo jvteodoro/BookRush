@@ -185,12 +185,12 @@ O facade calcula \`freshnessSeconds\` a partir do \`sourceWatermark\`. Quando a 
 }
 \`\`\`
 
-**Exemplo sintético de contrato, NÃO dado real.** \`status\`: \`OK|NO_DATA|NOT_INSTRUMENTED|STALE|RESTRICTED|ERROR|INSUFFICIENT_SAMPLE|UNTRUSTED\`. Para status diferente de OK, \`value=null\` e \`numerator/denominator\` podem ser nulos. Erros não revelam SQL interno ou PII. A API aplica range máximo de 366 dias, limites de amostra/página e autorização de reporting no backend; OpenAPI versionado é parte da implementação. Cache/rate limit permanecem controles de borda a validar no gateway antes do fechamento do pacote.
+**Exemplo sintético de contrato, NÃO dado real.** \`status\`: \`OK|NO_DATA|NOT_INSTRUMENTED|STALE|RESTRICTED|ERROR|INSUFFICIENT_SAMPLE|UNKNOWN_FRESHNESS\`. Ausência de atividade é \`NO_DATA\`; falha/atraso de atualização é informado separadamente da última atividade de negócio. A API aplica range máximo de 366 dias, limites de amostra/página e autorização de reporting no backend; OpenAPI versionado é parte da implementação. Cache/rate limit permanecem controles de borda a validar no gateway antes do fechamento do pacote.
 
 ## Integridade, privacidade e qualidade da medição
 
 - Identidade técnica deve seguir contrato \`TechnicalIdentity(issuer, subject)\` do PFV1. Não expor a identidade em tabelas ou logs de dashboard.
-- Segregar \`PRODUCT\`, \`ADMIN_SEED\`, \`TEST\` e \`SYNTHETIC\` por provenance; default da visão business é somente PRODUCT. Ausência de tag populacional não pode ser presumida como PRODUCT.
+- Segregar \`PRODUCT\`, \`ADMIN_SEED\`, \`TEST\` e \`UNKNOWN\` por origem autenticada; default da visão business é somente PRODUCT. Eventos históricos sem origem recuperável permanecem UNKNOWN.
 - \`identity_issuer\` e \`identity_subject\` não podem ser aceitos como autoridade de payload cliente. Validar principal no servidor e eventKey/idempotência.
 - Conferir \`BOOK_OPEN\` gerado por frontend e reader state: um único fato lógico (mesma chave ou dedup por mecanismo versionado), não simplesmente remover registros retroativamente sem relatório de reconciliação.
 - Atributos de impressões e outcomes V10 são **existentes**, mas sua completude precisa de testes integrados PFV1 com usuários distintos, livros distintos, múltiplas exposições e devoluções.
@@ -198,7 +198,7 @@ O facade calcula \`freshnessSeconds\` a partir do \`sourceWatermark\`. Quando a 
 - Não usar \`behavior.daily_book\` para CTR atribuída: agregados por livro não preservam o mesmo cohort/exposure.
 - Prever exclusão/retificação de dados pessoais e políticas de retenção LGPD; documentar base legal e consentimento aplicável ao tracking. Limitar exportação por role, auditar quem consultou/exportou e evitar pequenos grupos reidentificáveis.
 - Evidência de dashboards: screenshot + JSON de consulta sem PII + SQL/PromQL versionado + testes de fixture + lista de versões + commit/imagem. O gráfico deve explicitar período, timezone, atualização, \`n\` e definição.
-- PL-08 usa \`reporting.content_coverage_snapshot\`, agregada por \`language\` e \`rights_status\`, e \`reporting.content_rank_score_snapshot\` para decis de score agrupados por ranker, versão e hash exatos; expõe contagens em etapas aninhadas sem IDs. Configurações diferentes não compartilham uma escala. Denominadores de taxas são a etapa imediatamente anterior e taxa indefinida retorna ausência quando o denominador é zero. A população permanece \`UNCLASSIFIED\` até validação de origem.
+- Dados históricos cuja origem autenticada não é recuperável permanecem \`UNKNOWN\`; novas classificações usam origem autenticada e não campos arbitrários enviados no evento.
 - PL-07 usa \`reporting.excerpt_production_snapshot\`; estados são \`RANKED\`, \`ELIGIBLE_UNRANKED\`, \`RANKING_EXCLUDED\` ou \`STRUCTURALLY_EXCLUDED\`. Motivos são whitelisted e agregados. Analytics não mantém aprovação/publicação editorial de excerpts, então esses rótulos não são sintetizados.
 - PL-10 usa \`reporting.import_quality_daily\`; retry conta tentativas cujo \`attempt_number > 1\`, erros são agrupados em buckets limitados, direitos representam a decisão no instante do refresh e asset é a última versão vinculada à tentativa. O domínio não fornece flag autoritativa de duplicação; retries não substituem essa medida.
 - PL-11 usa \`reporting.backlog_snapshot\` para ingestion task, analytics job item e health de projeções. Worker stuck significa RUNNING acima de 15 minutos, sem constituir SLA de negócio. Frescor é idade do último refresh bem-sucedido; não há prazo de publicação inferido.

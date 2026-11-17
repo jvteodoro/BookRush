@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ReportingProjection {
   private static final Logger LOG = LoggerFactory.getLogger(ReportingProjection.class);
   private static final String VERSION = "events-issuer-subject-platform-windows-v3-untrusted-population";
-  private static final String FEED_VERSION = "feed-attribution-v4-mature-viewable-ctr-v1-untrusted-population";
+  private static final String FEED_VERSION = "feed-attribution-v5-population-significant-read";
   private static final String PIPELINE_VERSION = "analytics-pipeline-v1";
   private static final String QUALITY_VERSION = "event-quality-v1";
   private static final String PRODUCT_VERSION = "product-activity-v1-untrusted-population";
@@ -140,7 +140,9 @@ public class ReportingProjection {
               active_seconds, book_opens, meaningful_reads, completions,
               calculation_version, refreshed_at, source_watermark)
           WITH scoped AS (
-            SELECT e.occurred_at, e.identity_issuer, e.identity_subject, e.book_id, e.event_type, e.payload,
+            SELECT e.occurred_at, e.identity_issuer, e.identity_subject,
+              coalesce(e.identity_population, 'UNKNOWN') AS population,
+              e.book_id, e.event_type, e.payload,
               CASE WHEN lower(e.payload->>'platform') IN ('web', 'mobile')
                 THEN lower(e.payload->>'platform') ELSE 'UNKNOWN' END AS platform
             FROM behavior.events e
@@ -150,15 +152,17 @@ public class ReportingProjection {
                 'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
               AND e.occurred_at >= current_date - INTERVAL '396 days'
           ), first_seen AS (
-            SELECT e.identity_issuer, e.identity_subject, min(e.occurred_at::date) AS first_day
+            SELECT e.identity_issuer, e.identity_subject,
+              coalesce(e.identity_population, 'UNKNOWN') AS population,
+              min(e.occurred_at::date) AS first_day
             FROM behavior.events e
             WHERE e.identity_issuer IS NOT NULL AND e.identity_subject IS NOT NULL
               AND e.event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS',
                 'BOOK_COMPLETE', 'READ_COMPLETE', 'BOOK_LIKE', 'BOOK_UNLIKE',
                 'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
-            GROUP BY e.identity_issuer, e.identity_subject
+            GROUP BY e.identity_issuer, e.identity_subject, coalesce(e.identity_population, 'UNKNOWN')
           ), daily AS (
-            SELECT s.occurred_at::date AS day, s.platform,
+            SELECT s.occurred_at::date AS day, s.population, s.platform,
                 count(DISTINCT (s.identity_issuer, s.identity_subject)) AS active_users,
                 count(DISTINCT (s.identity_issuer, s.identity_subject)) FILTER (WHERE f.first_day = s.occurred_at::date) AS newly_active_users,
                 count(DISTINCT (s.identity_issuer, s.identity_subject)) FILTER (WHERE f.first_day < s.occurred_at::date) AS returning_users,
@@ -177,16 +181,19 @@ public class ReportingProjection {
             FROM scoped s JOIN first_seen f
               ON f.identity_issuer = s.identity_issuer
              AND f.identity_subject = s.identity_subject
-            GROUP BY s.occurred_at::date, s.platform
+             AND f.population = s.population
+            GROUP BY s.occurred_at::date, s.population, s.platform
           )
-          SELECT d.day, 'UNCLASSIFIED', d.platform, d.active_users, d.newly_active_users, d.sessions,
+          SELECT d.day, d.population, d.platform, d.active_users, d.newly_active_users, d.sessions,
               (SELECT count(DISTINCT (w.identity_issuer, w.identity_subject)) FROM scoped w
                 WHERE w.occurred_at >= d.day - INTERVAL '6 days'
                   AND w.occurred_at < d.day + INTERVAL '1 day'
+                  AND w.population = d.population
                   AND w.platform = d.platform),
               (SELECT count(DISTINCT (m.identity_issuer, m.identity_subject)) FROM scoped m
                 WHERE m.occurred_at >= d.day - INTERVAL '29 days'
                   AND m.occurred_at < d.day + INTERVAL '1 day'
+                  AND m.population = d.population
                   AND m.platform = d.platform),
               d.returning_users, d.active_seconds, d.book_opens,
               d.meaningful_reads, d.completions, ?, ?, d.source_watermark
@@ -212,7 +219,7 @@ public class ReportingProjection {
               projection_name, last_successful_refresh, source_watermark,
               record_count, definition_version, refresh_status, last_error_code)
           SELECT 'reader_day', ?, max(source_watermark), count(*), ?, 'SUCCESS', NULL
-          FROM reporting.reader_day WHERE population = 'UNCLASSIFIED' AND platform = 'UNKNOWN'
+          FROM reporting.reader_day WHERE platform = 'UNKNOWN'
           ON CONFLICT (projection_name) DO UPDATE SET
               last_successful_refresh = EXCLUDED.last_successful_refresh,
               source_watermark = EXCLUDED.source_watermark,
@@ -280,11 +287,17 @@ public class ReportingProjection {
           SELECT i.id AS impression_id, i.item_id, i.book_id, i.shown_at, i.viewable_at,
               i.viewable,
               r.model_version, r.strategy,
+              COALESCE(population.identity_population, 'UNKNOWN') AS population,
               COALESCE(r.context->>'personalizationPath', 'UNKNOWN') AS feed_path,
               COALESCE(r.context->>'platform', 'UNKNOWN') AS platform,
               r.subject_key
           FROM recommendation.impression i
           JOIN recommendation.request r ON r.id = i.request_id
+          LEFT JOIN LATERAL (
+            SELECT e.identity_population FROM behavior.events e
+            WHERE e.identity_issuer IS NOT NULL AND e.identity_subject = r.subject_key
+            ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1
+          ) population ON true
           WHERE i.shown_at >= current_date - INTERVAL '366 days'
         ), outcome AS (
           SELECT oa.source_event_id, oa.subject_key, oa.impression_id, oa.recommendation_item_id,
@@ -332,13 +345,22 @@ public class ReportingProjection {
           FROM dwell_events_by_visit
           GROUP BY impression_id, item_id
         ), funnel AS (
-          SELECT x.day, x.model_version, x.strategy, x.feed_path, x.platform,
+          SELECT x.day, x.model_version, x.strategy, x.feed_path, x.population, x.platform,
               count(DISTINCT x.impression_id) AS served_count,
+              count(DISTINCT x.impression_id) FILTER (WHERE x.shown_at <= current_timestamp - INTERVAL '7 days') AS mature_served_count,
               count(DISTINCT x.impression_id) FILTER (WHERE x.viewable) AS viewable_count,
               count(DISTINCT x.impression_id) FILTER (WHERE x.viewable
                 AND x.viewable_at IS NOT NULL
                 AND x.viewable_at <= current_timestamp - INTERVAL '7 days') AS eligible_viewable_count,
               count(DISTINCT x.impression_id) FILTER (WHERE x.outcome_type = 'BOOK_OPEN') AS attributed_open_count,
+              count(DISTINCT x.impression_id) FILTER (WHERE x.outcome_type = 'READ_SESSION'
+                AND x.payload->>'activeSeconds' ~ '^[0-9]+$'
+                AND (x.payload->>'activeSeconds')::bigint >= 60
+                AND x.viewable AND x.viewable_at IS NOT NULL
+                AND x.viewable_at <= current_timestamp - INTERVAL '7 days') AS mature_attributed_significant_read_count,
+              count(DISTINCT x.impression_id) FILTER (WHERE x.outcome_type IN ('BOOK_COMPLETE', 'READ_COMPLETE')
+                AND x.viewable AND x.viewable_at IS NOT NULL
+                AND x.viewable_at <= current_timestamp - INTERVAL '7 days') AS mature_attributed_complete_count,
               count(DISTINCT x.impression_id) FILTER (WHERE x.outcome_type = 'BOOK_OPEN'
                 AND x.viewable
                 AND x.viewable_at IS NOT NULL
@@ -368,9 +390,9 @@ public class ReportingProjection {
                 AND o.occurred_at >= COALESCE(e.viewable_at, e.shown_at)
                 AND o.occurred_at < COALESCE(e.viewable_at, e.shown_at) + INTERVAL '7 days'
           ) x
-          GROUP BY x.day, x.model_version, x.strategy, x.feed_path, x.platform
+          GROUP BY x.day, x.model_version, x.strategy, x.feed_path, x.population, x.platform
         ), dwell_rollup AS (
-          SELECT e.shown_at::date AS day, e.model_version, e.strategy, e.feed_path, e.platform,
+          SELECT e.shown_at::date AS day, e.model_version, e.strategy, e.feed_path, e.population, e.platform,
               coalesce(sum(d.dwell_observations), 0)::bigint AS dwell_observations,
               coalesce(sum(d.dwell_seconds), 0)::bigint AS dwell_seconds,
               coalesce(sum(d.skipped_visits), 0)::bigint AS skipped_visits,
@@ -378,18 +400,18 @@ public class ReportingProjection {
           FROM exposure e
           LEFT JOIN dwell_by_exposure d ON d.impression_id = e.impression_id
               AND d.item_id = e.item_id
-          GROUP BY e.shown_at::date, e.model_version, e.strategy, e.feed_path, e.platform
+          GROUP BY e.shown_at::date, e.model_version, e.strategy, e.feed_path, e.population, e.platform
         )
         INSERT INTO reporting.feed_daily(
             day, model_version, strategy, feed_path, population, platform,
-            served_count, viewable_count, eligible_viewable_count,
-            attributed_open_count, mature_attributed_open_count,
+            served_count, mature_served_count, viewable_count, eligible_viewable_count,
+            mature_attributed_significant_read_count, mature_attributed_complete_count, attributed_open_count, mature_attributed_open_count,
             attributed_read_10_count, attributed_read_50_count,
             attributed_complete_count, dwell_observations, dwell_seconds, skipped_visits,
             calculation_version, refreshed_at, source_watermark)
-        SELECT f.day, f.model_version, f.strategy, f.feed_path, 'UNCLASSIFIED', f.platform,
-            f.served_count, f.viewable_count, f.eligible_viewable_count,
-            f.attributed_open_count, f.mature_attributed_open_count,
+        SELECT f.day, f.model_version, f.strategy, f.feed_path, f.population, f.platform,
+            f.served_count, f.mature_served_count, f.viewable_count, f.eligible_viewable_count,
+            f.mature_attributed_significant_read_count, f.mature_attributed_complete_count, f.attributed_open_count, f.mature_attributed_open_count,
             f.attributed_read_10_count, f.attributed_read_50_count,
             f.attributed_complete_count, d.dwell_observations, d.dwell_seconds,
             d.skipped_visits,
@@ -400,9 +422,13 @@ public class ReportingProjection {
             AND d.model_version = f.model_version
             AND d.strategy = f.strategy
             AND d.feed_path = f.feed_path
+            AND d.population = f.population
             AND d.platform = f.platform
         ON CONFLICT (day, model_version, strategy, feed_path, population, platform) DO UPDATE SET
           served_count = EXCLUDED.served_count,
+          mature_served_count = EXCLUDED.mature_served_count,
+          mature_attributed_significant_read_count = EXCLUDED.mature_attributed_significant_read_count,
+          mature_attributed_complete_count = EXCLUDED.mature_attributed_complete_count,
           viewable_count = EXCLUDED.viewable_count,
           eligible_viewable_count = EXCLUDED.eligible_viewable_count,
           attributed_open_count = EXCLUDED.attributed_open_count,
@@ -1210,7 +1236,7 @@ public class ReportingProjection {
     jdbc.update("DELETE FROM reporting.reading_daily WHERE day >= current_date - INTERVAL '366 days'");
     jdbc.update("""
         WITH events AS (
-          SELECT occurred_at::date AS day,
+          SELECT occurred_at::date AS day, coalesce(identity_population, 'UNKNOWN') AS population,
               count(DISTINCT (identity_issuer, identity_subject)) AS unique_readers,
               count(DISTINCT (identity_issuer, identity_subject, book_id)) FILTER (WHERE event_type = 'BOOK_OPEN') AS books_opened,
               count(DISTINCT (identity_issuer, identity_subject, book_id)) FILTER (WHERE event_type = 'BOOK_OPEN') AS books_started,
@@ -1220,9 +1246,9 @@ public class ReportingProjection {
           WHERE identity_issuer IS NOT NULL AND identity_subject IS NOT NULL
             AND event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS', 'BOOK_COMPLETE', 'READ_COMPLETE')
             AND occurred_at >= current_date - INTERVAL '366 days'
-          GROUP BY occurred_at::date
+          GROUP BY occurred_at::date, coalesce(identity_population, 'UNKNOWN')
         ), sessions AS (
-          SELECT started_at::date AS day, count(*) AS sessions,
+          SELECT started_at::date AS day, population.population, count(*) AS sessions,
               coalesce(sum(least(greatest(active_seconds, 0), 86400)), 0) AS active_seconds,
               percentile_cont(0.50) WITHIN GROUP (ORDER BY least(greatest(active_seconds, 0), 86400)) AS p50_session_seconds,
               percentile_cont(0.90) WITHIN GROUP (ORDER BY least(greatest(active_seconds, 0), 86400)) AS p90_session_seconds,
@@ -1233,22 +1259,34 @@ public class ReportingProjection {
                 AND least(greatest(active_seconds, 0), 86400) < 900) AS session_5m_15m,
               count(*) FILTER (WHERE least(greatest(active_seconds, 0), 86400) >= 900) AS session_15m_plus,
               max(coalesce(ended_at, started_at)) AS source_watermark
-          FROM reader_state.session
+          FROM reader_state.session s
+          LEFT JOIN LATERAL (
+            SELECT coalesce(e.identity_population, 'UNKNOWN') AS population
+            FROM behavior.events e WHERE e.identity_issuer IS NOT NULL
+              AND e.identity_subject = s.subject_key AND e.occurred_at <= coalesce(s.ended_at, s.started_at)
+            ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1
+          ) population ON true
           WHERE started_at >= current_date - INTERVAL '366 days'
-          GROUP BY started_at::date
+          GROUP BY started_at::date, population.population
         ), library AS (
-          SELECT created_at::date AS day, count(DISTINCT book_id) AS saved_books,
+          SELECT created_at::date AS day, population.population, count(DISTINCT book_id) AS saved_books,
               count(DISTINCT subject_key) AS unique_savers, max(created_at) AS source_watermark
-          FROM reader_state.library
+          FROM reader_state.library l
+          LEFT JOIN LATERAL (
+            SELECT coalesce(e.identity_population, 'UNKNOWN') AS population
+            FROM behavior.events e WHERE e.identity_issuer IS NOT NULL
+              AND e.identity_subject = l.subject_key AND e.occurred_at <= l.created_at
+            ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1
+          ) population ON true
           WHERE status = 'SAVED' AND created_at >= current_date - INTERVAL '366 days'
-          GROUP BY created_at::date
+          GROUP BY created_at::date, population.population
         )
         INSERT INTO reporting.reading_daily(
-            day, unique_readers, sessions, active_seconds, p50_session_seconds,
+            day, population, unique_readers, sessions, active_seconds, p50_session_seconds,
             p90_session_seconds, session_under_1m, session_1m_5m,
             session_5m_15m, session_15m_plus, books_opened, books_started, completions,
             saved_books, unique_savers, calculation_version, refreshed_at, source_watermark)
-        SELECT coalesce(e.day, s.day, l.day), coalesce(e.unique_readers, 0),
+        SELECT coalesce(e.day, s.day, l.day), coalesce(e.population, s.population, l.population), coalesce(e.unique_readers, 0),
             coalesce(s.sessions, 0), coalesce(s.active_seconds, 0),
             s.p50_session_seconds, s.p90_session_seconds,
             coalesce(s.session_under_1m, 0), coalesce(s.session_1m_5m, 0),
@@ -1258,9 +1296,9 @@ public class ReportingProjection {
             greatest(coalesce(e.source_watermark, '-infinity'::timestamptz),
               coalesce(s.source_watermark, '-infinity'::timestamptz),
               coalesce(l.source_watermark, '-infinity'::timestamptz))
-        FROM events e FULL OUTER JOIN sessions s ON s.day = e.day
-          FULL OUTER JOIN library l ON l.day = coalesce(e.day, s.day)
-        ON CONFLICT (day) DO UPDATE SET
+        FROM events e FULL OUTER JOIN sessions s ON s.day = e.day AND s.population = e.population
+          FULL OUTER JOIN library l ON l.day = coalesce(e.day, s.day) AND l.population = coalesce(e.population, s.population)
+        ON CONFLICT (day, population) DO UPDATE SET
             unique_readers = EXCLUDED.unique_readers,
             sessions = EXCLUDED.sessions,
             active_seconds = EXCLUDED.active_seconds,
@@ -1309,37 +1347,39 @@ public class ReportingProjection {
     jdbc.update("DELETE FROM reporting.retention_cohort WHERE cohort_day >= current_date - INTERVAL '366 days'");
     jdbc.update("""
         WITH significant AS (
-          SELECT identity_issuer, identity_subject, occurred_at::date AS activity_day
+          SELECT identity_issuer, identity_subject, coalesce(identity_population, 'UNKNOWN') AS population, occurred_at::date AS activity_day
           FROM behavior.events
           WHERE identity_issuer IS NOT NULL AND identity_subject IS NOT NULL
-            AND event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS', 'BOOK_COMPLETE', 'READ_COMPLETE',
-              'BOOK_LIKE', 'BOOK_UNLIKE', 'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
+            AND event_type = 'READ_SESSION'
+            AND payload->>'activeSeconds' ~ '^[0-9]+$'
+            AND (payload->>'activeSeconds')::bigint >= 60
         ), first_seen AS (
-          SELECT identity_issuer, identity_subject, min(activity_day) AS cohort_day
-          FROM significant GROUP BY identity_issuer, identity_subject
+          SELECT identity_issuer, identity_subject, population, min(activity_day) AS cohort_day
+          FROM significant GROUP BY identity_issuer, identity_subject, population
         ), cohorts AS (
-          SELECT cohort_day, count(*) AS cohort_users
+          SELECT cohort_day, population, count(*) AS cohort_users
           FROM first_seen
           WHERE cohort_day >= current_date - INTERVAL '366 days'
-          GROUP BY cohort_day
+          GROUP BY cohort_day, population
         ), offsets AS (
-          SELECT c.cohort_day, o.offset_day, c.cohort_users,
+          SELECT c.cohort_day, c.population, o.offset_day, c.cohort_users,
               count(DISTINCT (s.identity_issuer, s.identity_subject)) AS retained_users
           FROM cohorts c CROSS JOIN (VALUES (0), (1), (7), (30)) o(offset_day)
-          LEFT JOIN first_seen f ON f.cohort_day = c.cohort_day
+          LEFT JOIN first_seen f ON f.cohort_day = c.cohort_day AND f.population = c.population
           LEFT JOIN significant s ON s.identity_issuer = f.identity_issuer
             AND s.identity_subject = f.identity_subject
             AND s.activity_day = c.cohort_day + o.offset_day
-          GROUP BY c.cohort_day, o.offset_day, c.cohort_users
+            AND s.population = c.population
+          GROUP BY c.cohort_day, c.population, o.offset_day, c.cohort_users
         )
         INSERT INTO reporting.retention_cohort(
-            cohort_day, offset_day, cohort_users, retained_users, mature,
+            cohort_day, offset_day, population, cohort_users, retained_users, mature,
             calculation_version, refreshed_at, source_watermark)
-        SELECT cohort_day, offset_day, cohort_users, retained_users,
+        SELECT cohort_day, offset_day, population, cohort_users, retained_users,
             current_date >= cohort_day + offset_day, ?, ?,
             (SELECT max(occurred_at) FROM behavior.events)
         FROM offsets
-        ON CONFLICT (cohort_day, offset_day) DO UPDATE SET
+        ON CONFLICT (cohort_day, offset_day, population) DO UPDATE SET
             cohort_users = EXCLUDED.cohort_users,
             retained_users = EXCLUDED.retained_users,
             mature = EXCLUDED.mature,
@@ -1516,6 +1556,7 @@ public class ReportingProjection {
     jdbc.update("""
         WITH requests AS (
           SELECT r.created_at::date AS day, r.model_version, r.strategy,
+            COALESCE(population.identity_population, 'UNKNOWN') AS population,
             COALESCE(r.context->>'personalizationPath', 'UNKNOWN') AS feed_path,
             COALESCE(r.context->>'platform', 'UNKNOWN') AS platform,
             COALESCE(r.context->>'profileConfidenceBucket', 'UNKNOWN') AS confidence_bucket,
@@ -1524,17 +1565,22 @@ public class ReportingProjection {
             COALESCE((r.context->>'coldStart') = 'true', false) AS cold_start,
             r.created_at AS source_watermark
           FROM recommendation.request r
+          LEFT JOIN LATERAL (
+            SELECT e.identity_population FROM behavior.events e
+            WHERE e.identity_issuer IS NOT NULL AND e.identity_subject = r.subject_key
+            ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1
+          ) population ON true
           WHERE r.created_at >= current_date - INTERVAL '366 days'
         )
         INSERT INTO reporting.recommendation_profile_quality_daily(
           day, model_version, strategy, feed_path, population, platform,
           confidence_bucket, profile_size_bucket, fatigue_coverage_bucket,
           cold_start, request_count, calculation_version, refreshed_at, source_watermark)
-        SELECT day, model_version, strategy, feed_path, 'UNCLASSIFIED', platform,
+        SELECT day, model_version, strategy, feed_path, population, platform,
           confidence_bucket, profile_size_bucket, fatigue_coverage_bucket,
           cold_start, count(*), ?, ?, max(source_watermark)
         FROM requests
-        GROUP BY day, model_version, strategy, feed_path, platform,
+        GROUP BY day, model_version, strategy, feed_path, population, platform,
           confidence_bucket, profile_size_bucket, fatigue_coverage_bucket, cold_start
         ON CONFLICT (day, model_version, strategy, feed_path, population, platform,
           confidence_bucket, profile_size_bucket, fatigue_coverage_bucket, cold_start)
@@ -1554,10 +1600,16 @@ public class ReportingProjection {
         WITH requests AS (
           SELECT r.id, r.subject_key, r.created_at::date AS day, r.model_version, r.strategy,
               r.candidate_count, r.scored_candidate_count, r.selected_count,
+              COALESCE(population.identity_population, 'UNKNOWN') AS population,
               coalesce(r.context->>'personalizationPath', 'UNKNOWN') AS feed_path,
               coalesce(r.context->>'platform', 'UNKNOWN') AS platform,
               r.created_at AS source_watermark
           FROM recommendation.request r
+          LEFT JOIN LATERAL (
+            SELECT e.identity_population FROM behavior.events e
+            WHERE e.identity_issuer IS NOT NULL AND e.identity_subject = r.subject_key
+            ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1
+          ) population ON true
           WHERE r.created_at >= current_date - INTERVAL '366 days'
         ), items AS (
           SELECT i.request_id, count(*) AS item_count,
@@ -1565,14 +1617,14 @@ public class ReportingProjection {
           FROM recommendation.item i JOIN requests r ON r.id = i.request_id
           GROUP BY i.request_id
         ), item_distribution AS (
-          SELECT r.day, r.model_version, r.strategy, r.feed_path, r.platform,
+          SELECT r.day, r.model_version, r.strategy, r.feed_path, r.population, r.platform,
               count(DISTINCT i.book_id) AS unique_books,
               percentile_cont(0.50) WITHIN GROUP (ORDER BY i.rank) AS p50_rank,
               percentile_cont(0.90) WITHIN GROUP (ORDER BY i.rank) AS p90_rank
           FROM requests r JOIN recommendation.item i ON i.request_id = r.id
-          GROUP BY r.day, r.model_version, r.strategy, r.feed_path, r.platform
+          GROUP BY r.day, r.model_version, r.strategy, r.feed_path, r.population, r.platform
         ), impression_events AS (
-          SELECT r.day, r.model_version, r.strategy, r.feed_path, r.platform,
+          SELECT r.day, r.model_version, r.strategy, r.feed_path, r.population, r.platform,
               i.id AS impression_id, i.book_id, i.viewable,
               COALESCE(i.viewable_at, i.shown_at) AS viewable_time,
               EXISTS (
@@ -1592,7 +1644,7 @@ public class ReportingProjection {
               ) AS repeat_viewable
           FROM recommendation.impression i JOIN requests r ON r.id = i.request_id
         ), impressions AS (
-          SELECT day, model_version, strategy, feed_path, platform,
+          SELECT day, model_version, strategy, feed_path, population, platform,
               count(DISTINCT impression_id) AS impression_count,
               count(DISTINCT impression_id) FILTER (WHERE viewable) AS viewable_count,
               count(DISTINCT impression_id) FILTER (WHERE viewable AND repeat_viewable)
@@ -1600,7 +1652,7 @@ public class ReportingProjection {
               count(DISTINCT book_id) FILTER (WHERE viewable) AS viewable_unique_books,
               max(viewable_time) AS source_watermark
           FROM impression_events
-          GROUP BY day, model_version, strategy, feed_path, platform
+          GROUP BY day, model_version, strategy, feed_path, population, platform
         )
         INSERT INTO reporting.recommendation_daily(
             day, model_version, strategy, feed_path, population, platform,
@@ -1609,7 +1661,7 @@ public class ReportingProjection {
             repeat_viewable_count, viewable_unique_books, unique_books, p50_rank, p90_rank,
             calculation_version, refreshed_at,
             source_watermark)
-        SELECT r.day, r.model_version, r.strategy, r.feed_path, 'UNCLASSIFIED', r.platform,
+        SELECT r.day, r.model_version, r.strategy, r.feed_path, r.population, r.platform,
             count(*), CASE WHEN count(r.candidate_count) = count(*)
               THEN sum(r.candidate_count) END,
             CASE WHEN count(r.scored_candidate_count) = count(*)
@@ -1623,11 +1675,11 @@ public class ReportingProjection {
         FROM requests r LEFT JOIN items i ON i.request_id = r.id
           LEFT JOIN impressions m ON m.day = r.day
             AND m.model_version = r.model_version AND m.strategy = r.strategy
-            AND m.feed_path = r.feed_path AND m.platform = r.platform
+            AND m.feed_path = r.feed_path AND m.population = r.population AND m.platform = r.platform
           LEFT JOIN item_distribution b ON b.day = r.day
             AND b.model_version = r.model_version AND b.strategy = r.strategy
-            AND b.feed_path = r.feed_path AND b.platform = r.platform
-        GROUP BY r.day, r.model_version, r.strategy, r.feed_path, r.platform
+            AND b.feed_path = r.feed_path AND b.population = r.population AND b.platform = r.platform
+        GROUP BY r.day, r.model_version, r.strategy, r.feed_path, r.population, r.platform
         ON CONFLICT (day, model_version, strategy, feed_path, population, platform) DO UPDATE SET
             request_count = EXCLUDED.request_count,
             candidate_count = EXCLUDED.candidate_count,
@@ -2130,7 +2182,7 @@ public class ReportingProjection {
     jdbc.update("DELETE FROM reporting.book_engagement_daily WHERE day >= current_date - INTERVAL '366 days'");
     jdbc.update("""
         WITH event_facts AS (
-          SELECT occurred_at::date AS day, book_id,
+          SELECT occurred_at::date AS day, book_id, coalesce(identity_population, 'UNKNOWN') AS population,
               count(DISTINCT identity_subject) FILTER (WHERE identity_subject IS NOT NULL
                 AND event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS',
                   'BOOK_COMPLETE', 'READ_COMPLETE')) AS unique_readers,
@@ -2144,9 +2196,9 @@ public class ReportingProjection {
               max(occurred_at) AS source_watermark
           FROM behavior.events
           WHERE book_id IS NOT NULL AND occurred_at >= current_date - INTERVAL '366 days'
-          GROUP BY occurred_at::date, book_id
+          GROUP BY occurred_at::date, book_id, coalesce(identity_population, 'UNKNOWN')
         ), books AS (
-          SELECT db.day, db.book_id, b.canonical_title AS book_title,
+          SELECT db.day, db.book_id, e.population, b.canonical_title AS book_title,
               coalesce(b.original_language, 'und') AS language,
               db.impressions, db.opens, db.reads,
               coalesce(e.viewable_count, 0) AS viewable_count,
@@ -2159,7 +2211,7 @@ public class ReportingProjection {
           LEFT JOIN event_facts e ON e.day = db.day AND e.book_id = db.book_id
           WHERE db.day >= current_date - INTERVAL '366 days' AND b.status = 'ACTIVE'
         ), language_events AS (
-          SELECT e.occurred_at::date AS day, coalesce(b.original_language, 'und') AS language,
+          SELECT e.occurred_at::date AS day, coalesce(e.identity_population, 'UNKNOWN') AS population, coalesce(b.original_language, 'und') AS language,
               count(DISTINCT e.identity_subject) FILTER (WHERE e.identity_subject IS NOT NULL
                 AND e.event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS',
                   'BOOK_COMPLETE', 'READ_COMPLETE')) AS unique_readers,
@@ -2173,34 +2225,34 @@ public class ReportingProjection {
           FROM behavior.events e JOIN catalog.book b ON b.id = e.book_id
           WHERE e.book_id IS NOT NULL AND b.status = 'ACTIVE'
             AND e.occurred_at >= current_date - INTERVAL '366 days'
-          GROUP BY e.occurred_at::date, coalesce(b.original_language, 'und')
+          GROUP BY e.occurred_at::date, coalesce(e.identity_population, 'UNKNOWN'), coalesce(b.original_language, 'und')
         ), language_books AS (
-          SELECT day, language, sum(impressions) AS impressions, sum(viewable_count) AS viewable_count,
+          SELECT day, population, language, sum(impressions) AS impressions, sum(viewable_count) AS viewable_count,
               sum(opens) AS opens, sum(reads) AS reads, max(source_watermark) AS source_watermark
-          FROM books GROUP BY day, language
+          FROM books GROUP BY day, population, language
         ), aggregated AS (
-          SELECT day, 'BOOK' AS aggregation_level, book_id::text AS aggregation_key,
+          SELECT day, population, 'BOOK' AS aggregation_level, book_id::text AS aggregation_key,
               book_id, book_title, language, impressions, viewable_count, opens, reads,
               active_minutes, unique_readers, completions, interactions, source_watermark
           FROM books
           UNION ALL
-          SELECT lb.day, 'LANGUAGE', lb.language, NULL, NULL, lb.language,
+          SELECT lb.day, lb.population, 'LANGUAGE', lb.language, NULL, NULL, lb.language,
               lb.impressions, lb.viewable_count, lb.opens, lb.reads,
               coalesce(le.active_minutes, 0), coalesce(le.unique_readers, 0),
               coalesce(le.completions, 0), coalesce(le.interactions, 0),
               greatest(lb.source_watermark, coalesce(le.source_watermark, lb.source_watermark))
           FROM language_books lb LEFT JOIN language_events le
-            ON le.day = lb.day AND le.language = lb.language
+            ON le.day = lb.day AND le.population = lb.population AND le.language = lb.language
         )
         INSERT INTO reporting.book_engagement_daily(
-            day, aggregation_level, aggregation_key, book_id, book_title, language,
+            day, population, aggregation_level, aggregation_key, book_id, book_title, language,
             impressions, viewable_count, opens, reads, active_minutes, unique_readers,
             completions, interactions, calculation_version, refreshed_at, source_watermark)
-        SELECT day, aggregation_level, aggregation_key, book_id, book_title, language,
+        SELECT day, population, aggregation_level, aggregation_key, book_id, book_title, language,
             impressions, viewable_count, opens, reads, active_minutes, unique_readers,
             completions, interactions, ?, ?, source_watermark
         FROM aggregated
-        ON CONFLICT (day, aggregation_level, aggregation_key) DO UPDATE SET
+        ON CONFLICT (day, aggregation_level, aggregation_key, population) DO UPDATE SET
             book_id = EXCLUDED.book_id, book_title = EXCLUDED.book_title, language = EXCLUDED.language,
             impressions = EXCLUDED.impressions, viewable_count = EXCLUDED.viewable_count,
             opens = EXCLUDED.opens, reads = EXCLUDED.reads, active_minutes = EXCLUDED.active_minutes,
@@ -2322,12 +2374,18 @@ public class ReportingProjection {
         WITH exposures AS (
           SELECT imp.id AS impression_id, imp.item_id, imp.book_id, imp.shown_at,
               imp.viewable_at, imp.viewable, r.subject_key, r.model_version, r.strategy,
+              COALESCE(population.identity_population, 'UNKNOWN') AS population,
               COALESCE(r.context->>'platform', 'UNKNOWN') AS platform,
               CASE WHEN item.rank <= 3 THEN '1-3'
                    WHEN item.rank <= 10 THEN '4-10'
                    WHEN item.rank <= 24 THEN '11-24' ELSE '25+' END AS rank_bucket
           FROM recommendation.impression imp
           JOIN recommendation.request r ON r.id = imp.request_id
+          LEFT JOIN LATERAL (
+            SELECT e.identity_population FROM behavior.events e
+            WHERE e.identity_issuer IS NOT NULL AND e.identity_subject = r.subject_key
+            ORDER BY e.occurred_at DESC, e.id DESC LIMIT 1
+          ) population ON true
           JOIN recommendation.item item ON item.id = imp.item_id
           WHERE imp.shown_at >= current_date - INTERVAL '366 days'
         ), outcomes AS (
@@ -2352,7 +2410,7 @@ public class ReportingProjection {
             impression_count, viewable_count, eligible_viewable_count,
             attributed_open_count, mature_attributed_open_count,
             calculation_version, refreshed_at, source_watermark)
-        SELECT shown_at::date, model_version, strategy, rank_bucket, 'UNCLASSIFIED', platform,
+        SELECT shown_at::date, model_version, strategy, rank_bucket, population, platform,
             count(DISTINCT impression_id),
             count(DISTINCT impression_id) FILTER (WHERE viewable),
             count(DISTINCT impression_id) FILTER (WHERE viewable AND viewable_at IS NOT NULL
@@ -2364,7 +2422,7 @@ public class ReportingProjection {
             ?, ?, max(greatest(COALESCE(viewable_at, shown_at),
               COALESCE(occurred_at, COALESCE(viewable_at, shown_at))))
         FROM outcomes
-        GROUP BY shown_at::date, model_version, strategy, rank_bucket, platform
+        GROUP BY shown_at::date, model_version, strategy, rank_bucket, population, platform
         ON CONFLICT (day, model_version, strategy, rank_bucket, population, platform) DO UPDATE SET
           impression_count = EXCLUDED.impression_count,
           viewable_count = EXCLUDED.viewable_count,

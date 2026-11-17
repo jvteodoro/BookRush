@@ -29,10 +29,10 @@ class ReportingControllerTest {
   void rejectsReadersAndUnboundedQueries() {
     var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
     assertEquals(403, assertThrows(ResponseStatusException.class,
-        () -> controller.readerDay(30, principal, reader)).getStatusCode().value());
+        () -> controller.readerDay(30, "PRODUCT", principal, reader)).getStatusCode().value());
     var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
     assertEquals(400, assertThrows(ResponseStatusException.class,
-        () -> controller.readerDay(367, principal, analyst)).getStatusCode().value());
+        () -> controller.readerDay(367, "PRODUCT", principal, analyst)).getStatusCode().value());
   }
 
   @Test
@@ -46,7 +46,7 @@ class ReportingControllerTest {
         "behavior_distinct_books", 1L)));
 
     var response = controller.socialDaily(7, principal, analyst);
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals(2L, row.get("behavior_like_events"));
     assertEquals(1L, row.get("behavior_unlike_events"));
@@ -54,19 +54,39 @@ class ReportingControllerTest {
   }
 
   @Test
-  void reportsUntrustedPopulationInsteadOfPretendingProductData() {
-    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.of(
+  void preservesUnknownPopulationInsteadOfGuessingHistoricProductData() {
+    when(jdbc.queryForList(anyString(), eq(7), eq("UNKNOWN"))).thenReturn(List.of(Map.of(
         "day", java.sql.Date.valueOf("2026-11-01"),
-        "population", "UNCLASSIFIED", "platform", "UNKNOWN",
+        "population", "UNKNOWN", "platform", "UNKNOWN",
         "refreshed_at", Timestamp.from(Instant.parse("2026-11-04T12:00:00Z")),
         "source_watermark", freshWatermark(),
         "active_users", 2L)));
     var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
 
-    var response = controller.readerDay(7, principal, analyst);
+    var response = controller.readerDay(7, "UNKNOWN", principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
-    assertEquals("UNCLASSIFIED", response.get("population"));
+    assertEquals("STALE", response.get("status"));
+    assertEquals("UNKNOWN", response.get("population"));
+  }
+
+  @Test
+  void reportsWeeklySignificantReadersAndPreviousWeekFromAuthenticatedPopulation() {
+    when(jdbc.queryForMap(anyString(), eq("PRODUCT"))).thenReturn(Map.of(
+        "weekly_significant_readers", 84L, "previous_week_significant_readers", 72L,
+        "weekly_books_started", 154L, "previous_week_books_started", 139L,
+        "weekly_sessions", 238L, "previous_week_sessions", 210L,
+        "weekly_active_seconds", 298800L, "previous_week_active_seconds", 276000L,
+        "event_count", 900L, "last_business_activity_at", Timestamp.from(Instant.now())));
+    var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
+
+    var response = controller.weeklySignificantReaders("PRODUCT", principal, analyst);
+
+    assertEquals("PRODUCT", response.get("population"));
+    assertEquals("significant-read-v1-active-seconds-gte-60-weekly-unique-readers",
+        response.get("definitionVersion"));
+    var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
+    assertEquals(84L, row.get("weekly_significant_readers"));
+    assertEquals(72L, row.get("previous_week_significant_readers"));
   }
 
   @Test
@@ -74,14 +94,14 @@ class ReportingControllerTest {
     when(jdbc.queryForList(anyString())).thenReturn(List.of(Map.of(
         "saved_book_pairs", 3L, "saved_books", 2L, "saved_subject_keys", 2L,
         "calculation_version", "library-current-state-v1-untrusted-population",
-        "refreshed_at", Timestamp.from(Instant.parse("2026-11-17T12:00:00Z"))
+        "refreshed_at", Timestamp.from(Instant.now().minusSeconds(60))
     )));
     var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
 
     var response = controller.libraryState(principal, analyst);
 
     assertEquals("current_snapshot", response.get("unit"));
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("OK", response.get("status"));
     assertFalse(response.containsKey("from"));
     assertFalse(response.containsKey("to"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
@@ -97,8 +117,9 @@ class ReportingControllerTest {
   @Test
   void exposesFeedAndPipelineSnapshotsOnlyToReportingRoles() {
     var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
-    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.of(
-        "day", java.sql.Date.valueOf("2026-11-01"),
+    when(jdbc.queryForList(anyString(), eq(7), eq("PRODUCT"))).thenReturn(List.of(Map.of(
+        "day", java.sql.Date.valueOf("2026-11-01"), "population", "PRODUCT",
+        "refreshed_at", Timestamp.from(Instant.now().minusSeconds(60)),
         "strategy", "PERSONALIZED", "served_count", 4L,
         "viewable_count", 3L, "attributed_open_count", 1L,
         "source_watermark", freshWatermark())))
@@ -107,15 +128,18 @@ class ReportingControllerTest {
             "phase", "ITEM", "job_status", "COMPLETED", "status_count", 4L,
             "failure_count", 0L, "throughput", 2L,
             "source_watermark", freshWatermark())));
+    when(jdbc.queryForList(anyString(), eq("pipeline_snapshot"))).thenReturn(List.of(Map.of(
+        "refreshed_at", Timestamp.from(Instant.now()), "source_watermark", freshWatermark(),
+        "refresh_status", "SUCCESS")));
 
-    assertEquals("UNTRUSTED", controller.feedDaily(7, principal, analyst).get("status"));
-    assertEquals("UNTRUSTED", controller.pipeline(7, principal, analyst).get("status"));
-    assertEquals("UNTRUSTED", controller.attributionQuality(7, principal, analyst).get("status"));
-    assertEquals("UNTRUSTED", controller.reconciliationQuality(7, principal, analyst).get("status"));
+    assertEquals("OK", controller.feedDaily(7, "PRODUCT", principal, analyst).get("status"));
+    assertEquals("NO_DATA", controller.pipeline(7, principal, analyst).get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", controller.attributionQuality(7, principal, analyst).get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", controller.reconciliationQuality(7, principal, analyst).get("status"));
 
     var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
     assertEquals(403, assertThrows(ResponseStatusException.class,
-        () -> controller.feedDaily(7, principal, reader)).getStatusCode().value());
+        () -> controller.feedDaily(7, "PRODUCT", principal, reader)).getStatusCode().value());
   }
 
   @Test
@@ -129,18 +153,18 @@ class ReportingControllerTest {
         Map.entry("completions", 1L), Map.entry("period_active_minutes", 90L),
         Map.entry("entity_rank", 1L), Map.entry("source_watermark", freshWatermark()))));
 
-    var response = controller.bookEngagementTrends(30, 5, 5, principal, analyst);
+    var response = controller.bookEngagementTrends(30, 5, 5, "PRODUCT", principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     assertEquals("book_engagement_trends", response.get("metricId"));
-    assertEquals("UNCLASSIFIED", response.get("population"));
+    assertEquals("PRODUCT", response.get("population"));
     assertEquals(1, ((List<?>) response.get("series")).size());
     var reader = new TestingAuthenticationToken(principal, "credentials", "ROLE_reader");
     assertEquals(403, assertThrows(ResponseStatusException.class,
-        () -> controller.bookEngagementTrends(30, 5, 5, principal, reader))
+        () -> controller.bookEngagementTrends(30, 5, 5, "PRODUCT", principal, reader))
         .getStatusCode().value());
     assertEquals(400, assertThrows(ResponseStatusException.class,
-        () -> controller.bookEngagementTrends(30, 5, 11, principal, analyst))
+        () -> controller.bookEngagementTrends(30, 5, 11, "PRODUCT", principal, analyst))
         .getStatusCode().value());
   }
 
@@ -153,12 +177,12 @@ class ReportingControllerTest {
         Map.entry("excerpt_ready_books", 1L), Map.entry("available_asset_versions", 2L),
         Map.entry("analyzed_asset_versions", 1L), Map.entry("eligible_excerpts", 1L),
         Map.entry("ranked_excerpts", 1L), Map.entry("calculation_version", "content-supply-v2"),
-        Map.entry("refreshed_at", Timestamp.from(Instant.parse("2026-11-15T12:00:00Z"))),
+        Map.entry("refreshed_at", Timestamp.from(Instant.now().minusSeconds(60))),
         Map.entry("source_watermark", freshWatermark()))));
 
     var response = controller.contentSupply(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("OK", response.get("status"));
     assertEquals("content_supply_snapshot", response.get("metricId"));
     assertEquals(1L, ((Map<?, ?>) ((List<?>) response.get("series")).get(0))
         .get("reader_ready_books"));
@@ -175,12 +199,12 @@ class ReportingControllerTest {
         Map.entry("active_books", 3L), Map.entry("reader_ready_books", 2L),
         Map.entry("eligible_excerpts", 8L), Map.entry("ranked_excerpts", 6L),
         Map.entry("calculation_version", "content-coverage-v1"),
-        Map.entry("refreshed_at", Timestamp.from(Instant.parse("2026-11-15T12:00:00Z"))),
+        Map.entry("refreshed_at", Timestamp.from(Instant.now().minusSeconds(60))),
         Map.entry("source_watermark", freshWatermark()))));
 
     var response = controller.contentCoverage(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("OK", response.get("status"));
     assertEquals("content_coverage_snapshot", response.get("metricId"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals("pt", row.get("language"));
@@ -203,7 +227,7 @@ class ReportingControllerTest {
 
     var response = controller.contentRankScores(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     assertEquals("content_rank_score_snapshot", response.get("metricId"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals("ranker-a", row.get("ranker_code"));
@@ -225,7 +249,7 @@ class ReportingControllerTest {
 
     var response = controller.excerptProduction(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     assertEquals("excerpt_production_snapshot", response.get("metricId"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals("RANKED", row.get("outcome"));
@@ -249,7 +273,7 @@ class ReportingControllerTest {
 
     var response = controller.importQualityDaily(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     assertEquals("import_quality_daily", response.get("metricId"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals("ASSET", row.get("error_bucket"));
@@ -271,7 +295,7 @@ class ReportingControllerTest {
 
     var response = controller.backlog(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     assertEquals("backlog_snapshot", response.get("metricId"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals(1200L, row.get("oldest_pending_age_seconds"));
@@ -290,12 +314,12 @@ class ReportingControllerTest {
         Map.entry("oldest_task_age_seconds", 1200L),
         Map.entry("expired_lease_count", 0L),
         Map.entry("calculation_version", "ingestion-queue-v1"),
-        Map.entry("refreshed_at", Timestamp.from(Instant.parse("2026-11-15T12:00:00Z"))),
+        Map.entry("refreshed_at", Timestamp.from(Instant.now().minusSeconds(60))),
         Map.entry("source_watermark", freshWatermark()))));
 
     var response = controller.ingestionQueue(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("OK", response.get("status"));
     assertEquals("ingestion_queue_snapshot", response.get("metricId"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals("PENDING", row.get("queue_status"));
@@ -318,10 +342,10 @@ class ReportingControllerTest {
     when(jdbc.queryForMap(anyString(), any(Object[].class)))
         .thenReturn(uniqueReaders, reader, feed, uniqueReaders, reader, feed);
 
-    var response = controller.executiveSummary(7, principal, analyst);
+    var response = controller.executiveSummary(7, "PRODUCT", principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
-    assertEquals("executive-period-comparison-v2-issuer-subject-unique-users-untrusted-population",
+    assertEquals("OK", response.get("status"));
+    assertEquals("executive-period-comparison-v3-issuer-subject-population",
         response.get("definitionVersion"));
     assertEquals("current", ((Map<?, ?>) response.get("current")).get("label"));
     assertEquals("previous", ((Map<?, ?>) response.get("previous")).get("label"));
@@ -342,8 +366,8 @@ class ReportingControllerTest {
 
     var response = controller.editorialQualityDaily(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
-    assertEquals("UNCLASSIFIED", response.get("population"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
+    assertEquals("UNKNOWN", response.get("population"));
     assertEquals(1, ((List<?>) response.get("series")).size());
   }
 
@@ -360,8 +384,8 @@ class ReportingControllerTest {
 
     var response = controller.readingProgressDaily(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
-    assertEquals("UNCLASSIFIED", response.get("population"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
+    assertEquals("UNKNOWN", response.get("population"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals(5L, row.get("reader_book_pairs_started"));
     assertEquals(4L, row.get("reader_book_pairs_10"));
@@ -384,7 +408,7 @@ class ReportingControllerTest {
 
     var response = controller.readingHabitsDaily(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals(1L, row.get("streak_2_6_day_users"));
     assertEquals(1L, row.get("streak_7_29_day_users"));
@@ -405,8 +429,8 @@ class ReportingControllerTest {
 
     var response = controller.rightsStatusDaily(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
-    assertEquals("UNCLASSIFIED", response.get("population"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
+    assertEquals("UNKNOWN", response.get("population"));
     var row = (Map<?, ?>) ((List<?>) response.get("series")).get(0);
     assertEquals("CATALOG_DECISION", row.get("source_type"));
     assertEquals("ACTIVE", row.get("status"));
@@ -434,7 +458,7 @@ class ReportingControllerTest {
         Map.entry("unique_subjects", 10L),
         Map.entry("source_watermark", freshWatermark()))));
     var response = controller.excerptPerformance(7, 20, 50, 0, principal, analyst);
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     assertEquals("SUPPRESSED_BELOW_MIN_SAMPLE", response.get("population"));
     assertEquals(1, ((List<?>) response.get("series")).size());
     assertEquals(false, response.get("hasNext"));
@@ -469,8 +493,8 @@ class ReportingControllerTest {
 
     var response = controller.experimentDaily(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
-    assertEquals("UNCLASSIFIED", response.get("population"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
+    assertEquals("UNKNOWN", response.get("population"));
   }
 
   @Test
@@ -483,7 +507,7 @@ class ReportingControllerTest {
 
     var response = controller.accessAudit(7, principal, analyst);
 
-    assertEquals("UNTRUSTED", response.get("status"));
+    assertEquals("UNKNOWN_FRESHNESS", response.get("status"));
     assertEquals(1, ((List<?>) response.get("series")).size());
     org.junit.jupiter.api.Assertions.assertFalse(
         ((Map<?, ?>) ((List<?>) response.get("series")).get(0)).containsKey("actor_subject"));
@@ -492,11 +516,12 @@ class ReportingControllerTest {
   @Test
   void marksOldProjectionDataAsStale() {
     var analyst = new TestingAuthenticationToken(principal, "credentials", "ROLE_analysts");
-    when(jdbc.queryForList(anyString(), eq(7))).thenReturn(List.of(Map.of(
+    when(jdbc.queryForList(anyString(), eq(7), eq("PRODUCT"))).thenReturn(List.of(Map.of(
         "day", java.sql.Date.valueOf("2026-11-01"),
-        "source_watermark", Timestamp.from(Instant.now().minusSeconds(3600)))));
+        "refreshed_at", Timestamp.from(Instant.now().minusSeconds(3600)),
+        "source_watermark", Timestamp.from(Instant.now().minusSeconds(7200)))));
 
-    var response = controller.readerDay(7, principal, analyst);
+    var response = controller.readerDay(7, "PRODUCT", principal, analyst);
 
     assertEquals("STALE", response.get("status"));
     long freshness = ((Number) response.get("freshnessSeconds")).longValue();

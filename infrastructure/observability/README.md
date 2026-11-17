@@ -22,6 +22,13 @@ até a integração SSO do pacote `dash-06`.
 - Feed: `bookrush_feed_*` expõe caminhos de personalização, candidatos,
   itens, confiança de perfil e comparação shadow; os painéis não interpretam
   esses contadores operacionais como conversão ou causalidade.
+- O dashboard Operations é a entrada operacional de seis horas; os dashboards
+  provisionados de serviço, PostgreSQL, JVM/containers, gateway/Keycloak,
+  storage/Redis e logs/traces oferecem drill-down técnico. Os JSONs ficam em
+  `grafana/dashboards` e são carregados pelo provider de arquivos existente.
+- As consultas de taxas Redis, PostgreSQL e shadow overlap preservam
+  denominadores reais; não usam `clamp_min(..., 1)` para fabricar taxas quando
+  não há amostra.
 
 As imagens são fixadas por versão. Os volumes `prometheus_data`,
 `grafana_data`, `loki_data` e `tempo_data` são persistentes e independentes dos
