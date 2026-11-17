@@ -126,7 +126,7 @@ service_account_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get use
 test -n "$service_account_id"
 docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
   "users/$service_account_id/role-mappings/realm" -r bookrush-platform \
-  --fields name --format csv --noquotes | grep -qx 'platform-operator'
+  --fields name --format csv --noquotes | grep -x 'platform-operator' >/dev/null
 grafana_client_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients \
   -r bookrush-platform -q clientId=bookrush-grafana \
   --fields id --format csv --noquotes | awk 'NR == 1 { print; exit }')"
@@ -137,10 +137,10 @@ grep -q 'http://grafana:3000/login/generic_oauth' <<<"$grafana_client"
 grep -q '"publicClient" : false' <<<"$grafana_client"
 docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
   "clients/$grafana_client_id/protocol-mappers/models" -r bookrush-platform \
-  --fields name --format csv --noquotes | grep -qx 'grafana-groups'
+  --fields name --format csv --noquotes | grep -x 'grafana-groups' >/dev/null
 for mapper in grafana-preferred-username grafana-email grafana-email-verified; do
   docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
     "clients/$grafana_client_id/protocol-mappers/models" -r bookrush-platform \
-    --fields name --format csv --noquotes | grep -qx "$mapper"
+    --fields name --format csv --noquotes | grep -x "$mapper" >/dev/null
 done
 echo 'Keycloak IaC + Grafana OAuth redirect: OK (ambiente descartável)'
