@@ -145,3 +145,8 @@ resultados continuam explicitamente observacionais.
 `admin.audit_log` por dia e ação. Subjects, targets e `details` não são
 copiados para a projeção, permitindo o painel DQ-08 sem divulgar valores
 individuais.
+
+`V50__expand_reporting_projection_version.sql` amplia para 120 caracteres a
+versão registrada em `reporting.projection_health`. O limite comporta os
+identificadores das definições das projeções; se uma origem estiver ausente,
+o erro fica registrado sem interromper a atualização das demais projeções.

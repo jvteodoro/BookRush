@@ -940,7 +940,7 @@ components:
       properties:
         schemaVersion: { type: string, example: dashboard-response-v1 }
         metricId: { type: string, example: reader_day }
-        definitionVersion: { type: string, example: events-v1-untrusted-population }
+        definitionVersion: { type: string, maxLength: 120, example: events-v1-untrusted-population }
         status: { type: string, enum: [OK, NO_DATA, NOT_INSTRUMENTED, STALE, RESTRICTED, ERROR, INSUFFICIENT_SAMPLE, UNTRUSTED] }
         unit: { type: string }
         from: { type: string, format: date-time }

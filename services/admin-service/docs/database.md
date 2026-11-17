@@ -9,6 +9,10 @@ payloads, subjects ou IDs de entidades na API. Enquanto a população dos evento
 não estiver classificada, os snapshots usam `UNCLASSIFIED` e a API responde
 `UNTRUSTED`, nunca `PRODUCT` ou zero implícito.
 
+A V50 permite até 120 caracteres em `reporting.projection_health.definition_version`,
+para comportar as definições versionadas e manter isoladas falhas recuperáveis
+de uma projeção durante a atualização periódica das demais.
+
 A migration V6 adiciona `reporting.feed_daily`, derivado do ledger de
 recomendações e de `behavior.outcome_attribution`, e
 `reporting.pipeline_snapshot`, derivado dos estados de jobs e fases do

@@ -209,6 +209,9 @@ echo 'Admin reporting migration upgrade E2E: V36 -> V37 OK'
 docker exec "$postgres" psql -At -U bookrush -d reporting_upgrade \
   -c "SELECT count(*) FROM information_schema.columns WHERE table_schema='reporting' AND table_name='library_state_snapshot'" | grep -qx 7
 echo 'Admin reporting migration upgrade E2E: V37 -> V38 OK'
+docker exec "$postgres" psql -At -U bookrush -d reporting_upgrade \
+  -c "SELECT character_maximum_length FROM information_schema.columns WHERE table_schema='reporting' AND table_name='projection_health' AND column_name='definition_version'" | grep -qx 120
+echo 'Admin reporting migration upgrade E2E: projection definition version supports 120 characters'
 # Real PostgreSQL upgrade from V7, with retained comment and moderation evidence.
 docker exec "$postgres" createdb -U bookrush comments_upgrade
 for migration in "$repo_dir"/services/social-service/src/main/resources/db/migration/V[1-7]__*.sql; do
