@@ -12,9 +12,10 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.MockMvc;
+import com.bookrush.behaviorservice.api.PublisherBehaviorMetricsController;
 import com.bookrush.behaviorservice.api.PublisherBookMetricsController;
 
-@WebMvcTest(PublisherBookMetricsController.class)
+@WebMvcTest({PublisherBookMetricsController.class, PublisherBehaviorMetricsController.class})
 @Import(BehaviorSecurityConfiguration.class)
 @org.springframework.test.context.TestPropertySource(properties = {
     "bookrush.security.enabled=true", "bookrush.security.s2s-issuer=https://platform.example/realms/bookrush-platform",
@@ -32,6 +33,9 @@ class PublisherMetricsSecurityTest {
   }
   @Test void dedicatedScopeReadsMetrics() throws Exception {
     mvc.perform(get(url).with(jwt().jwt(token -> token.claim("scope","bookrush.publisher.metrics.read")))).andExpect(status().isOk());
+  }
+  @Test void thresholdedSummaryUsesDistinctRouteAndDedicatedScope() throws Exception {
+    mvc.perform(get(url+"/summary").with(jwt().jwt(token -> token.claim("scope","bookrush.publisher.metrics.read")))).andExpect(status().isOk());
   }
   @Test void rejectsOutOfRangeDays() throws Exception {
     mvc.perform(get(url+"?days=366").with(jwt().jwt(token -> token.claim("scope","bookrush.publisher.metrics.read")))).andExpect(status().isBadRequest());
