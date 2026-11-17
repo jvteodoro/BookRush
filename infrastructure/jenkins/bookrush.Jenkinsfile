@@ -8,6 +8,7 @@ pipeline {
     string(name: 'REGISTRY', defaultValue: '', description: 'Registry sem barra final. Vazio: não publica imagens.')
     string(name: 'REGISTRY_CREDENTIAL_ID', defaultValue: 'docker-registry', description: 'Credential Jenkins de usuário/senha do registry.')
     booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Atualizar a aplicação no destino escolhido após o build.')
+    booleanParam(name: 'RUN_INFRA_CONTRACTS', defaultValue: true, description: 'Executar os contratos de infraestrutura antes de construir as imagens.')
     booleanParam(name: 'ANALYTICS_GPU', defaultValue: false, description: 'Construir e implantar o runtime analytics com PyTorch CUDA e override NVIDIA. Requer host com NVIDIA Container Toolkit.')
     choice(name: 'FEED_PERSONALIZED_MODE', choices: ['ON', 'OFF'], description: 'Modo do feed personalizado no Compose. ON é o padrão durante os testes; OFF mantém o caminho legado.')
     string(name: 'KUBECONFIG_CREDENTIAL_ID', defaultValue: 'bookrush-kubeconfig', description: 'Credential Jenkins do tipo Secret file.')
@@ -76,6 +77,7 @@ pipeline {
     }
 
     stage('Contratos de infraestrutura') {
+      when { expression { return params.RUN_INFRA_CONTRACTS } }
       steps {
         sh '''
           set -euo pipefail

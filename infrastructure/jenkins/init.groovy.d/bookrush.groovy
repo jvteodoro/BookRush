@@ -127,6 +127,7 @@ def mainParameters = [
     new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica imagens.'),
     new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação no destino escolhido após o build.'),
+    new BooleanParameterDefinition('RUN_INFRA_CONTRACTS', true, 'Executar os contratos de infraestrutura antes de construir as imagens.'),
     new BooleanParameterDefinition('RUN_ANALYTICS_SAMPLE', false, 'Cancelar jobs analíticos ativos e processar uma amostra controlada de scores.'),
     new StringParameterDefinition('ANALYTICS_SAMPLE_MAX_BOOKS', '4', 'Quantidade máxima de livros no lote controlado de scores.'),
     new ChoiceParameterDefinition('FEED_PERSONALIZED_MODE', ['ON', 'OFF'] as String[], 'Ativar o feed personalizado; ON é o padrão durante a fase de testes.'),

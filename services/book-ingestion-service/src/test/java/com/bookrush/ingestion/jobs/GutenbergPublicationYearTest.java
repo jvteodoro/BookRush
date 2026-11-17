@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.bookrush.ingestion.catalog.*;
+import com.bookrush.ingestion.observability.IngestionMetrics;
 import com.bookrush.ingestion.processing.TextProcessingService;
 import com.bookrush.ingestion.source.GutenbergProperties;
 import com.bookrush.ingestion.source.SnapshotDownloader;
@@ -54,7 +55,7 @@ class GutenbergPublicationYearTest {
     var service = new GutenbergImportService(jdbc, downloader, raw, catalog, new ObjectMapper(),
         mock(CatalogAssetClient.class), mock(TextProcessingService.class), mock(ProcessingLineageClient.class),
         mock(SubjectCatalogClient.class), new GutenbergProperties("https://example.test", false),
-        mock(PublisherSubmissionLinkClient.class));
+        mock(PublisherSubmissionLinkClient.class), mock(IngestionMetrics.class));
 
     service.process(lease);
 
