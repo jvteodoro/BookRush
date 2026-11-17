@@ -317,17 +317,13 @@ Kubernetes exige registry e a credencial de kubeconfig descrita em
 ## Atualizar a definição do job
 
 `Jenkinsfile` é a fonte da pipeline. `bookrush.Jenkinsfile` é sua cópia de
-bootstrap na imagem e precisa permanecer idêntica. O script de inicialização
-reconcilia a definição de parâmetros do job existente em cada inicialização do
-Jenkins. Isso evita que parâmetros novos, como `ANALYTICS_GPU`, sejam
-silenciosamente descartados por uma definição persistida antiga. Depois de
-publicar uma alteração desse tipo, reinicie somente o container Jenkins quando
-não houver builds em andamento e confirme na API/UI que o parâmetro aparece
-antes de disparar o deploy. Para alterar a pipeline de um job existente, cole
-o novo `Jenkinsfile` em **Configure → Pipeline script** (sandbox ativado).
-Alternativamente, depois de publicar o arquivo, configure **Pipeline script
-from SCM**, repositório `https://github.com/jvteodoro/BookRush.git`, branch
-`*/main`, Script Path `Jenkinsfile`. Essa branch fornece a definição da pipeline;
+bootstrap e precisa permanecer idêntica. No startup, o script de inicialização
+reconcilia a definição inline e os parâmetros do job existente a partir desse
+arquivo. Isso evita que opções como `RUN_INFRA_CONTRACTS` desapareçam da
+definição persistida. Depois de publicar uma alteração, reinicie somente o
+container Jenkins quando não houver builds ativos e confirme a revisão e os
+parâmetros na API/UI antes de disparar o deploy. O job, seu histórico e o volume
+`jenkins_home` são preservados. A branch `main` fornece a definição da pipeline;
 **BRANCH** seleciona o código que será compilado e implantado.
 
 Se a definição carregada pela `main` (ou um script inline antigo) ainda não

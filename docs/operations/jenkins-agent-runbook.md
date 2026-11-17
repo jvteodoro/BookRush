@@ -226,11 +226,14 @@ falha, leia `consoleText` do mesmo build antes de repetir.
 Os jobs criados por `infrastructure/jenkins/init.groovy.d/bookrush.groovy`
 usam `CpsFlowDefinition`: são pipelines inline, não Multibranch. Portanto:
 
-- fazer push do Jenkinsfile não altera a definição já salva no Jenkins;
+- fazer push do Jenkinsfile, por si só, não altera a definição já salva no Jenkins;
 - `checkout scm` não funciona nesses jobs;
 - a pipeline deve fazer checkout explícito do repositório e da branch;
-- após alterar um Jenkinsfile, sincronize a definição pelo bootstrap controlado
-  ou configure o job como **Pipeline script from SCM**;
+- no startup, o bootstrap copia `/opt/bookrush/bookrush.Jenkinsfile` para a
+  definição inline do job e reconcilia seus parâmetros. Depois de publicar
+  alterações na pipeline, reinicie somente o container Jenkins quando não
+  houver builds ativos e confirme a revisão e os parâmetros pela API/UI antes
+  de disparar o job;
 - sincronização não deve apagar o job, o histórico ou o volume `jenkins_home`.
 
 O bootstrap também deve atualizar a `ParametersDefinitionProperty` do

@@ -2,6 +2,7 @@ import jenkins.model.Jenkins
 import jenkins.model.JenkinsLocationConfiguration
 import hudson.model.*
 import org.jenkinsci.plugins.workflow.job.WorkflowJob
+import org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition
 import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition
 import hudson.plugins.git.GitSCM
 import hudson.plugins.git.UserRemoteConfig
@@ -14,6 +15,11 @@ def job = instance.getItem('bookrush-deploy')
 if (job == null) {
     job = instance.createProject(WorkflowJob, 'bookrush-deploy')
 }
+if (!pipelineFile.isFile()) {
+    throw new IllegalStateException("Missing bookrush-deploy pipeline source: ${pipelineFile}")
+}
+job.setDefinition(new CpsFlowDefinition(pipelineFile.getText('UTF-8'), true))
+job.save()
 
 def backstagePipelineFile = new File('/opt/bookrush/backstage.Jenkinsfile')
 def backstageJob = instance.getItem('bookrush-backstage')
