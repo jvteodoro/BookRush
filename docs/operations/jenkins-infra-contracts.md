@@ -14,4 +14,5 @@ seguintes, e pular contratos não corrige falhas de compilação das imagens.
 O job `bookrush-deploy` carrega o `Jenkinsfile` da branch escolhida em `BRANCH`.
 O bootstrap em `infrastructure/jenkins/init.groovy.d/bookrush.groovy` publica o
 parâmetro no formulário do job; o padrão é atualizado quando o bootstrap é
-recarregado no Jenkins.
+recarregado no Jenkins. O gate `validate-change.sh --ci` exige que mudanças
+na pipeline sejam acompanhadas por documentação operacional no mesmo commit.
