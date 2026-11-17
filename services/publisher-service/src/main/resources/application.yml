@@ -1,6 +1,8 @@
 server:
   port: ${SERVER_PORT:8099}
 spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
   application:
     name: publisher-service
   datasource:
@@ -16,7 +18,7 @@ spring:
           issuer-uri: ${BOOKRUSH_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
           jwk-set-uri: ${BOOKRUSH_SECURITY_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
 management:
-  endpoints.web.exposure.include: health,info,metrics
+  endpoints.web.exposure.include: health,info,metrics,prometheus
 bookrush:
   security:
     audience: ${BOOKRUSH_SECURITY_AUDIENCE:bookrush-ingestion}
@@ -32,6 +34,12 @@ publisher:
     url: ${PUBLISHER_INGESTION_URL:http://book-ingestion-service:8090}
     token: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:}
   behavior-url: ${PUBLISHER_BEHAVIOR_URL:http://behavior-service:8097}
+  behavior-metrics:
+    token-uri: ${PUBLISHER_BEHAVIOR_METRICS_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+    client-id: ${PUBLISHER_BEHAVIOR_METRICS_CLIENT_ID:bookrush-publisher-behavior-s2s}
+    client-secret: ${PUBLISHER_BEHAVIOR_METRICS_CLIENT_SECRET:}
+    scope: ${PUBLISHER_BEHAVIOR_METRICS_SCOPE:bookrush.publisher.metrics.read}
+    audience: ${PUBLISHER_BEHAVIOR_METRICS_AUDIENCE:bookrush-behavior}
   storage:
     enabled: ${PUBLISHER_STORAGE_ENABLED:false}
     endpoint: ${STORAGE_ENDPOINT:http://seaweedfs:8333}

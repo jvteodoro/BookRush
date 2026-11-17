@@ -48,6 +48,17 @@ projeção só inclui eventos com sujeito e `book_id`, portanto uma impressão s
 livro continua disponível no log bruto, mas não é atribuída artificialmente a
 um livro.
 
+As projeções tratam `EXCERPT_IMPRESSION` com `impressionId` como um fato lógico
+deduplicado, mesmo quando retries chegam com `eventKey` diferentes. Impressões
+sem correlação preservam o `event.id` como fallback; elas não são artificialmente
+unidas. O frontend não envia mais um evento paralelo quando o ledger do feed já
+confirma a viewability server-side. O teste PostgreSQL cobre a combinação de
+reenvio, viewability e idempotência.
+
+`BOOK_OPEN` correlacionado também usa `impressionId` ou `recommendationItemId`
+como chave lógica nos agregados; aberturas orgânicas permanecem separadas pelo
+ID do evento. O log append-only mantém todas as tentativas para reconciliação.
+
 ## API interna de sinais
 
 `POST /api/internal/v1/recommendation/signals` é uma API somente S2S para o
@@ -98,6 +109,28 @@ There is intentionally no cross-schema foreign key: recommendation-service
 validates impression ownership before emitting viewability, while behavior
 enforces subject scoping at ingestion.
 
+`V11__versioned_outcome_attribution.sql` adds `attribution_status`,
+`attribution_rule_version` and `attribution_window_seconds`. Rebuilds classify
+outcomes as `ATTRIBUTED`, `ORGANIC`, `OUTSIDE_WINDOW` or
+`INVALID_REFERENCE`; only an authenticated subject/book/impression match to a
+viewable exposure in the seven-day `attribution-v1` window is attributed. The
+classification is rebuildable and does not delete historical events.
+
+`V12__attribution_exposure_touch.sql` persists `exposure_event_id` and
+`attributed_exposure_at`. The attribution rebuild accepts either
+`impressionId` or `recommendationItemId`, chooses the latest eligible viewable
+exposure in the seven-day window (timestamp, impression and event ID are stable
+tie-breakers), and retains the selected touch for auditability.
+
+### Integração PostgreSQL
+
+`UserBookSignalPostgresIT` usa Testcontainers por padrão. Em hosts cujo cliente
+Docker embutido não negocia a API mínima do daemon, o teste aceita um banco
+descartável externo por meio de `BOOKRUSH_TEST_POSTGRES_URL`, além de
+`BOOKRUSH_TEST_POSTGRES_USER` e `BOOKRUSH_TEST_POSTGRES_PASSWORD`. O banco deve
+ser criado somente para o teste e removido ao final; nenhum volume produtivo é
+aceito.
+
 ## Outbox downstream
 
 Eventos aceitos entram na outbox e são enviados pelo dispatcher para
@@ -108,4 +141,11 @@ protegido. A linha só recebe `published_at` depois de uma resposta 2xx.
 
 ## Métricas de publicações
 
-GET `/api/internal/v1/publisher/metrics/books/{bookId}?days=30` retorna apenas agregados diários de impressões, aberturas, leituras, curtidas, compartilhamentos e comentários de um livro, sem identidades de leitores. O período aceita 1–365 dias e filtra datas no banco, incluindo hoje. Exige token RS256 do realm plataforma, audience bookrush-behavior e scope bookrush.publisher.metrics.read. O publisher-service valida a propriedade da publicação antes de chamar esta rota; o scope comum de recomendações não dá acesso a ela. Os dados vêm da projeção existente behavior.daily_book, atualizada pelo job de manutenção.
+`GET /api/internal/v1/publisher/metrics/books/{bookId}?days=N` é uma rota
+somente S2S, autorizada pelo audience `bookrush-behavior` e scope dedicado
+`bookrush.publisher.metrics.read`. O período aceita 1–365 dias e lê agregados
+diários de impressões, aberturas, leituras, curtidas, compartilhamentos e
+comentários da projeção `behavior.daily_book`, atualizada pelo job de
+manutenção. O publisher-service valida a propriedade da publicação antes de
+chamar a rota. A resposta não inclui identidades de leitores. O segredo da
+identidade S2S permanece no ambiente protegido.

@@ -1,0 +1,13 @@
+# Shared defaults. Services may override sampling and endpoint through environment.
+management:
+  tracing:
+    sampling:
+      probability: ${BOOKRUSH_TRACING_SAMPLING_PROBABILITY:0.1}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://alloy:4318/v1/traces}
+bookrush:
+  observability:
+    environment: ${BOOKRUSH_ENVIRONMENT:unknown}
+logging:
+  config: classpath:bookrush-logback.xml

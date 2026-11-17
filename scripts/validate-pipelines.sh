@@ -30,8 +30,11 @@ test -f infrastructure/jenkins/microservice.Jenkinsfile || fail 'pipeline de mic
 test -f infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical ausente'
 test -f infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline do SeaweedFS ausente'
 test -f infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline do admin-web ausente'
+test -f infrastructure/jenkins/observability.Jenkinsfile || fail 'pipeline de observabilidade ausente'
+grep -Fq "scmFor('infrastructure/jenkins/admin-web.Jenkinsfile')" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'job Admin Web sem Script Path SCM válido'
+grep -Fq 'https://grafana-bookrush.jteodoro.tec.br' admin-web/src/lib/config.ts || fail 'Admin Web sem URL Grafana pública segura por padrão'
 
-for file in scripts/test-book-metadata-e2e.sh scripts/test-book-ratings-e2e.sh scripts/test-profile-search-e2e.sh scripts/test-deploy-compose-config.sh scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-keycloak-access-lifecycle.sh scripts/test-keycloak-user-management.sh scripts/test-microservice.sh scripts/test-reader-bff-e2e.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
+for file in scripts/test-book-metadata-e2e.sh scripts/test-book-ratings-e2e.sh scripts/test-profile-search-e2e.sh scripts/test-deploy-compose-config.sh scripts/validate-change.sh scripts/validate-pipelines.sh scripts/test-portal.sh scripts/test-storage.sh scripts/test-keycloak-realms.sh scripts/test-keycloak-reconcile.sh scripts/test-keycloak-access-lifecycle.sh scripts/test-keycloak-user-management.sh scripts/test-microservice.sh scripts/test-reader-bff-e2e.sh scripts/test-vertical.sh scripts/vertical-services.sh scripts/deploy-compose-service.sh scripts/deploy-kubernetes-service.sh infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/deploy-seaweedfs.sh infrastructure/jenkins/deploy-observability.sh infrastructure/nginx/install-bookrush-grafana-vhost.sh infrastructure/bootstrap/start-environment.sh infrastructure/bootstrap/start-jenkins.sh; do
   test -f "$file" || fail "script referenciado não existe: $file"
   bash -n "$file" || fail "sintaxe inválida: $file"
 done
@@ -49,6 +52,9 @@ grep -Fq 'bash scripts/test-keycloak-user-management.sh' Jenkinsfile || fail 'pi
 grep -Fq 'bash scripts/test-admin-user-management-e2e.sh' Jenkinsfile || fail 'pipeline principal sem E2E do gerenciamento de usuários'
 grep -Fq 'resolver 127.0.0.11' admin-web/nginx.conf || fail 'admin-web não resolve dinamicamente o admin-service durante deploy'
 grep -Fq 'proxy_pass $admin_service;' admin-web/nginx.conf || fail 'admin-web sem proxy dinâmico para a API administrativa'
+grep -Fq 'location /api/admin/' admin-web/nginx.conf || fail 'admin-web sem proxy para a facade reporting /api/admin'
+grep -Fq 'admin-reporting-api:' infrastructure/traefik/dynamic.yaml || fail 'Traefik sem rota da facade reporting /api/admin'
+grep -Fq 'admin-reporting-rate-limit:' infrastructure/traefik/dynamic.yaml || fail 'reporting sem rate limit no gateway'
 grep -Fq 'ADMIN_SERVICE_IMAGE="${BACKEND_IMAGE/bookrush\/catalog-service/bookrush\/admin-service}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-service'
 grep -Fq 'ADMIN_WEB_IMAGE="${FRONTEND_IMAGE/bookrush\/frontend/bookrush\/admin-web}"' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fallback transitório da imagem admin-web'
 test -f infrastructure/keycloak/read-client-secret.py || fail 'resolvedor seguro do segredo admin-service ausente'
@@ -71,6 +77,7 @@ grep -Fq 'scripts/deploy-kubernetes-service.sh' infrastructure/jenkins/microserv
 grep -Fq 'scripts/deploy-compose-service.sh' infrastructure/jenkins/vertical.Jenkinsfile || fail 'pipeline de vertical sem deploy Compose'
 grep -Fq 'bash scripts/test-storage.sh' infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline SeaweedFS sem teste de storage'
 grep -Fq 'deploy-seaweedfs.sh' infrastructure/jenkins/seaweedfs.Jenkinsfile || fail 'pipeline SeaweedFS sem deploy dedicado'
+grep -Fq 'deploy-observability.sh' infrastructure/jenkins/observability.Jenkinsfile || fail 'pipeline observabilidade sem deploy dedicado'
 grep -Fq 'docker build --target build' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem build validado'
 grep -Fq 'docker push "$ADMIN_WEB_IMAGE"' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem publicação da imagem'
 grep -Fq 'PUBLISH exige REGISTRY' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem guarda de publicação'

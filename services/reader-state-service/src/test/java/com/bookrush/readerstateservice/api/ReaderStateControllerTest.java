@@ -97,17 +97,33 @@ class ReaderStateControllerTest {
     when(jdbc.query(anyString(), any(ResultSetExtractor.class), eq(sessionId), eq("iss:subject-1")))
         .thenReturn(Map.of("bookId", bookId, "recommendationItemId", itemId,
             "impressionId", impressionId));
-    when(jdbc.update(eq("UPDATE reader_state.session SET ended_at = now(), active_seconds = ? "
-        + "WHERE id = ? AND subject_key = ? AND ended_at IS NULL"),
-        eq(120), eq(sessionId), eq("iss:subject-1"))).thenReturn(1);
+    when(jdbc.query(eq(ReaderStateController.END_SESSION_SQL), any(ResultSetExtractor.class),
+        eq(120), eq(ReaderStateController.MAX_SESSION_ACTIVE_SECONDS), eq(sessionId), eq("iss:subject-1")))
+        .thenReturn(45);
     when(dailyPlant.get("iss:subject-1")).thenReturn(Map.of("stage", 1));
 
-    controller.endSession(sessionId, Map.of("activeSeconds", 120), user,
+    Object result = controller.endSession(sessionId, Map.of("activeSeconds", 120), user,
         new MockHttpServletRequest());
 
+    org.junit.jupiter.api.Assertions.assertEquals(45, ((Map<?, ?>) result).get("activeSeconds"));
     verify(behavior).publish(eq("READ_SESSION"), eq(bookId),
         eq(Map.of("recommendationItemId", itemId, "impressionId", impressionId,
-            "activeSeconds", 120)), eq(null));
+            "activeSeconds", 45)), eq(null));
+    verify(jdbc).update(org.mockito.ArgumentMatchers.contains("reader_state.reading_day.minutes + EXCLUDED.minutes"),
+        eq("iss:subject-1"), eq(0));
+  }
+
+  @Test
+  void endingUnknownOrAlreadyEndedSessionReturnsNotFound() {
+    UUID sessionId = UUID.randomUUID();
+    when(jdbc.query(anyString(), any(ResultSetExtractor.class), eq(sessionId), eq("iss:subject-1")))
+        .thenReturn(Map.of());
+    when(jdbc.query(eq(ReaderStateController.END_SESSION_SQL), any(ResultSetExtractor.class),
+        eq(0), eq(ReaderStateController.MAX_SESSION_ACTIVE_SECONDS), eq(sessionId), eq("iss:subject-1")))
+        .thenReturn(null);
+
+    assertThrows(ResponseStatusException.class,
+        () -> controller.endSession(sessionId, Map.of("activeSeconds", -10), user, null));
   }
 
   @Test

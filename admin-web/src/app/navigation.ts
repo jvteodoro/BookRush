@@ -7,6 +7,7 @@ export const adminNavigation = [
   { to: "/training", label: "Training" },
   { to: "/publisher", label: "Meus livros e estatísticas" },
   { to: "/operations", label: "Users & moderation" },
+  { to: "/dashboards", label: "Dashboards" },
 ] as const;
 
 export function isAdminRoute(pathname: string) {

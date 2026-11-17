@@ -1,6 +1,8 @@
 server:
   port: ${SERVER_PORT:8096}
 spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
   application:
     name: social-service
   datasource:
@@ -22,7 +24,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}

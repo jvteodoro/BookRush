@@ -25,7 +25,8 @@ const icons = {
   "/training": GraduationCap,
   "/operations": UsersRound,
   "/publisher": ChartNoAxesCombined,
-};
+  "/dashboards": LayoutDashboard,
+} as const;
 const items = adminNavigation.map(({ to, label }) => {
   const MenuIcon = icons[to];
   return {

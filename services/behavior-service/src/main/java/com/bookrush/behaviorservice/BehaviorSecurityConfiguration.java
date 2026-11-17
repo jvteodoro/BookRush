@@ -36,14 +36,14 @@ public class BehaviorSecurityConfiguration {
       AuthenticationManagerResolver<HttpServletRequest> authenticationManagerResolver) throws Exception {
     http.csrf(csrf -> csrf.disable()).cors(cors -> {})
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            .requestMatchers("/api/internal/v1/publisher/metrics/**")
-                .hasAuthority("SCOPE_bookrush.publisher.metrics.read")
             .requestMatchers("/api/internal/v1/recommendation/signals")
                 .hasAuthority("SCOPE_bookrush.behavior.read")
             .requestMatchers("/api/internal/v1/recommendation/trending")
                 .hasAuthority("SCOPE_bookrush.behavior.read")
+            .requestMatchers("/api/internal/v1/publisher/metrics/**")
+                .hasAuthority("SCOPE_bookrush.publisher.metrics.read")
             .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.authenticationManagerResolver(authenticationManagerResolver));
     return http.build();

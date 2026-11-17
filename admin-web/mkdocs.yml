@@ -2,6 +2,11 @@ site_name: LabSoft Admin Web
 docs_dir: docs
 nav:
   - Overview: index.md
+  - Dashboards:
+      - Specification: dashboard-specification.md
+      - Panel Catalog: dashboard-panel-catalog.md
+      - Data Contracts: dashboard-data-contracts.md
+      - Implementation Plan: dashboard-implementation-plan.md
   - API contracts: api-contracts.md
   - Security: security.md
   - Operations: operations.md

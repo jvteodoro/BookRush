@@ -26,6 +26,13 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1/reader")
 public class ReaderStateController {
+  static final int MAX_SESSION_ACTIVE_SECONDS = 86_400;
+  static final String END_SESSION_SQL = "WITH end_time AS (SELECT clock_timestamp() AS ended_at) "
+      + "UPDATE reader_state.session AS s SET ended_at = end_time.ended_at, "
+      + "active_seconds = LEAST(?, GREATEST(0, "
+      + "FLOOR(EXTRACT(EPOCH FROM (end_time.ended_at - s.started_at)))::integer), ?) "
+      + "FROM end_time WHERE s.id = ? AND s.subject_key = ? AND s.ended_at IS NULL "
+      + "RETURNING s.active_seconds";
   private final JdbcTemplate jdbc;
   private final BehaviorEventPublisher behavior;
   private final DailyPlantService dailyPlant;
@@ -66,6 +73,12 @@ public class ReaderStateController {
   private int integerValue(Map<String, Object> body, String key) {
     Object value = body.get(key);
     return value instanceof Number number ? Math.max(0, number.intValue()) : 0;
+  }
+
+  private int boundedSeconds(Map<String, Object> body) {
+    Object value = body.get("activeSeconds");
+    if (!(value instanceof Number number)) return 0;
+    return (int) Math.min(MAX_SESSION_ACTIVE_SECONDS, Math.max(0L, number.longValue()));
   }
 
   public record Progress(@NotNull Long positionCodepoint, @NotNull Double percent) {}
@@ -124,7 +137,7 @@ public class ReaderStateController {
   public Object endSession(@PathVariable UUID id, @RequestBody Map<String, Object> body,
       Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
-    int seconds = integerValue(body, "activeSeconds");
+    int seconds = boundedSeconds(body);
     Map<String, Object> sessionOrigin = jdbc.query("SELECT book_id, recommendation_item_id, impression_id "
         + "FROM reader_state.session WHERE id = ? AND subject_key = ? AND ended_at IS NULL",
         rs -> {
@@ -137,13 +150,15 @@ public class ReaderStateController {
         },
         id, subject);
     UUID bookId = (UUID) sessionOrigin.get("bookId");
-    int updated = jdbc.update("UPDATE reader_state.session SET ended_at = now(), active_seconds = ? "
-        + "WHERE id = ? AND subject_key = ? AND ended_at IS NULL", seconds, id, subject);
-    if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+    Integer persistedSeconds = jdbc.query(END_SESSION_SQL,
+        rs -> rs.next() ? rs.getInt("active_seconds") : null,
+        seconds, MAX_SESSION_ACTIVE_SECONDS, id, subject);
+    if (persistedSeconds == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
         "reading session not found");
+    int activeSeconds = persistedSeconds;
     jdbc.update("INSERT INTO reader_state.reading_day(subject_key, day, minutes) VALUES (?, CURRENT_DATE, ?) "
         + "ON CONFLICT (subject_key, day) DO UPDATE SET minutes = "
-        + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, seconds / 60);
+        + "reader_state.reading_day.minutes + EXCLUDED.minutes", subject, activeSeconds / 60);
     Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
     if (!payload.containsKey("recommendationItemId") && sessionOrigin.get("recommendationItemId") != null) {
       payload.put("recommendationItemId", sessionOrigin.get("recommendationItemId"));
@@ -151,9 +166,9 @@ public class ReaderStateController {
     if (!payload.containsKey("impressionId") && sessionOrigin.get("impressionId") != null) {
       payload.put("impressionId", sessionOrigin.get("impressionId"));
     }
-    payload.put("activeSeconds", seconds);
+    payload.put("activeSeconds", activeSeconds);
     behavior.publish("READ_SESSION", bookId, payload, authorization(request));
-    return Map.of("id", id, "activeSeconds", seconds, "plant", dailyPlant.get(subject));
+    return Map.of("id", id, "activeSeconds", activeSeconds, "plant", dailyPlant.get(subject));
   }
 
   @GetMapping("/streak")

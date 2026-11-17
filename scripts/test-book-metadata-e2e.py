@@ -67,6 +67,18 @@ for attempt in range(180):
     except OSError: pass
     time.sleep(1)
 else: raise AssertionError('Metadata services readiness failed')
+if '--start-session' in sys.argv:
+    status, result = request('/api/v1/reader/sessions', ana, {'bookId': BOOK}, 'POST')
+    assert status == 200 and result.get('id')
+    print(result['id'])
+    raise SystemExit(0)
+if '--end-session' in sys.argv:
+    session_id = sys.argv[1]
+    status, result = request('/api/v1/reader/sessions/' + session_id + '/end', ana,
+                             {'activeSeconds': 100000}, 'POST')
+    assert status == 200, 'session end returned HTTP ' + str(status)
+    print(result['activeSeconds'])
+    raise SystemExit(0)
 if '--history' in sys.argv:
     recent = request('/api/v1/reader/recent', ana)[1]
     assert len(recent) == 50 and all(item['book_id'] != BOOK for item in recent)

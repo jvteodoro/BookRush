@@ -1,3 +1,5 @@
+import { clientPlatform } from "./app/clientPlatform";
+
 export type BehaviorEvent = {
   eventKey: string;
   eventType: string;
@@ -68,7 +70,12 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
       eventType,
       bookId,
       occurredAt: new Date().toISOString(),
-      payload: safePayload(payload),
+      payload: safePayload({
+        platform: clientPlatform(),
+        ...Object.fromEntries(
+          Object.entries(payload).filter(([key]) => key !== "platform"),
+        ),
+      }),
     };
     queue.push(event);
     if (queue.length >= MAX_BATCH) void flush();

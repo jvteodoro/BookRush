@@ -1,6 +1,8 @@
 server:
   port: ${SERVER_PORT:8100}
 spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
   application:
     name: admin-service
   datasource:
@@ -16,8 +18,11 @@ spring:
           issuer-uri: ${BOOKRUSH_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
           jwk-set-uri: ${BOOKRUSH_SECURITY_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
 management:
-  endpoints.web.exposure.include: health,info,metrics
+  endpoints.web.exposure.include: health,info,metrics,prometheus
 bookrush:
+  reporting:
+    stale-after-seconds: ${BOOKRUSH_REPORTING_STALE_AFTER_SECONDS:900}
+    cache-max-age-seconds: ${BOOKRUSH_REPORTING_CACHE_MAX_AGE_SECONDS:30}
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
     audience: ${BOOKRUSH_SECURITY_AUDIENCE:bookrush-ingestion}

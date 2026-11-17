@@ -12,10 +12,17 @@ Feed requests require an authenticated principal and persist that subject in
 the request ledger. Each item still carries request ID, impression ID, model
 version and rank for later attribution.
 
+The Reader BFF may forward `X-BookRush-Platform` with the allowlisted values
+`web` or `mobile`. Recommendation stores only this coarse category in request
+context for aggregate reporting; absent or invalid values become `UNKNOWN`.
+The user-agent string is never persisted.
+
 `POST /api/v1/recommendations/impressions/{impressionId}/viewable` marks an
 impression only when the authenticated subject owns the originating request.
 The browser calls this after its viewability threshold, so non-visible feed
-items are not treated as negative outcomes. The endpoint is idempotent.
+items are not treated as negative outcomes. The endpoint is idempotent and
+records the first `viewable_at` timestamp; reporting uses that timestamp for
+the seven-day attribution and maturity window.
 
 The viewability event includes `viewable=true`, `recommendationItemId` and
 `impressionId`; this is the explicit input consumed by behavior's
@@ -94,3 +101,15 @@ The `feed.personalized` properties use Spring's mutable configuration binding
 so the service starts correctly in Docker and in the production profile. The
 binding is covered by a context-property test; invalid rollout values are
 handled by the gate's validation rather than changing the default `ON` mode.
+
+## Assignments de experimento
+
+`FEED_EXPERIMENT_ENABLED=false` por padrão. Quando habilitado explicitamente,
+o serviço grava em `recommendation.experiment_assignment` uma única variante
+(`CONTROL` ou `TREATMENT`) por sujeito e experimento. O bucket é determinístico
+e a linha persistida é a autoridade; mudanças de processo não reatribuem um
+sujeito já exposto. O contexto do request registra apenas `experimentId`,
+`experimentVariant` e `assignmentVersion`, sem subject ou conteúdo no
+dashboard. O tratamento mantém a decisão personalizada existente; o controle
+força o caminho fallback. Os guardrails administrativos são observacionais e
+não devem ser descritos como efeito causal sem análise estatística aprovada.

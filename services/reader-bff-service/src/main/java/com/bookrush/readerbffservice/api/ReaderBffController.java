@@ -1,11 +1,13 @@
 package com.bookrush.readerbffservice.api;
 
 import jakarta.servlet.http.HttpServletRequest;
+import io.micrometer.observation.ObservationRegistry;
 import java.net.http.HttpClient;
 import java.security.Principal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -25,11 +27,19 @@ public class ReaderBffController {
   private final RestClient recommendations;
   private final RestClient state;
   private final RestClient content;
+  private final ObservationRegistry observationRegistry;
 
+  public ReaderBffController(String recommendationUrl, String stateUrl, String contentUrl) {
+    this(recommendationUrl, stateUrl, contentUrl, ObservationRegistry.create());
+  }
+
+  @Autowired
   public ReaderBffController(
       @Value("${bookrush.recommendation-url:http://recommendation-service:8098}") String recommendationUrl,
       @Value("${bookrush.reader-state-url:http://reader-state-service:8094}") String stateUrl,
-      @Value("${bookrush.content-url:http://book-content-service:8093}") String contentUrl) {
+      @Value("${bookrush.content-url:http://book-content-service:8093}") String contentUrl,
+      ObservationRegistry observationRegistry) {
+    this.observationRegistry = observationRegistry;
     recommendations = client(recommendationUrl);
     state = client(stateUrl);
     content = client(contentUrl);
@@ -187,7 +197,8 @@ public class ReaderBffController {
     // the gateway budget above the normal batch latency so load does not turn
     // a slow but healthy feed into an opaque 502.
     requestFactory.setReadTimeout(Duration.ofSeconds(15));
-    return RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory).build();
+    return RestClient.builder().observationRegistry(observationRegistry)
+        .baseUrl(baseUrl).requestFactory(requestFactory).build();
   }
 
   private Object get(RestClient client, String path, HttpServletRequest request, Map<String, ?> variables) {
@@ -211,6 +222,12 @@ public class ReaderBffController {
           .headers(headers -> {
             if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
             copyReaderCorrelation(request, headers);
+            if ("/api/v1/recommendations/feed".equals(path)) {
+              String platform = request.getHeader("X-BookRush-Platform");
+              if ("web".equalsIgnoreCase(platform) || "mobile".equalsIgnoreCase(platform)) {
+                headers.set("X-BookRush-Platform", platform.toLowerCase(java.util.Locale.ROOT));
+              }
+            }
           })
           .retrieve()
           .body(Object.class);

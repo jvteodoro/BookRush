@@ -2,6 +2,7 @@ package com.bookrush.ingestion.jobs;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.bookrush.ingestion.observability.IngestionMetrics;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -23,12 +24,15 @@ public class IngestionJobService {
   private final JdbcTemplate jdbc;
   private final ObjectMapper mapper;
   private final IngestionDispatcher dispatcher;
+  private final IngestionMetrics ingestionMetrics;
 
   public IngestionJobService(
-      JdbcTemplate jdbc, ObjectMapper mapper, IngestionDispatcher dispatcher) {
+      JdbcTemplate jdbc, ObjectMapper mapper, IngestionDispatcher dispatcher,
+      IngestionMetrics ingestionMetrics) {
     this.jdbc = jdbc;
     this.mapper = mapper;
     this.dispatcher = dispatcher;
+    this.ingestionMetrics = ingestionMetrics;
   }
 
   @Transactional
@@ -284,6 +288,7 @@ SELECT i.id, i.external_identifier, i.status, i.attempt_number, i.book_id, i.edi
             + " id=?",
         request.externalIds().size(),
         id);
+    ingestionMetrics.discovered(request.externalIds().size());
     return new ExistingJob(id, "PENDING");
   }
 

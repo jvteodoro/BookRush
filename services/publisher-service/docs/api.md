@@ -26,9 +26,21 @@ envia o asset SOURCE ao catálogo e confirma o `catalogBookId` pelo callback
 idempotente. O fluxo não publica o binário nem expõe o bucket.
 
 Uma submissão pode receber `catalogBookId` quando a canonização confirmar o
-livro. `GET /api/v1/publisher/submissions/{id}/metrics` então consulta os
-agregados diários do behavior-service e devolve apenas dados do livro ligado à
-submissão; enquanto não houver vínculo retorna `NOT_LINKED`.
+livro. `GET /api/v1/publisher/submissions/{id}/metrics` consulta os agregados
+diários do behavior-service por uma credencial S2S própria
+(`bookrush-publisher-behavior-s2s`) com audience `bookrush-behavior` e scope
+dedicado `bookrush.publisher.metrics.read`. O publisher confere a propriedade da submissão pelo
+`subject_key` antes da chamada; a API interna do behavior retorna dados diários
+e variação em janelas de 30 dias, sem identidades de leitores. Os dados de um
+dia e a comparação entre períodos são suprimidos quando a amostra tem menos de
+cinco leitores únicos com leituras. Totais de cabeçalho ficam indisponíveis se
+a série contém dias suprimidos, evitando subtotais enganosos. Sem vínculo
+canônico, retorna `NOT_LINKED`.
+
+Configure `PUBLISHER_BEHAVIOR_S2S_CLIENT_SECRET` no ambiente protegido e
+reconcilie o realm `bookrush-platform` para provisionar o cliente S2S. O segredo
+não é necessário para o healthcheck, mas métricas de obras ligadas falham
+fechadas enquanto ele não estiver configurado.
 
 ## Vínculo automático após ingestão
 
