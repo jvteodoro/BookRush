@@ -6,13 +6,13 @@ info:
 paths:
   /api/admin/v1/reporting/executive-summary:
     get:
-      summary: Read executive KPIs and the previous-period comparison
+      summary: Read executive KPIs with cross-platform unique-user peak and previous-period comparison
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
       responses:
         '200':
-          description: Current and previous period aggregates with funnel denominators
+          description: Current and previous period aggregates; daily_peak_users is distinct by issuer and subject across all platforms
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -21,13 +21,13 @@ paths:
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/reader-day:
     get:
-      summary: Read versioned reader-day reporting snapshots
+      summary: Read reader-day snapshots with users distinct by issuer and subject
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
       responses:
         '200':
-          description: Reporting response with freshness and explicit data state
+          description: Reporting response with freshness and explicit data state; unique-user counts require both identity issuer and subject and retain platform dimensions
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -44,7 +44,7 @@ paths:
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/feed-daily:
     get:
-      summary: Read feed delivery and attributed outcome snapshots
+      summary: Read feed delivery, mature seven-day viewable CTR, dwell visits and explicit skips
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
@@ -74,13 +74,13 @@ paths:
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/recommendation-daily:
     get:
-      summary: Read recommendation ledger coverage by strategy and model
+      summary: Read recommendation candidate funnel, delivery and viewable repetition aggregates
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
       responses:
         '200':
-          description: Requests, items, viewability, books and rank distributions
+          description: Candidate, scored and selected counts; items, viewability, repetition, books and rank distributions
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -96,6 +96,21 @@ paths:
       responses:
         '200':
           description: Attributed recommendation outcomes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/recommendation-profile-quality-daily:
+    get:
+      summary: Read aggregated profile confidence, size and fatigue buckets
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Aggregate request counts by profile and fatigue buckets; no subject-level values
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -120,6 +135,23 @@ paths:
         '400': { description: Invalid range or sampling parameters }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/book-engagement-trends:
+    get:
+      summary: Read daily trends for top books and languages with minimum-sample suppression
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+        - { name: minReaders, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 5 } }
+        - { name: top, in: query, schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
+      responses:
+        '200':
+          description: Daily active-minute trends for top books and languages, suppressing days below minReaders
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range or sampling parameters }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/recommendation-position-daily:
     get:
       summary: Read attributed recommendation outcomes by rank bucket
@@ -135,9 +167,24 @@ paths:
         '400': { description: Invalid date range }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/recommendation-position-funnel-daily:
+    get:
+      summary: Read impression and mature viewable CTR funnel by rank bucket
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Impression-deduplicated funnel by rank without user identifiers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/excerpt-performance:
     get:
-      summary: Read protected aggregate performance by book excerpt
+      summary: Read protected excerpt performance with mature seven-day viewable CTR
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
@@ -155,7 +202,7 @@ paths:
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/experiment-daily:
     get:
-      summary: Read persisted experiment assignments and observational guardrails
+      summary: Read assignments, guardrails and mature seven-day viewable CTR
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
@@ -251,7 +298,7 @@ paths:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
       responses:
         '200':
-          description: Daily social activity and moderation aggregates
+          description: Social activity and moderation aggregates; accepted behavior events distinguish likes/unlikes and saves/unsaves and exclude identifiers
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -266,7 +313,7 @@ paths:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
       responses:
         '200':
-          description: Moderation states, aging and resolution percentiles
+          description: Daily moderation state counts, open case age buckets and resolution percentiles; age buckets describe unresolved cases by creation date cohort at refresh time.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -288,6 +335,21 @@ paths:
         '400': { description: Invalid date range }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/editorial-submission-funnel-daily:
+    get:
+      summary: Read editorial submission cohorts and reached lifecycle stages
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Submission cohorts, review, approval, publication and active publication counts; recent cohorts may still be in progress
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/rights-daily:
     get:
       summary: Read aggregated catalog rights decisions
@@ -297,6 +359,21 @@ paths:
       responses:
         '200':
           description: Rights counts by action and distribution status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/rights-status-daily:
+    get:
+      summary: Read aggregated catalog decisions and publisher rights attestations
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Daily aggregates split by source, right type, territory and decision state; attestations remain distinct from catalog decisions
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -320,13 +397,88 @@ paths:
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/content-supply:
     get:
-      summary: Read content supply and analytics eligibility snapshots
+      summary: Read catalog, reader-ready and excerpt-ready supply snapshots
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
       responses:
         '200':
-          description: Active books, available assets and eligible/ranked excerpts
+          description: Active books, license-ready and excerpt-ready book counts, available assets and eligible/ranked excerpts; new readiness metrics are null for historical snapshots that predate their definition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/content-coverage:
+    get:
+      summary: Read aggregated corpus coverage by language and rights status
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Book and excerpt counts by language and rights bucket, with no book identifiers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/content-rank-scores:
+    get:
+      summary: Read excerpt rank score deciles by ranker configuration
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Score ranges and excerpt counts grouped by language, rights and exact ranker configuration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/excerpt-production:
+    get:
+      summary: Read aggregate excerpt generation and eligibility outcomes
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Excerpt counts by language, rights, generation method, outcome and bounded exclusion reason
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/import-quality-daily:
+    get:
+      summary: Read ingestion attempt, rights and asset quality aggregates
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Import attempts by source, state, bounded error bucket, current rights outcome and linked asset state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/backlog:
+    get:
+      summary: Read queue backlog, stuck work and projection freshness snapshots
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 7 } }
+      responses:
+        '200':
+          description: Pending age, failures, stuck work and projection watermark/freshness
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -365,13 +517,13 @@ paths:
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/reading-daily:
     get:
-      summary: Read daily reading engagement and library snapshots
+      summary: Read daily reading engagement, session duration distribution and library snapshots
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
       responses:
         '200':
-          description: Sessions, duration percentiles, books and saves
+          description: Sessions by explicit duration buckets (<1m, 1–5m, 5–15m, 15m+), duration percentiles, unique readers by issuer and subject, books and saves; sessions over 24 hours are capped at 24 hours
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -380,7 +532,7 @@ paths:
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/retention-cohort:
     get:
-      summary: Read mature and immature reading retention cohorts
+      summary: Read mature and immature retention cohorts keyed by issuer and subject
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 366 } }
@@ -391,6 +543,48 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
         '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/reading-progress-daily:
+    get:
+      summary: Read reader-book progress cohorts and library save/unsave action aggregates
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Reader-book cohorts by first session/progress start and unique first passage of 10/50/100 percent observed at refresh, plus save/unsave actions; no implicit conversion rate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/reading-habits-daily:
+    get:
+      summary: Read daily active reading and streak distributions
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Aggregated active readers, reading minutes and exclusive streak buckets
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/library-state:
+    get:
+      summary: Read the current aggregate snapshot of saved libraries
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Current counts of saved reader-book pairs, distinct books and distinct subject keys; no historical series or reader identifiers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/ingestion-daily:
@@ -406,6 +600,80 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
         '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/ingestion-queue:
+    get:
+      summary: Read time-series snapshots of the ingestion task queue
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: Queue task counts by state, oldest queued task age, and expired running leases
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/export/{dataset}:
+    get:
+      summary: Export a bounded aggregate reporting dataset as CSV
+      description: Operator-only allowlisted exports. Each successful export writes a REPORTING_DATA_EXPORTED audit entry; book engagement export enforces a minimum of five readers.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: dataset, in: path, required: true, schema: { type: string, enum: [reader-day, feed-daily, recommendation-daily, recommendation-quality, recommendation-profile-quality, moderation-daily, social-daily, book-engagement, rights-status-daily] } }
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+      responses:
+        '200':
+          description: UTF-8 CSV download, maximum 10000 rows
+          headers:
+            Content-Disposition: { schema: { type: string } }
+            Cache-Control: { schema: { type: string, example: no-store } }
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        '400': { description: Invalid dataset or date range }
+        '401': { description: Authentication required }
+        '403': { description: Platform operator role required }
+        '413': { description: Export exceeds the row limit }
+  /api/admin/v1/reporting/internal/release-events:
+    post:
+      summary: Persist an idempotent Jenkins build, deploy or rollback event
+      description: >-
+        Server-to-server only. Requires the bookrush-platform issuer,
+        bookrush-admin-reporting audience and
+        bookrush.reporting.release.write scope. Reusing eventId with the same
+        release metadata is idempotent; the first accepted occurredAt is
+        retained. Reusing it with different release metadata returns 409.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReleaseEventRequest' }
+      responses:
+        '200': { description: Event accepted or identical retry; eventId and stored status returned }
+        '400': { description: Invalid event fields or service/event type combination }
+        '401': { description: Missing or invalid S2S token }
+        '403': { description: Missing release reporting scope }
+        '409': { description: eventId already exists with different metadata }
+  /api/admin/v1/reporting/release-events:
+    get:
+      summary: Read recent Jenkins build and release events
+      description: Reporting analyst role required. Returns the configured number of newest events, bounded to 500.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200':
+          description: Release event timeline
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Invalid days or limit }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
   /api/v1/admin/feed:
@@ -578,6 +846,24 @@ components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   schemas:
+    ReleaseEventRequest:
+      type: object
+      additionalProperties: false
+      required: [eventId, jobName, buildNumber, eventType, status, occurredAt]
+      properties:
+        eventId: { type: string, maxLength: 220, pattern: '^[A-Za-z0-9._:/#-]+$' }
+        jobName: { type: string, minLength: 1, maxLength: 180 }
+        buildNumber: { type: integer, format: int64, minimum: 1 }
+        buildUrl: { type: string, maxLength: 1024 }
+        branch: { type: string, maxLength: 180 }
+        gitCommit: { type: string, pattern: '^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$' }
+        eventType: { type: string, enum: [BUILD, DEPLOY, ROLLBACK] }
+        status: { type: string, enum: [STARTED, SUCCESS, FAILURE, UNSTABLE, ABORTED] }
+        serviceName: { type: string, maxLength: 120 }
+        imageRef: { type: string, maxLength: 512 }
+        imageDigest: { type: string, pattern: '^sha256:[0-9a-f]{64}$' }
+        durationMs: { type: integer, format: int64, minimum: 0, maximum: 86400000 }
+        occurredAt: { type: string, format: date-time }
     ModeratedComment:
       type: object
       required: [id, book_id, subject_key, author_name, body, visibility, created_at]

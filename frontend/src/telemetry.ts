@@ -1,3 +1,5 @@
+import { clientPlatform } from "./app/clientPlatform";
+
 export type BehaviorEvent = {
   eventKey: string;
   eventType: string;
@@ -23,17 +25,6 @@ function safePayload(
       )
       .slice(0, MAX_PAYLOAD_KEYS),
   );
-}
-
-function clientPlatform(): "web" | "mobile" {
-  if (typeof navigator === "undefined") return "web";
-  const mobileHint = (
-    navigator as Navigator & { userAgentData?: { mobile?: boolean } }
-  ).userAgentData?.mobile;
-  if (mobileHint === true) return "mobile";
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
-    ? "mobile"
-    : "web";
 }
 
 export function createTelemetry(send: Sender, flushMs = 3000) {

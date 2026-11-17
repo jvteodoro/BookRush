@@ -1,16 +1,17 @@
 {
   "uid": "bookrush-feed",
   "title": "BookRush / Feed & Recommendations",
-  "description": "FD-06, FD-07, FD-08, FD-11 and FD-12. Operational recommendation signals with explicit attribution boundaries.",
+  "description": "FD-06, FD-07, FD-08, FD-11 and FD-12. PFV1 serving paths and fallback reasons use low-cardinality counters; operational recommendation signals retain explicit attribution boundaries.",
   "tags": ["bookrush", "recommendations", "versioned"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "panels": [
-    {"id": 21, "title": "FD-06 PFV1 serving paths", "type": "timeseries", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_feed_requests_total[5m]))", "legendFormat": "requests {{outcome}}"}, {"refId": "B", "expr": "sum by (result) (rate(bookrush_feed_ranking_total[5m]))", "legendFormat": "ranking {{result}}"}], "fieldConfig": {"defaults": {"unit": "reqps"}}},
+    {"id": 21, "title": "FD-06 PFV1 paths (FALLBACK / SHADOW / PERSONALIZED)", "type": "timeseries", "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_feed_personalized_path_total[5m]))", "legendFormat": "serving path {{outcome}}"}], "fieldConfig": {"defaults": {"unit": "reqps"}}},
     {"id": 22, "title": "FD-07 Ranking stage latency", "type": "timeseries", "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (stage, le) (rate(bookrush_feed_stage_duration_seconds_bucket[5m])))", "legendFormat": "p95 {{stage}}"}], "fieldConfig": {"defaults": {"unit": "s"}}},
     {"id": 23, "title": "FD-11 Shadow overlap", "type": "timeseries", "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum(rate(bookrush_feed_personalized_shadow_overlap_total[5m])) / clamp_min(sum(rate(bookrush_feed_personalized_shadow_compared_total[5m])), 1)", "legendFormat": "overlap / compared"}, {"refId": "B", "expr": "sum(rate(bookrush_feed_personalized_shadow_rank_movement_total[5m]))", "legendFormat": "rank movement"}], "fieldConfig": {"defaults": {"unit": "short"}}},
-    {"id": 24, "title": "FD-08/12 Candidate and profile coverage", "type": "timeseries", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_feed_candidates_total[5m]))", "legendFormat": "candidates {{outcome}}"}, {"refId": "B", "expr": "sum by (outcome) (rate(bookrush_feed_items_total[5m]))", "legendFormat": "items {{outcome}}"}, {"refId": "C", "expr": "sum by (outcome) (rate(bookrush_feed_personalized_profile_confidence_total[5m]))", "legendFormat": "confidence {{outcome}}"}], "fieldConfig": {"defaults": {"unit": "ops"}}}
+    {"id": 24, "title": "FD-08/12 Candidate and profile coverage", "type": "timeseries", "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_feed_candidates_total[5m]))", "legendFormat": "candidates {{outcome}}"}, {"refId": "B", "expr": "sum by (outcome) (rate(bookrush_feed_items_total[5m]))", "legendFormat": "items {{outcome}}"}, {"refId": "C", "expr": "sum by (outcome) (rate(bookrush_feed_personalized_profile_confidence_total[5m]))", "legendFormat": "confidence {{outcome}}"}], "fieldConfig": {"defaults": {"unit": "ops"}}},
+    {"id": 25, "title": "FD-06 Fallback reasons (including OFF and ON degradation)", "type": "timeseries", "gridPos": {"x": 0, "y": 16, "w": 12, "h": 8}, "datasource": {"type": "prometheus", "uid": "bookrush-prometheus"}, "targets": [{"refId": "A", "expr": "sum by (outcome) (rate(bookrush_feed_personalized_reason_total{outcome!~\"ready|shadow\"}[5m]))", "legendFormat": "fallback {{outcome}}"}], "fieldConfig": {"defaults": {"unit": "reqps"}}}
   ]
 }

@@ -53,11 +53,16 @@ public class AdminSecurityConfiguration {
   JwtDecoder jwtDecoder(
       @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri}") String jwkSetUri,
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
-      @Value("${bookrush.security.audience}") String audience) {
+      @Value("${bookrush.security.audience}") String audience,
+      @Value("${bookrush.security.additional-audiences:}") String additionalAudiences) {
     NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
     OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(issuer);
+    var acceptedAudiences = new java.util.HashSet<String>();
+    acceptedAudiences.add(audience);
+    Arrays.stream(additionalAudiences.split(",")).map(String::trim)
+        .filter(value -> !value.isBlank()).forEach(acceptedAudiences::add);
     OAuth2TokenValidator<Jwt> audienceValidator = token ->
-        token.getAudience().contains(audience)
+        token.getAudience().stream().anyMatch(acceptedAudiences::contains)
             ? OAuth2TokenValidatorResult.success()
             : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "required audience is missing", null));
     decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuerValidator, audienceValidator));

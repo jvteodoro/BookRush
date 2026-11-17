@@ -222,6 +222,12 @@ public class ReaderBffController {
           .headers(headers -> {
             if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
             copyReaderCorrelation(request, headers);
+            if ("/api/v1/recommendations/feed".equals(path)) {
+              String platform = request.getHeader("X-BookRush-Platform");
+              if ("web".equalsIgnoreCase(platform) || "mobile".equalsIgnoreCase(platform)) {
+                headers.set("X-BookRush-Platform", platform.toLowerCase(java.util.Locale.ROOT));
+              }
+            }
           })
           .retrieve()
           .body(Object.class);

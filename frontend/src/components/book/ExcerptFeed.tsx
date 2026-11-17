@@ -22,7 +22,8 @@ type Props = {
     onComments: (id: string) => void;
     onShare: (id: string) => void;
     onViewable: (id: string) => void;
-    onDwell?: (id: string, durationMs: number) => void;
+    onDwell?: (id: string, durationMs: number, visitId: string) => void;
+    onSkip?: (id: string, visitId: string) => void;
     message: string;
   };
 };
@@ -48,10 +49,19 @@ export function ExcerptFeed({
   const scroll = useRef<HTMLDivElement>(null);
   const onViewable = live?.onViewable;
   const onDwell = live?.onDwell;
+  const onSkip = live?.onSkip;
+  const dwellTracker = useRef<ReturnType<typeof createDwellTracker> | undefined>(
+    undefined,
+  );
   useEffect(() => {
     const element = scroll.current;
     if (!element || !onViewable) return;
-    const dwell = onDwell ? createDwellTracker(onDwell) : undefined;
+    const dwell = onDwell
+      ? createDwellTracker((id, durationMs, visitId) =>
+          onDwell(id, durationMs, visitId),
+        )
+      : undefined;
+    dwellTracker.current = dwell;
     const onVisibilityChange = () =>
       dwell?.setPageVisible(document.visibilityState !== "hidden");
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -72,6 +82,7 @@ export function ExcerptFeed({
       .forEach((card) => observer.observe(card));
     return () => {
       dwell?.flush();
+      if (dwellTracker.current === dwell) dwellTracker.current = undefined;
       observer.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
@@ -104,6 +115,12 @@ export function ExcerptFeed({
       const next =
         cards[Math.min(cards.length - 1, Math.max(0, current + direction))];
       if (!next) return;
+      const currentCard = cards[current];
+      if (direction > 0 && currentCard && currentCard !== next) {
+        const id = currentCard.dataset.bookId;
+        const visitId = id ? dwellTracker.current?.visitId(id) : undefined;
+        if (id && visitId) onSkip?.(id, visitId);
+      }
       const destination = top(next);
       const start = element.scrollTop;
       if (
@@ -173,7 +190,7 @@ export function ExcerptFeed({
       element.removeEventListener("wheel", wheel);
       element.removeEventListener("keydown", key);
     };
-  }, [books]);
+  }, [books, onSkip]);
   return (
     <div className={`br-feed-layout${live ? " br-feed-layout--live" : ""}`}>
       <section className="br-feed-stage" aria-label="Feed Para você">

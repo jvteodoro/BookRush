@@ -2,17 +2,35 @@ package com.bookrush.adminservice.reporting;
 
 import java.security.Principal;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.Instant;
 import java.sql.Timestamp;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,12 +39,290 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/admin/v1/reporting")
 public class ReportingController {
+  private static final int EXPORT_ROW_LIMIT = 10_000;
   private final JdbcTemplate jdbc;
   @Value("${bookrush.reporting.stale-after-seconds:900}")
   private long staleAfterSeconds = 900;
 
   public ReportingController(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
+  }
+
+  private record ExportSpec(List<String> columns, String sql) {}
+
+  public record ReleaseEventRequest(
+      @NotBlank @Size(max = 220) @Pattern(regexp = "[A-Za-z0-9._:/#-]+") String eventId,
+      @NotBlank @Size(max = 180) String jobName,
+      @Min(1) long buildNumber,
+      @Size(max = 1024) String buildUrl,
+      @Size(max = 180) String branch,
+      @Pattern(regexp = "([0-9a-fA-F]{40}|[0-9a-fA-F]{64})") String gitCommit,
+      @NotBlank @Pattern(regexp = "BUILD|DEPLOY|ROLLBACK") String eventType,
+      @NotBlank @Pattern(regexp = "STARTED|SUCCESS|FAILURE|UNSTABLE|ABORTED") String status,
+      @Size(max = 120) String serviceName,
+      @Size(max = 512) String imageRef,
+      @Pattern(regexp = "sha256:[0-9a-f]{64}") String imageDigest,
+      @Min(0) @Max(86400000) Long durationMs,
+      @NotNull Instant occurredAt) {}
+
+  @PostMapping("/internal/release-events")
+  public Map<String, Object> ingestReleaseEvent(@Valid @RequestBody ReleaseEventRequest event,
+      Authentication authentication) {
+    requireReleaseWriter(authentication);
+    validateReleaseEvent(event);
+    int accepted = jdbc.update("""
+        INSERT INTO reporting.release_event(
+          id, event_id, job_name, build_number, build_url, branch, git_commit,
+          event_type, status, service_name, image_ref, image_digest, duration_ms, occurred_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (event_id) DO UPDATE SET event_id = EXCLUDED.event_id
+        WHERE reporting.release_event.job_name IS NOT DISTINCT FROM EXCLUDED.job_name
+          AND reporting.release_event.build_number IS NOT DISTINCT FROM EXCLUDED.build_number
+          AND reporting.release_event.build_url IS NOT DISTINCT FROM EXCLUDED.build_url
+          AND reporting.release_event.branch IS NOT DISTINCT FROM EXCLUDED.branch
+          AND reporting.release_event.git_commit IS NOT DISTINCT FROM EXCLUDED.git_commit
+          AND reporting.release_event.event_type IS NOT DISTINCT FROM EXCLUDED.event_type
+          AND reporting.release_event.status IS NOT DISTINCT FROM EXCLUDED.status
+          AND reporting.release_event.service_name IS NOT DISTINCT FROM EXCLUDED.service_name
+          AND reporting.release_event.image_ref IS NOT DISTINCT FROM EXCLUDED.image_ref
+          AND reporting.release_event.image_digest IS NOT DISTINCT FROM EXCLUDED.image_digest
+          AND reporting.release_event.duration_ms IS NOT DISTINCT FROM EXCLUDED.duration_ms
+        """, UUID.randomUUID(), event.eventId(), event.jobName(), event.buildNumber(),
+        event.buildUrl(), event.branch(), event.gitCommit(), event.eventType(), event.status(),
+        event.serviceName(), event.imageRef(), event.imageDigest(), event.durationMs(),
+        Timestamp.from(event.occurredAt()));
+    if (accepted == 0)
+      throw new ResponseStatusException(HttpStatus.CONFLICT,
+          "eventId was already used with different release metadata");
+    var stored = jdbc.queryForMap("""
+        SELECT event_id, status, occurred_at
+        FROM reporting.release_event WHERE event_id = ?
+        """, event.eventId());
+    return Map.of("eventId", stored.get("event_id"), "accepted", true,
+        "status", stored.get("status"), "occurredAt", stored.get("occurred_at"));
+  }
+
+  @GetMapping("/release-events")
+  public Map<String, Object> releaseEvents(@RequestParam(defaultValue = "30") int days,
+      @RequestParam(defaultValue = "100") int limit, Principal principal,
+      Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    if (limit < 1 || limit > 500)
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "limit must be between 1 and 500");
+    var rows = jdbc.queryForList("""
+        SELECT event_id, job_name, build_number, build_url, branch, git_commit,
+          event_type, status, service_name, image_ref, image_digest, duration_ms, occurred_at
+        FROM reporting.release_event
+        WHERE occurred_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY occurred_at DESC, id DESC
+        LIMIT ?
+        """, days, limit);
+    var result = new LinkedHashMap<String, Object>();
+    result.put("schemaVersion", "dashboard-response-v1");
+    result.put("metricId", "release_events");
+    result.put("definitionVersion", "jenkins-release-events-v1");
+    result.put("status", rows.isEmpty() ? "NO_DATA" : "OK");
+    result.put("unit", "events");
+    result.put("from", Instant.now().minusSeconds(days * 86400L).atOffset(ZoneOffset.UTC).toString());
+    result.put("to", Instant.now().atOffset(ZoneOffset.UTC).toString());
+    result.put("population", "PLATFORM");
+    result.put("warnings", List.of());
+    result.put("series", rows);
+    return result;
+  }
+
+  private void validateReleaseEvent(ReleaseEventRequest event) {
+    if ("BUILD".equals(event.eventType()) && event.serviceName() != null
+        || !"BUILD".equals(event.eventType()) && (event.serviceName() == null || event.serviceName().isBlank()))
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "serviceName must be absent for BUILD and present for DEPLOY/ROLLBACK");
+  }
+
+  private void requireReleaseWriter(Authentication authentication) {
+    if (authentication == null || authentication.getAuthorities().stream()
+        .noneMatch(a -> a.getAuthority().equals("SCOPE_bookrush.reporting.release.write")))
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "release reporting scope required");
+  }
+
+  @GetMapping(value = "/export/{dataset}", produces = "text/csv")
+  public ResponseEntity<byte[]> exportReporting(@PathVariable String dataset,
+      @RequestParam(defaultValue = "30") int days, Principal principal,
+      Authentication authentication) {
+    requireOperator(authentication, principal);
+    validateDays(days);
+    ExportSpec spec = exportSpec(dataset);
+    var rows = jdbc.queryForList(spec.sql(), days, EXPORT_ROW_LIMIT + 1);
+    if (rows.size() > EXPORT_ROW_LIMIT) {
+      throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+          "Export exceeds the 10000-row limit; narrow the date range");
+    }
+    byte[] csv = csvBytes(spec.columns(), rows);
+    jdbc.update("""
+        INSERT INTO admin.audit_log(id, actor_subject, action, target, details)
+        VALUES (?, ?, 'REPORTING_DATA_EXPORTED', ?,
+          jsonb_build_object('days', ?::int, 'rowCount', ?::int))
+        """, UUID.randomUUID(), principal.getName(), dataset, days, rows.size());
+    String filename = "bookrush-" + dataset + "-" + days + "d.csv";
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
+    headers.setContentDisposition(ContentDisposition.attachment()
+        .filename(filename, StandardCharsets.UTF_8).build());
+    headers.setCacheControl("no-store");
+    return new ResponseEntity<>(csv, headers, HttpStatus.OK);
+  }
+
+  private ExportSpec exportSpec(String dataset) {
+    return switch (dataset) {
+      case "reader-day" -> new ExportSpec(List.of("day", "population", "platform",
+          "active_users", "newly_active_users", "sessions", "weekly_active_users",
+          "monthly_active_users", "returning_users", "active_seconds", "book_opens",
+          "meaningful_reads", "completions", "calculation_version", "refreshed_at",
+          "source_watermark"), """
+          SELECT day, population, platform, active_users, newly_active_users, sessions,
+            weekly_active_users, monthly_active_users, returning_users, active_seconds,
+            book_opens, meaningful_reads, completions, calculation_version,
+            refreshed_at, source_watermark
+          FROM reporting.reader_day WHERE day >= current_date - (? - 1)
+          ORDER BY day, population, platform LIMIT ?
+          """);
+      case "feed-daily" -> new ExportSpec(List.of("day", "model_version", "strategy",
+          "feed_path", "population", "platform", "served_count", "viewable_count",
+          "eligible_viewable_count", "attributed_open_count", "mature_attributed_open_count",
+          "attributed_read_10_count", "attributed_read_50_count",
+          "attributed_complete_count", "dwell_observations", "dwell_seconds", "skipped_visits",
+          "calculation_version", "refreshed_at", "source_watermark"), """
+          SELECT day, model_version, strategy, feed_path, population, platform, served_count,
+            viewable_count, eligible_viewable_count, attributed_open_count,
+            mature_attributed_open_count, attributed_read_10_count,
+            attributed_read_50_count, attributed_complete_count, dwell_observations,
+            dwell_seconds, skipped_visits, calculation_version, refreshed_at, source_watermark
+          FROM reporting.feed_daily WHERE day >= current_date - (? - 1)
+          ORDER BY day, strategy, model_version, feed_path, platform LIMIT ?
+          """);
+      case "recommendation-daily" -> new ExportSpec(List.of("day", "model_version",
+          "strategy", "feed_path", "population", "platform", "request_count",
+          "candidate_count", "scored_candidate_count", "selected_count", "item_count",
+          "impression_count", "viewable_count", "repeat_viewable_count",
+          "viewable_unique_books", "unique_books", "p50_rank", "p90_rank",
+          "calculation_version", "refreshed_at", "source_watermark"), """
+          SELECT day, model_version, strategy, feed_path, population, platform, request_count,
+            candidate_count, scored_candidate_count, selected_count, item_count,
+            impression_count, viewable_count, repeat_viewable_count,
+            viewable_unique_books, unique_books, p50_rank, p90_rank,
+            calculation_version, refreshed_at, source_watermark
+          FROM reporting.recommendation_daily WHERE day >= current_date - (? - 1)
+          ORDER BY day, strategy, model_version, feed_path, platform LIMIT ?
+          """);
+      case "recommendation-quality" -> new ExportSpec(List.of("day", "model_version",
+          "strategy", "outcome_type", "attributed_count", "unique_subjects", "unique_books",
+          "p50_rank", "calculation_version", "refreshed_at", "source_watermark"), """
+          SELECT day, model_version, strategy, outcome_type, attributed_count, unique_subjects,
+            unique_books, p50_rank, calculation_version, refreshed_at, source_watermark
+          FROM reporting.recommendation_quality_daily WHERE day >= current_date - (? - 1)
+          ORDER BY day, strategy, model_version, outcome_type LIMIT ?
+          """);
+      case "recommendation-profile-quality" -> new ExportSpec(List.of("day", "model_version",
+          "strategy", "feed_path", "population", "platform", "confidence_bucket",
+          "profile_size_bucket", "fatigue_coverage_bucket", "cold_start", "request_count",
+          "calculation_version", "refreshed_at", "source_watermark"), """
+          SELECT day, model_version, strategy, feed_path, population, platform,
+            confidence_bucket, profile_size_bucket, fatigue_coverage_bucket, cold_start,
+            request_count, calculation_version, refreshed_at, source_watermark
+          FROM reporting.recommendation_profile_quality_daily
+          WHERE day >= current_date - (? - 1)
+          ORDER BY day, strategy, model_version, feed_path, confidence_bucket,
+            profile_size_bucket, fatigue_coverage_bucket, cold_start LIMIT ?
+          """);
+      case "moderation-daily" -> new ExportSpec(List.of("day", "open_count", "in_review_count",
+          "resolved_count", "dismissed_count", "p50_resolution_seconds",
+          "p95_resolution_seconds", "oldest_open_age_seconds", "open_under_1_day",
+          "open_1_to_3_days", "open_3_to_7_days", "open_7_days_or_more",
+          "calculation_version", "refreshed_at", "source_watermark"), """
+          SELECT day, open_count, in_review_count, resolved_count, dismissed_count,
+            p50_resolution_seconds, p95_resolution_seconds, oldest_open_age_seconds,
+            open_under_1_day, open_1_to_3_days, open_3_to_7_days, open_7_days_or_more,
+            calculation_version, refreshed_at, source_watermark
+          FROM reporting.moderation_daily WHERE day >= current_date - (? - 1)
+          ORDER BY day LIMIT ?
+          """);
+      case "social-daily" -> new ExportSpec(List.of("day", "follow_count", "like_count",
+          "comment_count", "share_count", "book_opened_count", "book_saved_count",
+          "unique_actors", "reports_open", "moderation_backlog", "behavior_like_events",
+          "behavior_unlike_events", "behavior_save_events", "behavior_unsave_events",
+          "behavior_share_events", "behavior_comment_events", "behavior_unique_actors",
+          "behavior_distinct_books", "calculation_version", "refreshed_at", "source_watermark"), """
+          SELECT day, follow_count, like_count, comment_count, share_count, book_opened_count,
+            book_saved_count, unique_actors, reports_open, moderation_backlog,
+            behavior_like_events, behavior_unlike_events, behavior_save_events,
+            behavior_unsave_events, behavior_share_events, behavior_comment_events,
+            behavior_unique_actors, behavior_distinct_books, calculation_version,
+            refreshed_at, source_watermark
+          FROM reporting.social_daily WHERE day >= current_date - (? - 1)
+          ORDER BY day LIMIT ?
+          """);
+      case "book-engagement" -> new ExportSpec(List.of("day", "aggregation_level",
+          "aggregation_key", "book_id", "book_title", "language", "impressions",
+          "viewable_count", "opens", "reads", "active_minutes", "unique_readers",
+          "completions", "interactions", "calculation_version", "refreshed_at",
+          "source_watermark"), """
+          SELECT day, aggregation_level, aggregation_key, book_id, book_title, language,
+            impressions, viewable_count, opens, reads, active_minutes, unique_readers,
+            completions, interactions, calculation_version, refreshed_at, source_watermark
+          FROM reporting.book_engagement_daily
+          WHERE day >= current_date - (? - 1) AND unique_readers >= 5
+          ORDER BY day DESC, aggregation_level, unique_readers DESC, aggregation_key LIMIT ?
+          """);
+      case "rights-status-daily" -> new ExportSpec(List.of("day", "source_type", "right_type",
+          "territory", "status", "item_count", "calculation_version", "refreshed_at",
+          "source_watermark"), """
+          SELECT day, source_type, right_type, territory, status, item_count,
+            calculation_version, refreshed_at, source_watermark
+          FROM reporting.rights_status_daily WHERE day >= current_date - (? - 1)
+          ORDER BY day, source_type, right_type, territory, status LIMIT ?
+          """);
+      default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "Unsupported reporting export dataset");
+    };
+  }
+
+  private byte[] csvBytes(List<String> columns, List<Map<String, Object>> rows) {
+    StringBuilder csv = new StringBuilder();
+    appendCsvRow(csv, columns);
+    for (Map<String, Object> row : rows) {
+      appendCsvRow(csv, columns.stream().map(row::get).toList());
+    }
+    return csv.toString().getBytes(StandardCharsets.UTF_8);
+  }
+
+  private void appendCsvRow(StringBuilder csv, List<?> values) {
+    for (int i = 0; i < values.size(); i++) {
+      if (i > 0) csv.append(',');
+      Object value = values.get(i);
+      String cell = value == null ? "" : value instanceof Timestamp timestamp
+          ? timestamp.toInstant().toString()
+          : value instanceof OffsetDateTime offsetDateTime
+              ? offsetDateTime.toInstant().toString()
+              : value instanceof Instant instant ? instant.toString() : String.valueOf(value);
+      if (value instanceof String) {
+        String trimmed = cell.stripLeading();
+        if (!trimmed.isEmpty() && "=+@-".indexOf(trimmed.charAt(0)) >= 0) cell = "'" + cell;
+      }
+      csv.append('"').append(cell.replace("\"", "\"\"")).append('"');
+    }
+    csv.append("\r\n");
+  }
+
+  private void requireOperator(Authentication authentication, Principal principal) {
+    if (principal == null || authentication == null || authentication.getAuthorities().stream()
+        .noneMatch(authority -> authority.getAuthority().equals("ROLE_platform-admins")
+            || authority.getAuthority().equals("ROLE_operators")
+            || authority.getAuthority().equals("ROLE_platform-admin")
+            || authority.getAuthority().equals("ROLE_platform-operator")
+            || authority.getAuthority().equals("ROLE_OPERATOR"))) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+          "reporting export operator permission required");
+    }
   }
 
   @GetMapping("/reader-day")
@@ -45,7 +341,7 @@ public class ReportingController {
         WHERE day >= current_date - (? - 1)
         ORDER BY day
         """, days);
-    return response("reader_day", "events-v1-untrusted-population", days,
+    return response("reader_day", "events-issuer-subject-platform-windows-v3-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -59,7 +355,7 @@ public class ReportingController {
     var response = new LinkedHashMap<String, Object>();
     response.put("schemaVersion", "dashboard-response-v1");
     response.put("metricId", "executive_summary");
-    response.put("definitionVersion", "executive-period-comparison-v1-untrusted-population");
+    response.put("definitionVersion", "executive-period-comparison-v2-issuer-subject-unique-users-untrusted-population");
     response.put("status", Boolean.TRUE.equals(current.get("has_data")) ? "UNTRUSTED" : "NO_DATA");
     response.put("unit", "period_aggregate");
     response.put("population", "UNCLASSIFIED");
@@ -77,11 +373,29 @@ public class ReportingController {
     String feedWindow = previous
         ? "day >= current_date - (2 * ? - 1) AND day < current_date - (? - 1)"
         : "day >= current_date - (? - 1)";
+    var uniqueReaders = jdbc.queryForMap("""
+        SELECT count(daily_users) > 0 AS has_data, max(daily_users) AS daily_peak_users
+        FROM (
+          SELECT occurred_at::date AS day,
+            count(DISTINCT (identity_issuer, identity_subject)) AS daily_users
+          FROM behavior.events
+          WHERE identity_issuer IS NOT NULL AND identity_subject IS NOT NULL
+            AND event_type IN ('BOOK_OPEN', 'READ_SESSION', 'READ_PROGRESS',
+              'BOOK_COMPLETE', 'READ_COMPLETE', 'BOOK_LIKE', 'BOOK_UNLIKE',
+              'BOOK_SAVE', 'BOOK_UNSAVE', 'BOOK_SHARE', 'BOOK_COMMENT')
+            AND %s
+          GROUP BY occurred_at::date
+        ) daily
+        """.formatted(previous
+            ? "occurred_at >= current_date - (2 * ? - 1) AND occurred_at < current_date - (? - 1)"
+            : "occurred_at >= current_date - (? - 1) AND occurred_at < current_date + INTERVAL '1 day'"),
+        previous ? new Object[] {days, days} : new Object[] {days});
     var reader = jdbc.queryForMap("""
-        SELECT count(*) > 0 AS has_data, max(active_users) AS daily_peak_users,
+        SELECT count(*) > 0 AS has_data,
           sum(sessions) AS sessions, sum(active_seconds) AS active_seconds,
           sum(meaningful_reads) AS meaningful_reads
-        FROM reporting.reader_day WHERE """ + readerWindow,
+        FROM reporting.reader_day
+        """ + " WHERE " + readerWindow,
         previous ? new Object[] {days, days} : new Object[] {days});
     var feed = jdbc.queryForMap("""
         SELECT count(*) > 0 AS has_data,
@@ -89,12 +403,14 @@ public class ReportingController {
           sum(attributed_open_count) AS opened,
           sum(attributed_read_10_count) AS meaningful,
           sum(attributed_complete_count) AS complete
-        FROM reporting.feed_daily WHERE """ + feedWindow,
+        FROM reporting.feed_daily
+        """ + " WHERE " + feedWindow,
         previous ? new Object[] {days, days} : new Object[] {days});
     var period = new LinkedHashMap<String, Object>();
     period.put("label", previous ? "previous" : "current");
-    period.put("has_data", Boolean.TRUE.equals(reader.get("has_data")) || Boolean.TRUE.equals(feed.get("has_data")));
-    period.put("daily_peak_users", reader.get("daily_peak_users"));
+    period.put("has_data", Boolean.TRUE.equals(uniqueReaders.get("has_data"))
+        || Boolean.TRUE.equals(reader.get("has_data")) || Boolean.TRUE.equals(feed.get("has_data")));
+    period.put("daily_peak_users", uniqueReaders.get("daily_peak_users"));
     period.put("sessions", reader.get("sessions"));
     period.put("active_seconds", reader.get("active_seconds"));
     period.put("meaningful_reads", reader.get("meaningful_reads"));
@@ -129,15 +445,16 @@ public class ReportingController {
     validateDays(days);
     var rows = jdbc.queryForList("""
         SELECT day, model_version, strategy, feed_path, population, platform,
-          served_count, viewable_count, attributed_open_count,
+          served_count, viewable_count, eligible_viewable_count, attributed_open_count,
+          mature_attributed_open_count,
           attributed_read_10_count, attributed_read_50_count,
-          attributed_complete_count, dwell_observations, dwell_seconds,
+          attributed_complete_count, dwell_observations, dwell_seconds, skipped_visits,
           calculation_version, refreshed_at, source_watermark
         FROM reporting.feed_daily
         WHERE day >= current_date - (? - 1)
         ORDER BY day, strategy, model_version, feed_path
         """, days);
-    return response("feed_daily", "feed-attribution-v1-untrusted-population", days,
+    return response("feed_daily", "feed-attribution-v4-mature-viewable-ctr-v1-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -148,14 +465,36 @@ public class ReportingController {
     validateDays(days);
     var rows = jdbc.queryForList("""
         SELECT day, model_version, strategy, feed_path, population, platform,
-          request_count, item_count, impression_count, viewable_count,
-          unique_books, p50_rank, p90_rank, calculation_version,
+          request_count, candidate_count, scored_candidate_count, selected_count,
+          item_count, impression_count, viewable_count,
+          repeat_viewable_count, viewable_unique_books, unique_books, p50_rank, p90_rank,
+          calculation_version,
           refreshed_at, source_watermark
         FROM reporting.recommendation_daily
         WHERE day >= current_date - (? - 1)
         ORDER BY day, strategy, model_version, feed_path
         """, days);
-    return response("recommendation_daily", "recommendation-ledger-v1-untrusted-population", days,
+    return response("recommendation_daily", "recommendation-ledger-v4-candidate-funnel-repeat-viewable-30d-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/recommendation-profile-quality-daily")
+  public Map<String, Object> recommendationProfileQualityDaily(
+      @RequestParam(defaultValue = "30") int days, Principal principal,
+      Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, model_version, strategy, feed_path, population, platform,
+          confidence_bucket, profile_size_bucket, fatigue_coverage_bucket, cold_start,
+          request_count, calculation_version, refreshed_at, source_watermark
+        FROM reporting.recommendation_profile_quality_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, strategy, model_version, feed_path, confidence_bucket,
+          profile_size_bucket, fatigue_coverage_bucket, cold_start
+        """, days);
+    return response("recommendation_profile_quality_daily",
+        "recommendation-profile-quality-v1-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -172,7 +511,7 @@ public class ReportingController {
         WHERE day >= current_date - (? - 1)
         ORDER BY day, strategy, model_version, outcome_type
         """, days);
-    return response("recommendation_quality_daily", "recommendation-outcome-v1-untrusted-population", days,
+    return response("recommendation_quality_daily", "recommendation-outcome-v3-exact-viewable-touch-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -189,7 +528,27 @@ public class ReportingController {
         WHERE day >= current_date - (? - 1)
         ORDER BY day, strategy, model_version, rank_bucket, outcome_type
         """, days);
-    return response("recommendation_position_daily", "recommendation-position-v1-untrusted-population", days,
+    return response("recommendation_position_daily", "recommendation-position-v3-exact-viewable-touch-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/recommendation-position-funnel-daily")
+  public Map<String, Object> recommendationPositionFunnelDaily(
+      @RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, model_version, strategy, rank_bucket, population, platform,
+          impression_count, viewable_count, eligible_viewable_count,
+          attributed_open_count, mature_attributed_open_count,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.recommendation_position_funnel_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, strategy, model_version, rank_bucket, platform
+        """, days);
+    return response("recommendation_position_funnel_daily",
+        "recommendation-position-funnel-v1-mature-viewable-ctr-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -209,7 +568,8 @@ public class ReportingController {
     }
     var rows = jdbc.queryForList("""
         SELECT day, excerpt_id, book_id, book_title, language, model_version, strategy,
-          eligible, impressions, viewable_count, attributed_open_count,
+          eligible, impressions, viewable_count, eligible_viewable_count,
+          attributed_open_count, mature_attributed_open_count,
           attributed_read_count, attributed_complete_count, unique_subjects,
           calculation_version, refreshed_at, source_watermark
         FROM reporting.excerpt_performance_daily
@@ -218,7 +578,7 @@ public class ReportingController {
         ORDER BY day DESC, viewable_count DESC, attributed_open_count DESC, excerpt_id
         LIMIT ? OFFSET ?
         """, days, minImpressions, limit + 1, pageOffset(page, limit));
-    return pagedResponse("excerpt_performance", "excerpt-performance-v1-untrusted-population", days,
+    return pagedResponse("excerpt_performance", "excerpt-performance-v3-mature-viewable-ctr-untrusted-population", days,
         "SUPPRESSED_BELOW_MIN_SAMPLE", rows, page, limit);
   }
 
@@ -229,14 +589,15 @@ public class ReportingController {
     validateDays(days);
     var rows = jdbc.queryForList("""
         SELECT day, experiment_id, assignment_version, variant, assigned_subjects,
-          request_count, impression_count, viewable_count, attributed_open_count,
+          request_count, impression_count, viewable_count, eligible_viewable_count,
+          attributed_open_count, mature_attributed_open_count,
           attributed_read_count, attributed_complete_count, unique_subjects,
           calculation_version, refreshed_at, source_watermark
         FROM reporting.experiment_daily
         WHERE day >= current_date - (? - 1)
         ORDER BY day, experiment_id, variant
         """, days);
-    return response("experiment_daily", "feed-experiment-v1-untrusted-population", days,
+    return response("experiment_daily", "feed-experiment-v3-mature-viewable-ctr-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -329,7 +690,7 @@ public class ReportingController {
     requireAnalyst(authentication, principal);
     validateDays(days);
     var rows = jdbc.queryForList("""
-        SELECT day, accepted_events, rejected_events, duplicate_rejections,
+        SELECT day, accepted_events, rejected_events, classified_events, duplicate_rejections,
           schema_rejections, payload_rejections, outbox_pending,
           outbox_published, outbox_failed_attempts,
           outbox_oldest_pending_age_seconds, calculation_version,
@@ -338,7 +699,7 @@ public class ReportingController {
         WHERE day >= current_date - (? - 1)
         ORDER BY day
         """, days);
-    return response("event_quality_daily", "event-quality-ingestion-v1", days,
+    return response("event_quality_daily", "event-quality-classified-events-v2", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -384,14 +745,69 @@ public class ReportingController {
     validateDays(days);
     var rows = jdbc.queryForList("""
         SELECT day, unique_readers, sessions, active_seconds,
-          p50_session_seconds, p90_session_seconds, books_opened,
+          p50_session_seconds, p90_session_seconds,
+          session_under_1m, session_1m_5m, session_5m_15m, session_15m_plus,
+          books_opened,
           books_started, completions, saved_books, unique_savers,
           calculation_version, refreshed_at, source_watermark
         FROM reporting.reading_daily
         WHERE day >= current_date - (? - 1)
         ORDER BY day
         """, days);
-    return response("reading_daily", "reading-engagement-v1-untrusted-population", days,
+    return response("reading_daily", "reading-session-duration-buckets-identity-v3-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/reading-progress-daily")
+  public Map<String, Object> readingProgressDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, reader_book_pairs_started, reader_book_pairs_10, reader_book_pairs_50,
+          reader_book_pairs_100, save_actions, unsave_actions,
+          unique_savers, unique_unsavers, calculation_version,
+          refreshed_at, source_watermark
+        FROM reporting.reading_progress_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("reading_progress_daily", "reading-progress-cohort-v2-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/library-state")
+  public Map<String, Object> libraryState(Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    var rows = jdbc.queryForList("""
+        SELECT saved_book_pairs, saved_books, saved_subject_keys,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.library_state_snapshot
+        WHERE snapshot_key = 'CURRENT'
+        """);
+    var result = response("library_state_snapshot", "library-current-state-v1-untrusted-population",
+        1, "UNCLASSIFIED", rows);
+    result.put("unit", "current_snapshot");
+    result.remove("from");
+    result.remove("to");
+    return result;
+  }
+
+  @GetMapping("/reading-habits-daily")
+  public Map<String, Object> readingHabitsDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, active_readers, reading_minutes, completed_books,
+          streak_1_day_users, streak_2_6_day_users,
+          streak_7_29_day_users, streak_30_plus_day_users,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.reading_habits_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day
+        """, days);
+    return response("reading_habits_daily", "reading-habits-v1-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -407,7 +823,7 @@ public class ReportingController {
         WHERE cohort_day >= current_date - (? - 1)
         ORDER BY cohort_day, offset_day
         """, days);
-    return response("retention_cohort", "reading-engagement-v1-untrusted-population", days,
+    return response("retention_cohort", "retention-cohort-issuer-subject-v2-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -419,7 +835,10 @@ public class ReportingController {
     var rows = jdbc.queryForList("""
         SELECT day, follow_count, like_count, comment_count, share_count,
           book_opened_count, book_saved_count, unique_actors, reports_open,
-          moderation_backlog, calculation_version, refreshed_at, source_watermark
+          moderation_backlog, behavior_like_events, behavior_unlike_events,
+          behavior_save_events, behavior_unsave_events, behavior_share_events,
+          behavior_comment_events, behavior_unique_actors, behavior_distinct_books,
+          calculation_version, refreshed_at, source_watermark
         FROM reporting.social_daily
         WHERE day >= current_date - (? - 1)
         ORDER BY day
@@ -436,12 +855,13 @@ public class ReportingController {
     var rows = jdbc.queryForList("""
         SELECT day, open_count, in_review_count, resolved_count, dismissed_count,
           p50_resolution_seconds, p95_resolution_seconds, oldest_open_age_seconds,
+          open_under_1_day, open_1_to_3_days, open_3_to_7_days, open_7_days_or_more,
           calculation_version, refreshed_at, source_watermark
         FROM reporting.moderation_daily
         WHERE day >= current_date - (? - 1)
         ORDER BY day
         """, days);
-    return response("moderation_daily", "governance-activity-v1-untrusted-population", days,
+    return response("moderation_daily", "moderation-aging-buckets-v2-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -462,6 +882,23 @@ public class ReportingController {
         "UNCLASSIFIED", rows);
   }
 
+  @GetMapping("/editorial-submission-funnel-daily")
+  public Map<String, Object> editorialSubmissionFunnelDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT cohort_day, submissions, reviewed_submissions, approved_submissions,
+          published_submissions, active_published_submissions, rights_attested_submissions,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.editorial_submission_funnel_daily
+        WHERE cohort_day >= current_date - (? - 1)
+        ORDER BY cohort_day
+        """, days);
+    return response("editorial_submission_funnel_daily",
+        "editorial-submission-funnel-v1-untrusted-population", days, "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/rights-daily")
   public Map<String, Object> rightsDaily(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {
@@ -475,6 +912,22 @@ public class ReportingController {
         ORDER BY day, action, distribution_status
         """, days);
     return response("rights_daily", "governance-activity-v1-untrusted-population", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/rights-status-daily")
+  public Map<String, Object> rightsStatusDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, source_type, right_type, territory, status, item_count,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.rights_status_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, source_type, right_type, territory, status
+        """, days);
+    return response("rights_status_daily", "rights-status-v1-untrusted-population", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -521,13 +974,57 @@ public class ReportingController {
         "SUPPRESSED_BELOW_MIN_SAMPLE", rows, page, limit);
   }
 
+  @GetMapping("/book-engagement-trends")
+  public Map<String, Object> bookEngagementTrends(
+      @RequestParam(defaultValue = "30") int days,
+      @RequestParam(defaultValue = "5") int minReaders,
+      @RequestParam(defaultValue = "5") int top,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    if (minReaders < 1 || minReaders > 10000 || top < 1 || top > 10) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+          "minReaders must be 1..10000 and top must be 1..10");
+    }
+    var rows = jdbc.queryForList("""
+        WITH eligible AS (
+          SELECT aggregation_level, aggregation_key,
+              max(book_title) AS book_title, max(language) AS language,
+              sum(active_minutes) AS period_active_minutes
+          FROM reporting.book_engagement_daily
+          WHERE day >= current_date - (? - 1) AND unique_readers >= ?
+          GROUP BY aggregation_level, aggregation_key
+        ), ranked AS (
+          SELECT aggregation_level, aggregation_key, book_title, language,
+              period_active_minutes,
+              row_number() OVER (PARTITION BY aggregation_level
+                ORDER BY period_active_minutes DESC, aggregation_key) AS entity_rank
+          FROM eligible
+        )
+        SELECT d.day, d.aggregation_level, d.aggregation_key, d.book_title,
+            d.language, d.active_minutes, d.unique_readers, d.completions,
+            r.period_active_minutes, r.entity_rank, d.source_watermark,
+            d.refreshed_at
+        FROM reporting.book_engagement_daily d
+        JOIN ranked r ON r.aggregation_level = d.aggregation_level
+          AND r.aggregation_key = d.aggregation_key
+        WHERE d.day >= current_date - (? - 1)
+          AND d.unique_readers >= ? AND r.entity_rank <= ?
+        ORDER BY d.aggregation_level, r.entity_rank, d.day
+        """, days, minReaders, days, minReaders, top);
+    return response("book_engagement_trends",
+        "book-engagement-trends-v1-min-sample", days,
+        rows.isEmpty() ? "SUPPRESSED_BELOW_MIN_SAMPLE" : "UNCLASSIFIED", rows);
+  }
+
   @GetMapping("/content-supply")
   public Map<String, Object> contentSupply(@RequestParam(defaultValue = "30") int days,
       Principal principal, Authentication authentication) {
     requireAnalyst(authentication, principal);
     validateDays(days);
     var rows = jdbc.queryForList("""
-        SELECT collected_at, active_books, available_asset_versions,
+        SELECT collected_at, active_books, reader_ready_books, excerpt_ready_books,
+          available_asset_versions,
           analyzed_asset_versions, eligible_excerpts, ranked_excerpts,
           calculation_version, refreshed_at, source_watermark
         FROM reporting.content_supply_snapshot
@@ -535,6 +1032,96 @@ public class ReportingController {
         ORDER BY collected_at
         """, days);
     return response("content_supply_snapshot", "content-supply-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/content-coverage")
+  public Map<String, Object> contentCoverage(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT collected_at, language, rights_status, active_books,
+          books_with_active_assets, available_asset_books, reader_ready_books,
+          analyzed_books, eligible_excerpt_books, ranked_books, eligible_excerpts,
+          ranked_excerpts, calculation_version, refreshed_at, source_watermark
+        FROM reporting.content_coverage_snapshot
+        WHERE collected_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY collected_at, language, rights_status
+        """, days);
+    return response("content_coverage_snapshot", "content-coverage-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/content-rank-scores")
+  public Map<String, Object> contentRankScores(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT collected_at, language, rights_status, ranker_code, ranker_version,
+          configuration_hash, score_decile, score_min, score_max, excerpt_count,
+          calculation_version, refreshed_at, source_watermark
+        FROM reporting.content_rank_score_snapshot
+        WHERE collected_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY collected_at, language, rights_status, ranker_code,
+          ranker_version, configuration_hash, score_decile
+        """, days);
+    return response("content_rank_score_snapshot", "content-rank-score-deciles-v1",
+        days, "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/excerpt-production")
+  public Map<String, Object> excerptProduction(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT collected_at, language, rights_status, generation_method, outcome,
+          reason_bucket, excerpt_count, calculation_version, refreshed_at, source_watermark
+        FROM reporting.excerpt_production_snapshot
+        WHERE collected_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY collected_at, language, rights_status, generation_method, outcome, reason_bucket
+        """, days);
+    return response("excerpt_production_snapshot", "excerpt-production-v1",
+        days, "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/import-quality-daily")
+  public Map<String, Object> importQualityDaily(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT day, source_code, item_status, error_bucket, rights_outcome,
+          asset_outcome, item_count, retry_attempt_count, calculation_version,
+          refreshed_at, source_watermark
+        FROM reporting.import_quality_daily
+        WHERE day >= current_date - (? - 1)
+        ORDER BY day, source_code, item_status, error_bucket, rights_outcome, asset_outcome
+        """, days);
+    return response("import_quality_daily", "import-quality-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/backlog")
+  public Map<String, Object> backlog(@RequestParam(defaultValue = "7") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT collected_at, source_type, queue_name, pending_count,
+          oldest_pending_age_seconds, failed_count, stuck_count, last_successful_at,
+          CASE WHEN last_successful_at IS NULL THEN NULL
+            ELSE greatest(0, extract(epoch FROM (now() - last_successful_at))::bigint) END
+            AS freshness_age_seconds,
+          source_watermark, record_count, refresh_status, calculation_version,
+          refreshed_at
+        FROM reporting.backlog_snapshot
+        WHERE collected_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY collected_at, source_type, queue_name
+        """, days);
+    return response("backlog_snapshot", "backlog-freshness-v1", days,
         "UNCLASSIFIED", rows);
   }
 
@@ -552,6 +1139,22 @@ public class ReportingController {
         ORDER BY day, job_status, item_status
         """, days);
     return response("ingestion_daily", "ingestion-operations-v1", days,
+        "UNCLASSIFIED", rows);
+  }
+
+  @GetMapping("/ingestion-queue")
+  public Map<String, Object> ingestionQueue(@RequestParam(defaultValue = "30") int days,
+      Principal principal, Authentication authentication) {
+    requireAnalyst(authentication, principal);
+    validateDays(days);
+    var rows = jdbc.queryForList("""
+        SELECT collected_at, queue_status, task_count, oldest_task_age_seconds,
+          expired_lease_count, calculation_version, refreshed_at, source_watermark
+        FROM reporting.ingestion_queue_snapshot
+        WHERE collected_at >= now() - (? * INTERVAL '1 day')
+        ORDER BY collected_at, queue_status
+        """, days);
+    return response("ingestion_queue_snapshot", "ingestion-queue-v1", days,
         "UNCLASSIFIED", rows);
   }
 

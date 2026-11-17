@@ -438,11 +438,6 @@
             ...document.querySelectorAll(".feed-card[data-book]"),
           ].indexOf(card),
         });
-      card
-        .querySelector(".feed-quote")
-        ?.addEventListener("dblclick", () =>
-          track("EXCERPT_DWELL", { durationMs: 0 }),
-        );
     });
     document.querySelectorAll("[data-follow]").forEach(
       (b) =>
@@ -1250,7 +1245,7 @@
               (b.catalog_book_id
                 ? " · catálogo ligado"
                 : " · aguardando canonização") +
-              '</span></div><div class="analytics-number">—<small>visualizações</small></div><div class="analytics-number">—<small>leituras</small></div><div class="analytics-number"><button class="mini-btn" data-metrics-id="' +
+              '</span></div><div class="analytics-number" data-publisher-metric="impressions">—<small>impressões</small></div><div class="analytics-number" data-publisher-metric="opens">—<small>aberturas</small></div><div class="analytics-number" data-publisher-metric="reads">—<small>leituras</small></div><div class="analytics-number"><button class="mini-btn" data-metrics-id="' +
               esc(b.id || "") +
               '">Métricas</button> <button class="mini-btn" data-submit-id="' +
               esc(b.id || "") +
@@ -1327,12 +1322,42 @@
               button.dataset.metricsId,
             );
             const rows = result?.items || [];
+            const row = button.closest(".analytics-book-row");
+            const hasSuppressed = rows.some((item) => item.suppressed);
+            const sum = (key) =>
+              hasSuppressed
+                ? "—"
+                : String(
+                    rows.reduce(
+                      (total, item) => total + (Number(item[key]) || 0),
+                      0,
+                    ),
+                  );
+            const opens = row?.querySelector('[data-publisher-metric="opens"]');
+            const reads = row?.querySelector('[data-publisher-metric="reads"]');
+            const impressions = row?.querySelector(
+              '[data-publisher-metric="impressions"]',
+            );
+            if (result?.status === "NOT_LINKED") {
+              if (opens) opens.firstChild.textContent = "—";
+              if (reads) reads.firstChild.textContent = "—";
+              if (impressions) impressions.firstChild.textContent = "—";
+            } else {
+              if (opens) opens.firstChild.textContent = sum("opens");
+              if (reads) reads.firstChild.textContent = sum("reads");
+              if (impressions)
+                impressions.firstChild.textContent = sum("impressions");
+            }
+            const growth = result?.growth || {};
+            const growthSummary = growth.suppressed
+              ? "Crescimento indisponível: amostra mínima de leitores não atingida em um dos períodos."
+              : `Variação em 30 dias: aberturas ${growth.opens_change_percent == null ? "indisponível" : `${growth.opens_change_percent}%`}, leituras ${growth.reads_change_percent == null ? "indisponível" : `${growth.reads_change_percent}%`}.`;
             modal(
               '<div class="eyebrow">MÉTRICAS REAIS</div><h2>Leituras da publicação</h2><p>' +
                 esc(
                   result?.status === "NOT_LINKED"
                     ? "A submissão ainda não está ligada a um livro canônico."
-                    : `Dados agregados por behavior-service (${rows.length} dias).`,
+                    : `Série diária por obra. Valores diários abaixo de cinco leitores são suprimidos. ${growthSummary}`,
                 ) +
                 "</p>" +
                 rows
@@ -1341,12 +1366,10 @@
                     (r) =>
                       '<div class="setting-row"><strong>' +
                       esc(String(r.day)) +
-                      "</strong><span>aberturas " +
-                      r.opens +
-                      " · leituras " +
-                      r.reads +
-                      " · curtidas " +
-                      r.likes +
+                      "</strong><span>" +
+                      (r.suppressed
+                        ? "Dados suprimidos (menos de 5 leitores)"
+                        : `impressões ${r.impressions} · aberturas ${r.opens} · leituras ${r.reads}`) +
                       "</span></div>",
                   )
                   .join(""),

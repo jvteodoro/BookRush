@@ -16,7 +16,9 @@ SECRETS = {
     "bookrush-seaweedfs": "SEAWEEDFS_OIDC_CLIENT_SECRET",
     "bookrush-recommendation-s2s": "FEED_EXCERPTS_CLIENT_SECRET",
     "bookrush-recommendation-behavior-s2s": "BEHAVIOR_S2S_CLIENT_SECRET",
+    "bookrush-publisher-behavior-s2s": "PUBLISHER_BEHAVIOR_S2S_CLIENT_SECRET",
     "bookrush-admin-service": "KEYCLOAK_ADMIN_CLIENT_SECRET",
+    "bookrush-jenkins-release-s2s": "JENKINS_RELEASE_REPORTING_CLIENT_SECRET",
     "bookrush-grafana": "GRAFANA_OIDC_CLIENT_SECRET",
 }
 

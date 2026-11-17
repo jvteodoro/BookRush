@@ -85,6 +85,45 @@ rejeições de telemetria, preservando apenas dimensões de baixa cardinalidade.
 `V19__reporting_recommendation_position_daily.sql` agrega outcomes atribuídos
 por bucket de rank para análise de relevância posicional.
 
+`V41__reporting_release_events.sql` cria o ledger de eventos de build, deploy e
+rollback recebidos do Jenkins. `event_id` fornece idempotência; reutilização do
+mesmo id com payload diferente é rejeitada. O schema guarda job, número/link do
+build, branch/commit, serviço, imagem/digest, estado, duração e horário, sem
+credenciais ou payloads de build.
+
+`V42__reporting_feed_visit_skip_metrics.sql` adiciona `skipped_visits` à
+projeção diária do feed. O valor conta visitas puladas por ação explícita de
+avançar no feed; a projeção não infere skip da ausência de abertura.
+
+`V43__reporting_feed_mature_viewable_ctr.sql` adiciona o denominador de
+impressões viewable maduras e as aberturas atribuídas nessa mesma coorte. A
+janela de atribuição é de sete dias desde a impressão viewable.
+
+`V44__reporting_experiment_mature_ctr.sql` acrescenta denominador viewable
+maduro e aberturas distintas por impressão à projeção dos experimentos; o CTR
+fica indisponível até cada impressão completar sete dias desde `viewable_at`.
+
+`V45__reporting_excerpt_mature_ctr.sql` acrescenta o mesmo denominador e
+numerador por impressão à análise de excerpt. Impressões legadas sem
+`viewable_at` não contam para o CTR elegível.
+
+`V46__reporting_recommendation_position_funnel.sql` cria o funil de impressão,
+viewability e abertura por faixa de rank, estratégia e modelo. Abreviaturas de
+usuário não são expostas; o CTR só inclui viewables com maturidade de sete dias.
+
+`V47__reporting_recommendation_repeat_coverage.sql` acrescenta repetição de
+livro por leitor entre impressões viewable numa janela móvel de 30 dias e a
+contagem diária de livros distintos que tiveram viewability.
+
+`V48__reporting_recommendation_candidate_funnel.sql` acrescenta as contagens
+diárias de candidatos, candidatos pontuados pelo analytics e seleções. Valores
+históricos permanecem nulos quando o request legado não carregava essas
+contagens.
+
+`V49__recommendation_profile_quality_daily.sql` cria a distribuição diária de
+confiança/tamanho de perfil, cobertura de fadiga e cold-start; publica apenas
+contagens por bucket.
+
 `V20__reporting_editorial_quality_daily.sql` cria o snapshot diário de
 qualidade editorial a partir das tabelas de campanhas de anotação. A projeção
 é limitada a 366 dias, idempotente e preserva watermark/versão; discordâncias

@@ -431,6 +431,24 @@ ações administrativas; após alterar o realm, gere token novo e valide `iss`,
 `aud`, `sub` e `groups` antes do smoke.
 protegidos.
 
+O histórico de releases usa uma credencial S2S separada do login humano do
+Jenkins. Configure `JENKINS_RELEASE_REPORTING_CLIENT_SECRET` somente no `.env`
+protegido e reconcilie o cliente declarativo `bookrush-jenkins-release-s2s`
+com `bash infrastructure/keycloak/reconcile.sh --env-file .env`. O client
+recebe audience `bookrush-admin-reporting` e scope
+`bookrush.reporting.release.write`; o Compose injeta o mesmo segredo no
+container Jenkins. Após alterar o `.env`, recrie somente o container Jenkins
+em janela controlada para carregar o novo valor. O endpoint exige audience e
+scope dedicados. Não reutilize cookies, crumbs ou o client OIDC interativo.
+
+O `Jenkinsfile` registra o resultado final do build. `deploy-compose.sh`
+registra por serviço os estados do deploy e, se a restauração das imagens
+anteriores terminar com sucesso, o evento de rollback com as referências e
+digests correspondentes. O envio usa `scripts/publish-release-event.sh`; falha
+na telemetria não altera o resultado do build nem interrompe deploy. O painel
+Admin Web só começa a mostrar eventos depois que a migration V41 estiver
+aplicada no Admin Service.
+
 O dispatcher de behavior usa o sink persistente do `book-analytics-service`.
 Provisionar no host com `infrastructure/operations/provision-behavior-outbox-sink.sh
 .env`; o script mantém a URL e um token aleatório no `.env` protegido e nunca

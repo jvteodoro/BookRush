@@ -3,7 +3,9 @@
 ## Métricas Micrometer
 
 Os serviços Spring Boot que usam `bookrush-observability-spring-boot-starter`
-recebem o registry Prometheus e convenções comuns de baixa cardinalidade. O
+recebem o registry Prometheus e convenções comuns de baixa cardinalidade. Para
+`http.server.requests`, o starter publica histogramas agregáveis e SLO buckets
+de 0.1, 0.25, 0.5, 1, 2 e 5 segundos. O
 endpoint interno é `/actuator/prometheus`; ele é permitido sem bearer somente
 na rede Docker privada e não é publicado pelo reverse proxy. Os demais
 endpoints de Actuator continuam sujeitos à segurança do serviço. As séries HTTP usam histogramas com objetivos
@@ -20,8 +22,19 @@ telemetria não impedem o serviço de iniciar.
 Os dashboards versionados ficam em
 `infrastructure/observability/grafana/dashboards/` e são carregados pelo
 provider `BookRush versioned dashboards`. A primeira entrega cobre OP-01..06,
-PL-01..05, FD-06/07/11, OP-07/12 e DQ-01/02/05/07. As consultas usam Prometheus, e os
+PL-01..05, FD-06/07/11, OP-07..09/12 e DQ-01/02/05/07. FD-06 consulta
+`bookrush_feed_personalized_path_total` para `FALLBACK`, `SHADOW` e
+`PERSONALIZED`, além de motivos de fallback; modo ON não implica serving
+personalizado se o gate degradar para fallback. As consultas usam Prometheus, e os
 datasources Loki/Tempo permanecem disponíveis para drill-down operacional.
+
+Traefik publica métricas Prometheus somente no entrypoint interno `metrics`
+(:8082), sem bind de porta no host e sem labels de routers/services. Keycloak
+expõe `/metrics` no management port interno 9000, com histograms HTTP
+habilitados. Prometheus coleta ambos pela rede privada. O painel OP-09 agrega
+status e latência de requisições; essas respostas HTTP não contam logins bem ou
+mal sucedidos por evento. Não use `uri` para segmentar o dashboard nem derive
+identidade de usuário das séries.
 
 Quando a origem de negócio ainda não existe, o painel mostra
 `NOT_INSTRUMENTED`; nenhum zero é fabricado. Attribution, outbox, shadow
@@ -76,7 +89,17 @@ Admin Web.
 ## HTTP errors
 
 Use as recording rules `bookrush:http_server_errors:rate5m` e
-`bookrush:http_requests:rate5m`. Separe health probes de tráfego de negócio,
+`bookrush:http_requests:rate5m`. O painel OP-02..04 e os alertas de erro/latência
+filtram `job="bookrush-java"` para não misturar os meters HTTP do Keycloak.
+OP-02 detalha req/s por serviço e `uri` template de controller; o Spring Boot
+usa o template com variáveis, por exemplo `/api/books/{id}`, preservando uma
+dimensão de rota sem incorporar valores de IDs às séries.
+OP-04 calcula os percentis HTTP por serviço e URI template, mantendo o bucket
+`le` antes de `histogram_quantile`.
+OP-03 mostra 4xx/5xx req/s por serviço e URI template, e a razão de 5xx por
+serviço somente quando há tráfego observado. O alerta agregado exige mais de
+0.1 req/s e mantém o threshold inicial de 1% por 10 minutos; ambos os limites
+são provisórios e não representam um error budget SLO aprovado. Separe health probes de tráfego de negócio,
 confirme a rota e o deploy no Jenkins e siga o serviço responsável. Não trate
 um erro de autenticação do gateway como indisponibilidade do serviço sem
 confirmar o issuer/audience.

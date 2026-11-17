@@ -129,3 +129,15 @@ Eventos aceitos entram na outbox e são enviados pelo dispatcher para
 `book-analytics-service` em `/api/internal/v1/behavior/events`; a autenticação
 entre os serviços usa `BEHAVIOR_OUTBOX_SINK_TOKEN`, mantido somente no `.env`
 protegido. A linha só recebe `published_at` depois de uma resposta 2xx.
+
+## Métricas de publisher
+
+`GET /api/internal/v1/publisher/metrics/books/{bookId}?days=N` é uma rota
+somente S2S, autorizada pelo audience `bookrush-behavior` e scope dedicado
+`bookrush.publisher.metrics.read`. O serviço retorna métricas diárias e comparação entre
+os últimos 30 dias e os 30 dias anteriores. Métricas diárias são suprimidas
+abaixo de cinco leitores distintos com leitura; a comparação inteira é
+suprimida se qualquer período estiver abaixo do mesmo limiar. A resposta nunca
+inclui identidade de leitores. O cliente `bookrush-publisher-behavior-s2s` é
+separado do cliente de recommendation, usa somente esse scope e mantém o segredo
+no ambiente protegido.

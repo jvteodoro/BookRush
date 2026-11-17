@@ -18,8 +18,15 @@ services:
       # running stack, so load it once instead of requiring a file watcher.
       - --providers.file.watch=false
       - --entrypoints.web.address=:80
+      # Private Prometheus scrape endpoint; intentionally not published on the host.
+      - --entrypoints.metrics.address=:8082
       - --api.dashboard=false
       - --ping=true
+      - --metrics.prometheus=true
+      - --metrics.prometheus.entrypoint=metrics
+      - --metrics.prometheus.addentrypointslabels=true
+      - --metrics.prometheus.addrouterslabels=false
+      - --metrics.prometheus.addserviceslabels=false
     ulimits:
       nofile:
         soft: 65536
@@ -139,7 +146,13 @@ services:
     image: quay.io/keycloak/keycloak:25.0
     profiles: [auth]
     restart: unless-stopped
-    command: ["start-dev", "--http-port=8080", "--import-realm"]
+    command:
+      - start-dev
+      - --http-port=8080
+      - --http-management-port=9000
+      - --metrics-enabled=true
+      - --http-metrics-histograms-enabled=true
+      - --import-realm
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
@@ -658,6 +671,11 @@ services:
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}
       PUBLISHER_BEHAVIOR_URL: ${PUBLISHER_BEHAVIOR_URL:-http://behavior-service:8097}
+      PUBLISHER_BEHAVIOR_METRICS_TOKEN_URI: ${PUBLISHER_BEHAVIOR_METRICS_TOKEN_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+      PUBLISHER_BEHAVIOR_METRICS_CLIENT_ID: ${PUBLISHER_BEHAVIOR_METRICS_CLIENT_ID:-bookrush-publisher-behavior-s2s}
+      PUBLISHER_BEHAVIOR_METRICS_CLIENT_SECRET: ${PUBLISHER_BEHAVIOR_S2S_CLIENT_SECRET:-}
+      PUBLISHER_BEHAVIOR_METRICS_SCOPE: ${PUBLISHER_BEHAVIOR_METRICS_SCOPE:-bookrush.publisher.metrics.read}
+      PUBLISHER_BEHAVIOR_METRICS_AUDIENCE: ${PUBLISHER_BEHAVIOR_METRICS_AUDIENCE:-bookrush-behavior}
       PUBLISHER_INGESTION_CALLBACK_TOKEN: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:-}
     depends_on:
       postgres:
@@ -685,6 +703,7 @@ services:
       BOOKRUSH_SECURITY_ISSUER: ${BOOKRUSH_ADMIN_SECURITY_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       BOOKRUSH_SECURITY_JWK_SET_URI: ${BOOKRUSH_ADMIN_SECURITY_JWK_SET_URI:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       BOOKRUSH_SECURITY_AUDIENCE: ${BOOKRUSH_ADMIN_SECURITY_AUDIENCE:-bookrush-ingestion}
+      BOOKRUSH_SECURITY_ADDITIONAL_AUDIENCES: ${BOOKRUSH_SECURITY_ADDITIONAL_AUDIENCES:-bookrush-admin-reporting}
       BOOKRUSH_CORS_ALLOWED_ORIGINS: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:-https://bookrush.jteodoro.tec.br,http://localhost:18080}
       KEYCLOAK_ADMIN_TOKEN_URI: ${KEYCLOAK_ADMIN_TOKEN_URI:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/token}
       KEYCLOAK_ADMIN_BASE: ${KEYCLOAK_ADMIN_BASE:-http://keycloak:8080/admin/realms/bookrush}
@@ -795,6 +814,7 @@ services:
       # OIDC is opt-in via CASC_JENKINS_CONFIG. Values come from the protected
       # host .env and are never written to the JCasC file in Git.
       JENKINS_OIDC_CLIENT_ID: ${JENKINS_OIDC_CLIENT_ID:-bookrush-jenkins}
+      JENKINS_RELEASE_REPORTING_CLIENT_SECRET: ${JENKINS_RELEASE_REPORTING_CLIENT_SECRET:-}
       JENKINS_OIDC_CLIENT_SECRET: ${JENKINS_OIDC_CLIENT_SECRET:-}
       JENKINS_OIDC_WELL_KNOWN_URL: ${JENKINS_OIDC_WELL_KNOWN_URL:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform/.well-known/openid-configuration}
     group_add:

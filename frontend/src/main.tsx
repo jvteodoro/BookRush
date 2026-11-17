@@ -18,7 +18,7 @@ import "./styles/reader-refinements.css";
 import "./styles/search.css";
 import "./styles/recommendations.css";
 import "./styles/comments.css";
-import { readiumBridge } from "./reader/readiumBridge";
+import { readiumBridge } from "./reader/lazyReadiumBridge";
 import { AuthenticatedShell } from "./app/AuthenticatedShell";
 import { AuthLanding } from "./app/AuthLanding";
 import {

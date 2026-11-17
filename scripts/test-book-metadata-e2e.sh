@@ -93,6 +93,17 @@ docker cp infrastructure/traefik/dynamic.yaml "$gateway:/dynamic.yaml" >/dev/nul
 docker start "$gateway" >/dev/null
 docker run -d --name "$probe" --network "$network" python:3.12-slim sleep 900 >/dev/null
 docker exec -i "$probe" python3 - < scripts/test-book-metadata-e2e.py
+# Exercise session end through the public gateway and BFF. A fresh session
+# cannot accept more active time than elapsed; a long-lived row is capped at 24h.
+fast_session="$(docker exec -i "$probe" python3 - --start-session < scripts/test-book-metadata-e2e.py)"
+fast_active_seconds="$(docker exec -i "$probe" python3 - "$fast_session" --end-session < scripts/test-book-metadata-e2e.py)"
+(( fast_active_seconds <= 5 ))
+long_session="$(docker exec -i "$probe" python3 - --start-session < scripts/test-book-metadata-e2e.py)"
+docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush -c \
+  "UPDATE reader_state.session SET started_at = clock_timestamp() - INTERVAL '25 hours' WHERE id = '$long_session'" >/dev/null
+long_active_seconds="$(docker exec -i "$probe" python3 - "$long_session" --end-session < scripts/test-book-metadata-e2e.py)"
+[[ "$long_active_seconds" == 86400 ]]
+echo 'Reader session E2E: gateway/BFF elapsed-time cap and 24h maximum OK'
 # Ensure the marker is not derived from the 50 most-recent entries.
 docker exec "$postgres" psql -v ON_ERROR_STOP=1 -U bookrush -d bookrush -c "INSERT INTO reader_state.recent(subject_key,book_id,last_opened_at) SELECT seen.subject_key,('99999999-9999-4999-8999-'||lpad(n::text,12,'0'))::uuid,clock_timestamp()+interval '1 minute' FROM reader_state.seen_book seen CROSS JOIN generate_series(1,55) n WHERE seen.book_id='11111111-1111-4111-8111-111111111111'" >/dev/null
 docker exec -i "$probe" python3 - --history < scripts/test-book-metadata-e2e.py

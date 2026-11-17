@@ -42,6 +42,8 @@ public class BehaviorSecurityConfiguration {
                 .hasAuthority("SCOPE_bookrush.behavior.read")
             .requestMatchers("/api/internal/v1/recommendation/trending")
                 .hasAuthority("SCOPE_bookrush.behavior.read")
+            .requestMatchers("/api/internal/v1/publisher/metrics/**")
+                .hasAuthority("SCOPE_bookrush.publisher.metrics.read")
             .anyRequest().authenticated())
         .oauth2ResourceServer(oauth -> oauth.authenticationManagerResolver(authenticationManagerResolver));
     return http.build();
@@ -70,6 +72,7 @@ public class BehaviorSecurityConfiguration {
         JwtValidators.createDefaultWithIssuer(s2sIssuer), audience));
     AuthenticationManager s2s = manager(s2sDecoder, converter);
     return request -> request.getRequestURI().startsWith("/api/internal/v1/recommendation/")
+        || request.getRequestURI().startsWith("/api/internal/v1/publisher/")
         ? s2s : product;
   }
 

@@ -198,6 +198,87 @@ input {
 .dashboard-chart {
   margin-top: 18px;
 }
+.dashboard-platform-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+.dashboard-platform-chart {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #26334a;
+  border-radius: 12px;
+  background: #0b1220;
+}
+.dashboard-platform-chart h3 {
+  margin: 0 0 8px;
+  color: #d6deec;
+  font: 600 14px "Space Grotesk";
+  text-transform: capitalize;
+}
+.dashboard-product-health-section {
+  margin-top: 20px;
+}
+.dashboard-product-health-section > strong {
+  color: #d6deec;
+  font: 600 15px "Space Grotesk";
+}
+.dashboard-product-health {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.dashboard-supply-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.dashboard-supply-kpis > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #26334a;
+  border-radius: 10px;
+  background: #0b1220;
+}
+.dashboard-supply-kpis span,
+.dashboard-supply-kpis small {
+  color: #8491a8;
+  font-size: 11px;
+}
+.dashboard-supply-kpis b {
+  color: #d6deec;
+  font-size: 20px;
+}
+.dashboard-health-tile {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #26334a;
+  border-radius: 12px;
+  background: #0b1220;
+}
+.dashboard-health-tile > span,
+.dashboard-health-tile > small {
+  color: #8491a8;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.dashboard-health-tile > strong {
+  color: #d6deec;
+  font: 600 16px "Space Grotesk";
+  overflow-wrap: anywhere;
+}
+.dashboard-health-tile > a {
+  color: #8cf0d2;
+  font-size: 12px;
+}
 .dashboard-state {
   color: #8491a8;
   padding: 48px 16px;
@@ -265,12 +346,135 @@ input {
   gap: 24px;
   margin-top: 20px;
 }
+.dashboard-engagement-trends {
+  display: grid;
+  gap: 18px;
+  margin-top: 14px;
+}
+.dashboard-engagement-trend {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #26334a;
+  border-radius: 12px;
+  background: #0b1220;
+}
+.dashboard-engagement-trend h4 {
+  margin: 0 0 8px;
+  color: #d6deec;
+  font: 600 14px "Space Grotesk";
+}
+.dashboard-retention-heatmap {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: separate;
+  border-spacing: 3px;
+  margin-top: 14px;
+  font-size: 11px;
+}
+.dashboard-retention-heatmap caption {
+  color: #8491a8;
+  text-align: left;
+  padding: 8px 0;
+}
+.dashboard-retention-heatmap th {
+  padding: 8px;
+  color: #aebbd0;
+  text-align: left;
+}
+.dashboard-retention-heatmap td {
+  min-width: 90px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  color: #071019;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.dashboard-retention-heatmap td.retention-immature {
+  color: #aebbd0;
+  background: repeating-linear-gradient(
+    135deg,
+    #172233,
+    #172233 5px,
+    #202c3f 5px,
+    #202c3f 10px
+  );
+}
 .dashboard-quality-grid > div {
   min-width: 0;
 }
 .dashboard-quality-grid strong {
   color: #d6deec;
   font: 600 15px "Space Grotesk";
+}
+.executive-delta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.executive-delta-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #26334a;
+  border-radius: 10px;
+  background: #0b1220;
+}
+.executive-delta-card > span,
+.executive-delta-card > small {
+  color: #8491a8;
+  font-size: 11px;
+}
+.executive-delta-card > strong {
+  color: #d6deec;
+  font-size: 22px;
+}
+.executive-delta-card > b {
+  font-size: 12px;
+}
+.executive-delta-card > b.positive {
+  color: #8cf0d2;
+}
+.executive-delta-card > b.negative {
+  color: #ff9f7f;
+}
+.executive-delta-card > b.neutral {
+  color: #aebbd0;
+}
+.executive-funnel {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+.executive-funnel-stage {
+  display: grid;
+  gap: 5px;
+  color: #aebbd0;
+  font-size: 12px;
+}
+.executive-funnel-stage > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.executive-funnel-stage b {
+  color: #d6deec;
+}
+.executive-funnel-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #20283a;
+}
+.executive-funnel-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8cf0d2;
+}
+.executive-funnel-stage small {
+  color: #8290a7;
 }
 .projection-list {
   display: grid;
@@ -322,6 +526,12 @@ input {
     overflow-x: auto;
   }
   .dashboard-quality-grid {
+    grid-template-columns: 1fr;
+  }
+  .executive-delta-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-supply-kpis {
     grid-template-columns: 1fr;
   }
 }

@@ -3,6 +3,62 @@ info:
   title: publisher-service
   version: 0.1.0
 paths:
+  /api/v1/publisher/submissions/{id}/metrics:
+    get:
+      summary: Read protected publisher metrics for an owned submission
+      description: The submission is scoped by subject_key; behavior metrics are loaded with S2S auth and daily values are suppressed below five unique readers.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Submission metrics or NOT_LINKED state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [submissionId, status]
+                properties:
+                  submissionId: {type: string, format: uuid}
+                  catalogBookId: {type: string, format: uuid}
+                  status: {type: string, enum: [READY, NOT_LINKED]}
+                  days: {type: integer, maximum: 366}
+                  minReaders: {type: integer, minimum: 5}
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [day, suppressed]
+                      properties:
+                        day: {type: string, format: date}
+                        suppressed: {type: boolean}
+                        uniqueReaders: {type: integer, minimum: 5}
+                        impressions: {type: integer, format: int64}
+                        opens: {type: integer, format: int64}
+                        reads: {type: integer, format: int64}
+                  growth:
+                    type: object
+                    required: [windowDays, suppressed]
+                    properties:
+                      windowDays: {type: integer, enum: [30]}
+                      suppressed: {type: boolean}
+                      currentReaders: {type: integer, minimum: 5}
+                      previousReaders: {type: integer, minimum: 5}
+                      current_impressions: {type: integer, format: int64}
+                      previous_impressions: {type: integer, format: int64}
+                      impressions_change_percent: {type: number, nullable: true}
+                      current_opens: {type: integer, format: int64}
+                      previous_opens: {type: integer, format: int64}
+                      opens_change_percent: {type: number, nullable: true}
+                      current_reads: {type: integer, format: int64}
+                      previous_reads: {type: integer, format: int64}
+                      reads_change_percent: {type: number, nullable: true}
+        '401': {description: Missing or invalid bearer token}
+        '404': {description: Submission does not belong to the authenticated subject}
   /api/internal/v1/publisher/submissions/{submissionId}/catalog-link:
     post:
       summary: Link a submission after canonical ingestion
@@ -32,3 +88,9 @@ paths:
         '200': {description: Link applied}
         '401': {description: Invalid callback credential}
         '409': {description: Conflicting existing link}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

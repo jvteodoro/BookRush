@@ -39,12 +39,13 @@ public final class DataQualityReconciliation {
     long eventCount = count("SELECT count(*) FROM behavior.events");
     long subjectCount = count("SELECT count(*) FROM behavior.user_book_signal");
     long attributedCount = count("SELECT count(*) FROM behavior.outcome_attribution "
-        + "WHERE recommendation_item_id IS NOT NULL OR impression_id IS NOT NULL");
+        + "WHERE attribution_status = 'ATTRIBUTED'");
     long orphanedCount = count("""
         SELECT count(*) FROM behavior.events e
         JOIN behavior.outcome_attribution a ON a.source_event_id=e.id
         WHERE (e.payload ? 'recommendationItemId' AND a.recommendation_item_id IS NULL)
            OR (e.payload ? 'impressionId' AND a.impression_id IS NULL)
+           OR (a.attribution_status = 'ATTRIBUTED' AND a.exposure_event_id IS NULL)
         """);
     Instant latestEvent = jdbc.queryForObject("SELECT max(occurred_at) FROM behavior.events", Instant.class);
     Instant latestProjection = jdbc.queryForObject("SELECT max(updated_at) FROM behavior.user_book_signal", Instant.class);

@@ -1,0 +1,35 @@
+import type { ReadiumBridge, ReaderPreferences } from "../app/types";
+
+let bridgePromise: Promise<ReadiumBridge> | undefined;
+
+function getBridge(): Promise<ReadiumBridge> {
+  if (!bridgePromise) {
+    bridgePromise = import("./readiumBridge")
+      .then((module) => module.readiumBridge)
+      .catch((error: unknown) => {
+        bridgePromise = undefined;
+        throw error;
+      });
+  }
+  return bridgePromise;
+}
+
+export const readiumBridge: ReadiumBridge = {
+  mount: (bookId, container, onLocatorChanged) =>
+    getBridge().then((bridge) =>
+      bridge.mount(bookId, container, onLocatorChanged),
+    ),
+  unmount: () => getBridge().then((bridge) => bridge.unmount()),
+  goToChapter: (chapterId) =>
+    getBridge().then((bridge) => bridge.goToChapter(chapterId)),
+  chapters: () => getBridge().then((bridge) => bridge.chapters()),
+  next: () => getBridge().then((bridge) => bridge.next()),
+  previous: () => getBridge().then((bridge) => bridge.previous()),
+  applyPreferences: (preferences: ReaderPreferences) => {
+    void getBridge()
+      .then((bridge) => bridge.applyPreferences(preferences))
+      .catch((error: unknown) => {
+        console.error("Could not load reader rendering preferences", error);
+      });
+  },
+};

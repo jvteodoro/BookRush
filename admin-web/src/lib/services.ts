@@ -154,7 +154,39 @@ export type CommentHistory = {
   reason: string;
 };
 export type ReportingSeries = {
+  event_id?: string;
+  job_name?: string;
+  build_number?: number;
+  build_url?: string | null;
+  branch?: string | null;
+  git_commit?: string | null;
+  service_name?: string | null;
+  image_ref?: string | null;
+  image_digest?: string | null;
+  duration_ms?: number | null;
+  occurred_at?: string;
+  rights_status?: string;
+  books_with_active_assets?: number;
+  available_asset_books?: number;
+  analyzed_books?: number;
+  eligible_excerpt_books?: number;
+  ranked_books?: number;
   day?: string;
+  reader_book_pairs_10?: number;
+  reader_book_pairs_started?: number;
+  reader_book_pairs_50?: number;
+  reader_book_pairs_100?: number;
+  save_actions?: number;
+  unsave_actions?: number;
+  unique_savers?: number;
+  unique_unsavers?: number;
+  active_readers?: number;
+  reading_minutes?: number;
+  completed_books?: number;
+  streak_1_day_users?: number;
+  streak_2_6_day_users?: number;
+  streak_7_29_day_users?: number;
+  streak_30_plus_day_users?: number;
   collected_at?: string;
   population?: string;
   platform?: string;
@@ -174,7 +206,18 @@ export type ReportingSeries = {
   throughput?: number;
   served_count?: number;
   viewable_count?: number;
+  repeat_viewable_count?: number;
+  viewable_unique_books?: number;
+  candidate_count?: number | null;
+  scored_candidate_count?: number | null;
+  selected_count?: number | null;
+  confidence_bucket?: string;
+  profile_size_bucket?: string;
+  fatigue_coverage_bucket?: string;
+  cold_start?: boolean;
+  eligible_viewable_count?: number;
   attributed_open_count?: number;
+  mature_attributed_open_count?: number;
   attributed_read_10_count?: number;
   attributed_read_50_count?: number;
   attributed_complete_count?: number;
@@ -185,6 +228,7 @@ export type ReportingSeries = {
   attributed_read_count?: number;
   dwell_observations?: number | null;
   dwell_seconds?: number | null;
+  skipped_visits?: number | null;
   attribution_status?: string;
   outcome_count?: number;
   unique_events?: number;
@@ -196,6 +240,14 @@ export type ReportingSeries = {
   duplicate_event_count?: number;
   follow_count?: number;
   like_count?: number;
+  behavior_like_events?: number;
+  behavior_unlike_events?: number;
+  behavior_save_events?: number;
+  behavior_unsave_events?: number;
+  behavior_share_events?: number;
+  behavior_comment_events?: number;
+  behavior_unique_actors?: number;
+  behavior_distinct_books?: number;
   comment_count?: number;
   share_count?: number;
   book_opened_count?: number;
@@ -211,11 +263,38 @@ export type ReportingSeries = {
   shares?: number;
   comments?: number;
   active_books?: number;
+  reader_ready_books?: number | null;
+  excerpt_ready_books?: number | null;
   available_asset_versions?: number;
   analyzed_asset_versions?: number;
   eligible_excerpts?: number;
   ranked_excerpts?: number;
+  ranker_code?: string;
+  ranker_version?: string;
+  configuration_hash?: string;
+  score_decile?: number;
+  score_min?: number;
+  score_max?: number;
+  excerpt_count?: number;
+  generation_method?: string;
+  outcome?: string;
+  reason_bucket?: string;
+  source_code?: string;
+  error_bucket?: string;
+  rights_outcome?: string;
+  asset_outcome?: string;
+  retry_attempt_count?: number;
+  source_type?: string;
+  queue_name?: string;
+  pending_count?: number;
+  last_successful_at?: string | null;
+  freshness_age_seconds?: number | null;
+  refresh_status?: string;
   job_count?: number;
+  queue_status?: string;
+  task_count?: number;
+  oldest_task_age_seconds?: number | null;
+  expired_lease_count?: number;
   discovered_items?: number;
   processed_items?: number;
   succeeded_items?: number;
@@ -256,6 +335,7 @@ export type ReportingSeries = {
   unknown_event_count?: number;
   accepted_events?: number;
   rejected_events?: number;
+  classified_events?: number;
   duplicate_rejections?: number;
   schema_rejections?: number;
   payload_rejections?: number;
@@ -283,6 +363,11 @@ export type ReportingSeries = {
   p50_elapsed_ms?: number | null;
   p95_elapsed_ms?: number | null;
   submissions?: number;
+  reviewed_submissions?: number;
+  approved_submissions?: number;
+  published_submissions?: number;
+  active_published_submissions?: number;
+  rights_attested_submissions?: number;
   approved_reviews?: number;
   rejected_reviews?: number;
   changes_requested?: number;
@@ -292,13 +377,21 @@ export type ReportingSeries = {
   action?: string;
   distribution_status?: string;
   decision_count?: number;
+  right_type?: string;
+  territory?: string;
+  status?: string;
   unique_readers?: number;
   p50_session_seconds?: number | null;
   p90_session_seconds?: number | null;
+  session_under_1m?: number;
+  session_1m_5m?: number;
+  session_5m_15m?: number;
+  session_15m_plus?: number;
   books_opened?: number;
   books_started?: number;
   saved_books?: number;
-  unique_savers?: number;
+  saved_book_pairs?: number;
+  saved_subject_keys?: number;
   cohort_day?: string;
   offset_day?: number;
   cohort_users?: number;
@@ -333,6 +426,16 @@ export type ReportingResponse = {
   hasNext?: boolean | null;
   series: ReportingSeries[];
 };
+export type ReportingExportDataset =
+  | "reader-day"
+  | "feed-daily"
+  | "recommendation-daily"
+  | "recommendation-quality"
+  | "recommendation-profile-quality"
+  | "moderation-daily"
+  | "social-daily"
+  | "book-engagement"
+  | "rights-status-daily";
 export type ExecutivePeriod = {
   label: string;
   has_data: boolean;
@@ -579,6 +682,23 @@ export const services = {
       throw problem(error, "Não foi possível carregar a saúde das projeções.");
     }
   },
+  async reportingReleaseEvents(
+    days = 30,
+    limit = 100,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/release-events",
+        { params: { days, limit } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar o histórico de releases.",
+      );
+    }
+  },
   async reportingFeedDaily(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
@@ -601,6 +721,22 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar a instrumentação do recomendador.",
+      );
+    }
+  },
+  async reportingRecommendationProfileQualityDaily(
+    days = 30,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/recommendation-profile-quality-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar a qualidade agregada do perfil.",
       );
     }
   },
@@ -633,6 +769,22 @@ export const services = {
       throw problem(
         error,
         "Não foi possível carregar a relevância por posição.",
+      );
+    }
+  },
+  async reportingRecommendationPositionFunnelDaily(
+    days = 30,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/recommendation-position-funnel-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar o funil de conversão por posição.",
       );
     }
   },
@@ -679,6 +831,20 @@ export const services = {
       throw problem(error, "Não foi possível carregar a auditoria agregada.");
     }
   },
+  async exportReporting(
+    dataset: ReportingExportDataset,
+    days: number,
+  ): Promise<Blob> {
+    try {
+      const { data } = await adminHttp.get<Blob>(
+        `/api/admin/v1/reporting/export/${encodeURIComponent(dataset)}`,
+        { params: { days }, responseType: "blob" },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível exportar este relatório.");
+    }
+  },
   async reportingBookEngagement(
     days = 30,
     minReaders = 5,
@@ -692,6 +858,21 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível carregar o engajamento por obra.");
+    }
+  },
+  async reportingBookEngagementTrends(
+    days = 30,
+    minReaders = 5,
+    top = 5,
+  ): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/book-engagement-trends",
+        { params: { days, minReaders, top } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar as tendências por obra.");
     }
   },
   async reportingPipeline(days = 30): Promise<ReportingResponse> {
@@ -811,6 +992,41 @@ export const services = {
       throw problem(error, "Não foi possível carregar a retenção por coorte.");
     }
   },
+  async reportingReadingProgressDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/reading-progress-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os marcos de leitura.");
+    }
+  },
+  async reportingLibraryState(): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/library-state",
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar o snapshot da biblioteca.",
+      );
+    }
+  },
+  async reportingReadingHabitsDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/reading-habits-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os hábitos de leitura.");
+    }
+  },
   async reportingSocialDaily(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
@@ -847,15 +1063,20 @@ export const services = {
       throw problem(error, "Não foi possível carregar a moderação agregada.");
     }
   },
-  async reportingPublisherWorkflowDaily(days = 30): Promise<ReportingResponse> {
+  async reportingEditorialSubmissionFunnelDaily(
+    days = 30,
+  ): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
-        "/api/admin/v1/reporting/publisher-workflow-daily",
+        "/api/admin/v1/reporting/editorial-submission-funnel-daily",
         { params: { days } },
       );
       return data;
     } catch (error) {
-      throw problem(error, "Não foi possível carregar o funil editorial.");
+      throw problem(
+        error,
+        "Não foi possível carregar as coortes do funil editorial.",
+      );
     }
   },
   async reportingRightsDaily(days = 30): Promise<ReportingResponse> {
@@ -869,6 +1090,17 @@ export const services = {
       throw problem(error, "Não foi possível carregar os direitos agregados.");
     }
   },
+  async reportingRightsStatusDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/rights-status-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar o status dos direitos.");
+    }
+  },
   async reportingContentSupply(days = 30): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
@@ -878,6 +1110,64 @@ export const services = {
       return data;
     } catch (error) {
       throw problem(error, "Não foi possível carregar a oferta de conteúdo.");
+    }
+  },
+  async reportingContentCoverage(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/content-coverage",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a cobertura do corpus.");
+    }
+  },
+  async reportingContentRankScores(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/content-rank-scores",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar os scores de ranking.");
+    }
+  },
+  async reportingExcerptProduction(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/excerpt-production",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a produção de excerpts.");
+    }
+  },
+  async reportingImportQualityDaily(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/import-quality-daily",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(
+        error,
+        "Não foi possível carregar a qualidade da importação.",
+      );
+    }
+  },
+  async reportingBacklog(days = 7): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/backlog",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar o backlog e o frescor.");
     }
   },
   async reportingIngestionDaily(days = 30): Promise<ReportingResponse> {
@@ -892,6 +1182,17 @@ export const services = {
         error,
         "Não foi possível carregar os snapshots de ingestão.",
       );
+    }
+  },
+  async reportingIngestionQueue(days = 30): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/ingestion-queue",
+        { params: { days } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar a fila de ingestão.");
     }
   },
   async listBookPage(
