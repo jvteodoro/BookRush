@@ -154,6 +154,7 @@ export type CommentHistory = {
   reason: string;
 };
 export type ReportingSeries = {
+  [key: string]: string | number | boolean | null | undefined;
   event_id?: string;
   job_name?: string;
   build_number?: number;
@@ -172,6 +173,16 @@ export type ReportingSeries = {
   eligible_excerpt_books?: number;
   ranked_books?: number;
   day?: string;
+  aggregation_level?: string;
+  aggregation_key?: string;
+  language?: string;
+  period_active_minutes?: number;
+  entity_rank?: number;
+  cohort_day?: string;
+  offset_day?: number;
+  cohort_users?: number;
+  retained_users?: number;
+  mature?: boolean;
   reader_book_pairs_10?: number;
   reader_book_pairs_started?: number;
   reader_book_pairs_50?: number;
@@ -205,6 +216,9 @@ export type ReportingSeries = {
   failure_count?: number;
   throughput?: number;
   served_count?: number;
+  mature_served_count?: number | null;
+  mature_attributed_significant_read_count?: number | null;
+  mature_attributed_complete_count?: number | null;
   viewable_count?: number;
   repeat_viewable_count?: number;
   viewable_unique_books?: number;
@@ -320,9 +334,6 @@ export type ReportingSeries = {
   attributed_count?: number;
   unique_subjects?: number;
   unique_targets?: number;
-  aggregation_level?: string;
-  aggregation_key?: string;
-  language?: string;
   active_minutes?: number;
   interactions?: number;
   record_kind?: string;
@@ -392,14 +403,12 @@ export type ReportingSeries = {
   saved_books?: number;
   saved_book_pairs?: number;
   saved_subject_keys?: number;
-  cohort_day?: string;
-  offset_day?: number;
-  cohort_users?: number;
-  retained_users?: number;
-  mature?: boolean;
   active_users?: number;
   newly_active_users?: number;
   weekly_active_users?: number;
+  weekly_books_started?: number;
+  weekly_sessions?: number;
+  weekly_active_seconds?: number;
   monthly_active_users?: number;
   returning_users?: number;
   sessions?: number;
@@ -420,6 +429,9 @@ export type ReportingResponse = {
   sourceWatermark?: string | null;
   refreshedAt?: string | null;
   freshnessSeconds?: number | null;
+  lastBusinessActivityAt?: string | null;
+  projectionUpdatedAt?: string | null;
+  processingLagSeconds?: number | null;
   warnings?: string[];
   page?: number | null;
   pageSize?: number | null;
@@ -661,6 +673,16 @@ export const services = {
       );
     }
   },
+  async reportingWeeklySignificantReaders(population = "PRODUCT"): Promise<ReportingResponse> {
+    try {
+      const { data } = await adminHttp.get<ReportingResponse>(
+        "/api/admin/v1/reporting/weekly-significant-readers", { params: { population } },
+      );
+      return data;
+    } catch (error) {
+      throw problem(error, "Não foi possível carregar leitores com leitura significativa.");
+    }
+  },
   async reportingExecutiveSummary(days = 30): Promise<ExecutiveSummary> {
     try {
       const { data } = await adminHttp.get<ExecutiveSummary>(
@@ -699,11 +721,11 @@ export const services = {
       );
     }
   },
-  async reportingFeedDaily(days = 30): Promise<ReportingResponse> {
+  async reportingFeedDaily(days = 30, population = "PRODUCT"): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
         "/api/admin/v1/reporting/feed-daily",
-        { params: { days } },
+        { params: { days, population } },
       );
       return data;
     } catch (error) {
@@ -849,11 +871,12 @@ export const services = {
     days = 30,
     minReaders = 5,
     limit = 50,
+    population = "PRODUCT",
   ): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
         "/api/admin/v1/reporting/book-engagement",
-        { params: { days, minReaders, limit } },
+        { params: { days, minReaders, limit, population } },
       );
       return data;
     } catch (error) {
@@ -864,11 +887,12 @@ export const services = {
     days = 30,
     minReaders = 5,
     top = 5,
+    population = "PRODUCT",
   ): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
         "/api/admin/v1/reporting/book-engagement-trends",
-        { params: { days, minReaders, top } },
+        { params: { days, minReaders, top, population } },
       );
       return data;
     } catch (error) {
@@ -967,11 +991,11 @@ export const services = {
       );
     }
   },
-  async reportingReadingDaily(days = 30): Promise<ReportingResponse> {
+  async reportingReadingDaily(days = 30, population = "PRODUCT"): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
         "/api/admin/v1/reporting/reading-daily",
-        { params: { days } },
+        { params: { days, population } },
       );
       return data;
     } catch (error) {
@@ -981,11 +1005,11 @@ export const services = {
       );
     }
   },
-  async reportingRetentionCohort(days = 366): Promise<ReportingResponse> {
+  async reportingRetentionCohort(days = 366, population = "PRODUCT"): Promise<ReportingResponse> {
     try {
       const { data } = await adminHttp.get<ReportingResponse>(
         "/api/admin/v1/reporting/retention-cohort",
-        { params: { days } },
+        { params: { days, population } },
       );
       return data;
     } catch (error) {

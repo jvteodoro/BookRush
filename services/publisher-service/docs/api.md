@@ -83,7 +83,7 @@ A console oferece `/admin/publisher`, usando a sessão do realm `bookrush-platfo
 
 A interface mostra impressões, aberturas, leituras (READ_PROGRESS e BOOK_COMPLETE, não leitores únicos), curtidas, compartilhamentos e comentários, com totais e linhas diárias. Os agregados são atualizados periodicamente pelo behavior-service. Não são dados em tempo real nem um relatório de usuários identificáveis.
 
-O publisher consulta `/api/internal/v1/publisher/metrics/books/{bookId}` por uma identidade S2S exclusiva: `bookrush-publisher-metrics-s2s`, realm plataforma, audience `bookrush-behavior`, scope `bookrush.publisher.metrics.read`. O bearer humano não é encaminhado. O token é cacheado até perto da expiração; timeout/falha de autenticação não vira atividade zero.
+O publisher consulta `/api/internal/v1/publisher/metrics/books/{bookId}` por uma identidade S2S exclusiva: `bookrush-publisher-metrics-s2s`, realm plataforma, audience `bookrush-behavior`, scope `bookrush.publisher.metrics.read`. Esse contrato diário retorna agregados sem leitores. O contrato agregado com supressão de pequenas amostras usa `/api/internal/v1/publisher/metrics/books/{bookId}/summary`. O bearer humano não é encaminhado. O token é cacheado até perto da expiração; timeout/falha de autenticação não vira atividade zero.
 
 O cliente de resumo com supressão de amostras usa a rota distinta `/api/internal/v1/publisher/metrics/books/{bookId}/summary`, atendida pelo behavior-service. Essa separação preserva o contrato de agregados diários acima e evita conflito entre controllers.
 

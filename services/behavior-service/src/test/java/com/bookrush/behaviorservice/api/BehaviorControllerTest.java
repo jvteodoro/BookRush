@@ -87,7 +87,7 @@ class BehaviorControllerTest {
         org.mockito.Mockito.mock(BehaviorMaintenance.class));
     Jwt jwt = Jwt.withTokenValue("test-token")
         .header("alg", "RS256")
-        .issuer("https://issuer.example/realms/bookrush")
+        .issuer("https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush")
         .subject("user-a")
         .issuedAt(Instant.now().minusSeconds(5))
         .expiresAt(Instant.now().plusSeconds(300))
@@ -99,9 +99,11 @@ class BehaviorControllerTest {
 
     ArgumentCaptor<Object[]> values = ArgumentCaptor.forClass(Object[].class);
     verify(jdbc, times(1)).update(
-        eq("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING"),
+        eq("INSERT INTO behavior.events(id,event_key,event_type,identity_issuer,identity_subject,identity_population,book_id,payload,occurred_at) VALUES (?,?,?,?,?,?,?,?::jsonb,?) ON CONFLICT (event_key) DO NOTHING"),
         values.capture());
-    assertEquals("TechnicalIdentity[issuer=https://issuer.example/realms/bookrush, subject=user-a]",
+    assertEquals("https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush", values.getValue()[3]);
+    assertEquals("TechnicalIdentity[issuer=https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush, subject=user-a]",
         values.getValue()[4]);
+    assertEquals("PRODUCT", values.getValue()[5]);
   }
 }

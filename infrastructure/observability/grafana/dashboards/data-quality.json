@@ -14,7 +14,7 @@
   "panels": [
     {
       "id": 31,
-      "title": "DQ-01 Behavior reconciliation",
+      "title": "Behavior reconciliation",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
@@ -56,7 +56,7 @@
     },
     {
       "id": 32,
-      "title": "DQ-02 Outbox",
+      "title": "Outbox",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
@@ -93,7 +93,7 @@
     },
     {
       "id": 33,
-      "title": "DQ-05 Projection freshness",
+      "title": "Projection freshness",
       "type": "timeseries",
       "gridPos": {
         "x": 0,
@@ -130,7 +130,7 @@
     },
     {
       "id": 35,
-      "title": "DQ-07 Observability overhead",
+      "title": "Observability overhead",
       "type": "timeseries",
       "gridPos": {
         "x": 0,

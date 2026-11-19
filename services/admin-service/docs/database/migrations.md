@@ -151,3 +151,18 @@ individuais.
 versão registrada em `reporting.projection_health`. O limite comporta os
 identificadores das definições das projeções; se uma origem estiver ausente,
 o erro fica registrado sem interromper a atualização das demais projeções.
+
+`V51__reporting_unknown_population.sql` move a categoria legada
+`UNCLASSIFIED` para `UNKNOWN` nas projeções existentes. Não infere origem para
+linhas históricas.
+
+`V52__reporting_mature_reading_funnel.sql` adiciona contagens nullable para
+exposições servidas maduras, leitura significativa (sessão ativa de pelo menos
+60 segundos) e conclusão. Linhas anteriores ficam `NULL` até haver coorte
+matura; não são convertidas em zero.
+
+`V53__reading_daily_population.sql`, `V54__retention_population.sql` e
+`V55__book_engagement_population.sql` acrescentam população às chaves das
+projeções correspondentes. A classificação histórica default é `UNKNOWN`; as
+projeções usam origem autenticada de eventos, e a API filtra explicitamente a
+população solicitada.

@@ -6,13 +6,14 @@ info:
 paths:
   /api/admin/v1/reporting/executive-summary:
     get:
-      summary: Read executive KPIs with cross-platform unique-user peak and previous-period comparison
+      summary: Read population-filtered executive KPIs with previous-period comparison
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+        - { name: population, in: query, schema: { type: string, enum: [PRODUCT, ADMIN_SEED, TEST, UNKNOWN], default: PRODUCT } }
       responses:
         '200':
-          description: Current and previous period aggregates; daily_peak_users is distinct by issuer and subject across all platforms
+          description: Current and previous period aggregates; daily_peak_users is distinct by issuer and subject across all platforms. Population defaults to PRODUCT.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
@@ -25,13 +26,30 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+        - { name: population, in: query, schema: { type: string, enum: [PRODUCT, ADMIN_SEED, TEST, UNKNOWN], default: PRODUCT } }
       responses:
         '200':
-          description: Reporting response with freshness and explicit data state; unique-user counts require both identity issuer and subject and retain platform dimensions
+          description: Filtered population snapshot; UNKNOWN is historical/unclassified data. Freshness separates last business activity, projection update and processing lag.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DashboardResponse' }
         '400': { description: Invalid date range }
+        '401': { description: Authentication required }
+        '403': { description: Reporting analyst role required }
+  /api/admin/v1/reporting/weekly-significant-readers:
+    get:
+      summary: Count weekly unique readers with a significant reading session
+      description: A significant read is one READ_SESSION with at least 60 active seconds; this is not a 10-percent progress event. Population defaults to PRODUCT and is classified from authenticated origin.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: population, in: query, schema: { type: string, enum: [PRODUCT, ADMIN_SEED, TEST, UNKNOWN], default: PRODUCT } }
+      responses:
+        '200':
+          description: Seven-day unique reader count and versioned threshold definition
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DashboardResponse' }
+        '400': { description: Unsupported population }
         '401': { description: Authentication required }
         '403': { description: Reporting analyst role required }
   /api/admin/v1/reporting/health:
@@ -48,6 +66,7 @@ paths:
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: days, in: query, schema: { type: integer, minimum: 1, maximum: 366, default: 30 } }
+        - { name: population, in: query, schema: { type: string, enum: [PRODUCT, ADMIN_SEED, TEST, UNKNOWN], default: PRODUCT } }
       responses:
         '200':
           description: Feed reporting response with explicit attribution and population state
@@ -941,14 +960,17 @@ components:
         schemaVersion: { type: string, example: dashboard-response-v1 }
         metricId: { type: string, example: reader_day }
         definitionVersion: { type: string, maxLength: 120, example: events-v1-untrusted-population }
-        status: { type: string, enum: [OK, NO_DATA, NOT_INSTRUMENTED, STALE, RESTRICTED, ERROR, INSUFFICIENT_SAMPLE, UNTRUSTED] }
+        status: { type: string, enum: [OK, NO_DATA, NOT_INSTRUMENTED, STALE, RESTRICTED, ERROR, INSUFFICIENT_SAMPLE, UNKNOWN_FRESHNESS] }
         unit: { type: string }
         from: { type: string, format: date-time }
         to: { type: string, format: date-time }
-        population: { type: string, example: UNCLASSIFIED }
+        population: { type: string, enum: [PRODUCT, ADMIN_SEED, TEST, UNKNOWN, PLATFORM] }
         sourceWatermark: { type: string, format: date-time, nullable: true }
         refreshedAt: { type: string, format: date-time, nullable: true }
         freshnessSeconds: { type: integer, format: int64, nullable: true }
+        lastBusinessActivityAt: { type: string, format: date-time, nullable: true }
+        projectionUpdatedAt: { type: string, format: date-time, nullable: true }
+        processingLagSeconds: { type: integer, format: int64, nullable: true }
         warnings: { type: array, items: { type: string } }
         series: { type: array, items: { type: object, additionalProperties: true } }
         page: { type: integer, minimum: 0, nullable: true }

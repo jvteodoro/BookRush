@@ -1,4 +1,6 @@
-# Auditoria dos dashboards administrativos
+# Auditoria dos dashboards administrativos — baseline anterior ao Redesign V2
+
+Este documento registra o estado observado antes do Redesign V2 e não descreve a implementação atual. Consulte [Dashboard Redesign V2](dashboard-specification.md) e o [catálogo de painéis](dashboard-panel-catalog.md) para definições e lacunas atuais.
 
 Data da revisão: 2026-11-17
 Base: implementação na branch `feature/admin-dashboards-observability` em
