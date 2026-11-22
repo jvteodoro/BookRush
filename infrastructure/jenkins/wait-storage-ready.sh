@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Read-only preflight: never recreate storage or touch its persistent volume.
+# Never recreate storage or its volume. Deploy may opt into one start attempt.
 set -Eeuo pipefail
 set +x
+filter_diagnostics() {
+  head -c 32768 | sed -E \
+    '/password|passwd|secret|token|authorization|credential|signature|access.?key|bearer|:\/\/[^ /]+@/I c\[linha omitida: possível credencial]'
+}
 diagnostic() {
   # Bound daemon calls and output. Never print Config.Env, healthcheck commands
   # or full inspect payloads; storage logs may contain credentials.
@@ -12,8 +16,7 @@ diagnostic() {
     echo 'Diagnóstico omitido: comando timeout indisponível no agente.' >&2
     return 0
   fi
-  { timeout 15 "$@" 2>&1 || true; } | head -c 32768 | sed -E \
-    '/password|passwd|secret|token|authorization|credential|signature|access.?key|bearer|:\/\/[^ /]+@/I c\[linha omitida: possível credencial]' >&2 || true
+  { timeout 15 "$@" 2>&1 || true; } | filter_diagnostics >&2 || true
 }
 failure_diagnostics() {
   local container="$1"
@@ -28,7 +31,9 @@ failure_diagnostics() {
 }
 timeout="${1:-180}"
 project="${2:-bookrush}"
+recover="${3:-false}"
 [[ "$timeout" =~ ^[1-9][0-9]*$ ]] || { echo 'Timeout de storage inválido.' >&2; exit 2; }
+[[ "$recover" == true || "$recover" == false ]] || { echo 'Opção de recuperação inválida.' >&2; exit 2; }
 containers="$(docker ps -aq --filter "label=com.docker.compose.project=$project" --filter label=com.docker.compose.service=seaweedfs)"
 mapfile -t ids < <(printf '%s\n' "$containers" | sed '/^$/d')
 if ((${#ids[@]} != 1)); then
@@ -45,6 +50,20 @@ for ((attempt=1; attempt<=attempts; attempt++)); do
   fi
   echo "SeaweedFS: $container estado=$state (verificação $attempt/$attempts)." >&2
   case "$state" in
+    exited\|starting|exited\|unhealthy|exited\|healthy)
+      if [[ "$recover" != true || "$attempt" != 1 ]]; then break; fi
+      diagnostic 'estado anterior à tentativa única de recuperação' docker inspect --format \
+        'storage={{.Name}} state={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}} finished={{.State.FinishedAt}}' "$container"
+      echo "SeaweedFS: tentando iniciar uma única vez o container existente $container; imagem, configuração e volume preservados." >&2
+      if ! command -v timeout >/dev/null 2>&1; then
+        echo 'Recuperação bloqueada: timeout indisponível no agente.' >&2
+        break
+      fi
+      if ! timeout 30 docker start "$container" 2>&1 | filter_diagnostics >&2; then
+        echo 'SeaweedFS: falha ao iniciar o container existente.' >&2
+        break
+      fi
+      ;;
     running\|starting|running\|unhealthy) ;;
     *) break ;;
   esac

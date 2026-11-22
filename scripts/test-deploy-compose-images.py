@@ -194,13 +194,14 @@ class ClientTokenTest(unittest.TestCase):
                 self.assertTrue(errors)
 
 class StorageReadinessTest(unittest.TestCase):
-    def check(self, states='running|healthy', containers='renamed-storage-id', diagnostic_failure=False):
+    def check(self, states='running|healthy', containers='renamed-storage-id', diagnostic_failure=False, recover=False, start_failure=False):
         with tempfile.TemporaryDirectory(prefix='bookrush-storage-preflight-') as directory:
             folder = Path(directory)
             docker = folder / 'docker'
             docker.write_text('''#!/bin/bash
 printf '%s\\n' "$*" >> "$CALL_LOG"
 if [[ "$1" == ps ]]; then printf "%s" "$CONTAINERS"; exit 0; fi
+if [[ "$1" == start ]]; then [[ "$START_FAILURE" != true ]]; exit; fi
 if [[ "$1" == logs ]]; then
   [[ "$DIAGNOSTIC_FAILURE" != true ]] || exit 124
   echo 'fatal: no space left on device'
@@ -222,8 +223,8 @@ printf "%s\\n" "$((count+1))" > "$COUNTER"
             sleep = folder / 'sleep'; sleep.write_text('#!/bin/bash\nexit 0\n'); sleep.chmod(0o755)
             env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}', CONTAINERS=containers,
                        HEALTH_STATES=states, COUNTER=str(folder / 'counter'), CALL_LOG=str(folder / 'calls'),
-                       DIAGNOSTIC_FAILURE=str(diagnostic_failure).lower())
-            result = subprocess.run(['bash', str(ROOT / 'infrastructure/jenkins/wait-storage-ready.sh'), '6'],
+                       DIAGNOSTIC_FAILURE=str(diagnostic_failure).lower(), START_FAILURE=str(start_failure).lower())
+            result = subprocess.run(['bash', str(ROOT / 'infrastructure/jenkins/wait-storage-ready.sh'), '6', 'bookrush', str(recover).lower()],
                                     env=env, text=True, capture_output=True)
             result.calls = (folder / 'calls').read_text().splitlines()
             return result
@@ -263,6 +264,27 @@ printf "%s\\n" "$((count+1))" > "$COUNTER"
         self.assertEqual(result.returncode, 1)
         self.assertIn('Images usage fixture', result.stderr)
         self.assertIn('deploy bloqueado sem alterar volumes', result.stderr)
+
+    def test_deploy_recovers_existing_stopped_container_once(self):
+        result = self.check('exited|starting;running|starting;running|healthy', recover=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.calls.count('start renamed-storage-id'), 1)
+        self.assertTrue(all(call.startswith(('ps ', 'inspect ', 'start ')) for call in result.calls))
+
+    def test_recovery_failure_and_repeated_exit_remain_blocked(self):
+        for states, start_failure in [('exited|starting', False), ('exited|starting', True),
+                                      ('exited|starting;running|unhealthy', False)]:
+            with self.subTest(states=states, start_failure=start_failure):
+                result = self.check(states, recover=True, start_failure=start_failure)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(result.calls.count('start renamed-storage-id'), 1)
+                self.assertIn('deploy bloqueado sem alterar volumes', result.stderr)
+
+    def test_recovery_does_not_restart_running_or_invalid_storage(self):
+        for states in ('running|healthy', 'running|unhealthy', 'exited|missing', 'dead|unhealthy'):
+            result = self.check(states, recover=True)
+            self.assertFalse(any(call.startswith('start ') for call in result.calls))
+
 
 
 class GatewayRoutesTest(unittest.TestCase):
