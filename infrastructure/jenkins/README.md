@@ -533,8 +533,16 @@ SeaweedFS pelas labels Compose (projeto `bookrush`, serviço `seaweedfs`) em vez
 do nome físico do container. Aguarda até 180 segundos por `running|healthy`,
 incluindo recuperação transitória de `starting`/`unhealthy`. Ausência, múltiplos
 containers, estado parado, ausência de healthcheck ou timeout continuam bloqueando
-o deploy. O diagnóstico mostra identidade/estado/exit code, sem variáveis ou
-credenciais. Não inicia, reinicia, recria ou apaga storage/volumes. Falha persistente
+o deploy. Em caso de falha, o próprio console do build mostra identidade, estado,
+exit code, OOM, motivo e horário do término, contador de reinícios, últimos resultados
+do healthcheck e últimas 100 linhas do container. Cada consulta tem limite de 15s
+e saída de 32KiB; requer `timeout` no agente (se ausente, registra a omissão).
+Não imprime `Config.Env` nem comandos do healthcheck. Linhas com indícios de
+credenciais são omitidas dos diagnósticos; confira os logs antes de compartilhá-los.
+Mostra também `docker system df` do daemon e espaço/inodes do agente Jenkins,
+identificados separadamente: com socket remoto, o disco do agente pode não ser o
+disco do servidor Docker. Falha na coleta não libera o deploy nem impede as demais
+consultas. Não inicia, reinicia, recria ou apaga storage/volumes. Falha persistente
 exige inspecionar healthcheck, disco e a pipeline dedicada de SeaweedFS; aumentar
 a espera não resolve falta real de infraestrutura. O log antigo do build325 não
 permite distinguir essas causas por si só.

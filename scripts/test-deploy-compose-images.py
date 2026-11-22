@@ -194,13 +194,24 @@ class ClientTokenTest(unittest.TestCase):
                 self.assertTrue(errors)
 
 class StorageReadinessTest(unittest.TestCase):
-    def check(self, states='running|healthy', containers='renamed-storage-id'):
+    def check(self, states='running|healthy', containers='renamed-storage-id', diagnostic_failure=False):
         with tempfile.TemporaryDirectory(prefix='bookrush-storage-preflight-') as directory:
             folder = Path(directory)
             docker = folder / 'docker'
             docker.write_text('''#!/bin/bash
+printf '%s\\n' "$*" >> "$CALL_LOG"
 if [[ "$1" == ps ]]; then printf "%s" "$CONTAINERS"; exit 0; fi
-if [[ "$3" == storage=* ]]; then echo storage-diagnostic; exit 0; fi
+if [[ "$1" == logs ]]; then
+  [[ "$DIAGNOSTIC_FAILURE" != true ]] || exit 124
+  echo 'fatal: no space left on device'
+  echo 'password=fixture-sensitive-value'
+  echo 'Authorization: Bearer fixture-sensitive-value'
+  echo 'url=https://user:fixture-sensitive-value@storage.example'
+  exit 0
+fi
+if [[ "$1 $2" == 'system df' ]]; then echo 'Images usage fixture'; exit 0; fi
+if [[ "$3" == storage=* ]]; then echo 'storage=fixture oom=false error=fixture-start-error'; exit 0; fi
+if [[ "$3" == *'.State.Health.Log'* ]]; then echo 'exit=1 output=connection refused'; exit 0; fi
 count=0; [[ ! -f "$COUNTER" ]] || read -r count < "$COUNTER"
 IFS=";" read -ra states <<< "$HEALTH_STATES"
 index=$count; ((index < ${#states[@]})) || index=$((${#states[@]}-1))
@@ -210,9 +221,12 @@ printf "%s\\n" "$((count+1))" > "$COUNTER"
             docker.chmod(0o755)
             sleep = folder / 'sleep'; sleep.write_text('#!/bin/bash\nexit 0\n'); sleep.chmod(0o755)
             env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}', CONTAINERS=containers,
-                       HEALTH_STATES=states, COUNTER=str(folder / 'counter'))
-            return subprocess.run(['bash', str(ROOT / 'infrastructure/jenkins/wait-storage-ready.sh'), '6'],
-                                  env=env, text=True, capture_output=True)
+                       HEALTH_STATES=states, COUNTER=str(folder / 'counter'), CALL_LOG=str(folder / 'calls'),
+                       DIAGNOSTIC_FAILURE=str(diagnostic_failure).lower())
+            result = subprocess.run(['bash', str(ROOT / 'infrastructure/jenkins/wait-storage-ready.sh'), '6'],
+                                    env=env, text=True, capture_output=True)
+            result.calls = (folder / 'calls').read_text().splitlines()
+            return result
 
     def test_recognizes_renamed_healthy_storage_by_compose_identity(self):
         self.assertEqual(self.check().returncode, 0)
@@ -233,6 +247,22 @@ printf "%s\\n" "$((count+1))" > "$COUNTER"
             result = self.check(containers=containers)
             self.assertEqual(result.returncode, 1)
             self.assertIn('esperado exatamente um', result.stderr)
+
+    def test_failure_reports_diagnostics_without_credentials_or_mutations(self):
+        result = self.check('exited|starting')
+        self.assertEqual(result.returncode, 1)
+        for detail in ('oom=false', 'fixture-start-error', 'connection refused',
+                       'no space left on device', 'Images usage fixture', 'pode diferir do host Docker'):
+            self.assertIn(detail, result.stderr)
+        self.assertNotIn('fixture-sensitive-value', result.stderr)
+        self.assertIn('linha omitida', result.stderr)
+        self.assertTrue(all(call.startswith(('ps ', 'inspect ', 'logs ', 'system df')) for call in result.calls))
+
+    def test_diagnostic_failure_keeps_deploy_blocked_and_continues_reporting(self):
+        result = self.check('exited|starting', diagnostic_failure=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('Images usage fixture', result.stderr)
+        self.assertIn('deploy bloqueado sem alterar volumes', result.stderr)
 
 
 class GatewayRoutesTest(unittest.TestCase):
