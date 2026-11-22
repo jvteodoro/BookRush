@@ -31,7 +31,11 @@ class DeployImagesTest(unittest.TestCase):
             docker = folder / 'docker'
             docker.write_text('''#!/bin/bash
 printf '%s\\n' "$*" >> "$CALL_LOG"
-if [[ "$1 $2" == 'inspect --format' ]]; then echo healthy; exit 0; fi
+if [[ "$1" == ps ]]; then echo storage-fixture; exit 0; fi
+if [[ "$1 $2" == 'inspect --format' ]]; then
+  if [[ "$3" == *'.State.Status'* ]]; then echo 'running|healthy'; else echo healthy; fi
+  exit 0
+fi
 if [[ "$1 $2" == 'image inspect' ]]; then
   [[ -z "$MISSING_IMAGE" || "$3" != "$MISSING_IMAGE" ]] || exit 1
   if [[ "$CACHED" == true || "$3" == test/* || "$3" == custom/* || "$3" == */catalog-service:* || "$3" == */frontend:* || "$3" == */book-analytics-service:* ]]; then exit 0; fi
@@ -188,6 +192,48 @@ class ClientTokenTest(unittest.TestCase):
                 self.assertEqual(code, 1)
                 self.assertEqual(output, '')
                 self.assertTrue(errors)
+
+class StorageReadinessTest(unittest.TestCase):
+    def check(self, states='running|healthy', containers='renamed-storage-id'):
+        with tempfile.TemporaryDirectory(prefix='bookrush-storage-preflight-') as directory:
+            folder = Path(directory)
+            docker = folder / 'docker'
+            docker.write_text('''#!/bin/bash
+if [[ "$1" == ps ]]; then printf "%s" "$CONTAINERS"; exit 0; fi
+if [[ "$3" == storage=* ]]; then echo storage-diagnostic; exit 0; fi
+count=0; [[ ! -f "$COUNTER" ]] || read -r count < "$COUNTER"
+IFS=";" read -ra states <<< "$HEALTH_STATES"
+index=$count; ((index < ${#states[@]})) || index=$((${#states[@]}-1))
+printf "%s" "${states[$index]}"
+printf "%s\\n" "$((count+1))" > "$COUNTER"
+''')
+            docker.chmod(0o755)
+            sleep = folder / 'sleep'; sleep.write_text('#!/bin/bash\nexit 0\n'); sleep.chmod(0o755)
+            env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}', CONTAINERS=containers,
+                       HEALTH_STATES=states, COUNTER=str(folder / 'counter'))
+            return subprocess.run(['bash', str(ROOT / 'infrastructure/jenkins/wait-storage-ready.sh'), '6'],
+                                  env=env, text=True, capture_output=True)
+
+    def test_recognizes_renamed_healthy_storage_by_compose_identity(self):
+        self.assertEqual(self.check().returncode, 0)
+
+    def test_waits_for_starting_or_transient_unhealthy_storage_to_recover(self):
+        for states in ('running|starting;running|healthy', 'running|unhealthy;running|healthy'):
+            result = self.check(states)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_persistent_failure_is_not_bypassed(self):
+        for states in ('running|unhealthy', 'running|starting', 'exited|unhealthy', 'running|missing'):
+            result = self.check(states)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn('deploy bloqueado sem alterar volumes', result.stderr)
+
+    def test_missing_or_ambiguous_storage_is_actionable(self):
+        for containers in ('', 'storage-one\nstorage-two'):
+            result = self.check(containers=containers)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('esperado exatamente um', result.stderr)
+
 
 class GatewayRoutesTest(unittest.TestCase):
     def test_library_probe_rejects_cors_and_dependency_failures_without_mutating_books(self):

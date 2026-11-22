@@ -26,3 +26,15 @@ proveniência; esta alteração não inventa categorias nem reclassifica dados.
 A rota pública de metadados continua pública, sem bearer do realm produto.
 
 A projeção de categorias oculta valores técnicos legados: MIME (incluindo parâmetros charset), tipo Gutenberg Text e códigos curtos de classificação Gutenberg/LCC/DDC. Prateleiras Category: recebem legenda sem o prefixo. IDs e associações originais são preservados, sem apagar proveniência ou exigir reimportação. Subjects literários descritivos continuam disponíveis.
+
+A busca aceita filtros opcionais `category`, `author` e `year`, combinados por
+AND com `q`. Categoria e autor fazem correspondência parcial sem distinguir
+maiúsculas; somente categorias literárias ativas e créditos AUTHOR participam.
+O ano é exatamente o apresentado em `publicationYear`: primeiro ano conhecido
+da obra ou, se ausente, o menor ano de edição conhecido. Datas de upload não
+substituem datas bibliográficas; ausência de ano/autor continua explícita.
+A busca livre também encontra esse ano, autores e categorias. Paginação e
+contagem usam o mesmo predicado SQL, com ordenação estável por relevância/título/ID.
+O CORS de listagem/detalhes públicos permite somente GET/OPTIONS das origens
+já configuradas em `CATALOG_CORS_ALLOWED_ORIGINS`, sem credenciais nem wildcard.
+A autenticação das rotas internas e de conteúdo protegido permanece obrigatória.

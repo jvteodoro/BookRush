@@ -9,6 +9,11 @@ export type SearchResult = {
   page: number;
 };
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
+export type SearchFilters = {
+  category?: string;
+  author?: string;
+  year?: string;
+};
 type CatalogBook = {
   id: string;
   canonicalTitle: string;
@@ -27,12 +32,29 @@ export async function searchCatalog(
   page = 0,
   signal?: AbortSignal,
   fetcher: Fetcher = fetch,
+  filters: SearchFilters = {},
 ): Promise<SearchResult> {
   const params = new URLSearchParams({
     q: query.trim(),
     page: String(Math.max(0, page)),
     size: "20",
   });
+  for (const key of ["category", "author", "year"] as const) {
+    const value = filters[key]?.trim();
+    if (value) params.set(key, value);
+  }
+  if (params.has("year")) {
+    const value = params.get("year")!;
+    if (
+      !/^-?\d+$/.test(value) ||
+      Number(value) < -9999 ||
+      Number(value) > 9999 ||
+      Number(value) === 0
+    )
+      throw new Error(
+        "Informe um ano inteiro entre -9999 e 9999, diferente de zero.",
+      );
+  }
   const response = await fetcher(apiRoutes.catalog.search(params.toString()), {
     credentials: "same-origin",
     signal,

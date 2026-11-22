@@ -105,6 +105,22 @@ assert other['categories'] == [] and other['originalLanguage'] == 'pt'
 page = request('/api/v1/books?q=Adventure')[1]
 assert page['totalItems'] == 1 and page['items'][0]['categories'] == [category]
 assert request('/api/v1/books')[1]['totalItems'] == 2
+filters = urllib.parse.urlencode(dict(q='fixture', category='adventure', author='Fixture Writer', year='1899'))
+filtered = request('/api/v1/books?' + filters)[1]
+assert filtered['totalItems'] == 1 and filtered['items'][0]['id'] == BOOK
+assert filtered['items'][0]['authors'] == ['Fixture Writer']
+assert filtered['items'][0]['publicationYear'] == 1899
+fallback = request('/api/v1/books?year=1912')[1]
+assert fallback['totalItems'] == 1 and fallback['items'][0]['id'] == OTHER
+assert fallback['items'][0]['firstPublicationYear'] is None and fallback['items'][0]['publicationYear'] == 1912
+assert request('/api/v1/books?q=1912')[1]['items'][0]['id'] == OTHER
+assert request('/api/v1/books?category=application%2Frdf%2Bxml')[1]['totalItems'] == 0
+assert request('/api/v1/books?author=Fixture&size=1&page=1')[1]['totalItems'] == 2
+for query in ['year=40000', 'year=not-a-year', 'category=' + 'x' * 201]:
+    assert request('/api/v1/books?' + query)[0] == 400
+assert request('/api/internal/v1/catalog/books')[0] == 401
+print('Catalog search E2E: combined category/author/year filters, edition year fallback, pagination and public/internal authorization OK')
+
 assert request(PATH)[0] == 401
 assert request(PATH, 'invalid')[0] == 401
 assert request(PATH, ana)[1] == {'items': []}

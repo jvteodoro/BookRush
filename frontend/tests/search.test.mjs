@@ -34,3 +34,21 @@ test('search delegates query and pagination to the catalog API', async () => {
   assert.equal(result.books[0].author, 'Mary Shelley');
   assert.equal(result.books[0].publicationYear, 1818);
 });
+
+test('category author and year filters are combined with free text and resettable independently', async () => {
+  let requested;
+  await searchCatalog('Harbour', 0, undefined, async url => {
+    requested = new URL(url, 'https://bookrush.test');
+    return {ok:true,json:async()=>({items:[],totalItems:0,totalPages:0,page:0})};
+  }, {category:' Adventure ',author:' Fixture Writer ',year:'1912'});
+  assert.equal(requested.searchParams.get('q'), 'Harbour');
+  assert.equal(requested.searchParams.get('category'), 'Adventure');
+  assert.equal(requested.searchParams.get('author'), 'Fixture Writer');
+  assert.equal(requested.searchParams.get('year'), '1912');
+});
+
+test('invalid years are rejected without sending a request', async () => {
+  for (const year of ['not-a-year', '1899.5', '40000', '10000', '0']) {
+    await assert.rejects(searchCatalog('', 0, undefined, async () => assert.fail('Unexpected request'), {year}), /ano inteiro/);
+  }
+});

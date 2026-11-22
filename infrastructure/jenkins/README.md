@@ -527,3 +527,17 @@ os registros mas não os expõe como categorias. A etapa de imagens executa
 `mvn verify` da ingestão, incluindo regressões do parser RDF para contextos
 LCSH/LCC/prateleira/idioma/formato e texto fragmentado. Para validar a correção
 em produção, implante catálogo, ingestão e frontend da mesma revisão.
+
+O preflight de storage do deploy integrado usa `wait-storage-ready.sh`: localiza
+SeaweedFS pelas labels Compose (projeto `bookrush`, serviço `seaweedfs`) em vez
+do nome físico do container. Aguarda até 180 segundos por `running|healthy`,
+incluindo recuperação transitória de `starting`/`unhealthy`. Ausência, múltiplos
+containers, estado parado, ausência de healthcheck ou timeout continuam bloqueando
+o deploy. O diagnóstico mostra identidade/estado/exit code, sem variáveis ou
+credenciais. Não inicia, reinicia, recria ou apaga storage/volumes. Falha persistente
+exige inspecionar healthcheck, disco e a pipeline dedicada de SeaweedFS; aumentar
+a espera não resolve falta real de infraestrutura. O log antigo do build325 não
+permite distinguir essas causas por si só.
+
+O contrato de metadados cobre também os filtros combinados de categoria, autor e
+ano pelo gateway real, com paginação e ano de edição quando o ano da obra é ausente.

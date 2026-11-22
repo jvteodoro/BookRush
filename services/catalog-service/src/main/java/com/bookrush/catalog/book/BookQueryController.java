@@ -42,17 +42,29 @@ public class BookQueryController {
   public BookPage list(
       @RequestParam(defaultValue = "") String q,
       @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "50") int size) {
+      @RequestParam(defaultValue = "50") int size,
+      @RequestParam(defaultValue = "") String category,
+      @RequestParam(defaultValue = "") String author,
+      @RequestParam(required = false) Integer year) {
     if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
       throw new ResponseStatusException(
           HttpStatus.BAD_REQUEST, "page must be >= 0 and size must be between 1 and 100");
     }
+    if (q.length() > 500 || category.length() > 200 || author.length() > 200
+        || (year != null && (year < -9999 || year > 9999 || year == 0))) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid search filters");
+    }
+    boolean filtered = !category.isBlank() || !author.isBlank() || year != null;
     Page<Book> result =
-        q.isBlank()
+        filtered ? books.searchFiltered(q.trim(), category.trim(), author.trim(), year, PageRequest.of(page, size)) : q.isBlank()
             ? books.findAll(PageRequest.of(page, size, Sort.by("canonicalTitle").ascending()))
             : books.search(q.trim(), PageRequest.of(page, size));
     var ids = result.getContent().stream().map(Book::getId).toList();
     return BookPage.from(result, categories.forBooks(ids), authors.forBooks(ids), publicationYears.forBooks(ids));
+  }
+
+  public BookPage list(String q, int page, int size) {
+    return list(q, page, size, "", "", null);
   }
 
   @GetMapping("/{bookId}")
