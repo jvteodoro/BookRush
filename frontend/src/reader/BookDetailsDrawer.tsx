@@ -202,8 +202,12 @@ export function BookDetailsDrawer({
                   <dd>{book.author}</dd>
                 </>
               )}
-              <dt>Ano de publicação</dt>
-              <dd>{book.publicationYear ?? "Não informado"}</dd>
+              {book.publicationYear != null && (
+                <>
+                  <dt>Ano de publicação</dt>
+                  <dd>{book.publicationYear}</dd>
+                </>
+              )}
               <dt>Categorias</dt>
               <dd>
                 {categories.join(" · ") || book.genre || "Não informadas"}

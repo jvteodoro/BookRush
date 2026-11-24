@@ -546,3 +546,6 @@ podem ser combinados com a busca livre. Alterar um filtro volta à primeira
 página; **Limpar filtros** preserva o texto livre, enquanto **Explorar catálogo**
 limpa tudo. A busca de Pessoas continua independente desses filtros.
 Os campos usam metadados bibliográficos reais; datas ausentes não são inventadas.
+Quando o ano de publicação está ausente, ele é omitido dos detalhes do livro,
+assim como dos cards, do feed e dos resultados de busca. Anos disponíveis
+continuam visíveis e o filtro por ano permanece disponível.
