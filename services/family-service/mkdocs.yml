@@ -1,0 +1,3 @@
+INHERIT: ../../backstage/mkdocs.base.yml
+site_name: family-service
+docs_dir: docs

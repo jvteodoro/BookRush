@@ -1,0 +1,29 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: subscription-service
+  description: Commercial subscriptions and entitlements
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  providesApis:
+    - subscription-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: subscription-api
+  description: Assinaturas e direitos comerciais
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/book-platform
+  system: book-catalog
+  definition:
+    $text: ./api/openapi.yaml

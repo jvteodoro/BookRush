@@ -1,0 +1,37 @@
+server:
+  port: ${SERVER_PORT:8102}
+spring:
+  config:
+    import: optional:classpath:bookrush-observability.yml
+  application:
+    name: subscription-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:bookrush}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: 2000
+  flyway:
+    schemas: subscription
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+bookrush:
+  security:
+    enabled: true
+    issuer: ${SUBSCRIPTION_PRODUCT_ISSUER}
+    jwk-set-uri: ${SUBSCRIPTION_PRODUCT_JWKS}
+    audience: bookrush-subscription
+subscription:
+  workload-issuer: ${SUBSCRIPTION_WORKLOAD_ISSUER}
+  workload-jwks: ${SUBSCRIPTION_WORKLOAD_JWKS}
+  evaluation-client: ${SUBSCRIPTION_EVALUATION_CLIENT:bookrush-family-s2s}
+  transition-client: ${SUBSCRIPTION_TRANSITION_CLIENT:bookrush-billing-s2s}
+  cors-origins: ${SUBSCRIPTION_CORS_ORIGINS:}
+  mock:
+    enabled: ${SUBSCRIPTION_MOCK_ENABLED:false}

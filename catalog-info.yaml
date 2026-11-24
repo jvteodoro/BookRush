@@ -33,6 +33,8 @@ spec:
   - ./services/behavior-service/catalog-info.yaml
   - ./services/social-service/catalog-info.yaml
   - ./services/reader-profile-service/catalog-info.yaml
+  - ./services/subscription-service/catalog-info.yaml
+  - ./services/family-service/catalog-info.yaml
   - ./services/reader-state-service/catalog-info.yaml
   - ./services/book-content-service/catalog-info.yaml
   - ./backstage/templates/java-spring-service/template.yaml

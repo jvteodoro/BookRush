@@ -6,7 +6,9 @@ Este pacote especifica a integração futura dos ADRs 0035 e 0036.
 ## Inventário
 
 [Rotas por método, caminho e serviço](routes.tsv) contém 251 mapeamentos Spring
-existentes e sete entradas planejadas para ações novas. Cada linha nomeia o
+da baseline, quatorze rotas comerciais implementadas depois dela e cinco
+entradas ainda planejadas. O marcador AFTER_BASELINE e o prefixo dev
+identificam os serviços com exposição no gateway local opcional. Cada linha nomeia o
 controller, registra realm, audience e identidade atuais e especifica a ação
 e a identidade de destino. `public` indica o caminho que Traefik realmente
 encaminha ao dono, inclusive caminhos técnicos roteáveis pelo catch-all;
@@ -58,7 +60,7 @@ Receitas adicionais de segurança do inventário:
 - Operações de contas restritas têm allowlist por método e caminho. Todo
   acesso a histórico supervisionado exige conta alvo menor, vínculo
   elegível e concessão ativa para o ator, o alvo e o escopo exatos. Apenas
-  as quatro entradas de sessão e convites próprios dispensam elegibilidade
+  as cinco entradas atuais e planejadas de sessão e convites próprios dispensam elegibilidade
   ao produto. Convites ainda têm suas precondições de estado e titularidade.
 
 ## Transporte e fronteiras
@@ -119,3 +121,7 @@ Os Beads seguintes definem SLOs de frescor e timeout, método de verificação
 etária, detalhes de retenção, escopos Keycloak por cliente, comportamento
 de URLs já assinadas e a transição editorial com conteúdo em processamento.
 O [plano principal](../premium-family.md) mantém o grafo e os donos dessas decisões.
+
+A [política etária e de supervisão v1](../age-supervision-v1/README.md)
+detalha os escopos independentes e os seletores de READING_HISTORY. A
+aprovação de lançamento está pendente.

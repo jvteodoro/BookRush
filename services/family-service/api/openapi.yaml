@@ -1,0 +1,281 @@
+openapi: 3.0.3
+info:
+  title: BookRush Commercial Families
+  version: 1.0.0
+paths:
+  /api/v1/family:
+    post:
+      operationId: createHousehold
+      description: Scope family.manage. Identity from JWT; current Premium for first
+        create.
+      security:
+      - productBearer: []
+      responses:
+        '201':
+          description: Created or idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '401':
+          description: Missing or invalid product bearer including issuer or audience
+        '403':
+          description: Missing scope or commercial entitlement where required
+        '503':
+          description: Required commercial or storage state unavailable
+        '409':
+          description: Seat, membership, duplicate or lifecycle conflict
+  /api/v1/family/me:
+    get:
+      operationId: getOwnHousehold
+      description: Scope family.manage. Owner only; minimal commercial state regardless
+        of entitlement.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdView'
+        '401':
+          description: Missing or invalid product bearer including issuer or audience
+        '403':
+          description: Missing scope or commercial entitlement where required
+        '503':
+          description: Required commercial or storage state unavailable
+        '404':
+          description: Resource or recipient unavailable
+  /api/v1/family/invite-address:
+    post:
+      operationId: rotateOwnInviteAddress
+      description: Scope family.invites. Creates a short-lived random address for
+        the authenticated recipient and invalidates their previous one.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteAddress'
+        '401':
+          description: Missing or invalid product bearer including issuer or audience
+        '403':
+          description: Missing scope or commercial entitlement where required
+        '503':
+          description: Required commercial or storage state unavailable
+  /api/v1/family/{id}/invitations:
+    post:
+      operationId: issueInvitation
+      description: Scope family.manage. Owner only; current Premium and capacity required.
+        Accepts an opaque recipient-issued code.
+      security:
+      - productBearer: []
+      responses:
+        '201':
+          description: Created or idempotent replay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '401':
+          description: Missing or invalid product bearer including issuer or audience
+        '403':
+          description: Missing scope or commercial entitlement where required
+        '503':
+          description: Required commercial or storage state unavailable
+        '400':
+          description: Malformed UUID or invalid body or header
+        '404':
+          description: Resource or recipient unavailable
+        '409':
+          description: Seat, membership, duplicate or lifecycle conflict
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationRequest'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: &id001
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id001
+    get:
+      operationId: listSentInvitations
+      description: Scope family.manage. Owner only; at most the 100 most recent invitations.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitation'
+        '401':
+          description: Missing or invalid product bearer including issuer or audience
+        '403':
+          description: Missing scope or commercial entitlement where required
+        '503':
+          description: Required commercial or storage state unavailable
+        '400':
+          description: Malformed UUID or invalid body or header
+        '404':
+          description: Resource or recipient unavailable
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id001
+  /api/v1/family/invitations/me:
+    get:
+      operationId: listOwnPendingInvitations
+      description: Scope family.invites. Recipient from JWT; at most the 100 most
+        recent live invitations.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitation'
+        '401':
+          description: Missing or invalid product bearer including issuer or audience
+        '403':
+          description: Missing scope or commercial entitlement where required
+        '503':
+          description: Required commercial or storage state unavailable
+  /api/v1/family/{id}/invitations/{invitationId}:
+    delete:
+      operationId: cancelInvitation
+      description: Scope family.manage. Owner only; cancels a live invitation even
+        if Premium lapsed.
+      security:
+      - productBearer: []
+      responses:
+        '204':
+          description: Canceled or already canceled
+        '401':
+          description: Missing or invalid product bearer including issuer or audience
+        '403':
+          description: Missing scope or commercial entitlement where required
+        '503':
+          description: Required commercial or storage state unavailable
+        '400':
+          description: Malformed UUID or invalid body or header
+        '404':
+          description: Resource or recipient unavailable
+        '409':
+          description: Seat, membership, duplicate or lifecycle conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id001
+      - name: invitationId
+        in: path
+        required: true
+        schema: *id001
+components:
+  securitySchemes:
+    productBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Product realm bookrush; audience bookrush-family
+  schemas:
+    Household:
+      type: object
+      required:
+      - id
+      additionalProperties: false
+      properties:
+        id: *id001
+    HouseholdView:
+      type: object
+      required:
+      - id
+      - additionalSeats
+      - occupiedOrReserved
+      - members
+      additionalProperties: false
+      properties:
+        id: *id001
+        additionalSeats: &id002
+          type: integer
+          minimum: 0
+        occupiedOrReserved: *id002
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+    Member:
+      type: object
+      required:
+      - id
+      - state
+      - delegationEnabled
+      additionalProperties: false
+      properties:
+        id: *id001
+        state:
+          type: string
+          enum:
+          - ACTIVE
+          - SUSPENDED
+        delegationEnabled:
+          type: boolean
+    InviteAddress:
+      type: object
+      required:
+      - code
+      - expiresAt
+      additionalProperties: false
+      properties:
+        code: *id001
+        expiresAt: &id003
+          type: string
+          format: date-time
+    InvitationRequest:
+      type: object
+      required:
+      - recipientCode
+      additionalProperties: false
+      properties:
+        recipientCode: *id001
+    Invitation:
+      type: object
+      required:
+      - id
+      - householdId
+      - state
+      - expiresAt
+      additionalProperties: false
+      properties:
+        id: *id001
+        householdId: *id001
+        state:
+          type: string
+          enum:
+          - PENDING
+          - ACCEPTED
+          - DECLINED
+          - CANCELED
+          - EXPIRED
+        expiresAt: *id003

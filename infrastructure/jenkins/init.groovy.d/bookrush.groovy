@@ -78,7 +78,7 @@ def createOrUpdatePipeline = { String name, File file ->
 [
     'admin-service', 'behavior-service', 'book-content-service',
     'book-ingestion-service', 'book-analytics-service', 'catalog-service',
-    'publisher-service', 'reader-bff-service', 'reader-profile-service',
+    'publisher-service', 'reader-bff-service', 'reader-profile-service', 'subscription-service', 'family-service',
     'reader-state-service', 'recommendation-service', 'social-service'
 ].each { service -> createOrUpdatePipeline("bookrush-microservice-${service}", microservicePipelineFile) }
 ['catalog', 'ingestion', 'reader', 'social', 'analytics', 'publishing', 'platform'].each { vertical ->

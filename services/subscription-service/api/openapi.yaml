@@ -1,0 +1,535 @@
+openapi: 3.0.3
+info:
+  title: BookRush Subscription
+  version: 1.0.0
+paths:
+  /api/v1/subscription/me:
+    get:
+      operationId: getMySubscription
+      description: Audience bookrush-subscription; scope subscription.read.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+        '401':
+          description: Missing or invalid bearer, issuer or audience
+        '403':
+          description: Missing route scope or authorized technical client
+        '503':
+          description: Commercial state unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+  /api/v1/subscription/me/entitlements:
+    get:
+      operationId: getMyEntitlements
+      description: Audience bookrush-subscription; scope subscription.read.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rights'
+        '401':
+          description: Missing or invalid bearer, issuer or audience
+        '403':
+          description: Missing route scope or authorized technical client
+        '503':
+          description: Commercial state unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+  /api/internal/v1/subscription/entitlements/evaluate:
+    post:
+      operationId: evaluateEntitlement
+      description: Audience bookrush-subscription; scope entitlements.evaluate.
+      security:
+      - workloadBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evaluation'
+        '401':
+          description: Missing or invalid bearer, issuer or audience
+        '403':
+          description: Missing route scope or authorized technical client
+        '503':
+          description: Commercial state unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+        '400':
+          description: Invalid payload or owner issuer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluationRequest'
+  /api/internal/v1/subscription/transitions:
+    post:
+      operationId: applyBillingTransition
+      description: Audience bookrush-subscription; scope subscription.transitions.write.
+      security:
+      - workloadBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receipt'
+        '401':
+          description: Missing or invalid bearer, issuer or audience
+        '403':
+          description: Missing route scope or authorized technical client
+        '503':
+          description: Commercial state unavailable
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+        '400':
+          description: Invalid payload or owner issuer
+        '409':
+          description: Version, event identity or lifecycle conflict
+        '422':
+          description: Invalid commercial period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transition'
+  /api/internal/v1/subscription/billing/events:
+    post:
+      operationId: ingestVerifiedBillingEvent
+      description: Internal normalized delivery. Platform realm; audience bookrush-subscription;
+        scope subscription.transitions.write; allowlisted billing client. Provider authentication
+        and authoritative financial verification take place in the adapter before calling.
+      security:
+      - workloadBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingDelivery'
+      responses:
+        '200':
+          description: Applied or stale durable receipt, including replay.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingReceipt'
+        '202':
+          description: Event persisted with a version gap. Retry the same verified delivery
+            after reconciliation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingReceipt'
+        '400':
+          description: Malformed normalized event or invalid owner issuer.
+        '401':
+          description: Missing or invalid platform bearer.
+        '403':
+          description: Incorrect workload client or missing scope.
+        '409':
+          description: Event ID reused with different normalized data or lifecycle/version
+            conflict.
+        '422':
+          description: Invalid effective period.
+        '503':
+          description: Storage unavailable. Retry the same source and external event
+            ID.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+  /api/v1/subscription/checkout:
+    post:
+      operationId: checkoutMockPremium
+      description: Local simulation only. Requires subscription.read, allowlisted environment,
+        billing-mock profile and explicit opt-in. Owner is derived from the bearer,
+        no payment details are accepted.
+      security:
+      - productBearer: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Simulated receipt. No real payment was made.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockBillingReceipt'
+        '202':
+          description: Simulated delivery pending reconciliation. Retry with the same
+            key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockBillingReceipt'
+        '400':
+          description: Invalid idempotency key or simulation payload.
+        '401':
+          description: Missing or invalid bearer.
+        '403':
+          description: Missing scope or unauthorized billing workload.
+        '404':
+          description: Simulation unavailable in this environment.
+        '409':
+          description: Idempotency, ordering or lifecycle conflict.
+        '422':
+          description: Invalid commercial period.
+        '503':
+          description: Storage unavailable. Retry with the same key.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+  /api/internal/v1/subscription/billing/mock/simulate:
+    post:
+      operationId: simulateMockBillingOutcome
+      description: Local simulation only. Requires allowlisted platform billing client
+        and subscription.transitions.write.
+      security:
+      - workloadBearer: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Simulated receipt. No real payment was made.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockBillingReceipt'
+        '202':
+          description: Simulated delivery pending reconciliation. Retry with the same
+            key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MockBillingReceipt'
+        '400':
+          description: Invalid idempotency key or simulation payload.
+        '401':
+          description: Missing or invalid bearer.
+        '403':
+          description: Missing scope or unauthorized billing workload.
+        '404':
+          description: Simulation unavailable in this environment.
+        '409':
+          description: Idempotency, ordering or lifecycle conflict.
+        '422':
+          description: Invalid commercial period.
+        '503':
+          description: Storage unavailable. Retry with the same key.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Unavailable'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockBillingScenario'
+components:
+  securitySchemes:
+    productBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Product realm bookrush
+    workloadBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform realm bookrush-platform
+  schemas:
+    Rights:
+      type: object
+      additionalProperties: false
+      required:
+      - publishBooks
+      - premiumFamily
+      - additionalSeats
+      - effectiveUntil
+      - version
+      properties:
+        publishBooks: &id001
+          type: boolean
+        premiumFamily: *id001
+        additionalSeats: &id002
+          type: integer
+          minimum: 0
+        effectiveUntil: &id003
+          type: string
+          format: date-time
+          nullable: true
+        version: &id004
+          type: integer
+          format: int64
+          minimum: 0
+    Snapshot:
+      type: object
+      additionalProperties: false
+      required:
+      - plan
+      - planVersion
+      - state
+      - publishBooks
+      - premiumFamily
+      - additionalSeats
+      - effectiveUntil
+      - version
+      properties:
+        plan:
+          type: string
+        planVersion:
+          type: integer
+        state:
+          type: string
+          enum:
+          - FREE
+          - ACTIVE
+          - CANCEL_AT_END
+          - CANCELED
+          - EXPIRED
+          - SUSPENDED
+        publishBooks: *id001
+        premiumFamily: *id001
+        additionalSeats: *id002
+        effectiveUntil: *id003
+        version: *id004
+    Identity:
+      type: object
+      additionalProperties: false
+      required:
+      - issuer
+      - subject
+      properties:
+        issuer:
+          type: string
+          minLength: 1
+          maxLength: 512
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+    EvaluationRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - owner
+      - entitlement
+      properties:
+        owner:
+          $ref: '#/components/schemas/Identity'
+        entitlement:
+          type: string
+          enum:
+          - PUBLISH_BOOKS
+          - PREMIUM_FAMILY
+    Evaluation:
+      type: object
+      additionalProperties: false
+      required:
+      - enabled
+      - effectiveUntil
+      - version
+      properties:
+        enabled: *id001
+        effectiveUntil: *id003
+        version: *id004
+    Transition:
+      type: object
+      additionalProperties: false
+      required:
+      - owner
+      - eventId
+      - sourceVersion
+      - operation
+      properties:
+        owner:
+          $ref: '#/components/schemas/Identity'
+        eventId:
+          type: string
+          format: uuid
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        operation:
+          type: string
+          enum:
+          - ACTIVATE
+          - RENEW
+          - CANCEL_AT_END
+          - CANCEL_NOW
+          - EXPIRE
+          - SUSPEND
+          - REACTIVATE
+        startsAt: *id003
+        endsAt: *id003
+    Receipt:
+      type: object
+      additionalProperties: false
+      required:
+      - version
+      properties:
+        version: *id004
+    Unavailable:
+      type: object
+      required:
+      - status
+      - code
+      properties:
+        status:
+          type: integer
+          enum:
+          - 503
+        code:
+          type: string
+          enum:
+          - DECISION_UNAVAILABLE
+    BillingDelivery:
+      type: object
+      additionalProperties: false
+      required:
+      - billingSource
+      - externalEventId
+      - owner
+      - sourceVersion
+      - operation
+      properties:
+        owner:
+          $ref: '#/components/schemas/Identity'
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        operation:
+          type: string
+          enum:
+          - ACTIVATE
+          - RENEW
+          - CANCEL_AT_END
+          - CANCEL_NOW
+          - EXPIRE
+          - SUSPEND
+          - REACTIVATE
+        startsAt: &etkwDateTime
+          type: string
+          format: date-time
+          nullable: true
+        endsAt: *etkwDateTime
+        billingSource:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]{0,63}$
+        externalEventId:
+          type: string
+          maxLength: 160
+          pattern: ^[A-Za-z0-9_.:-]+$
+    BillingReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - eventId
+      - state
+      - sourceVersion
+      - currentVersion
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - PENDING
+          - APPLIED
+          - STALE
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        currentVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+    MockBillingScenario:
+      type: object
+      additionalProperties: false
+      required:
+      - owner
+      - scenario
+      properties:
+        owner:
+          $ref: '#/components/schemas/Identity'
+        scenario:
+          type: string
+          enum:
+          - DECLINE
+          - RENEW
+          - CANCEL
+          - REFUND
+          - CHARGEBACK
+    MockBillingReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - simulation
+      - realPayment
+      - externalEventId
+      - state
+      - billingEventId
+      properties:
+        simulation:
+          type: boolean
+          enum:
+          - true
+        realPayment:
+          type: boolean
+          enum:
+          - false
+        externalEventId:
+          type: string
+          format: uuid
+        state:
+          type: string
+          enum:
+          - APPLIED
+          - PENDING
+          - STALE
+          - DECLINED
+        billingEventId:
+          type: string
+          format: uuid
+          nullable: true

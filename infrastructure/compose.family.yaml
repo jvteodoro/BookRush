@@ -1,0 +1,39 @@
+# Opt-in development overlay for compose.yaml and compose.subscription.yaml.
+services:
+  family-service:
+    image: ${FAMILY_IMAGE:-bookrush/family-service:local}
+    build:
+      context: ..
+      dockerfile: services/family-service/Dockerfile
+    environment:
+      DB_HOST: ${FAMILY_DB_HOST:-postgres}
+      DB_NAME: ${FAMILY_DB_NAME:-bookrush}
+      DB_USERNAME: ${FAMILY_DB_USERNAME:-}
+      DB_PASSWORD: ${FAMILY_DB_PASSWORD:-}
+      FAMILY_PRODUCT_ISSUER: ${FAMILY_PRODUCT_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      FAMILY_PRODUCT_JWKS: ${FAMILY_PRODUCT_JWKS:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      FAMILY_TOKEN_URL: ${FAMILY_TOKEN_URL:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+      FAMILY_SUBSCRIPTION_CLIENT_SECRET: ${SUBSCRIPTION_FAMILY_CLIENT_SECRET:-}
+      FAMILY_CORS_ORIGINS: ${FAMILY_CORS_ORIGINS:-}
+    profiles: [family]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      subscription-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8103/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  family-gateway:
+    image: traefik:v3.3
+    command: ["--entrypoints.web.address=:8080", "--providers.file.filename=/etc/traefik/family.yaml"]
+    volumes:
+      - ../infrastructure/traefik/family.yaml:/etc/traefik/family.yaml:ro
+    ports: ["127.0.0.1:18103:8080"]
+    profiles: [family]
+    depends_on:
+      family-service:
+        condition: service_healthy

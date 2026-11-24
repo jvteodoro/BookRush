@@ -40,6 +40,7 @@ pipeline {
           currentBuild.description = "${env.SELECTED_SERVICE} — ${env.SELECTED_BRANCH} @ ${env.GIT_COMMIT.take(7)}"
           if (params.PUBLISH && !params.REGISTRY?.trim()) { error('PUBLISH exige REGISTRY.') }
           if (params.DEPLOY && params.DEPLOY_TARGET == 'none') { error('DEPLOY exige DEPLOY_TARGET.') }
+          if (params.DEPLOY && (env.SELECTED_SERVICE in ['subscription-service', 'family-service'])) { error('O serviço usa overlay de desenvolvimento; deploy pertence à integração de entrega.') }
           if (params.DEPLOY && params.DEPLOY_TARGET == 'kubernetes' && !params.REGISTRY?.trim()) { error('Deploy Kubernetes exige REGISTRY.') }
           if (params.DEPLOY && params.DEPLOY_TARGET == 'kubernetes' && !params.PUBLISH) { error('Deploy Kubernetes exige PUBLISH para disponibilizar a imagem no registry.') }
           if (params.RUN_PUBLIC_E2E && env.SELECTED_SERVICE != 'reader-bff-service') { error('RUN_PUBLIC_E2E só é válido para reader-bff-service.') }

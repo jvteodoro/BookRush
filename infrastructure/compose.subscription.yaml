@@ -1,0 +1,40 @@
+# Opt-in development overlay for infrastructure/compose.yaml.
+services:
+  subscription-service:
+    image: ${SUBSCRIPTION_IMAGE:-bookrush/subscription-service:local}
+    build:
+      context: ..
+      dockerfile: services/subscription-service/Dockerfile
+    environment:
+      DB_HOST: ${SUBSCRIPTION_DB_HOST:-postgres}
+      DB_NAME: ${SUBSCRIPTION_DB_NAME:-bookrush}
+      DB_USERNAME: ${SUBSCRIPTION_DB_USERNAME:-}
+      DB_PASSWORD: ${SUBSCRIPTION_DB_PASSWORD:-}
+      SUBSCRIPTION_PRODUCT_ISSUER: ${SUBSCRIPTION_PRODUCT_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+      SUBSCRIPTION_PRODUCT_JWKS: ${SUBSCRIPTION_PRODUCT_JWKS:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      SUBSCRIPTION_WORKLOAD_ISSUER: ${SUBSCRIPTION_WORKLOAD_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      SUBSCRIPTION_WORKLOAD_JWKS: ${SUBSCRIPTION_WORKLOAD_JWKS:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
+      SPRING_PROFILES_ACTIVE: ${SUBSCRIPTION_SPRING_PROFILES:-}
+      BOOKRUSH_ENVIRONMENT: ${BOOKRUSH_ENVIRONMENT:-unknown}
+      SUBSCRIPTION_MOCK_ENABLED: ${SUBSCRIPTION_MOCK_ENABLED:-false}
+      SUBSCRIPTION_CORS_ORIGINS: ${SUBSCRIPTION_CORS_ORIGINS:-}
+    profiles: [subscription]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8102/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  subscription-gateway:
+    image: traefik:v3.3
+    command: ["--entrypoints.web.address=:8080", "--providers.file.filename=/etc/traefik/subscription.yaml"]
+    volumes:
+      - ../infrastructure/traefik/subscription.yaml:/etc/traefik/subscription.yaml:ro
+    ports: ["127.0.0.1:18102:8080"]
+    profiles: [subscription]
+    depends_on:
+      subscription-service:
+        condition: service_healthy

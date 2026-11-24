@@ -1,0 +1,14 @@
+http:
+  routers:
+    subscription-self:
+      rule: Method(`GET`, `OPTIONS`) && (Path(`/api/v1/subscription/me`) || Path(`/api/v1/subscription/me/entitlements`))
+      entryPoints: [web]
+      service: subscription
+    subscription-mock-checkout:
+      rule: Method(`POST`, `OPTIONS`) && Path(`/api/v1/subscription/checkout`)
+      entryPoints: [web]
+      service: subscription
+  services:
+    subscription:
+      loadBalancer:
+        servers: [{url: "http://subscription-service:8102"}]

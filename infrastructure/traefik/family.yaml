@@ -1,0 +1,10 @@
+http:
+  routers:
+    family-commercial:
+      rule: Path(`/api/v1/family`) || PathPrefix(`/api/v1/family/`)
+      entryPoints: [web]
+      service: family
+  services:
+    family:
+      loadBalancer:
+        servers: [{url: "http://family-service:8103"}]

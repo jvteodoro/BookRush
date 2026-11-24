@@ -96,12 +96,23 @@ class ProductAccessContractTest(unittest.TestCase):
                 action = row["action"]
                 self.assertIn(action, set(SCHEMAS["Request"]["properties"]["action"]["enum"]) | TECHNICAL)
                 self.assertEqual(row["restricted"] == "yes", action in RESTRICTED_ACTIONS | {"PUBLIC_STATUS"})
-        baseline = Path(os.environ.get("BOOKRUSH_CONTRACT_SOURCE", ROOT))
+        historical_source = os.environ.get("BOOKRUSH_CONTRACT_SOURCE")
+        baseline = Path(historical_source) if historical_source else ROOT
         actual = set(controller_routes(baseline))
         listed = {(r["service"], r["method"], r["internal"])
-                  for r in ROUTES if r["controller"] != "planned"}
+                  for r in ROUTES if r["controller"] != "planned" and not (
+                      historical_source and r["baseline_identity"] == "AFTER_BASELINE"
+                      and not (baseline / "services" / r["service"]).exists()
+                  )}
         self.assertEqual(listed, actual)
-        self.assertEqual(len([r for r in ROUTES if r["action"] in RESTRICTED_ACTIONS]), 4)
+        restricted = {(r["method"], r["internal"]) for r in ROUTES if r["action"] in RESTRICTED_ACTIONS}
+        self.assertEqual(restricted, {
+            ("GET", "/api/v1/session"),
+            ("GET", "/api/v1/family/invitations/me"),
+            ("POST", "/api/v1/family/invitations/{id}/accept"),
+            ("POST", "/api/v1/family/invitations/{id}/decline"),
+            ("POST", "/api/v1/family/invite-address"),
+        })
 
     def test_policy_vectors(self):
         by_key = {" ".join(r[k] for k in ("service", "method", "internal")): r for r in ROUTES}

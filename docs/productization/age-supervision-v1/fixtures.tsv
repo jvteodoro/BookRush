@@ -1,0 +1,23 @@
+case	birth_date	now_utc	trusted_facts	action	expected_http	expected_reason
+day_before_18	2008-11-24	2026-11-24T02:59:59Z	no membership	PRODUCT_USE	403	ACCOUNT_RESTRICTED
+midnight_18	2008-11-24	2026-11-24T03:00:00Z	no membership	PRODUCT_USE	200	—
+leap_feb28	2008-02-29	2026-03-01T02:59:59Z	no membership	PRODUCT_USE	403	ACCOUNT_RESTRICTED
+leap_mar01	2008-02-29	2026-03-01T03:00:00Z	no membership	PRODUCT_USE	200	—
+unknown	—	2026-11-24T03:00:00Z	activated legacy cohort	PRODUCT_USE	403	ACCOUNT_RESTRICTED
+unknown_own_session	—	2026-11-24T03:00:00Z	valid JWT	SESSION_VIEW	200	—
+declaration_insufficient	1990-01-01	2026-11-24T03:00:00Z	verification required and missing	PRODUCT_USE	403	ACCOUNT_RESTRICTED
+minor_invited	2010-11-24	2026-11-24T03:00:00Z	own pending invitation; no grant	PRODUCT_USE	403	ACCOUNT_RESTRICTED
+minor_accepts	2010-11-24	2026-11-24T03:00:00Z	own pending invitation; reserved seat; paid	INVITE_SELF	200	—
+minor_active	2010-11-24	2026-11-24T03:00:00Z	active member; paid; PRODUCT_ACCESS	PRODUCT_USE	200	—
+minor_cannot_publish	2010-11-24	2026-11-24T03:00:00Z	active member; paid; PRODUCT_ACCESS; delegated	PUBLISH_WRITE	403	AGE_INELIGIBLE
+adult_member	1990-01-01	2026-11-24T03:00:00Z	active member; paid; delegated	PUBLISH_WRITE	200	—
+payer_only	2010-11-24	2026-11-24T03:00:00Z	payer; no legal grant to target	SUPERVISE_HISTORY:books-accessed	403	SUPERVISION_REQUIRED
+partial_books	2010-11-24	2026-11-24T03:00:00Z	verified exact target; BOOKS_ACCESSED only	SUPERVISE_HISTORY:books-accessed	200	—
+partial_activity	2010-11-24	2026-11-24T03:00:00Z	verified exact target; BOOKS_ACCESSED only	SUPERVISE_HISTORY:reading-activity	403	SUPERVISION_REQUIRED
+partial_comments	2010-11-24	2026-11-24T03:00:00Z	verified exact target; BOOKS_ACCESSED only	SUPERVISE_COMMENTS	403	SUPERVISION_REQUIRED
+revoked	2010-11-24	2026-11-24T03:00:00Z	valid JWT; grant revoked	SUPERVISE_COMMENTS	403	SUPERVISION_REQUIRED
+old_jwt_majority	2008-11-24	2026-11-24T03:00:00Z	valid JWT; historical grant and entries; job delayed	SUPERVISE_HISTORY:books-accessed	403	TARGET_NOT_ELIGIBLE
+expired_minor	2010-11-24	2026-11-24T03:00:00Z	paid entitlement expired; PRODUCT_ACCESS active	PRODUCT_USE	403	ACCOUNT_RESTRICTED
+expired_guardian	2010-11-24	2026-11-24T03:00:00Z	paid entitlement expired; legal grant active; BOOKS_ACCESSED	SUPERVISE_HISTORY:books-accessed	200	—
+other_family	2010-11-24	2026-11-24T03:00:00Z	verified for another minor only	SUPERVISE_HISTORY:books-accessed	403	SUPERVISION_REQUIRED
+decision_down	2010-11-24	2026-11-24T03:00:00Z	required decision unavailable; prior allow exists	PRODUCT_USE	503	DECISION_UNAVAILABLE
