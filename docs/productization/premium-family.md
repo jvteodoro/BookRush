@@ -311,3 +311,27 @@ independentes quando o grafo permite.
 Primeiro PR técnico: `bookrush-gdch`. Entregar o mapa método/rota/action, o
 contrato de decisão v1 e fixtures de 401/403/503 para consumo pelos serviços.
 Validar schemas e cobertura do inventário antes de plugar a primeira chain.
+
+## Validação comercial isolada
+
+Execute `bash scripts/test-premium-family-e2e.sh` com Docker e Python 3.
+A suíte compila os dois serviços, provisiona PostgreSQL e Keycloak
+descartáveis, aplica duas vezes os fragmentos declarativos e usa os arquivos
+de rotas do Traefik local. Os usuários e os clientes de teste existem
+apenas na rede descartável. O fluxo de senha é exclusivo da fixture e as
+credenciais e os tokens de teste não aparecem na saída.
+
+A cobertura inclui checkout MOCK, replay, cinco reservas, isolamento,
+estorno com o JWT original, indisponibilidade da dependência S2S, reabertura
+das migrations e veto das rotas MOCK sob perfil de produção. A suíte limpa
+os containers, volumes anônimos, imagens locais de teste e rede que cria.
+
+Para validar os contratos com `openapi-spec-validator` 0.7.2, execute:
+
+```bash
+openapi-spec-validator docs/productization/product-access-v1/openapi.json \
+  services/{subscription,family,catalog}-service/api/openapi.yaml
+```
+
+A suíte cobre a superfície comercial disponível e não altera os gates de
+identidade, aceite ou supervisão.

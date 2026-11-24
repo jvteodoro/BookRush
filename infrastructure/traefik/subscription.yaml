@@ -1,11 +1,11 @@
 http:
   routers:
     subscription-self:
-      rule: Method(`GET`, `OPTIONS`) && (Path(`/api/v1/subscription/me`) || Path(`/api/v1/subscription/me/entitlements`))
+      rule: (Method(`GET`) || Method(`OPTIONS`)) && (Path(`/api/v1/subscription/me`) || Path(`/api/v1/subscription/me/entitlements`))
       entryPoints: [web]
       service: subscription
     subscription-mock-checkout:
-      rule: Method(`POST`, `OPTIONS`) && Path(`/api/v1/subscription/checkout`)
+      rule: (Method(`POST`) || Method(`OPTIONS`)) && Path(`/api/v1/subscription/checkout`)
       entryPoints: [web]
       service: subscription
   services:
