@@ -16,3 +16,13 @@ que permanece responsável pela política durável de tentativas.
 ## Assuntos RDF Gutenberg
 
 O parser respeita namespaces e o contexto RDF: idioma vem de dcterms:language, assuntos de dcterms:subject (LCSH ou sem vocabulário declarado) e categorias de pgterms:bookshelf. Classificação LCC, tipo de conteúdo e formatos MIME não são assuntos. Valores XML fragmentados/CDATA são concatenados antes de interpretar título/assunto. Mantém bloqueio de DTD/entidades externas e preferência EPUB sem imagens. O catálogo filtra também representações técnicas já importadas, preservando dados e proveniência.
+
+## Publicação editorial após upload
+
+A ingestão verifica SHA-256 antes de criar a referência canônica do upload.
+`POST /api/internal/v1/ingestion/publisher-submissions/{submissionId}/publication`
+exige X-BookRush-Ingestion-Token e recebe bookId, reviewId, reviewer e action
+PUBLISH/WITHDRAW. Encaminha o comando ao catálogo usando a identidade S2S de
+assets existente, sem encaminhar o bearer humano. Retorna 200, 400 ou 401; uma
+falha do catálogo não é convertida em aprovação local. A credencial é a mesma
+configurada privadamente no publisher; nunca é persistida no livro nem em logs.

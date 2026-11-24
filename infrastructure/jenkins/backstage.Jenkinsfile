@@ -46,7 +46,9 @@ pipeline {
 
     stage('Validar catálogo e TechDocs') {
       steps {
-        sh 'docker run --rm --volumes-from "$HOSTNAME" -w "$WORKSPACE" python:3.12-slim bash -lc "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && apt-get install -y -qq --no-install-recommends git >/dev/null && git config --global --add safe.directory \"$WORKSPACE\" && bash scripts/validate-change.sh --ci"'
+        timeout(time: 5, unit: 'MINUTES') {
+          sh(label: 'Change gate local e offline', script: 'bash scripts/validate-change.sh --ci --offline')
+        }
         sh 'bash scripts/test-portal.sh'
       }
     }

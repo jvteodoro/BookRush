@@ -7,24 +7,23 @@ materializados.
 
 ## Pré-condições
 
-O estágio de validação do `bookrush-deploy` executa
-`scripts/validate-change.sh --ci` dentro da imagem `python:3.12-slim`,
-instalando o `git`, `PyYAML` e `jsonschema` no container efêmero antes do gate.
-As pipelines isoladas usam o mesmo container e também instalam o Git antes do
-gate do analytics. Assim, o agente Jenkins
-precisa apenas do Docker CLI/daemon acessível; ele não precisa ter `python3` ou
-`git` instalados diretamente no container do agente. O gate também registra
-`/repo` como `safe.directory`, pois o workspace montado pode pertencer ao
-usuário do container Jenkins.
+O change gate das pipelines integrada, Backstage, microserviço, vertical e
+SeaweedFS executa `bash scripts/validate-change.sh --ci --offline` diretamente
+no agente, com timeout de cinco minutos. Git e Python 3 já fazem parte da imagem
+Jenkins; PyYAML e jsonschema são fornecidos por `python3-yaml` e
+`python3-jsonschema` durante o build da imagem. O gate não baixa pacotes nem
+inicia um container para validar o diff. Isso também evita trocar o dono do
+workspace e precisar de uma exceção global de `safe.directory`.
 
 1. Publique o commit na branch remota antes de disparar o job. O Jenkins não
    executa alterações que existem somente no checkout local.
 
-O job `bookrush-backstage` compartilha o workspace com o container de validação
-usando `--volumes-from "$HOSTNAME"`; não substitua isso por um bind mount de
-`$PWD`, pois o caminho do workspace existe no daemon Docker e não no processo
-do agente. Um bind mount incorreto faz o gate receber um `/repo` vazio e falhar
-com `scripts/validate-change.sh: No such file or directory`.
+Uma imagem antiga do agente pode continuar validando alterações que não exigem
+analytics. Se PyYAML/jsonschema forem necessários e estiverem ausentes, o gate
+falha imediatamente com instrução para atualizar a imagem; não tenta instalar
+pacotes durante o job. A imagem atualizada deve ser construída/implantada em
+janela controlada, preservando `jenkins_home`, jobs, sessões e credenciais.
+Agentes customizados precisam fornecer Bash, Git, Python 3 e esses módulos.
 
 O teste do runtime de modelos executa os probes via `docker exec` dentro do
 container temporário. Isso evita assumir que o `127.0.0.1` do agente, o IP da
@@ -224,10 +223,13 @@ falha, leia `consoleText` do mesmo build antes de repetir.
 ## Definição e parâmetros da pipeline
 
 O job `bookrush-deploy` usa `CpsScmFlowDefinition` com o repositório BookRush,
-branch fixa `*/main` e Script Path `Jenkinsfile`. A definição da pipeline fica
-sempre na `main`; o parâmetro `BRANCH` seleciona o código que será validado e
-implantado. Assim, executar uma branch antiga não remove parâmetros novos da
-definição do job.
+branch `*/${BRANCH}` e Script Path `Jenkinsfile`. O parâmetro BRANCH seleciona
+ambos a definição e o código da revisão; mantenha a feature atualizada com main.
+Fixar a definição em main fazia o Jenkins executar etapas antigas mesmo depois
+de um checkout da feature. O script idempotente
+`infrastructure/jenkins/reconcile-publishing-pipeline.groovy` pode ser executado
+na Script Console autenticada quando não houver build ativo. Ele preserva
+credenciais, parâmetros, histórico e volumes e não dispara deploy.
 
 No startup, `infrastructure/jenkins/init.groovy.d/bookrush.groovy` reconcilia
 essa definição SCM e `ParametersDefinitionProperty`, incluindo
@@ -275,3 +277,25 @@ Bearer token, crumb, cookie, authorization code ou conteúdo de `.env`.
 Uma atualização de produção só deve ser reportada como concluída quando o
 build de validação, o build de deploy e o health check do Compose estiverem
 verdes.
+
+## Change gate e falha de durable task
+
+Os avisos de `debconf` sobre TTY não demonstram falha do gate: ele pode mudar
+para o modo noninteractive. O problema do caminho antigo era executar
+`apt-get`/`pip` silenciosos e dependentes da rede antes da validação em todo build.
+O caminho offline os elimina e registra o início da validação; erros de leitura
+do diff Git também falham explicitamente, em vez de aparentar ausência de mudanças.
+
+`wrapper script does not appear to be touching the log file` indica que o
+heartbeat do processo durable não foi observado. Um log de console isolado não
+prova se houve OOM, reinício/desconexão do agente ou problema de filesystem.
+Se persistir com o gate nativo, preserve os logs e confira no host o estado do
+agente, `OOMKilled`, eventos/reinícios do container, espaço/inodes do volume e
+logs do kernel no intervalo da falha. Não altere HEARTBEAT_CHECK_INTERVAL nem
+reinicie/apague o volume apenas para esconder a mensagem.
+
+Validação reproduzível: `python3 scripts/test-change-gate.py`,
+`bash scripts/validate-pipelines.sh` e
+`bash scripts/validate-change.sh --ci --offline`. Os testes usam repositórios Git
+descartáveis e bloqueiam Docker/apt/pip para garantir que ausência de dependências
+falhe rápido e que regras de documentação/analytics continuem sendo executadas.

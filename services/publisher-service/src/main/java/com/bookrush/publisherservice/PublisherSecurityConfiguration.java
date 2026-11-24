@@ -60,7 +60,7 @@ public class PublisherSecurityConfiguration {
       @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuer,
       @Value("${bookrush.security.audience}") String audience) {
     NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-    OAuth2TokenValidator<Jwt> issuerValidator = new JwtIssuerValidator(issuer);
+    OAuth2TokenValidator<Jwt> issuerValidator = org.springframework.security.oauth2.jwt.JwtValidators.createDefaultWithIssuer(issuer);
     OAuth2TokenValidator<Jwt> audienceValidator = token ->
         token.getAudience().contains(audience)
             ? OAuth2TokenValidatorResult.success()

@@ -3,6 +3,280 @@ info:
   title: publisher-service
   version: 0.1.0
 paths:
+  /api/v1/publisher/submissions/{id}/rights:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Attest distribution rights for an owned editable draft
+      description: ''
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - rightType
+              - territory
+              - evidenceReference
+              properties:
+                rightType:
+                  type: string
+                  enum:
+                  - DISTRIBUTION
+                  - PROCESSING
+                  - DISPLAY
+                territory: &id001
+                  type: string
+                  minLength: 1
+                evidenceReference: *id001
+  /api/v1/publisher/submissions/{id}/review:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Editorial operator decision with catalog publication
+      description: Only operators/platform-admins. APPROVED requires canonical SOURCE
+        and owner distribution attestation; confirms catalog promotion before recording
+        PUBLISHED locally. Rejection never exposes the source.
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - APPROVED
+                  - REJECTED
+                  - CHANGES_REQUESTED
+  /api/v1/publisher/submissions/{id}/withdraw:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Withdraw own published book
+      description: Revokes public catalog access before recording withdrawal. Existing
+        signed URLs expire normally; source and history are preserved.
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+  /api/v1/publisher/review:
+    parameters: []
+    get:
+      summary: List pending editorial submissions
+      description: Operators/platform-admins only.
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+  /api/v1/publisher/submissions:
+    get:
+      summary: List the authenticated publisher's submissions
+      security: [{publisherBearer: []}]
+      responses:
+        '200':
+          description: Owned submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Submission'}
+        '401': {description: "Missing or invalid bearer"}
+    post:
+      summary: Save an owned book draft
+      security: [{publisherBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: {type: string, minLength: 1, maxLength: 300}
+      responses:
+        '200':
+          description: Draft created
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Submission'}
+        '400': {description: "Invalid title"}
+        '401': {description: "Missing or invalid bearer"}
+        '403': {description: "Publisher membership is not active"}
+  /api/v1/publisher/submissions/{id}/upload:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Reserve a private upload for an owned editable draft
+      description: Requires ACTIVE membership and DRAFT or UPLOADED submission. Returns a short-lived signed PUT URL; send the file without the human bearer, then finalize it. Storage must be enabled.
+      security: [{publisherBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, contentType]
+              properties:
+                filename: {type: string}
+                contentType: {type: string, enum: [application/epub+zip, application/pdf]}
+      responses:
+        '200':
+          description: Temporary private upload reservation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uploadId, url, expiresAt]
+                properties:
+                  uploadId: {type: string, format: uuid}
+                  url: {type: string, format: uri}
+                  expiresAt: {type: string, format: date-time}
+        '401': {description: "Missing or invalid bearer"}
+        '403': {description: "Membership is not active"}
+        '404': {description: "Submission absent or owned by another subject, or storage disabled"}
+        '409': {description: "Submission no longer editable"}
+        '415': {description: "Unsupported book format"}
+  /api/v1/publisher/submissions/{id}/upload/{uploadId}/finalize:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      - {name: uploadId, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Confirm a staged object after upload
+      description: HEAD confirms a nonempty object; ingestion verifies the supplied SHA-256 against the actual bytes before accepting its source asset.
+      security: [{publisherBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sha256]
+              properties:
+                sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+      responses:
+        '200':
+          description: Upload confirmed and draft ready for submission
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [uploadId, status, sizeBytes, sha256]
+                properties:
+                  uploadId: {type: string, format: uuid}
+                  status: {type: string, enum: [FINALIZED]}
+                  sizeBytes: {type: integer, format: int64, minimum: 1}
+                  sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+        '400': {description: "Invalid SHA-256"}
+        '401': {description: "Missing or invalid bearer"}
+        '403': {description: "Membership is not active"}
+        '404': {description: "Owned draft or pending upload absent"}
+        '409': {description: "Submission no longer editable"}
+        '413': {description: "Uploaded object exceeds the configured limit (100 MiB by default)"}
+        '422': {description: "Empty uploaded object"}
+  /api/v1/publisher/submissions/{id}/submit:
+    parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Send an uploaded book for ingestion and editorial review
+      description: Requires an owned UPLOADED submission with a FINALIZED upload and ACTIVE membership. Repeated requests for SUBMITTED or PROCESSING return the current state. Ingestion failure restores UPLOADED only if its callback has not already advanced the state. Successful ingestion creates a PENDING editorial review; this does not activate the catalog book or expose its binary.
+      security: [{publisherBearer: []}]
+      responses:
+        '200':
+          description: Current submission state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id: {type: string, format: uuid}
+                  status: {type: string, enum: [SUBMITTED, PROCESSING]}
+        '401': {description: "Missing or invalid bearer"}
+        '403': {description: "Membership is not active"}
+        '404': {description: "Submission absent or owned by another subject"}
+        '409': {description: "Finalized upload missing or state changed concurrently"}
+        '422': {description: "Invalid source book or staged checksum mismatch; upload a valid file"}
+        '503': {description: "Ingestion unavailable; refresh state and retry"}
   /api/internal/v1/publisher/submissions/{submissionId}/catalog-link:
     post:
       summary: Link a submission after canonical ingestion
@@ -29,9 +303,9 @@ paths:
                 sourceCode: {type: string}
                 sourceExternalId: {type: string}
       responses:
-        '200': {description: Link applied}
-        '401': {description: Invalid callback credential}
-        '409': {description: Conflicting existing link}
+        '200': {description: "Link applied"}
+        '401': {description: "Invalid callback credential"}
+        '409': {description: "Conflicting existing link"}
   /api/v1/publisher/submissions/{id}/metrics:
     get:
       summary: Daily statistics for the authenticated publisher's own published book
@@ -57,14 +331,22 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/DailyMetrics'
-        '400': {description: Invalid days or UUID}
-        '401': {description: Missing or invalid bearer}
-        '404': {description: Submission absent or owned by another publisher}
-        '503': {description: Metrics service or dedicated credential unavailable; never reported as zero activity}
+        '400': {description: "Invalid days or UUID"}
+        '401': {description: "Missing or invalid bearer"}
+        '404': {description: "Submission absent or owned by another publisher"}
+        '503': {description: "Metrics service or dedicated credential unavailable; never reported as zero activity"}
 components:
   securitySchemes:
     publisherBearer: {type: http, scheme: bearer, bearerFormat: JWT}
   schemas:
+    Submission:
+      type: object
+      required: [id, title, status]
+      properties:
+        id: {type: string, format: uuid}
+        title: {type: string, maxLength: 300}
+        status: {type: string}
+        catalog_book_id: {type: string, format: uuid, nullable: true}
     DailyMetrics:
       type: object
       required: [day, impressions, opens, reads, likes, shares, comments]

@@ -1,7 +1,6 @@
 package com.bookrush.ingestion.catalog;
 
 import java.net.URI;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -25,15 +24,16 @@ public class PublisherSubmissionLinkClient {
     if (properties.token() == null || properties.token().isBlank()) {
       throw new IllegalStateException("publisher callback token is not configured");
     }
+    var body = new java.util.LinkedHashMap<String, Object>();
+    body.put("catalogBookId", bookId);
+    if (jobId != null) body.put("ingestionJobId", jobId);
+    body.put("sourceCode", source);
+    body.put("sourceExternalId", externalId);
     client.post()
         .uri("/api/internal/v1/publisher/submissions/{id}/catalog-link", submissionId)
         .header("X-BookRush-Ingestion-Token", properties.token())
         .header(HttpHeaders.CONTENT_TYPE, "application/json")
-        .body(Map.of(
-            "catalogBookId", bookId,
-            "ingestionJobId", jobId,
-            "sourceCode", source,
-            "sourceExternalId", externalId))
+        .body(body)
         .retrieve()
         .toBodilessEntity();
   }

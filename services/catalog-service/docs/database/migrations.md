@@ -23,3 +23,10 @@ migration no catálogo. O DTO usa id/nome/esquema e ignora subjects INACTIVE;
 `DISTINCT` elimina associações repetidas por fontes diferentes. O E2E de
 metadados cobre múltiplas fontes, subject inativo, livro sem categorias, detalhe,
 listagem e busca por categoria no PostgreSQL 16 real.
+
+## V18 — identidade das submissões do publicador
+
+Adiciona PUBLISHER_SUBMISSION à constraint de tipos e exige edition_id e um UUID
+válido como valor. Os tipos e as regras anteriores permanecem válidos. Não altera
+migrations já aplicadas nem reescreve livros existentes. O teste da publicação
+valida banco vazio até V17, upgrade V18, preservação de registro anterior e replay.

@@ -1,6 +1,7 @@
 package com.bookrush.catalog.persistence.model;
 
 public enum ExternalIdentifierIdentifierType {
+  PUBLISHER_SUBMISSION,
   ISBN10,
   ISBN13,
   GUTENBERG_ID,

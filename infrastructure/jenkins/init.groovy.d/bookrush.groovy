@@ -117,7 +117,7 @@ replaceParameters(observabilityJob, [
 ])
 def mainScm = new GitSCM(
     [new UserRemoteConfig('https://github.com/jvteodoro/BookRush.git', null, null, null)],
-    [new BranchSpec('*/main')], false, [], null, null, [])
+    [new BranchSpec('*/${BRANCH}')], false, [], null, null, [])
 def mainPipelineDefinition = new CpsScmFlowDefinition(mainScm, 'Jenkinsfile')
 mainPipelineDefinition.setLightweight(false)
 def currentMainDefinition = job.getDefinition()
@@ -126,7 +126,7 @@ def currentMainBranches = currentMainDefinition instanceof CpsScmFlowDefinition
     : []
 if (!(currentMainDefinition instanceof CpsScmFlowDefinition) ||
     currentMainDefinition.getScriptPath() != 'Jenkinsfile' ||
-    currentMainBranches != ['*/main']) {
+    currentMainBranches != ['*/${BRANCH}']) {
     job.setDefinition(mainPipelineDefinition)
     job.save()
 }

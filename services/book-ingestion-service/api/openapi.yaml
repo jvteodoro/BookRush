@@ -13,6 +13,65 @@ tags:
   description: Executa e acompanha importações controladas. Requer JWT do Keycloak
     com role OPERATOR, REVIEWER ou CLEANUP conforme a operação.
 paths:
+  /api/internal/v1/ingestion/publisher-submissions/{submissionId}/publication:
+    parameters:
+    - name: submissionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: X-BookRush-Ingestion-Token
+      in: header
+      required: true
+      schema:
+        type: string
+        format: password
+    post:
+      summary: Apply publisher editorial decision to catalog
+      description: Internal only; requires the shared publishing callback credential.
+        Delegates to catalog using asset S2S credentials; never forwards human bearer
+        tokens.
+      security: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - bookId
+              - reviewId
+              - reviewer
+              - action
+              properties:
+                bookId: &id001
+                  type: string
+                  format: uuid
+                reviewId: *id001
+                reviewer:
+                  type: string
+                  minLength: 1
+                action:
+                  type: string
+                  enum:
+                  - PUBLISH
+                  - WITHDRAW
   /api/internal/v1/ingestion/publisher-submissions/process:
     post:
       summary: Processar objeto finalizado de publisher

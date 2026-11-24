@@ -648,7 +648,7 @@ services:
     networks: [bookrush]
 
   publisher-service:
-    image: bookrush/publisher-service:local
+    image: ${PUBLISHER_IMAGE:-bookrush/publisher-service:local}
     build:
       context: ..
       dockerfile: services/publisher-service/Dockerfile

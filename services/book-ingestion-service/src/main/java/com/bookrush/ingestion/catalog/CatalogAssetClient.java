@@ -155,6 +155,13 @@ public final class CatalogAssetClient {
     }
   }
 
+  public void publishSubmission(UUID bookId, UUID submissionId, UUID reviewId, String reviewer, String action) {
+    client.post().uri("/api/admin/books/{bookId}/publisher-publication", bookId)
+        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokens.token(OidcServiceTokenProvider.Kind.ASSET))
+        .body(Map.of("submissionId", submissionId, "reviewId", reviewId, "reviewer", reviewer, "action", action))
+        .retrieve().toBodilessEntity();
+  }
+
   public void approve(UUID bookId, UUID assetId) {
     String token = tokens.token(OidcServiceTokenProvider.Kind.ASSET);
     client

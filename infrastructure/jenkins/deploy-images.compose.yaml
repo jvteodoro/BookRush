@@ -37,6 +37,9 @@ services:
     image: ${FRONTEND_IMAGE:?Imagem frontend ausente}
   book-ingestion-service:
     image: ${INGESTION_IMAGE:?Imagem ingestion ausente}
+    environment:
+      PUBLISHER_INGESTION_CALLBACK_TOKEN: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:?Credencial interna da publicação ausente}
+      INGESTION_PUBLISHER_CALLBACK_URL: http://publisher-service:8099
   book-analytics-service:
     image: ${ANALYTICS_IMAGE:?Imagem analytics ausente}
   recommendation-service:
@@ -82,3 +85,11 @@ services:
       context: ../../admin-web
       args:
         VITE_GRAFANA_URL: ${ADMIN_WEB_GRAFANA_URL:-https://grafana-bookrush.jteodoro.tec.br}
+
+  publisher-service:
+    image: ${PUBLISHER_IMAGE:?Imagem publisher ausente}
+    environment:
+      PUBLISHER_STORAGE_ENABLED: ${PUBLISHER_STORAGE_ENABLED:-true}
+      PUBLISHER_INGESTION_URL: http://book-ingestion-service:8090
+      PUBLISHER_INGESTION_CALLBACK_TOKEN: ${PUBLISHER_INGESTION_CALLBACK_TOKEN:?Credencial interna da publicação ausente}
+      STORAGE_BUCKET_STAGING: ${STORAGE_BUCKET_STAGING:-books-staging}

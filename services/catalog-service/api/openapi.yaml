@@ -24,6 +24,62 @@ tags:
 - name: Conteúdo reader
   description: Projeção de capítulos e leitura interna da versão textual exata.
 paths:
+  /api/admin/books/{bookId}/publisher-publication:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Promote or withdraw a verified publisher source
+      description: Requires catalog asset-administration authorization. Verifies ADMIN_UPLOAD/PUBLISHER_SUBMISSION
+        identity and SOURCE. PUBLISH creates a PUBLIC copy, records editorial distribution
+        evidence and activates asset/book. WITHDRAW inactivates the public asset and
+        revokes book approval; SOURCE remains private. Replays preserve existing physical
+        assets.
+      security:
+      - assetAdmin: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - submissionId
+              - reviewId
+              - reviewer
+              - action
+              properties:
+                submissionId: &id001
+                  type: string
+                  format: uuid
+                reviewId: *id001
+                reviewer:
+                  type: string
+                  minLength: 1
+                action:
+                  type: string
+                  enum:
+                  - PUBLISH
+                  - WITHDRAW
   /api/v1/books/{bookId}/thumbnail:
     get:
       tags: [Distribuição]
