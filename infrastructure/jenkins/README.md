@@ -556,3 +556,14 @@ permite distinguir essas causas por si só.
 
 O contrato de metadados cobre também os filtros combinados de categoria, autor e
 ano pelo gateway real, com paginação e ano de edição quando o ano da obra é ausente.
+
+O E2E administrativo valida a pontuação no snapshot mais recente da configuração
+de ranker da fixture. O relatório mantém buckets por minuto: uma execução que
+atravessa a virada do minuto pode retornar mais de uma linha válida no período.
+`scripts/test-reporting-rank-score-fixture.sh` cobre snapshots únicos/múltiplos,
+ordem invertida, configuração distinta e rejeição de valores atuais incorretos.
+A espera e a asserção final compartilham `scripts/assert-rank-score-fixture.jq`,
+incluindo status, versão/hash, decil, mínimo/máximo e contagem esperados. Se falhar,
+o console mostra somente os campos agregados usados na verificação.
+Os percentis de duração são comparados numericamente, sem depender de a versão
+do `jq` preservar a representação textual `120.0` ou normalizá-la para `120`.
