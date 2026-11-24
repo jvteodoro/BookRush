@@ -32,5 +32,17 @@ test('search delegates query and pagination to the catalog API', async () => {
   assert.equal(result.totalItems, 21);
   assert.equal(result.books[0].title, 'Frankenstein');
   assert.equal(result.books[0].author, 'Mary Shelley');
-  assert.equal(result.books[0].publicationYear, 1818);
+  assert.equal('publicationYear' in result.books[0], false);
+});
+
+test('category and author filters are combined with free text and resettable independently', async () => {
+  let requested;
+  await searchCatalog('Harbour', 0, undefined, async url => {
+    requested = new URL(url, 'https://bookrush.test');
+    return {ok:true,json:async()=>({items:[],totalItems:0,totalPages:0,page:0})};
+  }, {category:' Adventure ',author:' Fixture Writer ',year:'1912'});
+  assert.equal(requested.searchParams.get('q'), 'Harbour');
+  assert.equal(requested.searchParams.get('category'), 'Adventure');
+  assert.equal(requested.searchParams.get('author'), 'Fixture Writer');
+  assert.equal(requested.searchParams.has('year'), false);
 });

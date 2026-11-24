@@ -283,6 +283,10 @@ public class AssetSecurity {
     var source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/internal/v1/catalog/**", configuration);
     source.registerCorsConfiguration("/api/admin/**", configuration);
+    var metadata = new CorsConfiguration(configuration);
+    metadata.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.OPTIONS.name()));
+    source.registerCorsConfiguration("/api/v1/books", metadata);
+    source.registerCorsConfiguration("/api/v1/books/*", metadata);
     return source;
   }
 

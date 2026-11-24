@@ -9,12 +9,14 @@ export type SearchResult = {
   page: number;
 };
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
+export type SearchFilters = {
+  category?: string;
+  author?: string;
+};
 type CatalogBook = {
   id: string;
   canonicalTitle: string;
   authors?: string[] | null;
-  firstPublicationYear?: number | null;
-  publicationYear?: number | null;
   originalTitle?: string;
   originalLanguage?: string;
   categories?: BookCategory[];
@@ -27,12 +29,17 @@ export async function searchCatalog(
   page = 0,
   signal?: AbortSignal,
   fetcher: Fetcher = fetch,
+  filters: SearchFilters = {},
 ): Promise<SearchResult> {
   const params = new URLSearchParams({
     q: query.trim(),
     page: String(Math.max(0, page)),
     size: "20",
   });
+  for (const key of ["category", "author"] as const) {
+    const value = filters[key]?.trim();
+    if (value) params.set(key, value);
+  }
   const response = await fetcher(apiRoutes.catalog.search(params.toString()), {
     credentials: "same-origin",
     signal,

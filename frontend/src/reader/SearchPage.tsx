@@ -3,6 +3,7 @@ import { Notice } from "@bookrush/ui/Notice";
 import { SearchField } from "@bookrush/ui/SearchField";
 import { PageHeader } from "@bookrush/ui/PageHeader";
 import { Toolbar } from "@bookrush/ui/Toolbar";
+import { Input } from "@bookrush/ui/Input";
 import { useSeenBooks } from "./useSeenBooks";
 import { useEffect, useState } from "react";
 import { BookCard } from "../components/book/BookCard";
@@ -39,6 +40,13 @@ export function SearchPage({
   onDetails,
 }: Props) {
   const [kind, setKind] = useState<"books" | "people">("books");
+  const [category, setCategory] = useState("");
+  const [author, setAuthor] = useState("");
+  const clearFilters = () => {
+    setCategory("");
+    setAuthor("");
+    setPage(0);
+  };
   const [page, setPage] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [data, setData] = useState<SearchResult | null>(null);
@@ -46,7 +54,7 @@ export function SearchPage({
   const [error, setError] = useState("");
   useEffect(() => {
     setPage(0);
-  }, [query]);
+  }, [query, category, author]);
   useEffect(() => {
     if (!visible || kind !== "books") return;
     const controller = new AbortController();
@@ -54,7 +62,10 @@ export function SearchPage({
     setError("");
     const timer = window.setTimeout(
       () => {
-        void searchCatalog(query, page, controller.signal)
+        void searchCatalog(query, page, controller.signal, undefined, {
+          category,
+          author,
+        })
           .then((result) => {
             if (!controller.signal.aborted) setData(result);
           })
@@ -65,13 +76,13 @@ export function SearchPage({
             if (!controller.signal.aborted) setLoading(false);
           });
       },
-      query.trim() ? 300 : 0,
+      query.trim() || category || author ? 300 : 0,
     );
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, page, attempt, visible, kind]);
+  }, [query, page, attempt, visible, kind, category, author]);
   const seenState = useSeenBooks(
     data?.books.map((book) => book.id) ?? [],
     visible && kind === "books",
@@ -82,8 +93,8 @@ export function SearchPage({
         <div>
           <h1>Encontre sua próxima história</h1>
           <p className="br-muted">
-            Busque livros por título, descrição ou categoria e pessoas por nome
-            ou @usuário.
+            Busque livros por título, autor, descrição ou categoria e pessoas
+            por nome ou @usuário.
           </p>
         </div>
       </PageHeader>
@@ -100,9 +111,11 @@ export function SearchPage({
           label="Buscar livros ou pessoas"
           value={query}
           placeholder={
-            kind === "people" ? "Um nome ou @usuário…" : "Um livro, uma ideia…"
+            kind === "people"
+              ? "Um nome ou @usuário…"
+              : "Título, autor ou categoria…"
           }
-          maxLength={kind === "people" ? 100 : undefined}
+          maxLength={kind === "people" ? 100 : 500}
           onChange={(event) => onQuery(event.target.value)}
           action={
             query ? (
@@ -116,6 +129,39 @@ export function SearchPage({
             ) : undefined
           }
         />
+        {kind === "books" && (
+          <fieldset className="br-search-filters">
+            <legend>Filtrar livros</legend>
+            <label htmlFor="search-category">
+              Categoria
+              <Input
+                id="search-category"
+                value={category}
+                maxLength={200}
+                placeholder="Ex.: Adventure"
+                onChange={(event) => setCategory(event.target.value)}
+              />
+            </label>
+            <label htmlFor="search-author">
+              Autor
+              <Input
+                id="search-author"
+                value={author}
+                maxLength={200}
+                placeholder="Ex.: Machado de Assis"
+                onChange={(event) => setAuthor(event.target.value)}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={!category && !author}
+              onClick={clearFilters}
+            >
+              Limpar filtros
+            </Button>
+          </fieldset>
+        )}
       </form>
       <Tabs role="group" aria-label="Tipo de busca">
         <Button
@@ -155,8 +201,14 @@ export function SearchPage({
       ) : !data?.books.length ? (
         <Card className="br-live-empty">
           <h2>Nenhum livro encontrado</h2>
-          <p>Tente outro título ou palavra.</p>
-          <Button variant="ghost" onClick={() => onQuery("")}>
+          <p>Tente outro título, metadado ou combinação de filtros.</p>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              onQuery("");
+              clearFilters();
+            }}
+          >
             Explorar catálogo
           </Button>
         </Card>
@@ -169,7 +221,9 @@ export function SearchPage({
                 ? "livro encontrado"
                 : "livros encontrados"}
             </p>
-            <span>Ordenados por título</span>
+            <span>
+              {query.trim() ? "Relevância e título" : "Ordenados por título"}
+            </span>
           </Toolbar>
           <div className="br-search-results">
             {data.books.map((book) => (
@@ -195,10 +249,8 @@ export function SearchPage({
                   </h2>
                   <p>
                     {book.author}
-                    {book.publicationYear != null
-                      ? ` · ${book.publicationYear}`
-                      : ""}{" "}
-                    · {book.genre}
+                    {" · "}
+                    {book.genre}
                   </p>
                   {book.description && (
                     <p className="br-search-result__description">

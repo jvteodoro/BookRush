@@ -32,5 +32,12 @@ class AssetSecurityCorsTest {
     assertThat(admin.getAllowedHeaders())
         .containsExactly("Authorization", "Accept", "Content-Type", "Idempotency-Key", "X-Admin-Client");
     assertThat(admin.getAllowCredentials()).isFalse();
+    for (String path : List.of("/api/v1/books", "/api/v1/books/book-id")) {
+      var metadata = source.getCorsConfiguration(new MockHttpServletRequest("OPTIONS", path));
+      assertThat(metadata).isNotNull();
+      assertThat(metadata.getAllowedMethods()).containsExactly("GET", "OPTIONS");
+      assertThat(metadata.getAllowedOrigins()).containsExactlyElementsOf(admin.getAllowedOrigins());
+      assertThat(metadata.getAllowCredentials()).isFalse();
+    }
   }
 }
