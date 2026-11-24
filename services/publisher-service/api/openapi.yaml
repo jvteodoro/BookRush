@@ -3,6 +3,151 @@ info:
   title: publisher-service
   version: 0.1.0
 paths:
+  /api/v1/publisher/submissions/{id}/rights:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Attest distribution rights for an owned editable draft
+      description: ''
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - rightType
+              - territory
+              - evidenceReference
+              properties:
+                rightType:
+                  type: string
+                  enum:
+                  - DISTRIBUTION
+                  - PROCESSING
+                  - DISPLAY
+                territory: &id001
+                  type: string
+                  minLength: 1
+                evidenceReference: *id001
+  /api/v1/publisher/submissions/{id}/review:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Editorial operator decision with catalog publication
+      description: Only operators/platform-admins. APPROVED requires canonical SOURCE
+        and owner distribution attestation; confirms catalog promotion before recording
+        PUBLISHED locally. Rejection never exposes the source.
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - APPROVED
+                  - REJECTED
+                  - CHANGES_REQUESTED
+  /api/v1/publisher/submissions/{id}/withdraw:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Withdraw own published book
+      description: Revokes public catalog access before recording withdrawal. Existing
+        signed URLs expire normally; source and history are preserved.
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
+  /api/v1/publisher/review:
+    parameters: []
+    get:
+      summary: List pending editorial submissions
+      description: Operators/platform-admins only.
+      security:
+      - publisherBearer: []
+      responses:
+        '200':
+          description: Operation confirmed
+        '400':
+          description: Invalid command
+        '401':
+          description: Missing or invalid credential
+        '403':
+          description: Insufficient permission
+        '404':
+          description: Owned resource not found
+        '409':
+          description: Publication state or rights do not allow this operation
+        '503':
+          description: Required downstream service unavailable
   /api/v1/publisher/submissions:
     get:
       summary: List the authenticated publisher's submissions
@@ -106,6 +251,7 @@ paths:
         '403': {description: "Membership is not active"}
         '404': {description: "Owned draft or pending upload absent"}
         '409': {description: "Submission no longer editable"}
+        '413': {description: "Uploaded object exceeds the configured limit (100 MiB by default)"}
         '422': {description: "Empty uploaded object"}
   /api/v1/publisher/submissions/{id}/submit:
     parameters:
@@ -129,6 +275,7 @@ paths:
         '403': {description: "Membership is not active"}
         '404': {description: "Submission absent or owned by another subject"}
         '409': {description: "Finalized upload missing or state changed concurrently"}
+        '422': {description: "Invalid source book or staged checksum mismatch; upload a valid file"}
         '503': {description: "Ingestion unavailable; refresh state and retry"}
   /api/internal/v1/publisher/submissions/{submissionId}/catalog-link:
     post:

@@ -10,15 +10,16 @@ test -f infrastructure/jenkins/bookrush.Jenkinsfile || fail 'cópia do Jenkinsfi
 cmp -s Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile || fail 'Jenkinsfiles principais divergem'
 grep -Fq "booleanParam(name: 'RUN_INFRA_CONTRACTS'" Jenkinsfile || fail 'Jenkinsfile principal sem opção RUN_INFRA_CONTRACTS'
 grep -Fq "BooleanParameterDefinition('RUN_INFRA_CONTRACTS'" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bootstrap Jenkins sem definição persistente de RUN_INFRA_CONTRACTS'
-grep -Fq "new BranchSpec('*/main')" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bookrush-deploy não fixa a definição da pipeline em main'
+grep -Fq 'currentMainBranches != ['"'"'*/${BRANCH}'"'"']' infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bookrush-deploy não reconcilia a definição para a branch selecionada'
 if command -v python3 >/dev/null 2>&1; then
   python3 scripts/test-deploy-compose-images.py || fail 'contrato de imagens do deploy Compose inválido'
   python3 scripts/test-change-gate.py || fail 'regressões do change gate inválidas'
+  python3 scripts/test-publishing-config.py || fail 'configuração da publicação inválida'
 elif command -v docker >/dev/null 2>&1; then
   # O agente Jenkins tem Docker, mas não necessariamente Python. Envie apenas
   # os arquivos do teste por stdin: funciona também com daemon fora do agente,
   # sem depender de bind mounts ou instalar pacotes no host.
-  tar -cf - scripts/test-deploy-compose-images.py infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/wait-storage-ready.sh infrastructure/jenkins/probe-reader-library.sh infrastructure/traefik/dynamic.yaml infrastructure/keycloak/request-client-token.py |
+  tar -cf - scripts/test-deploy-compose-images.py infrastructure/jenkins/prepare-publishing-env.py infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/wait-storage-ready.sh infrastructure/jenkins/probe-reader-library.sh infrastructure/traefik/dynamic.yaml infrastructure/keycloak/request-client-token.py |
     docker run --rm -i --network none python:3.12-slim bash -lc '
       set -euo pipefail
       workspace=$(mktemp -d)
@@ -96,4 +97,10 @@ grep -Fq 'docker push "$ADMIN_WEB_IMAGE"' infrastructure/jenkins/admin-web.Jenki
 grep -Fq 'PUBLISH exige REGISTRY' infrastructure/jenkins/admin-web.Jenkinsfile || fail 'pipeline admin-web sem guarda de publicação'
 grep -Fq 'bash scripts/test-book-ratings-e2e.sh' Jenkinsfile || fail 'pipeline principal sem E2E de avaliações'
 grep -Fq 'bash scripts/test-book-metadata-e2e.sh' Jenkinsfile || fail 'pipeline principal sem E2E de categorias e livros vistos'
+
+grep -Fq 'env.PUBLISHER_IMAGE =' Jenkinsfile || fail 'pipeline não versiona publisher-service'
+grep -Fq 'scripts/test-publishing-e2e.sh' Jenkinsfile || fail 'pipeline não testa publicação ponta a ponta'
+grep -Fq 'resolve_service_image PUBLISHER_IMAGE publisher-service' infrastructure/jenkins/deploy-compose.sh || fail 'deploy antigo não resolve a imagem publisher'
+grep -Fq 'publisher-service:' infrastructure/jenkins/deploy-images.compose.yaml || fail 'publisher fora do override de imagens'
+
 echo 'Pipeline contracts: OK'

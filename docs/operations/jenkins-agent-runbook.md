@@ -223,10 +223,13 @@ falha, leia `consoleText` do mesmo build antes de repetir.
 ## Definição e parâmetros da pipeline
 
 O job `bookrush-deploy` usa `CpsScmFlowDefinition` com o repositório BookRush,
-branch fixa `*/main` e Script Path `Jenkinsfile`. A definição da pipeline fica
-sempre na `main`; o parâmetro `BRANCH` seleciona o código que será validado e
-implantado. Assim, executar uma branch antiga não remove parâmetros novos da
-definição do job.
+branch `*/${BRANCH}` e Script Path `Jenkinsfile`. O parâmetro BRANCH seleciona
+ambos a definição e o código da revisão; mantenha a feature atualizada com main.
+Fixar a definição em main fazia o Jenkins executar etapas antigas mesmo depois
+de um checkout da feature. O script idempotente
+`infrastructure/jenkins/reconcile-publishing-pipeline.groovy` pode ser executado
+na Script Console autenticada quando não houver build ativo. Ele preserva
+credenciais, parâmetros, histórico e volumes e não dispara deploy.
 
 No startup, `infrastructure/jenkins/init.groovy.d/bookrush.groovy` reconcilia
 essa definição SCM e `ParametersDefinitionProperty`, incluindo

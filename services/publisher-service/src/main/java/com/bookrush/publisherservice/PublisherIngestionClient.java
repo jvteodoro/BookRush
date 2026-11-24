@@ -33,6 +33,14 @@ public class PublisherIngestionClient {
         .toBodilessEntity();
   }
 
+  public void publication(UUID submissionId, UUID bookId, UUID reviewId, String reviewer, String action) {
+    if (properties.token().isBlank()) throw new IllegalStateException("publisher ingestion credential is missing");
+    client.post().uri("/api/internal/v1/ingestion/publisher-submissions/{id}/publication", submissionId)
+        .header("X-BookRush-Ingestion-Token", properties.token())
+        .body(Map.of("bookId", bookId, "reviewId", reviewId, "reviewer", reviewer, "action", action))
+        .retrieve().toBodilessEntity();
+  }
+
   @ConfigurationProperties(prefix = "publisher.ingestion")
   public record Properties(URI url, String token) {
     public Properties {

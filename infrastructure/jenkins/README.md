@@ -121,11 +121,12 @@ Esse gate exige documentação ou contrato para mudanças de código, infraestru
 e Backstage e valida a consistência dos Jenkinsfiles. A mesma regra pode ser
 executada localmente após instalar os hooks com `bash scripts/install-hooks.sh`.
 
-O gate roda em um container Python efêmero. Como o agente Jenkins usa o socket
-Docker e o workspace está no volume nomeado `jenkins_home`, a etapa usa
-`--volumes-from "$HOSTNAME"` para compartilhar o workspace com o container do
-gate, mantendo a chamada `bash scripts/validate-change.sh --ci`. Não use `-v "$PWD:/repo"` nesse agente: esse caminho é resolvido pelo
-daemon Docker no host e resulta em um diretório vazio dentro do gate.
+O gate roda localmente no agente com `--offline`, sem instalar pacotes nem
+executar `apt`/`pip` durante essa etapa. Há timeout de cinco minutos e o
+ambiente Python é preparado na imagem do Jenkins. Os builds que precisam de
+containers compartilham o workspace via `--volumes-from "$HOSTNAME"`, pois ele
+fica no volume nomeado `jenkins_home`. Não use `-v "$PWD:/repo"`: esse caminho é
+resolvido pelo daemon Docker no host e pode resultar em diretório vazio.
 
 ### Pipeline dedicada do Backstage
 
@@ -329,7 +330,7 @@ Kubernetes exige registry e a credencial de kubeconfig descrita em
 `Jenkinsfile` é a fonte da pipeline e `bookrush.Jenkinsfile` é a cópia de
 bootstrap que deve permanecer idêntica. O job `bookrush-deploy` carrega o
 `Jenkinsfile` de `main` via Pipeline from SCM, com Script Path `Jenkinsfile` e
-branch fixa `*/main`; **BRANCH** seleciona o código que será compilado e
+branch `*/${BRANCH}`; **BRANCH** seleciona a definição e o código compilado e
 implantado. O bootstrap reconcilia essa definição e os parâmetros do job a cada
 startup, incluindo `RUN_INFRA_CONTRACTS`. O gate `scripts/validate-pipelines.sh`
 garante que a opção exista tanto na pipeline quanto no bootstrap. Depois de
@@ -365,7 +366,7 @@ O mesmo preparo cobre `ANALYTICS_RUNTIME_IMAGE` ausente: deriva o nome de
 garante que a imagem exista. Antes de iniciar ou alterar containers, o deploy
 confere as treze imagens no daemon e valida o Compose; imagem explícita ausente
 interrompe o processo com o nome da variável, sem iniciar recriação ou rollback.
-O override `deploy-images.compose.yaml` fixa as treze imagens da revisão, inclusive
+O override `deploy-images.compose.yaml` fixa as imagens da revisão, inclusive
 catálogo, frontend, ingestion e analytics, mesmo se o Compose do host for antigo.
 Os testes também cobrem build CPU/GPU do runtime e falhas no preflight das imagens.
 
@@ -577,3 +578,19 @@ incluindo status, versão/hash, decil, mínimo/máximo e contagem esperados. Se 
 o console mostra somente os campos agregados usados na verificação.
 Os percentis de duração são comparados numericamente, sem depender de a versão
 do `jq` preservar a representação textual `120.0` ou normalizá-la para `120`.
+
+
+## Publicação de livros próprios
+
+`PUBLISHER_IMAGE` é versionada junto com as demais imagens. O Jenkins testa a
+migração V18 e o fluxo de publicação com PostgreSQL/SeaweedFS e os serviços reais
+em projeto descartável, antes do deploy. O override inclui publisher, habilita
+staging por padrão e injeta a mesma credencial interna em publisher e ingestion.
+A credencial configurada é preservada; se ausente, o deploy a gera num arquivo
+0600 temporário, sem gravar no `.env` protegido ou log. O rollback reutiliza essa
+configuração para ambos os serviços. URLs de storage seguem privadas/assinadas.
+
+Instalações antigas fixadas em main precisam de reconciliação da definição SCM,
+via init atualizado ou `reconcile-publishing-pipeline.groovy` na Script Console,
+antes de executar `BRANCH=feature/book-publishing`. Confirme SHA e etapas de
+publisher no log. Não remova jobs, usuários ou o volume Jenkins para isso.

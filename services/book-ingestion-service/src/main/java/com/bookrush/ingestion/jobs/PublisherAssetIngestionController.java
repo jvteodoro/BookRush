@@ -61,13 +61,8 @@ public class PublisherAssetIngestionController {
     }
     var sourceId = jdbc.queryForObject("select id from catalog.source where code='ADMIN_UPLOAD' and is_active", UUID.class);
     var operation = "publisher-upload:" + request.submissionId();
-    var suppliedHash = request.sha256() == null ? "" : request.sha256().toLowerCase();
-    var result = catalog.apply(new CanonicalCatalogPort.CanonicalCatalogCommand(
-        operation, sha256(operation + "\u0000" + suppliedHash + "\u0000" + request.title()), 0L,
-        "ADMIN_UPLOAD", "PUBLISHER_SUBMISSION", request.submissionId().toString(), request.title(), null,
-        "Publisher upload", Map.of("objectKey", request.objectKey(), "bucket", request.bucket() == null ? "" : request.bucket()), null, null, null, null));
-    var bookId = UUID.fromString(String.valueOf(result.get("bookId")));
-    var editionId = UUID.fromString(String.valueOf(result.get("editionId")));
+    var suppliedHash = request.sha256() == null ? "" : request.sha256().toLowerCase(java.util.Locale.ROOT);
+    if (!suppliedHash.matches("[0-9a-f]{64}")) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "SHA-256 is required");
     Path temp = null;
     try {
       temp = Files.createTempFile("bookrush-publisher-", type.toLowerCase());
@@ -75,9 +70,15 @@ public class PublisherAssetIngestionController {
       try (InputStream in = s3.getObject(r -> r.bucket(bucket).key(request.objectKey()))) {
         Files.copy(in, temp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
       }
-      if (request.sha256() != null && !request.sha256().isBlank() && !request.sha256().equalsIgnoreCase(sha256(temp))) {
+      if (!suppliedHash.equals(sha256(temp))) {
         throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "staged object hash mismatch");
       }
+    var result = catalog.apply(new CanonicalCatalogPort.CanonicalCatalogCommand(
+        operation, sha256(operation + "\u0000" + suppliedHash + "\u0000" + request.title()), 0L,
+        "ADMIN_UPLOAD", "PUBLISHER_SUBMISSION", request.submissionId().toString(), request.title(), null,
+        "Publisher upload", Map.of("objectKey", request.objectKey(), "bucket", request.bucket() == null ? "" : request.bucket()), null, null, null, null));
+    var bookId = UUID.fromString(String.valueOf(result.get("bookId")));
+    var editionId = UUID.fromString(String.valueOf(result.get("editionId")));
       assets.uploadSource(bookId, editionId, sourceId, temp, Path.of(request.objectKey()).getFileName().toString(), type);
       links.link(request.submissionId(), bookId, request.ingestionJobId(), "ADMIN_UPLOAD", request.submissionId().toString());
       return Map.of("submissionId", request.submissionId(), "catalogBookId", bookId, "status", "PROCESSING");
@@ -88,6 +89,20 @@ public class PublisherAssetIngestionController {
     } finally {
       if (temp != null) try { Files.deleteIfExists(temp); } catch (Exception ignored) { }
     }
+  }
+
+  public record Publication(UUID bookId, UUID reviewId, String reviewer, String action) {}
+
+  @PostMapping("/{submissionId}/publication")
+  public Map<String, Object> publication(@PathVariable UUID submissionId,
+      @RequestHeader(value="X-BookRush-Ingestion-Token", required=false) String supplied,
+      @RequestBody Publication request) {
+    authorize(supplied);
+    if (request.bookId() == null || request.reviewId() == null || request.reviewer() == null
+        || !java.util.Set.of("PUBLISH", "WITHDRAW").contains(String.valueOf(request.action())))
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid publication command");
+    assets.publishSubmission(request.bookId(), submissionId, request.reviewId(), request.reviewer(), request.action());
+    return Map.of("submissionId", submissionId, "status", request.action());
   }
 
   private void authorize(String supplied) {

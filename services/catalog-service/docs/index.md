@@ -40,3 +40,16 @@ contagem usam o mesmo predicado SQL, com ordenação estável por relevância/t�
 O CORS de listagem/detalhes públicos permite somente GET/OPTIONS das origens
 já configuradas em `CATALOG_CORS_ALLOWED_ORIGINS`, sem credenciais nem wildcard.
 A autenticação das rotas internas e de conteúdo protegido permanece obrigatória.
+
+## Publicação editorial de obras próprias
+
+`POST /api/admin/books/{bookId}/publisher-publication` recebe submissionId,
+reviewId, reviewer e action (PUBLISH/WITHDRAW). Exige a autorização administrativa
+de assets existente (audience bookrush-catalog-admin, scope bookrush.assets.write).
+A identidade ADMIN_UPLOAD/PUBLISHER_SUBMISSION precisa resolver a edição do livro
+e possuir SOURCE disponível; não permite promover um livro arbitrário. Publisher
+somente solicita PUBLISH após revisão de operador e declaração de distribuição.
+O catálogo copia o objeto privado para PUBLIC, registra a evidência editorial e
+ativa asset/livro. WITHDRAW inativa o asset e revoga a aprovação; não apaga SOURCE.
+Retorna 200 no sucesso, 400 para comando inválido, 401/403 para autenticação ou
+permissão ausente e 409 quando falta SOURCE canônico. Repetições são idempotentes.

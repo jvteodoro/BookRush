@@ -117,6 +117,7 @@ pipeline {
           env.READER_PROFILE_IMAGE = "${registry}/bookrush/reader-profile-service:${env.IMAGE_TAG}"
           env.SOCIAL_IMAGE = "${registry}/bookrush/social-service:${env.IMAGE_TAG}"
           env.ADMIN_SERVICE_IMAGE = "${registry}/bookrush/admin-service:${env.IMAGE_TAG}"
+          env.PUBLISHER_IMAGE = "${registry}/bookrush/publisher-service:${env.IMAGE_TAG}"
           env.ADMIN_WEB_IMAGE = "${registry}/bookrush/admin-web:${env.IMAGE_TAG}"
         }
         sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" -f services/catalog-service/Dockerfile .'
@@ -139,6 +140,12 @@ pipeline {
         sh 'docker build --target build -t "bookrush/admin-service-test:$BUILD_NUMBER" -f services/admin-service/Dockerfile .'
         sh 'docker run --rm "bookrush/admin-service-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$ADMIN_SERVICE_IMAGE" -f services/admin-service/Dockerfile .'
+        sh 'docker build --target build -t "bookrush/publisher-test:$BUILD_NUMBER" -f services/publisher-service/Dockerfile .'
+        sh 'docker run --rm "bookrush/publisher-test:$BUILD_NUMBER" mvn -B verify'
+        sh 'docker build -t "$PUBLISHER_IMAGE" -f services/publisher-service/Dockerfile .'
+        timeout(time: 10, unit: 'MINUTES') {
+          sh 'CATALOG_MIGRATION_TEST_IMAGE="bookrush/catalog-test:$BUILD_NUMBER" PUBLISHER_TEST_IMAGE="$PUBLISHER_IMAGE" CATALOG_TEST_IMAGE="$BACKEND_IMAGE" INGESTION_TEST_IMAGE="$INGESTION_IMAGE" bash scripts/test-publishing-e2e.sh'
+        }
         sh 'docker build -t "$ADMIN_WEB_IMAGE" -f admin-web/Dockerfile .'
       }
     }
@@ -272,7 +279,7 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin'
-          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$BEHAVIOR_IMAGE" && docker push "$RECOMMENDATION_IMAGE" && docker push "$READER_BFF_IMAGE" && docker push "$READER_STATE_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE" && docker push "$ADMIN_SERVICE_IMAGE" && docker push "$ADMIN_WEB_IMAGE"'
+          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$BEHAVIOR_IMAGE" && docker push "$RECOMMENDATION_IMAGE" && docker push "$READER_BFF_IMAGE" && docker push "$READER_STATE_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE" && docker push "$ADMIN_SERVICE_IMAGE" && docker push "$ADMIN_WEB_IMAGE" && docker push "$PUBLISHER_IMAGE"'
         }
       }
     }

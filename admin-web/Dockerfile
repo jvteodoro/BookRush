@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:22-bookworm-slim AS build
 WORKDIR /workspace/admin-web
 COPY packages/ui /workspace/packages/ui
 COPY eslint.shared.config.mjs /workspace/eslint.shared.config.mjs
@@ -22,7 +22,12 @@ RUN npm run format:check \
  && npm run test:coverage \
  && npm run build \
  && npm run lint
+FROM build AS publishing-validation
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium && rm -rf /var/lib/apt/lists/*
+RUN node --test tests/publisher-publishing.e2e.mjs tests/publisher-statistics.e2e.mjs tests/publisher-editorial.e2e.mjs
+
 FROM nginx:1.27-alpine
 COPY admin-web/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /workspace/admin-web/dist /usr/share/nginx/html
+COPY admin-web/security-headers.conf /etc/nginx/bookrush-security-headers.conf
+COPY --from=publishing-validation /workspace/admin-web/dist /usr/share/nginx/html
 EXPOSE 80

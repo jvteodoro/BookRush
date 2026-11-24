@@ -1,0 +1,122 @@
+# No host ports, production env files, named volumes or external networks.
+x-database: &database
+  DB_HOST: postgres
+  DB_NAME: publishing_test
+  DB_USERNAME: fixture
+  DB_PASSWORD: fixture-only
+x-storage: &storage
+  NO_PROXY: postgres,seaweed,seaweedfs,catalog,publisher,publisher-service,ingestion,tests,web,localhost,127.0.0.1
+  no_proxy: postgres,seaweed,seaweedfs,catalog,publisher,publisher-service,ingestion,tests,web,localhost,127.0.0.1
+  STORAGE_ENDPOINT: http://seaweed:8333
+  STORAGE_PUBLIC_ENDPOINT: http://seaweed:8333
+  STORAGE_ACCESS_KEY: fixture
+  STORAGE_SECRET_KEY: fixture-only
+x-oidc: &oidc
+  CATALOG_OIDC_ENABLED: "true"
+  CATALOG_OIDC_ISSUER: http://publishing-fixture/issuer
+  CATALOG_OIDC_JWK_SET_URI: http://tests:8765/jwks
+  CATALOG_PRODUCT_OIDC_ISSUER: http://publishing-fixture/issuer
+  CATALOG_PRODUCT_OIDC_JWK_SET_URI: http://tests:8765/jwks
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: publishing_test
+      POSTGRES_USER: fixture
+      POSTGRES_PASSWORD: fixture-only
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U fixture -d publishing_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  migration-tests:
+    image: ${CATALOG_MIGRATION_TEST_IMAGE:-bookrush/catalog-publishing-migration-test}
+    command: [mvn, -B, test, -Dtest=PublisherIdentifierMigrationIT]
+    environment:
+      TEST_DATABASE_URL: jdbc:postgresql://postgres:5432/publishing_test
+    depends_on:
+      postgres: {condition: service_healthy}
+  seaweed:
+    image: bookrush/seaweedfs-publishing-test
+    build: {context: ./seaweedfs}
+    networks:
+      default:
+        aliases: [seaweedfs]
+    environment:
+      STORAGE_ACCESS_KEY: fixture
+      STORAGE_SECRET_KEY: fixture-only
+      STORAGE_ALLOWED_ORIGINS: http://publisher.test
+      STORAGE_MIN_FREE_SPACE: 64MiB
+    tmpfs: [/data]
+    healthcheck:
+      test: [CMD-SHELL, "wget -Y off -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -Eq '200 OK|403 Forbidden'"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+  catalog:
+    image: ${CATALOG_TEST_IMAGE:-bookrush/catalog-publishing-test}
+    environment:
+      <<: [*database, *storage, *oidc]
+      STORAGE_ENABLED: "true"
+      ASSET_ADMIN_TOKEN: publishing-fixture-unused-legacy-token-32chars
+      CATALOG_OIDC_AUDIENCE: bookrush-catalog-admin
+    depends_on:
+      postgres: {condition: service_healthy}
+      seaweed: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, "wget -Y off -q -O /dev/null http://127.0.0.1:8080/actuator/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 50
+  ingestion:
+    image: ${INGESTION_TEST_IMAGE:-bookrush/ingestion-publishing-test}
+    environment:
+      <<: [*database, *storage]
+      INGESTION_STORAGE_ENDPOINT: http://seaweed:8333
+      CATALOG_SERVICE_URL: http://catalog:8080
+      INGESTION_OIDC_S2S_ENABLED: "true"
+      INGESTION_OIDC_TOKEN_URI: http://tests:8765/token
+      INGESTION_CANONICAL_CLIENT_ID: fixture-canonical
+      INGESTION_CANONICAL_CLIENT_SECRET: fixture-only
+      INGESTION_ASSET_CLIENT_ID: fixture-assets
+      INGESTION_ASSET_CLIENT_SECRET: fixture-only
+      PUBLISHER_INGESTION_CALLBACK_TOKEN: fixture-internal-token
+      INGESTION_PUBLISHER_CALLBACK_URL: http://publisher:8099
+    depends_on:
+      catalog: {condition: service_healthy}
+  publisher:
+    networks:
+      default:
+        aliases: [publisher-service]
+    image: ${PUBLISHER_TEST_IMAGE:-bookrush/publisher-publishing-test}
+    environment:
+      <<: [*database, *storage]
+      BOOKRUSH_SECURITY_ENABLED: "true"
+      BOOKRUSH_SECURITY_ISSUER: http://publishing-fixture/issuer
+      BOOKRUSH_SECURITY_JWK_SET_URI: http://tests:8765/jwks
+      BOOKRUSH_CORS_ALLOWED_ORIGINS: http://publisher.test
+      PUBLISHER_STORAGE_ENABLED: "true"
+      PUBLISHER_INGESTION_URL: http://ingestion:8090
+      PUBLISHER_INGESTION_CALLBACK_TOKEN: fixture-internal-token
+      PUBLISHER_BEHAVIOR_URL: http://tests:8765
+    depends_on:
+      postgres: {condition: service_healthy}
+      seaweed: {condition: service_healthy}
+  web:
+    build:
+      context: ..
+      dockerfile: infrastructure/testing/publishing/web.Dockerfile
+    depends_on:
+      publisher: {condition: service_started}
+  tests:
+    environment:
+      NO_PROXY: postgres,seaweed,seaweedfs,catalog,publisher,publisher-service,ingestion,tests,web,localhost,127.0.0.1
+      no_proxy: postgres,seaweed,seaweedfs,catalog,publisher,publisher-service,ingestion,tests,web,localhost,127.0.0.1
+    build:
+      context: ..
+      dockerfile: infrastructure/testing/publishing/Dockerfile
+    depends_on:
+      web: {condition: service_started}
+      publisher: {condition: service_started}
+      ingestion: {condition: service_started}

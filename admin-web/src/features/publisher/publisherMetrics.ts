@@ -100,6 +100,31 @@ export const publishingApi = {
       sha256,
     });
   },
+  async attest(id: string): Promise<void> {
+    await http.post(
+      `/api/v1/publisher/submissions/${encodeURIComponent(id)}/rights`,
+      {
+        rightType: "DISTRIBUTION",
+        territory: "GLOBAL",
+        evidenceReference:
+          "Publisher explicitly affirmed distribution rights in the publishing portal",
+      },
+    );
+  },
+  async reviewQueue(): Promise<{ submission_id: string; title: string }[]> {
+    return (await http.get("/api/v1/publisher/review")).data;
+  },
+  async review(id: string, status: string): Promise<void> {
+    await http.post(
+      `/api/v1/publisher/submissions/${encodeURIComponent(id)}/review`,
+      { status, reasonCode: "EDITORIAL_REVIEW" },
+    );
+  },
+  async withdraw(id: string): Promise<void> {
+    await http.post(
+      `/api/v1/publisher/submissions/${encodeURIComponent(id)}/withdraw`,
+    );
+  },
   async submit(id: string): Promise<{ id: string; status: string }> {
     return (
       await http.post(

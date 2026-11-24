@@ -48,6 +48,7 @@ resolve_service_image READER_BFF_IMAGE reader-bff-service
 resolve_service_image READER_STATE_IMAGE reader-state-service
 resolve_service_image READER_PROFILE_IMAGE reader-profile-service
 resolve_service_image SOCIAL_IMAGE social-service
+resolve_service_image PUBLISHER_IMAGE publisher-service
 
 # O job parametrizado pode carregar o Jenkinsfile da main antes de fazer
 # checkout de uma feature. Durante a transição para uma pipeline que publica as
@@ -106,13 +107,14 @@ fi
 # Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
 # Este preflight também detecta builds feitos em um daemon diferente do deploy.
 missing_images=false
-for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE BEHAVIOR_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE BEHAVIOR_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE PUBLISHER_IMAGE; do
   if ! docker image inspect "${!variable}" >/dev/null 2>&1; then
     echo "Imagem de deploy ausente no daemon: $variable=${!variable}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
     missing_images=true
   fi
 done
 if $missing_images; then exit 1; fi
+python3 "$script_dir/prepare-publishing-env.py" /run/bookrush.env "$mode_env_file"
 "${compose[@]}" config --quiet
 old_backend="$(docker inspect --format '{{.Config.Image}}' bookrush-catalog-service-1 2>/dev/null || true)"
 old_frontend="$(docker inspect --format '{{.Config.Image}}' bookrush-frontend-1 2>/dev/null || true)"
@@ -127,6 +129,7 @@ old_reader_profile="$(docker inspect --format '{{.Config.Image}}' bookrush-reade
 old_social="$(docker inspect --format '{{.Config.Image}}' bookrush-social-service-1 2>/dev/null || true)"
 old_admin_service="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-service-1 2>/dev/null || true)"
 old_admin_web="$(docker inspect --format '{{.Config.Image}}' bookrush-admin-web-1 2>/dev/null || true)"
+old_publisher="$(docker inspect --format '{{.Config.Image}}' bookrush-publisher-service-1 2>/dev/null || true)"
 old_gateway_config="$(docker exec bookrush-reverse-proxy-1 sh -ec '
   if [ -s /tmp/bookrush-traefik-dynamic.yaml ]; then
     cat /tmp/bookrush-traefik-dynamic.yaml
@@ -137,7 +140,7 @@ old_gateway_config="$(docker exec bookrush-reverse-proxy-1 sh -ec '
 keycloak_state="$(docker inspect --format '{{.State.Status}}' bookrush-keycloak-1 2>/dev/null || true)"
 diagnose() {
   docker logs --tail=70 bookrush-reverse-proxy-1 >&2 || true
-  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-behavior-service-1 bookrush-recommendation-service-1 bookrush-reader-bff-service-1 bookrush-reader-state-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-frontend-1; do
+  for service in bookrush-keycloak-1 bookrush-catalog-service-1 bookrush-book-ingestion-service-1 bookrush-book-analytics-service-1 bookrush-book-analytics-runtime-1 bookrush-behavior-service-1 bookrush-recommendation-service-1 bookrush-reader-bff-service-1 bookrush-reader-state-service-1 bookrush-reader-profile-service-1 bookrush-social-service-1 bookrush-admin-service-1 bookrush-admin-web-1 bookrush-publisher-service-1 bookrush-frontend-1; do
     echo "--- diagnóstico $service ---" >&2
     docker inspect --format 'state={{.State.Status}} exitCode={{.State.ExitCode}} error={{.State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}n/a{{end}} image={{.Config.Image}}' "$service" >&2 || true
     if [[ "$service" == bookrush-admin-service-1 ]]; then
@@ -149,7 +152,7 @@ diagnose() {
     fi
   done
 }
-compose_services=(reverse-proxy catalog-service book-ingestion-service book-content-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
+compose_services=(reverse-proxy catalog-service book-ingestion-service book-content-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service publisher-service admin-service admin-web frontend)
 report_release_events() {
   local event_type="$1" status="$2" use_previous="${3:-false}"
   [[ -n "${JENKINS_RELEASE_REPORTING_CLIENT_SECRET:-}" ]] || return 0
@@ -159,6 +162,7 @@ report_release_events() {
     (( duration_ms >= 0 )) || duration_ms=0
   fi
   local -a managed_images=(
+    'publisher-service|PUBLISHER_IMAGE|old_publisher'
     'catalog-service|BACKEND_IMAGE|old_backend'
     'frontend|FRONTEND_IMAGE|old_frontend'
     'book-ingestion-service|INGESTION_IMAGE|old_ingestion'
@@ -408,8 +412,8 @@ rollback() {
     BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$old_gateway_config"
     export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG
   fi
-  if [[ -n "$old_backend" && -n "$old_frontend" && -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}" || return $?
+  if [[ -n "$old_backend" && -n "$old_frontend" && -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" && -n "$old_publisher" ]]; then
+    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" PUBLISHER_IMAGE="$old_publisher" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}" || return $?
     rollback_status=SUCCESS
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend || return $?

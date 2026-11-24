@@ -86,6 +86,10 @@ test("publisher saves and resumes a draft, retries upload and submission, and ke
       res.end(JSON.stringify({ status: "FINALIZED" }));
       return;
     }
+    if (req.url.endsWith("/rights")) {
+      res.end("{}");
+      return;
+    }
     if (req.url.endsWith("/submit")) {
       submitAttempts++;
       if (submitAttempts === 1) {
@@ -156,6 +160,7 @@ test("publisher saves and resumes a draft, retries upload and submission, and ke
         "Arquivo recebido e confirmado. Seu livro está pronto para envio à revisão.",
       )
       .waitFor();
+    await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Enviar para revisão" }).click();
     await page
       .getByRole("alert")

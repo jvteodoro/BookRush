@@ -107,19 +107,30 @@ ativa; valida MIME, SHA-256 e presença de bytes no objeto. Um envio que falha n
 ingestão restaura `UPLOADED` somente se o callback ainda não avançou o estado.
 O sucesso registra uma revisão `PENDING`; decisões posteriores a retiram da fila.
 O status `PROCESSING` significa processamento/revisão, **não publicação aprovada**.
-A aprovação editorial e a ativação do catálogo continuam nos fluxos administrativos.
+A fila editorial da console permite ao operador aprovar o arquivo e ativar o catálogo.
 
 Habilite `PUBLISHER_STORAGE_ENABLED=true` no ambiente com S3 disponível; configure
 `STORAGE_ENDPOINT`, `STORAGE_PUBLIC_ENDPOINT` acessível ao navegador,
 `STORAGE_BUCKET_STAGING=books-staging`, credenciais de storage e
 `PUBLISHER_INGESTION_CALLBACK_TOKEN` compartilhado com ingestion. O handoff usa o bucket de staging configurado.
 O bucket precisa aceitar PUT da origem explícita da console via CORS.
-O serviço permanece opt-in quando o storage não está configurado. O controller de
+O Compose Jenkins habilita o storage por padrão; um false explícito preserva a desativação. O controller de
 upload é habilitado pela mesma propriedade do storage, sem depender da ordem de
 registro dos beans Spring.
 
-Não há migration nova. As rotas usam o gateway existente `/api/v1/publisher/**`,
+A migration V18 do catálogo aceita o identificador PUBLISHER_SUBMISSION. As rotas usam o gateway existente `/api/v1/publisher/**`,
 realm `bookrush-platform`, audience `bookrush-ingestion` e dono por subject;
-revisão editorial exige grupo `operators` ou `platform-admins`. A origem e os
+revisão editorial exige grupo `operators`, `platform-operators` ou `platform-admins`. A origem e os
 headers permanecem na configuração CORS existente. A validação pública com sessão
 real e o deploy da branch são necessários para confirmar funcionamento em produção.
+
+### Aprovação editorial completa
+
+A console registra DISTRIBUTION/GLOBAL com o subject do dono; outro subject
+recebe 404 ao tentar editar metadados ou afirmar direitos. A fila de revisão
+somente permite decisões de operators/platform-operators/platform-admins. APPROVED exige vínculo
+canônico e declaração de distribuição do dono e só confirma PUBLISHED depois
+que o catálogo confirma o asset público e ativa o livro. A decisão e o estado
+local usam uma transação; falhas remotas não registram uma aprovação local.
+Withdraw confirma primeiro a retirada no catálogo e mantém SOURCE e histórico.
+Tokens expirados são recusados além da verificação de issuer/audience.

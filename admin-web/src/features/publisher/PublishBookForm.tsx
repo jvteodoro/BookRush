@@ -40,6 +40,7 @@ export function PublishBookForm({
   const [selected, setSelected] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState("");
+  const [rights, setRights] = useState(false);
   const [notice, setNotice] = useState("");
   const drafts = submissions.filter((book) =>
     ["DRAFT", "UPLOADED"].includes(book.status),
@@ -61,6 +62,7 @@ export function PublishBookForm({
         (items) => [book, ...(items ?? [])],
       );
       setSelected(book.id);
+      setRights(false);
       setTitle("");
       setFile(null);
       setNotice("Rascunho salvo. Agora anexe o arquivo do livro.");
@@ -84,7 +86,10 @@ export function PublishBookForm({
     },
   });
   const submit = useMutation({
-    mutationFn: publishingApi.submit,
+    mutationFn: async (id: string) => {
+      await publishingApi.attest(id);
+      return publishingApi.submit(id);
+    },
     onSuccess: (result) => {
       update(result.id, result.status);
       setNotice(
@@ -140,6 +145,7 @@ export function PublishBookForm({
             disabled={busy}
             onChange={(event) => {
               setSelected(event.target.value);
+              setRights(false);
               setFile(null);
               clear();
             }}
@@ -180,6 +186,15 @@ export function PublishBookForm({
               enviá-lo para revisão ou substituí-lo.
             </p>
           )}
+          <label>
+            <input
+              type="checkbox"
+              checked={rights}
+              disabled={busy}
+              onChange={(event) => setRights(event.target.checked)}
+            />
+            Confirmo que tenho autorização para distribuir este livro.
+          </label>
           <div className="publisher-publishing__actions">
             <Button
               disabled={busy || !file}
@@ -193,7 +208,9 @@ export function PublishBookForm({
               {upload.isPending ? "Enviando arquivo…" : "Enviar arquivo"}
             </Button>
             <Button
-              disabled={busy || draft.status !== "UPLOADED" || Boolean(file)}
+              disabled={
+                busy || draft.status !== "UPLOADED" || Boolean(file) || !rights
+              }
               onClick={() => {
                 clear();
                 submit.mutate(draft.id);

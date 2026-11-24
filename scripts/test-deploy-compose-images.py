@@ -21,6 +21,7 @@ SERVICES = {
     'READER_STATE_IMAGE': 'reader-state-service',
     'READER_PROFILE_IMAGE': 'reader-profile-service',
     'SOCIAL_IMAGE': 'social-service',
+    'PUBLISHER_IMAGE': 'publisher-service',
 }
 
 
@@ -62,6 +63,9 @@ exit 99
             preparation = preparation.replace(
                 'script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
                 'script_dir="$TEST_SCRIPT_DIR"')
+            protected = folder / 'fixture.env'
+            protected.write_text('PUBLISHER_INGESTION_CALLBACK_TOKEN=fixture-internal-token\n')
+            preparation = preparation.replace('/run/bookrush.env', str(protected))
             runner = folder / 'prepare.sh'
             runner.write_text(preparation + '\nenv | sort\n')
             env = {key: value for key, value in os.environ.items()
@@ -88,7 +92,7 @@ exit 99
             image = f'registry.example:5000/team/bookrush/{service}:42-abcdef0'
             self.assertIn(f'{variable}={image}', result.stdout)
             self.assertIn(f'build -t {image} -f {ROOT}/services/{service}/Dockerfile {ROOT}', calls)
-        self.assertEqual(calls.count('build -t'), 7)
+        self.assertEqual(calls.count('build -t'), 8)
 
     def test_runtime_cpu_is_built_before_compose_validation(self):
         result, calls = self.prepare()
@@ -126,7 +130,7 @@ exit 99
     def test_existing_derived_images_are_reused(self):
         result, calls = self.prepare(cached=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(calls.count('image inspect registry.example'), 17)
+        self.assertEqual(calls.count('image inspect registry.example'), 19)
         self.assertNotIn('build -t', calls)
 
     def test_unrecognized_backend_fails_before_docker(self):

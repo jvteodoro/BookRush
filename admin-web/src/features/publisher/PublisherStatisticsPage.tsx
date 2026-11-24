@@ -10,6 +10,7 @@ import {
   type Metric,
 } from "./publisherMetrics";
 import "./publisher-statistics.css";
+import { PublisherReviewQueue } from "./PublisherReviewQueue";
 import { PublishBookForm } from "./PublishBookForm";
 
 const number = new Intl.NumberFormat("pt-BR");
@@ -40,7 +41,12 @@ export function PublisherStatisticsPage() {
           <p>Envie seus livros para revisão e acompanhe suas publicações.</p>
         </div>
       </PageHeader>
-      {submissions.isSuccess && <PublishBookForm submissions={books} />}
+      {submissions.isSuccess && (
+        <>
+          <PublishBookForm submissions={books} />
+          <PublisherReviewQueue books={books} />
+        </>
+      )}
       {submissions.isPending ? (
         <p role="status">Carregando suas publicações…</p>
       ) : submissions.isError ? (
