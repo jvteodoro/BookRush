@@ -24,7 +24,7 @@ public class PublisherBehaviorMetricsController {
     this.jdbc = jdbc;
   }
 
-  @GetMapping("/books/{bookId}")
+  @GetMapping("/books/{bookId}/summary")
   public Map<String, Object> bookMetrics(@PathVariable UUID bookId,
       @RequestParam(defaultValue = "90") int days) {
     if (days < 1 || days > 366) {

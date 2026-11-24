@@ -326,19 +326,18 @@ Kubernetes exige registry e a credencial de kubeconfig descrita em
 
 ## Atualizar a definição do job
 
-`Jenkinsfile` é a fonte da pipeline. `bookrush.Jenkinsfile` é sua cópia de
-bootstrap na imagem e precisa permanecer idêntica. O script de inicialização
-reconcilia a definição de parâmetros do job existente em cada inicialização do
-Jenkins. Isso evita que parâmetros novos, como `ANALYTICS_GPU`, sejam
-silenciosamente descartados por uma definição persistida antiga. Depois de
-publicar uma alteração desse tipo, reinicie somente o container Jenkins quando
-não houver builds em andamento e confirme na API/UI que o parâmetro aparece
-antes de disparar o deploy. Para alterar a pipeline de um job existente, cole
-o novo `Jenkinsfile` em **Configure → Pipeline script** (sandbox ativado).
-Alternativamente, depois de publicar o arquivo, configure **Pipeline script
-from SCM**, repositório `https://github.com/jvteodoro/BookRush.git`, branch
-`*/main`, Script Path `Jenkinsfile`. Essa branch fornece a definição da pipeline;
-**BRANCH** seleciona o código que será compilado e implantado.
+`Jenkinsfile` é a fonte da pipeline e `bookrush.Jenkinsfile` é a cópia de
+bootstrap que deve permanecer idêntica. O job `bookrush-deploy` carrega o
+`Jenkinsfile` de `main` via Pipeline from SCM, com Script Path `Jenkinsfile` e
+branch fixa `*/main`; **BRANCH** seleciona o código que será compilado e
+implantado. O bootstrap reconcilia essa definição e os parâmetros do job a cada
+startup, incluindo `RUN_INFRA_CONTRACTS`. O gate `scripts/validate-pipelines.sh`
+garante que a opção exista tanto na pipeline quanto no bootstrap. Depois de
+publicar alterações no bootstrap, aguarde não haver builds ativos e recrie
+somente o container Jenkins com `docker compose ... up -d --no-deps
+--force-recreate jenkins`; isso atualiza os bind mounts e preserva o job, o
+histórico e o volume `jenkins_home`. Confirme definição e parâmetros na API/UI
+antes de disparar o deploy.
 
 Se a definição carregada pela `main` (ou um script inline antigo) ainda não
 exportar `RECOMMENDATION_IMAGE`, `READER_BFF_IMAGE`, `READER_PROFILE_IMAGE` ou
@@ -538,3 +537,43 @@ os registros mas não os expõe como categorias. A etapa de imagens executa
 `mvn verify` da ingestão, incluindo regressões do parser RDF para contextos
 LCSH/LCC/prateleira/idioma/formato e texto fragmentado. Para validar a correção
 em produção, implante catálogo, ingestão e frontend da mesma revisão.
+
+O preflight de storage do deploy integrado usa `wait-storage-ready.sh`: localiza
+SeaweedFS pelas labels Compose (projeto `bookrush`, serviço `seaweedfs`) em vez
+do nome físico do container. Aguarda até 180 segundos por `running|healthy`,
+incluindo recuperação transitória de `starting`/`unhealthy`. O deploy chama o helper
+com `180 bookrush true`: se o container identificado estiver inicialmente `exited`
+e tiver healthcheck, tenta `docker start` uma única vez, limitado a 30s, preservando
+imagem, configuração e volume existentes. Registra o estado anterior e aguarda
+`running|healthy`; se parar novamente, não repete a tentativa. O helper sem o
+terceiro argumento `true` permanece somente leitura. Não reinicia containers em
+execução, não provisiona containers ausentes e não recupera estados `dead`,
+`paused` ou sem healthcheck. Ausência, múltiplos containers, falha no start,
+novo encerramento ou timeout continuam bloqueando o deploy.
+Em caso de falha, o próprio console do build mostra identidade, estado,
+exit code, OOM, motivo e horário do término, contador de reinícios, últimos resultados
+do healthcheck e últimas 100 linhas do container. Cada consulta tem limite de 15s
+e saída de 32KiB; requer `timeout` no agente (se ausente, registra a omissão).
+Não imprime `Config.Env` nem comandos do healthcheck. Linhas com indícios de
+credenciais são omitidas dos diagnósticos; confira os logs antes de compartilhá-los.
+Mostra também `docker system df` do daemon e espaço/inodes do agente Jenkins,
+identificados separadamente: com socket remoto, o disco do agente pode não ser o
+disco do servidor Docker. Falha na coleta não libera o deploy nem impede as demais
+consultas. Não recria containers, não limpa disco e não apaga storage/volumes. Falha persistente
+exige inspecionar healthcheck, disco e a pipeline dedicada de SeaweedFS; aumentar
+a espera não resolve falta real de infraestrutura. O log antigo do build325 não
+permite distinguir essas causas por si só.
+
+O contrato de metadados cobre também os filtros combinados de categoria, autor e
+ano pelo gateway real, com paginação e ano de edição quando o ano da obra é ausente.
+
+O E2E administrativo valida a pontuação no snapshot mais recente da configuração
+de ranker da fixture. O relatório mantém buckets por minuto: uma execução que
+atravessa a virada do minuto pode retornar mais de uma linha válida no período.
+`scripts/test-reporting-rank-score-fixture.sh` cobre snapshots únicos/múltiplos,
+ordem invertida, configuração distinta e rejeição de valores atuais incorretos.
+A espera e a asserção final compartilham `scripts/assert-rank-score-fixture.jq`,
+incluindo status, versão/hash, decil, mínimo/máximo e contagem esperados. Se falhar,
+o console mostra somente os campos agregados usados na verificação.
+Os percentis de duração são comparados numericamente, sem depender de a versão
+do `jq` preservar a representação textual `120.0` ou normalizá-la para `120`.

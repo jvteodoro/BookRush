@@ -76,6 +76,31 @@ paths:
         '401': {description: Token interno ausente ou inválido.}
         '404': {description: Livro ou asset EPUB não encontrado.}
         '409': {description: Objeto ausente; reconciliação de storage necessária.}
+  /api/v1/books:
+    get:
+      tags: [Catálogo público]
+      summary: Listar livros do catálogo
+      description: Consulta pública de metadados bibliográficos com filtros opcionais combinados por AND. Não concede acesso ao conteúdo protegido.
+      operationId: searchPublicBooks
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: {type: string, maxLength: 500}
+          description: Busca livre por título, descrição, autores, categorias literárias ativas.
+        - {name: category, in: query, schema: {type: string, maxLength: 200}, description: Categoria literária ativa; correspondência parcial sem distinguir maiúsculas.}
+        - {name: author, in: query, schema: {type: string, maxLength: 200}, description: Autor creditado como AUTHOR; correspondência parcial.}
+        - {name: year, in: query, schema: {type: integer, minimum: -9999, maximum: 9999, not: {enum: [0]}}, description: Ano apresentado; primeiro ano da obra ou menor ano de edição conhecido.}
+        - {name: page, in: query, required: false, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: size, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200':
+          description: Página de livros ordenada por relevância, título e ID.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BookPage'}
+        '400': {description: Filtros ou paginação inválidos.}
+      security: []
   /api/internal/v1/catalog/books:
     get:
       tags: [Catálogo interno]
@@ -86,16 +111,20 @@ paths:
         - name: q
           in: query
           required: false
-          schema: {type: string}
-          description: Filtro por título canônico.
+          schema: {type: string, maxLength: 500}
+          description: Busca livre por título, descrição, autores, categorias literárias ativas.
+        - {name: category, in: query, schema: {type: string, maxLength: 200}, description: Categoria literária ativa; correspondência parcial sem distinguir maiúsculas.}
+        - {name: author, in: query, schema: {type: string, maxLength: 200}, description: Autor creditado como AUTHOR; correspondência parcial.}
+        - {name: year, in: query, schema: {type: integer, minimum: -9999, maximum: 9999, not: {enum: [0]}}, description: Ano apresentado; primeiro ano da obra ou menor ano de edição conhecido.}
         - {name: page, in: query, required: false, schema: {type: integer, minimum: 0, default: 0}}
         - {name: size, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
       responses:
         '200':
-          description: Página de livros ordenada pelo título canônico.
+          description: Página de livros ordenada por relevância, título e ID.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/BookPage'}
+        '400': {description: Filtros ou paginação inválidos.}
         '401': {description: Token interno ausente ou inválido.}
         '403': {description: Token sem scope bookrush.catalog.read/write.}
       security: [{catalogService: []}]

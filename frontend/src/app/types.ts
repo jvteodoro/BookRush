@@ -17,10 +17,13 @@ export type ReaderChapter = {
 };
 
 export type ReadiumBridge = {
+  currentLocator: () => Record<string, unknown> | null;
+  goToLocator: (locator: unknown) => Promise<boolean>;
   mount: (
     bookId: string,
     container: HTMLElement,
     onLocatorChanged?: (progression: number) => void,
+    onNotice?: (message: string) => void,
   ) => Promise<void>;
   unmount: () => Promise<void>;
   goToChapter: (chapterId: string) => Promise<boolean>;
@@ -34,8 +37,6 @@ export type CatalogBook = {
   id: string;
   canonicalTitle: string;
   authors?: string[] | null;
-  firstPublicationYear?: number | null;
-  publicationYear?: number | null;
   categories?: BookCategory[];
   originalLanguage?: string | null;
   description?: string | null;
@@ -58,7 +59,6 @@ export type PageLoopBook = {
   id: string;
   title: string;
   author: string;
-  publicationYear?: number | null;
   genre: string;
   categories?: BookCategory[];
   language?: string | null;

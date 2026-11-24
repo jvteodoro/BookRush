@@ -8,6 +8,9 @@ fail() { echo "pipeline validation: $*" >&2; exit 1; }
 test -f Jenkinsfile || fail 'Jenkinsfile ausente'
 test -f infrastructure/jenkins/bookrush.Jenkinsfile || fail 'cópia do Jenkinsfile ausente'
 cmp -s Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile || fail 'Jenkinsfiles principais divergem'
+grep -Fq "booleanParam(name: 'RUN_INFRA_CONTRACTS'" Jenkinsfile || fail 'Jenkinsfile principal sem opção RUN_INFRA_CONTRACTS'
+grep -Fq "BooleanParameterDefinition('RUN_INFRA_CONTRACTS'" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bootstrap Jenkins sem definição persistente de RUN_INFRA_CONTRACTS'
+grep -Fq "new BranchSpec('*/main')" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bookrush-deploy não fixa a definição da pipeline em main'
 if command -v python3 >/dev/null 2>&1; then
   python3 scripts/test-deploy-compose-images.py || fail 'contrato de imagens do deploy Compose inválido'
   python3 scripts/test-change-gate.py || fail 'regressões do change gate inválidas'
@@ -15,7 +18,7 @@ elif command -v docker >/dev/null 2>&1; then
   # O agente Jenkins tem Docker, mas não necessariamente Python. Envie apenas
   # os arquivos do teste por stdin: funciona também com daemon fora do agente,
   # sem depender de bind mounts ou instalar pacotes no host.
-  tar -cf - scripts/test-deploy-compose-images.py infrastructure/jenkins/deploy-compose.sh infrastructure/keycloak/request-client-token.py |
+  tar -cf - scripts/test-deploy-compose-images.py infrastructure/jenkins/deploy-compose.sh infrastructure/jenkins/wait-storage-ready.sh infrastructure/jenkins/probe-reader-library.sh infrastructure/traefik/dynamic.yaml infrastructure/keycloak/request-client-token.py |
     docker run --rm -i --network none python:3.12-slim bash -lc '
       set -euo pipefail
       workspace=$(mktemp -d)

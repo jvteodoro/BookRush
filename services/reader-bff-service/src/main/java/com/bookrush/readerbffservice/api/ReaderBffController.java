@@ -138,6 +138,21 @@ public class ReaderBffController {
     return mutate(state, HttpMethod.POST, "/api/v1/reader/books/" + bookId + "/bookmarks", request, body);
   }
 
+  @PutMapping("/books/{bookId}/bookmarks/{bookmarkId}")
+  public Object renameBookmark(@PathVariable UUID bookId, @PathVariable UUID bookmarkId,
+      @RequestBody Object body, Principal principal, HttpServletRequest request) {
+    requireReader(principal);
+    return mutate(state, HttpMethod.PUT, "/api/v1/reader/books/" + bookId + "/bookmarks/" + bookmarkId, request, body);
+  }
+
+  @DeleteMapping("/books/{bookId}/bookmarks/{bookmarkId}")
+  @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteBookmark(@PathVariable UUID bookId, @PathVariable UUID bookmarkId,
+      Principal principal, HttpServletRequest request) {
+    requireReader(principal);
+    mutate(state, HttpMethod.DELETE, "/api/v1/reader/books/" + bookId + "/bookmarks/" + bookmarkId, request, null);
+  }
+
   @PostMapping("/books/{bookId}/opened")
   public Object opened(@PathVariable UUID bookId, @RequestBody(required = false) Object body, Principal principal,
       HttpServletRequest request) {

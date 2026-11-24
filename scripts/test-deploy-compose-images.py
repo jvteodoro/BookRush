@@ -31,7 +31,11 @@ class DeployImagesTest(unittest.TestCase):
             docker = folder / 'docker'
             docker.write_text('''#!/bin/bash
 printf '%s\\n' "$*" >> "$CALL_LOG"
-if [[ "$1 $2" == 'inspect --format' ]]; then echo healthy; exit 0; fi
+if [[ "$1" == ps ]]; then echo storage-fixture; exit 0; fi
+if [[ "$1 $2" == 'inspect --format' ]]; then
+  if [[ "$3" == *'.State.Status'* ]]; then echo 'running|healthy'; else echo healthy; fi
+  exit 0
+fi
 if [[ "$1 $2" == 'image inspect' ]]; then
   [[ -z "$MISSING_IMAGE" || "$3" != "$MISSING_IMAGE" ]] || exit 1
   if [[ "$CACHED" == true || "$3" == test/* || "$3" == custom/* || "$3" == */catalog-service:* || "$3" == */frontend:* || "$3" == */book-analytics-service:* ]]; then exit 0; fi
@@ -188,6 +192,100 @@ class ClientTokenTest(unittest.TestCase):
                 self.assertEqual(code, 1)
                 self.assertEqual(output, '')
                 self.assertTrue(errors)
+
+class StorageReadinessTest(unittest.TestCase):
+    def check(self, states='running|healthy', containers='renamed-storage-id', diagnostic_failure=False, recover=False, start_failure=False):
+        with tempfile.TemporaryDirectory(prefix='bookrush-storage-preflight-') as directory:
+            folder = Path(directory)
+            docker = folder / 'docker'
+            docker.write_text('''#!/bin/bash
+printf '%s\\n' "$*" >> "$CALL_LOG"
+if [[ "$1" == ps ]]; then printf "%s" "$CONTAINERS"; exit 0; fi
+if [[ "$1" == start ]]; then [[ "$START_FAILURE" != true ]]; exit; fi
+if [[ "$1" == logs ]]; then
+  [[ "$DIAGNOSTIC_FAILURE" != true ]] || exit 124
+  echo 'fatal: no space left on device'
+  echo 'password=fixture-sensitive-value'
+  echo 'Authorization: Bearer fixture-sensitive-value'
+  echo 'url=https://user:fixture-sensitive-value@storage.example'
+  exit 0
+fi
+if [[ "$1 $2" == 'system df' ]]; then echo 'Images usage fixture'; exit 0; fi
+if [[ "$3" == storage=* ]]; then echo 'storage=fixture oom=false error=fixture-start-error'; exit 0; fi
+if [[ "$3" == *'.State.Health.Log'* ]]; then echo 'exit=1 output=connection refused'; exit 0; fi
+count=0; [[ ! -f "$COUNTER" ]] || read -r count < "$COUNTER"
+IFS=";" read -ra states <<< "$HEALTH_STATES"
+index=$count; ((index < ${#states[@]})) || index=$((${#states[@]}-1))
+printf "%s" "${states[$index]}"
+printf "%s\\n" "$((count+1))" > "$COUNTER"
+''')
+            docker.chmod(0o755)
+            sleep = folder / 'sleep'; sleep.write_text('#!/bin/bash\nexit 0\n'); sleep.chmod(0o755)
+            env = dict(os.environ, PATH=f'{folder}:{os.environ["PATH"]}', CONTAINERS=containers,
+                       HEALTH_STATES=states, COUNTER=str(folder / 'counter'), CALL_LOG=str(folder / 'calls'),
+                       DIAGNOSTIC_FAILURE=str(diagnostic_failure).lower(), START_FAILURE=str(start_failure).lower())
+            result = subprocess.run(['bash', str(ROOT / 'infrastructure/jenkins/wait-storage-ready.sh'), '6', 'bookrush', str(recover).lower()],
+                                    env=env, text=True, capture_output=True)
+            result.calls = (folder / 'calls').read_text().splitlines()
+            return result
+
+    def test_recognizes_renamed_healthy_storage_by_compose_identity(self):
+        self.assertEqual(self.check().returncode, 0)
+
+    def test_waits_for_starting_or_transient_unhealthy_storage_to_recover(self):
+        for states in ('running|starting;running|healthy', 'running|unhealthy;running|healthy'):
+            result = self.check(states)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_persistent_failure_is_not_bypassed(self):
+        for states in ('running|unhealthy', 'running|starting', 'exited|unhealthy', 'running|missing'):
+            result = self.check(states)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn('deploy bloqueado sem alterar volumes', result.stderr)
+
+    def test_missing_or_ambiguous_storage_is_actionable(self):
+        for containers in ('', 'storage-one\nstorage-two'):
+            result = self.check(containers=containers)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('esperado exatamente um', result.stderr)
+
+    def test_failure_reports_diagnostics_without_credentials_or_mutations(self):
+        result = self.check('exited|starting')
+        self.assertEqual(result.returncode, 1)
+        for detail in ('oom=false', 'fixture-start-error', 'connection refused',
+                       'no space left on device', 'Images usage fixture', 'pode diferir do host Docker'):
+            self.assertIn(detail, result.stderr)
+        self.assertNotIn('fixture-sensitive-value', result.stderr)
+        self.assertIn('linha omitida', result.stderr)
+        self.assertTrue(all(call.startswith(('ps ', 'inspect ', 'logs ', 'system df')) for call in result.calls))
+
+    def test_diagnostic_failure_keeps_deploy_blocked_and_continues_reporting(self):
+        result = self.check('exited|starting', diagnostic_failure=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('Images usage fixture', result.stderr)
+        self.assertIn('deploy bloqueado sem alterar volumes', result.stderr)
+
+    def test_deploy_recovers_existing_stopped_container_once(self):
+        result = self.check('exited|starting;running|starting;running|healthy', recover=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.calls.count('start renamed-storage-id'), 1)
+        self.assertTrue(all(call.startswith(('ps ', 'inspect ', 'start ')) for call in result.calls))
+
+    def test_recovery_failure_and_repeated_exit_remain_blocked(self):
+        for states, start_failure in [('exited|starting', False), ('exited|starting', True),
+                                      ('exited|starting;running|unhealthy', False)]:
+            with self.subTest(states=states, start_failure=start_failure):
+                result = self.check(states, recover=True, start_failure=start_failure)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertEqual(result.calls.count('start renamed-storage-id'), 1)
+                self.assertIn('deploy bloqueado sem alterar volumes', result.stderr)
+
+    def test_recovery_does_not_restart_running_or_invalid_storage(self):
+        for states in ('running|healthy', 'running|unhealthy', 'exited|missing', 'dead|unhealthy'):
+            result = self.check(states, recover=True)
+            self.assertFalse(any(call.startswith('start ') for call in result.calls))
+
+
 
 class GatewayRoutesTest(unittest.TestCase):
     def test_library_probe_rejects_cors_and_dependency_failures_without_mutating_books(self):

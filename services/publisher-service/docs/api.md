@@ -86,6 +86,8 @@ A interface mostra impressões, aberturas, leituras (READ_PROGRESS e BOOK_COMPLE
 
 O publisher consulta `/api/internal/v1/publisher/metrics/books/{bookId}` por uma identidade S2S exclusiva: `bookrush-publisher-metrics-s2s`, realm plataforma, audience `bookrush-behavior`, scope `bookrush.publisher.metrics.read`. O bearer humano não é encaminhado. O token é cacheado até perto da expiração; timeout/falha de autenticação não vira atividade zero.
 
+O cliente de resumo com supressão de amostras usa a rota distinta `/api/internal/v1/publisher/metrics/books/{bookId}/summary`, atendida pelo behavior-service. Essa separação preserva o contrato de agregados diários acima e evita conflito entre controllers.
+
 Para implantação, reconciliar o realm declarativo e configurar `PUBLISHER_METRICS_CLIENT_SECRET` de forma protegida, além de `PUBLISHER_METRICS_CLIENT_ID` e `PUBLISHER_METRICS_TOKEN_URI` se houver overrides. Sem essa credencial a interface indica indisponibilidade. Não inserir valores em Git. A rota pública existente é preservada pelo router publisher de `infrastructure/traefik/dynamic.yaml`; a rota interna não recebe router público próprio. CORS mantém as origens explícitas existentes da console.
 
 Nenhuma migration foi necessária: reutilizamos published_work e behavior.daily_book. Deploy, reconcile no ambiente real e smoke público com sessão real precisam ser executados no ambiente de destino antes de declarar validação em produção.

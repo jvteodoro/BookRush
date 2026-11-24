@@ -94,7 +94,7 @@ paths:
         '400': { description: Invalid limit }
         '401': { description: Missing or invalid S2S token }
         '403': { description: Missing S2S scope or audience }
-  /api/internal/v1/publisher/metrics/books/{bookId}:
+  /api/internal/v1/publisher/metrics/books/{bookId}/summary:
     get:
       summary: Read thresholded daily metrics for one publisher book
       description: >-

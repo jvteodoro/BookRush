@@ -9,7 +9,6 @@ import hudson.plugins.git.BranchSpec
 
 def instance = Jenkins.get()
 JenkinsLocationConfiguration.get().setUrl('https://jenkins-bookrush.jteodoro.tec.br/')
-def pipelineFile = new File('/opt/bookrush/bookrush.Jenkinsfile')
 def job = instance.getItem('bookrush-deploy')
 if (job == null) {
     job = instance.createProject(WorkflowJob, 'bookrush-deploy')
@@ -116,8 +115,19 @@ replaceParameters(observabilityJob, [
     new StringParameterDefinition('GRAFANA_OIDC_CREDENTIAL_ID', 'grafana-oidc-client-secret', 'Credential Jenkins Secret text do client OIDC Grafana.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Implantar a stack de observabilidade no Compose de produção.')
 ])
-if (!(job.getDefinition() instanceof CpsScmFlowDefinition)) {
-    job.setDefinition(scmFor('Jenkinsfile'))
+def mainScm = new GitSCM(
+    [new UserRemoteConfig('https://github.com/jvteodoro/BookRush.git', null, null, null)],
+    [new BranchSpec('*/main')], false, [], null, null, [])
+def mainPipelineDefinition = new CpsScmFlowDefinition(mainScm, 'Jenkinsfile')
+mainPipelineDefinition.setLightweight(false)
+def currentMainDefinition = job.getDefinition()
+def currentMainBranches = currentMainDefinition instanceof CpsScmFlowDefinition
+    ? currentMainDefinition.getScm().getBranches().collect { it.getName() }
+    : []
+if (!(currentMainDefinition instanceof CpsScmFlowDefinition) ||
+    currentMainDefinition.getScriptPath() != 'Jenkinsfile' ||
+    currentMainBranches != ['*/main']) {
+    job.setDefinition(mainPipelineDefinition)
     job.save()
 }
 def mainParameters = [
@@ -127,6 +137,7 @@ def mainParameters = [
     new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica imagens.'),
     new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação no destino escolhido após o build.'),
+    new BooleanParameterDefinition('RUN_INFRA_CONTRACTS', true, 'Executar os contratos de infraestrutura antes de construir as imagens.'),
     new BooleanParameterDefinition('RUN_ANALYTICS_SAMPLE', false, 'Cancelar jobs analíticos ativos e processar uma amostra controlada de scores.'),
     new StringParameterDefinition('ANALYTICS_SAMPLE_MAX_BOOKS', '4', 'Quantidade máxima de livros no lote controlado de scores.'),
     new ChoiceParameterDefinition('FEED_PERSONALIZED_MODE', ['ON', 'OFF'] as String[], 'Ativar o feed personalizado; ON é o padrão durante a fase de testes.'),

@@ -20,6 +20,8 @@ class ReaderBffControllerTest {
     assertThrows(ResponseStatusException.class, () -> controller.feed(20, null, request));
     assertThrows(ResponseStatusException.class, () -> controller.library(null, request));
     assertThrows(ResponseStatusException.class, () -> controller.bookmarks(java.util.UUID.randomUUID(), null, request));
+    assertThrows(ResponseStatusException.class, () -> controller.renameBookmark(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), java.util.Map.of("name", "Trecho"), null, request));
+    assertThrows(ResponseStatusException.class, () -> controller.deleteBookmark(java.util.UUID.randomUUID(), java.util.UUID.randomUUID(), null, request));
   }
 
   @Test

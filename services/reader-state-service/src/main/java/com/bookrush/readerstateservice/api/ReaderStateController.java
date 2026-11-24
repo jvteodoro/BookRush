@@ -75,13 +75,33 @@ public class ReaderStateController {
     return value instanceof Number number ? Math.max(0, number.intValue()) : 0;
   }
 
+  public record Progress(@NotNull @jakarta.validation.constraints.Min(0) Long positionCodepoint,
+      @NotNull @jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("100") Double percent,
+      Map<String, Object> locator) {
+    public Progress(Long positionCodepoint, Double percent) { this(positionCodepoint, percent, null); }
+  }
+
+  private String serializeLocator(Map<?, ?> locator) {
+    if (!(locator.get("href") instanceof String href) || href.isBlank()
+        || !(locator.get("type") instanceof String type) || type.isBlank()
+        || !(locator.get("locations") instanceof Map<?, ?> locations)
+        || !(locations.get("progression") instanceof Number progression)
+        || !Double.isFinite(progression.doubleValue())
+        || progression.doubleValue() < 0 || progression.doubleValue() > 1) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
+    }
+    try {
+      return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(locator);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
+    }
+  }
   private int boundedSeconds(Map<String, Object> body) {
     Object value = body.get("activeSeconds");
     if (!(value instanceof Number number)) return 0;
     return (int) Math.min(MAX_SESSION_ACTIVE_SECONDS, Math.max(0L, number.longValue()));
   }
 
-  public record Progress(@NotNull Long positionCodepoint, @NotNull Double percent) {}
 
   @Transactional
   @PostMapping("/books/{bookId}/opened")
@@ -221,10 +241,15 @@ public class ReaderStateController {
   public Map<String, Object> progress(@PathVariable UUID bookId, @Valid @RequestBody Progress value,
       Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
-    jdbc.update("INSERT INTO reader_state.progress(subject_key, book_id, position_codepoint, percent) "
-        + "VALUES (?, ?, ?, ?) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
-        + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, updated_at = now()",
-        subject, bookId, value.positionCodepoint(), value.percent());
+    if (value.percent() == null || !Double.isFinite(value.percent()) || value.percent() < 0 || value.percent() > 100
+        || value.positionCodepoint() == null || value.positionCodepoint() < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid reading progress");
+    }
+    String locator = value.locator() == null ? null : serializeLocator(value.locator());
+    jdbc.update("INSERT INTO reader_state.progress(subject_key, book_id, position_codepoint, percent, locator) "
+        + "VALUES (?, ?, ?, ?, ?::jsonb) ON CONFLICT (subject_key, book_id) DO UPDATE SET "
+        + "position_codepoint = EXCLUDED.position_codepoint, percent = EXCLUDED.percent, locator = EXCLUDED.locator, updated_at = now()",
+        subject, bookId, value.positionCodepoint(), value.percent(), locator);
     Map<String, Object> payload = new LinkedHashMap<>(correlation(request));
     payload.put("percent", value.percent());
     behavior.publish("READ_PROGRESS", bookId, payload, authorization(request));
@@ -240,24 +265,68 @@ public class ReaderStateController {
   @PostMapping("/books/{bookId}/bookmarks")
   public Map<String, Object> bookmark(@PathVariable UUID bookId, @RequestBody Map<String, Object> body,
       Principal principal) {
-    long position = integerValue(body, "positionCodepoint");
+    String reader = subject(principal);
+    String name = bookmarkName(body, false);
+    long position = body.get("positionCodepoint") instanceof Number number ? number.longValue() : 0;
     String note = String.valueOf(body.getOrDefault("note", ""));
-    UUID id = UUID.randomUUID();
-    jdbc.update("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, note) "
-        + "VALUES (?, ?, ?, ?, ?) ON CONFLICT (subject_key, book_id, position_codepoint) "
-        + "DO UPDATE SET note = EXCLUDED.note", id, subject(principal), bookId, position, note);
-    return Map.of("id", id, "bookId", bookId, "positionCodepoint", position, "note", note);
+    String locatorJson = null;
+    if (body.containsKey("locator")) {
+      if (!(body.get("locator") instanceof Map<?, ?> locator)) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid Readium locator");
+      }
+      locatorJson = serializeLocator(locator);
+    } else if (!(body.get("positionCodepoint") instanceof Number number) || number.longValue() < 0) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "locator or positionCodepoint required");
+    }
+    String conflict = locatorJson == null
+        ? "(subject_key, book_id, position_codepoint) WHERE locator IS NULL "
+        : "(subject_key, book_id, md5(locator::text)) WHERE locator IS NOT NULL ";
+    return jdbc.queryForMap("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, note, locator, name) "
+        + "VALUES (?, ?, ?, ?, ?, ?::jsonb, COALESCE(?, '')) ON CONFLICT " + conflict
+        + "DO UPDATE SET note = EXCLUDED.note, name = COALESCE(?, bookmarks.name) "
+        + "RETURNING id, book_id, position_codepoint, name, note, locator::text AS locator, created_at",
+        UUID.randomUUID(), reader, bookId, position, note, locatorJson, name, name);
+  }
+
+  private String bookmarkName(Map<String, Object> body, boolean required) {
+    if (!required && !body.containsKey("name")) return null;
+    if (!(body.get("name") instanceof String value) || value.strip().isEmpty() || value.strip().length() > 120) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "bookmark name must have 1 to 120 characters");
+    }
+    return value.strip();
+  }
+
+  @PutMapping("/books/{bookId}/bookmarks/{bookmarkId}")
+  public Map<String, Object> renameBookmark(@PathVariable UUID bookId, @PathVariable UUID bookmarkId,
+      @RequestBody Map<String, Object> body, Principal principal) {
+    String reader = subject(principal);
+    String name = bookmarkName(body, true);
+    var rows = jdbc.queryForList("UPDATE reader_state.bookmarks SET name = ? "
+        + "WHERE id = ? AND subject_key = ? AND book_id = ? "
+        + "RETURNING id, book_id, position_codepoint, name, note, locator::text AS locator, created_at",
+        name, bookmarkId, reader, bookId);
+    if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "bookmark not found");
+    return rows.get(0);
+  }
+
+  @DeleteMapping("/books/{bookId}/bookmarks/{bookmarkId}")
+  @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteBookmark(@PathVariable UUID bookId, @PathVariable UUID bookmarkId, Principal principal) {
+    if (jdbc.update("DELETE FROM reader_state.bookmarks WHERE id = ? AND subject_key = ? AND book_id = ?",
+        bookmarkId, subject(principal), bookId) == 0) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "bookmark not found");
+    }
   }
 
   @GetMapping("/books/{bookId}/bookmarks")
   public Object bookmarks(@PathVariable UUID bookId, Principal principal) {
-    return jdbc.queryForList("SELECT id, position_codepoint, note, created_at FROM reader_state.bookmarks "
-        + "WHERE subject_key = ? AND book_id = ? ORDER BY position_codepoint", subject(principal), bookId);
+    return jdbc.queryForList("SELECT id, position_codepoint, name, note, locator::text AS locator, created_at FROM reader_state.bookmarks "
+        + "WHERE subject_key = ? AND book_id = ? ORDER BY created_at DESC, id", subject(principal), bookId);
   }
 
   @GetMapping("/books/{bookId}/progress")
   public Object getProgress(@PathVariable UUID bookId, Principal principal) {
-    return jdbc.queryForList("SELECT position_codepoint, percent, updated_at FROM reader_state.progress "
+    return jdbc.queryForList("SELECT position_codepoint, percent, locator::text AS locator, updated_at FROM reader_state.progress "
         + "WHERE subject_key = ? AND book_id = ?", subject(principal), bookId);
   }
 }

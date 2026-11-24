@@ -5,6 +5,7 @@ trap 'printf "E2E failure at line %s\n" "$LINENO" >&2' ERR
 # End-to-end proof of platform token -> admin-service -> product-realm users.
 # All containers, credentials and data are disposable.
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+bash "$repo_dir/scripts/test-reporting-rank-score-fixture.sh"
 suffix="$RANDOM-$$"
 network="bookrush-admin-e2e-$suffix"
 keycloak="bookrush-admin-e2e-keycloak-$suffix"
@@ -611,16 +612,18 @@ reading_daily_json="$(docker exec -e ACCESS_TOKEN="$token" "$probe" /bin/sh -c '
   curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
     "http://admin-service:8100/api/admin/v1/reporting/reading-daily?days=7"
 ')"
-if [[ "$(jq -r '[.series[] | select(.sessions == 3) | .sessions, .active_seconds, .p50_session_seconds, .p90_session_seconds] | @tsv' <<<"$reading_daily_json")" != $'3\t480\t120.0\t264.0' \
-    || "$(jq -r '[.series[] | select(.sessions == 1) | .active_seconds, .p50_session_seconds, .p90_session_seconds] | @tsv' <<<"$reading_daily_json")" != $'86400\t86400.0\t86400.0' ]]; then
+reading_daily_assert='([.series[] | select(.sessions == 3) |
+  [.sessions, .active_seconds, .p50_session_seconds, .p90_session_seconds]] == [[3, 480, 120, 264]]) and
+  ([.series[] | select(.sessions == 1) |
+  [.active_seconds, .p50_session_seconds, .p90_session_seconds]] == [[86400, 86400, 86400]])'
+if ! jq -e "$reading_daily_assert" <<<"$reading_daily_json" >/dev/null; then
   echo "Reading daily response: $reading_daily_json" >&2
   docker exec "$postgres" psql -U bookrush -d bookrush -c \
     "SELECT projection_name, refresh_status, last_error_code, record_count FROM reporting.projection_health WHERE projection_name = 'reading_daily'" >&2 || true
   docker logs --tail=80 "$service" >&2
 fi
 [[ "$(jq -r '.status' <<<"$reading_daily_json")" == UNTRUSTED ]]
-[[ "$(jq -r '[.series[] | select(.sessions == 3) | .sessions, .active_seconds, .p50_session_seconds, .p90_session_seconds] | @tsv' <<<"$reading_daily_json")" == $'3\t480\t120.0\t264.0' ]]
-[[ "$(jq -r '[.series[] | select(.sessions == 1) | .active_seconds, .p50_session_seconds, .p90_session_seconds] | @tsv' <<<"$reading_daily_json")" == $'86400\t86400.0\t86400.0' ]]
+jq -e "$reading_daily_assert" <<<"$reading_daily_json" >/dev/null
 [[ "$(jq -r '[.series[] | select(.sessions == 3) | .unique_readers] | @tsv' <<<"$reading_daily_json")" == $'4' ]]
 [[ "$(jq -r '[.series[] | select(.sessions == 3) | .session_under_1m, .session_1m_5m, .session_5m_15m, .session_15m_plus] | @tsv' <<<"$reading_daily_json")" == $'0\t2\t1\t0' ]]
 [[ "$(jq -r '[.series[] | select(.sessions == 1) | .session_under_1m, .session_1m_5m, .session_5m_15m, .session_15m_plus] | @tsv' <<<"$reading_daily_json")" == $'0\t0\t0\t1' ]]
@@ -751,11 +754,14 @@ for _ in $(seq 1 30); do
     curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
       "http://admin-service:8100/api/admin/v1/reporting/content-rank-scores?days=1"
   ' 2>/dev/null || true)"
-  [[ "$(jq -r '[.series[]? | select(.ranker_code == "fixture-ranker" and .score_decile == 0 and .excerpt_count == 1)] | length' <<<"$rank_scores_json")" == 1 ]] && break
+  jq -e -s -f "$repo_dir/scripts/assert-rank-score-fixture.jq" <<<"$rank_scores_json" >/dev/null 2>&1 && break
   sleep 1
 done
-[[ "$(jq -r '.status' <<<"$rank_scores_json")" == UNTRUSTED ]]
-[[ "$(jq -r '[.series[] | select(.ranker_code == "fixture-ranker") | .score_min, .score_max, .excerpt_count] | @tsv' <<<"$rank_scores_json")" == $'0.9\t0.9\t1' ]]
+if ! jq -e -s -f "$repo_dir/scripts/assert-rank-score-fixture.jq" <<<"$rank_scores_json" >/dev/null; then
+  echo 'Content rank score E2E: latest configuration snapshot does not match expected scores/count/decile.' >&2
+  jq -c '{status, series: [.series[]? | {collected_at, ranker_code, ranker_version, configuration_hash, score_decile, score_min, score_max, excerpt_count}]}' <<<"$rank_scores_json" >&2 || true
+  exit 1
+fi
 echo 'Content rank score E2E: V29, 401/200, config-scoped score deciles OK'
 excerpt_production_unauthenticated_status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
   'http://admin-service:8100/api/admin/v1/reporting/excerpt-production?days=1')"

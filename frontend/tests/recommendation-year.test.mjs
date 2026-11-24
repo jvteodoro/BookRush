@@ -34,15 +34,15 @@ const bundle = await build({
 });
 const { render } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 
-test('recommendations render the bibliographic edition year when first publication is unknown', () => {
+test('recommendations omit edition years while preserving authors', () => {
   const html = render({ authors: ['Fixture Author'], firstPublicationYear: null, publicationYear: 1899 });
-  assert.match(html, /br-book-card__year[^>]*>1899</);
+  assert.doesNotMatch(html, /br-book-card__year|1899/);
   assert.match(html, /Fixture Author/);
 });
 
-test('recommendations still prefer the known first publication over a later edition', () => {
+test('recommendations omit both known work and edition years', () => {
   const html = render({ firstPublicationYear: 1818, publicationYear: 1912 });
-  assert.match(html, /br-book-card__year[^>]*>1818</);
+  assert.doesNotMatch(html, /br-book-card__year|1818/);
   assert.doesNotMatch(html, />1912</);
 });
 

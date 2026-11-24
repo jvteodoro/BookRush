@@ -149,3 +149,9 @@ comentários da projeção `behavior.daily_book`, atualizada pelo job de
 manutenção. O publisher-service valida a propriedade da publicação antes de
 chamar a rota. A resposta não inclui identidades de leitores. O segredo da
 identidade S2S permanece no ambiente protegido.
+
+O resumo com supressão de amostras pequenas usa a rota separada
+`GET /api/internal/v1/publisher/metrics/books/{bookId}/summary?days=N`.
+Ela retorna métricas diárias e crescimento em 30 dias; oculta valores quando há
+menos de cinco leitores distintos com leitura no período aplicável. O cliente
+`PublisherBehaviorMetricsClient` usa essa rota.

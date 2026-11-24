@@ -78,11 +78,7 @@ if [[ -z "$storage_public_endpoint" || "$storage_public_endpoint" =~ ^https?://(
   echo 'STORAGE_PUBLIC_ENDPOINT deve ser uma URL HTTPS pública do endpoint S3; localhost não pode ser usado em produção.' >&2
   exit 1
 fi
-storage_health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' bookrush-seaweedfs-1 2>/dev/null || true)"
-if [[ "$storage_health" != healthy ]]; then
-  echo 'SeaweedFS não está provisionado/saudável. Execute o procedimento inicial de infraestrutura antes do deploy.' >&2
-  exit 1
-fi
+bash "${script_dir}/wait-storage-ready.sh" 180 bookrush true
 for entry in "${compatibility_services[@]}"; do
   service="${entry%%|*}"
   image="${entry#*|}"

@@ -42,7 +42,7 @@ public final class PublisherBehaviorMetricsClient {
 
   public Object bookMetrics(Object bookId) {
     return behavior.get()
-        .uri(uri -> uri.path("/api/internal/v1/publisher/metrics/books/{bookId}")
+        .uri(uri -> uri.path("/api/internal/v1/publisher/metrics/books/{bookId}/summary")
             .queryParam("days", 366).build(bookId))
         .headers(headers -> headers.setBearerAuth(accessToken()))
         .retrieve().body(Map.class);
