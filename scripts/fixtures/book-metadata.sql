@@ -18,3 +18,11 @@ INSERT INTO catalog.subject(id,canonical_name,normalized_name,scheme) VALUES
 INSERT INTO catalog.book_subject(book_id,subject_id,source_id,assignment_method)
 SELECT book.id, subject.id,'10000000-0000-4000-8000-000000000001'::uuid,'SOURCE'
 FROM catalog.book book CROSS JOIN catalog.subject subject WHERE subject.scheme='GUTENBERG';
+
+-- Search filters use real author credits and the same effective year as metadata.
+UPDATE catalog.book SET first_publication_year=1899 WHERE id='11111111-1111-4111-8111-111111111111';
+INSERT INTO catalog.author(id,name) VALUES ('99999999-9999-4999-8999-999999999999','Fixture Writer');
+INSERT INTO catalog.book_author(book_id,author_id,role,position)
+SELECT id,'99999999-9999-4999-8999-999999999999','AUTHOR',1 FROM catalog.book;
+INSERT INTO catalog.edition(id,book_id,publication_year) VALUES
+ ('88888888-8888-4888-8888-888888888888','22222222-2222-4222-8222-222222222222',1912);

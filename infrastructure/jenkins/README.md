@@ -527,3 +527,32 @@ os registros mas não os expõe como categorias. A etapa de imagens executa
 `mvn verify` da ingestão, incluindo regressões do parser RDF para contextos
 LCSH/LCC/prateleira/idioma/formato e texto fragmentado. Para validar a correção
 em produção, implante catálogo, ingestão e frontend da mesma revisão.
+
+O preflight de storage do deploy integrado usa `wait-storage-ready.sh`: localiza
+SeaweedFS pelas labels Compose (projeto `bookrush`, serviço `seaweedfs`) em vez
+do nome físico do container. Aguarda até 180 segundos por `running|healthy`,
+incluindo recuperação transitória de `starting`/`unhealthy`. O deploy chama o helper
+com `180 bookrush true`: se o container identificado estiver inicialmente `exited`
+e tiver healthcheck, tenta `docker start` uma única vez, limitado a 30s, preservando
+imagem, configuração e volume existentes. Registra o estado anterior e aguarda
+`running|healthy`; se parar novamente, não repete a tentativa. O helper sem o
+terceiro argumento `true` permanece somente leitura. Não reinicia containers em
+execução, não provisiona containers ausentes e não recupera estados `dead`,
+`paused` ou sem healthcheck. Ausência, múltiplos containers, falha no start,
+novo encerramento ou timeout continuam bloqueando o deploy.
+Em caso de falha, o próprio console do build mostra identidade, estado,
+exit code, OOM, motivo e horário do término, contador de reinícios, últimos resultados
+do healthcheck e últimas 100 linhas do container. Cada consulta tem limite de 15s
+e saída de 32KiB; requer `timeout` no agente (se ausente, registra a omissão).
+Não imprime `Config.Env` nem comandos do healthcheck. Linhas com indícios de
+credenciais são omitidas dos diagnósticos; confira os logs antes de compartilhá-los.
+Mostra também `docker system df` do daemon e espaço/inodes do agente Jenkins,
+identificados separadamente: com socket remoto, o disco do agente pode não ser o
+disco do servidor Docker. Falha na coleta não libera o deploy nem impede as demais
+consultas. Não recria containers, não limpa disco e não apaga storage/volumes. Falha persistente
+exige inspecionar healthcheck, disco e a pipeline dedicada de SeaweedFS; aumentar
+a espera não resolve falta real de infraestrutura. O log antigo do build325 não
+permite distinguir essas causas por si só.
+
+O contrato de metadados cobre também os filtros combinados de categoria, autor e
+ano pelo gateway real, com paginação e ano de edição quando o ano da obra é ausente.

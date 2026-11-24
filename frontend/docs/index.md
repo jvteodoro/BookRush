@@ -540,3 +540,12 @@ headless, com fixture local e a interface real do leitor. Cobre nomes vazios,
 cria??o, edi??o sem mudar posi??o, cancelamento, Escape, exclus?o e erros HTTP
 com nova tentativa. A vari?vel PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH permite usar
 um Chrome j? instalado, como no teste de layout do leitor.
+
+Na busca de **Livros**, os campos **Categoria** e **Autor**
+podem ser combinados com a busca livre. Alterar um filtro volta à primeira
+página; **Limpar filtros** preserva o texto livre, enquanto **Explorar catálogo**
+limpa tudo. A busca de Pessoas continua independente desses filtros.
+Os filtros utilizam autores e categorias bibliográficas fornecidos pelo catálogo.
+O site não exibe nem utiliza o ano de publicação, mesmo quando fornecido pela
+API. Não há filtro por ano; a busca livre não usa os campos bibliográficos de ano.
+Autores, categorias e demais metadados continuam disponíveis.
