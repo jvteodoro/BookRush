@@ -1,0 +1,280 @@
+[
+  {
+    "name": "Free adult reads",
+    "route": "reader-bff-service GET /api/v1/reader/feed",
+    "facts": {},
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Free adult cannot publish",
+    "route": "publisher-service POST /api/v1/publisher/submissions",
+    "facts": {},
+    "expected": {
+      "status": 403,
+      "reason": "ENTITLEMENT_REQUIRED"
+    }
+  },
+  {
+    "name": "Premium owner publishes",
+    "route": "publisher-service POST /api/v1/publisher/submissions",
+    "facts": {
+      "paid": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Adult family member publishes",
+    "route": "publisher-service POST /api/v1/publisher/submissions",
+    "facts": {
+      "paid": true,
+      "member": true,
+      "delegate": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Adult family member without delegation",
+    "route": "publisher-service POST /api/v1/publisher/submissions",
+    "facts": {
+      "paid": true,
+      "member": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "DELEGATION_REQUIRED"
+    }
+  },
+  {
+    "name": "Unlinked minor cannot read",
+    "route": "reader-bff-service GET /api/v1/reader/feed",
+    "facts": {
+      "minor": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "ACCOUNT_RESTRICTED"
+    }
+  },
+  {
+    "name": "Unlinked minor sees own session",
+    "route": "reader-bff-service GET /api/v1/session",
+    "facts": {
+      "minor": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Unlinked minor accepts own invitation",
+    "route": "family-service POST /api/v1/family/invitations/{id}/accept",
+    "facts": {
+      "minor": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Unlinked minor cannot accept another invitation",
+    "route": "family-service POST /api/v1/family/invitations/{id}/accept",
+    "facts": {
+      "minor": true,
+      "owner": false
+    },
+    "expected": {
+      "status": 403,
+      "reason": "OWNERSHIP_REQUIRED"
+    }
+  },
+  {
+    "name": "Supervised minor reads",
+    "route": "reader-bff-service GET /api/v1/reader/feed",
+    "facts": {
+      "minor": true,
+      "member": true,
+      "access_grant": true,
+      "paid": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Supervised minor cannot publish",
+    "route": "publisher-service POST /api/v1/publisher/submissions",
+    "facts": {
+      "minor": true,
+      "member": true,
+      "access_grant": true,
+      "paid": true,
+      "delegate": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "AGE_INELIGIBLE"
+    }
+  },
+  {
+    "name": "Billing owner lacks supervision",
+    "route": "reader-bff-service GET /api/v1/reader/supervision/{memberId}/history",
+    "facts": {
+      "paid": true,
+      "target_minor": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "SUPERVISION_REQUIRED"
+    }
+  },
+  {
+    "name": "Verified guardian reads exact minor history",
+    "route": "reader-bff-service GET /api/v1/reader/supervision/{memberId}/history",
+    "facts": {
+      "guardian": true,
+      "target_minor": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Other family cannot read minor history",
+    "route": "reader-bff-service GET /api/v1/reader/supervision/{memberId}/history",
+    "facts": {
+      "target_minor": true,
+      "guardian_other_minor": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "SUPERVISION_REQUIRED"
+    }
+  },
+  {
+    "name": "Guardian loses access at majority",
+    "route": "reader-bff-service GET /api/v1/reader/supervision/{memberId}/history",
+    "facts": {
+      "guardian": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "TARGET_NOT_ELIGIBLE"
+    }
+  },
+  {
+    "name": "Expired subscription with valid JWT",
+    "route": "publisher-service POST /api/v1/publisher/submissions",
+    "facts": {
+      "paid": true,
+      "expired": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "ENTITLEMENT_REQUIRED"
+    }
+  },
+  {
+    "name": "Revoked delegation with valid JWT",
+    "route": "publisher-service POST /api/v1/publisher/submissions",
+    "facts": {
+      "paid": true,
+      "member": true,
+      "delegate": true,
+      "revoked": true
+    },
+    "expected": {
+      "status": 403,
+      "reason": "DELEGATION_REQUIRED"
+    }
+  },
+  {
+    "name": "Unavailable decision service",
+    "route": "reader-bff-service GET /api/v1/reader/feed",
+    "facts": {
+      "unavailable": true
+    },
+    "expected": {
+      "status": 503,
+      "reason": "DECISION_UNAVAILABLE"
+    }
+  },
+  {
+    "name": "Missing JWT",
+    "route": "reader-bff-service GET /api/v1/reader/feed",
+    "facts": {
+      "missing": true
+    },
+    "expected": {
+      "status": 401,
+      "reason": "INVALID_AUTHENTICATION"
+    }
+  },
+  {
+    "name": "Wrong issuer",
+    "route": "reader-bff-service GET /api/v1/reader/feed",
+    "facts": {
+      "issuer": "https://id.example/realms/bookrush-platform"
+    },
+    "expected": {
+      "status": 401,
+      "reason": "INVALID_AUTHENTICATION"
+    }
+  },
+  {
+    "name": "Wrong audience",
+    "route": "reader-bff-service GET /api/v1/reader/feed",
+    "facts": {
+      "audience": "bookrush-ingestion"
+    },
+    "expected": {
+      "status": 401,
+      "reason": "INVALID_AUTHENTICATION"
+    }
+  },
+  {
+    "name": "Legitimate editorial operator",
+    "route": "publisher-service GET /api/v1/publisher/review",
+    "facts": {
+      "unavailable": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Legitimate technical callback",
+    "route": "publisher-service POST /api/internal/v1/publisher/submissions/{submissionId}/catalog-link",
+    "facts": {
+      "unavailable": true
+    },
+    "expected": {
+      "status": 200,
+      "reason": null
+    }
+  },
+  {
+    "name": "Missing editorial privilege",
+    "route": "publisher-service GET /api/v1/publisher/review",
+    "facts": {
+      "scope": false
+    },
+    "expected": {
+      "status": 403,
+      "reason": "SCOPE_REQUIRED"
+    }
+  }
+]

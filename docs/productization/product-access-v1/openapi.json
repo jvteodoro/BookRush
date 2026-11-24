@@ -1,0 +1,330 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BookRush Product Access Decision",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/internal/v1/product-access/decisions": {
+      "post": {
+        "operationId": "evaluateProductAccessV1",
+        "security": [
+          {
+            "workloadBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Evaluated allow or deny",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Decision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid decision request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid workload authentication",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller outside registered permissions",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Cannot evaluate securely",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "workloadBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Identity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuer",
+          "subject"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "Authentication": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "clientId",
+          "audience",
+          "scopes"
+        ],
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "audience": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "scopes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        }
+      },
+      "Resource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SESSION",
+              "INVITATION",
+              "CATALOG",
+              "BOOK",
+              "ASSET",
+              "FEED",
+              "PROFILE",
+              "READER_STATE",
+              "COMMENT",
+              "SUBMISSION",
+              "FAMILY",
+              "READING_HISTORY",
+              "TELEMETRY"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "owner": {
+            "$ref": "#/components/schemas/Identity"
+          }
+        }
+      },
+      "Request": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actor",
+          "action",
+          "authentication",
+          "resource",
+          "correlationId"
+        ],
+        "properties": {
+          "actor": {
+            "$ref": "#/components/schemas/Identity"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "SESSION_VIEW",
+              "INVITE_SELF",
+              "PRODUCT_USE",
+              "PUBLISH_READ",
+              "PUBLISH_WRITE",
+              "PUBLISH_WITHDRAW",
+              "FAMILY_MANAGE",
+              "SUPERVISE_HISTORY",
+              "SUPERVISE_COMMENTS"
+            ]
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/Authentication"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "correlationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "Decision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "allowed",
+          "correlationId",
+          "policyVersion",
+          "validUntil",
+          "factVersions"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "ACCOUNT_RESTRICTED",
+              "ACCOUNT_SUSPENDED",
+              "AGE_INELIGIBLE",
+              "ENTITLEMENT_REQUIRED",
+              "DELEGATION_REQUIRED",
+              "OWNERSHIP_REQUIRED",
+              "SUPERVISION_REQUIRED",
+              "TARGET_NOT_ELIGIBLE",
+              "SCOPE_REQUIRED"
+            ]
+          },
+          "correlationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "policyVersion": {
+            "const": "1"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "factVersions": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "if": {
+          "properties": {
+            "allowed": {
+              "const": true
+            }
+          }
+        },
+        "then": {
+          "not": {
+            "required": [
+              "reason"
+            ]
+          }
+        },
+        "else": {
+          "required": [
+            "reason"
+          ]
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "code",
+          "correlationId"
+        ],
+        "properties": {
+          "status": {
+            "type": "integer",
+            "enum": [
+              400,
+              401,
+              403,
+              503
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "INVALID_AUTHENTICATION",
+              "CALLER_FORBIDDEN",
+              "DECISION_UNAVAILABLE",
+              "ACCOUNT_RESTRICTED",
+              "ACCOUNT_SUSPENDED",
+              "AGE_INELIGIBLE",
+              "ENTITLEMENT_REQUIRED",
+              "DELEGATION_REQUIRED",
+              "OWNERSHIP_REQUIRED",
+              "SUPERVISION_REQUIRED",
+              "TARGET_NOT_ELIGIBLE",
+              "SCOPE_REQUIRED"
+            ]
+          },
+          "correlationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    }
+  }
+}
