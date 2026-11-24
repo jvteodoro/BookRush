@@ -33,7 +33,9 @@ maiúsculas; somente categorias literárias ativas e créditos AUTHOR participam
 O ano é exatamente o apresentado em `publicationYear`: primeiro ano conhecido
 da obra ou, se ausente, o menor ano de edição conhecido. Datas de upload não
 substituem datas bibliográficas; ausência de ano/autor continua explícita.
-A busca livre também encontra esse ano, autores e categorias. Paginação e
+A busca livre encontra autores e categorias; não usa o ano bibliográfico.
+O filtro `year` e os campos de datas permanecem apenas para compatibilidade da API;
+o site não os utiliza nem os apresenta. Paginação e
 contagem usam o mesmo predicado SQL, com ordenação estável por relevância/título/ID.
 O CORS de listagem/detalhes públicos permite somente GET/OPTIONS das origens
 já configuradas em `CATALOG_CORS_ALLOWED_ORIGINS`, sem credenciais nem wildcard.

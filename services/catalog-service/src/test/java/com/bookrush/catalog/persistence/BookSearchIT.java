@@ -28,22 +28,24 @@ class BookSearchIT {
   }
 
   @Test
-  void searchesTheDisplayedYearWithoutInventingFirstPublicationDates() {
-    var page = books.list("1912", 0, 20);
+  void retainsYearApiCompatibilityWithoutSearchingYearsInFreeText() {
+    assertEquals(0, books.list("1912", 0, 20).totalItems());
+    var page = books.list("", 0, 20, "", "", 1912);
     assertEquals(1, page.totalItems());
     var view = page.items().getFirst();
     assertNull(view.firstPublicationYear());
     assertEquals((short) 1912, view.publicationYear());
     assertEquals(1, books.list("", 0, 20, "", "", 1912).totalItems());
     assertEquals(0, books.list("", 0, 20, "", "", 1901).totalItems());
-    assertTrue(books.list("1899", 0, 20).items().stream().anyMatch(book -> book.canonicalTitle().equals("Alpha Harbour")));
+    assertFalse(books.list("1899", 0, 20).items().stream().anyMatch(book -> book.canonicalTitle().equals("Alpha Harbour")));
   }
 
   @Test
   void onlySearchesVisibleLiteraryCategoriesAndAuthorCredits() {
     for (String value : java.util.List.of("Hidden", "application/rdf+xml", "PR")) {
       assertEquals(0, books.list("", 0, 20, value, "", null).totalItems(), value);
-      assertEquals(0, books.list(value, 0, 20).totalItems(), value);
+      assertFalse(books.list(value, 0, 100).items().stream()
+          .anyMatch(book -> book.canonicalTitle().equals("Gamma Archive")), value);
     }
     assertEquals(0, books.list("", 0, 20, "", "Translator Only", null).totalItems());
     assertEquals(1, books.list("Adventure", 0, 20).totalItems());

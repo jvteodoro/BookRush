@@ -113,7 +113,7 @@ assert filtered['items'][0]['publicationYear'] == 1899
 fallback = request('/api/v1/books?year=1912')[1]
 assert fallback['totalItems'] == 1 and fallback['items'][0]['id'] == OTHER
 assert fallback['items'][0]['firstPublicationYear'] is None and fallback['items'][0]['publicationYear'] == 1912
-assert request('/api/v1/books?q=1912')[1]['items'][0]['id'] == OTHER
+assert request('/api/v1/books?q=1912')[1]['totalItems'] == 0
 assert request('/api/v1/books?category=application%2Frdf%2Bxml')[1]['totalItems'] == 0
 assert request('/api/v1/books?author=Fixture&size=1&page=1')[1]['totalItems'] == 2
 for query in ['year=40000', 'year=not-a-year', 'category=' + 'x' * 201]:

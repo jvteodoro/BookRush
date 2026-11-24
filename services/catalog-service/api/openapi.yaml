@@ -87,7 +87,7 @@ paths:
           in: query
           required: false
           schema: {type: string, maxLength: 500}
-          description: Busca livre por título, descrição, autores, categorias literárias ativas e ano apresentado.
+          description: Busca livre por título, descrição, autores, categorias literárias ativas.
         - {name: category, in: query, schema: {type: string, maxLength: 200}, description: Categoria literária ativa; correspondência parcial sem distinguir maiúsculas.}
         - {name: author, in: query, schema: {type: string, maxLength: 200}, description: Autor creditado como AUTHOR; correspondência parcial.}
         - {name: year, in: query, schema: {type: integer, minimum: -9999, maximum: 9999, not: {enum: [0]}}, description: Ano apresentado; primeiro ano da obra ou menor ano de edição conhecido.}
@@ -112,7 +112,7 @@ paths:
           in: query
           required: false
           schema: {type: string, maxLength: 500}
-          description: Busca livre por título, descrição, autores, categorias literárias ativas e ano apresentado.
+          description: Busca livre por título, descrição, autores, categorias literárias ativas.
         - {name: category, in: query, schema: {type: string, maxLength: 200}, description: Categoria literária ativa; correspondência parcial sem distinguir maiúsculas.}
         - {name: author, in: query, schema: {type: string, maxLength: 200}, description: Autor creditado como AUTHOR; correspondência parcial.}
         - {name: year, in: query, schema: {type: integer, minimum: -9999, maximum: 9999, not: {enum: [0]}}, description: Ano apresentado; primeiro ano da obra ou menor ano de edição conhecido.}

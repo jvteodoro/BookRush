@@ -42,11 +42,9 @@ export function SearchPage({
   const [kind, setKind] = useState<"books" | "people">("books");
   const [category, setCategory] = useState("");
   const [author, setAuthor] = useState("");
-  const [year, setYear] = useState("");
   const clearFilters = () => {
     setCategory("");
     setAuthor("");
-    setYear("");
     setPage(0);
   };
   const [page, setPage] = useState(0);
@@ -56,7 +54,7 @@ export function SearchPage({
   const [error, setError] = useState("");
   useEffect(() => {
     setPage(0);
-  }, [query, category, author, year]);
+  }, [query, category, author]);
   useEffect(() => {
     if (!visible || kind !== "books") return;
     const controller = new AbortController();
@@ -67,7 +65,6 @@ export function SearchPage({
         void searchCatalog(query, page, controller.signal, undefined, {
           category,
           author,
-          year,
         })
           .then((result) => {
             if (!controller.signal.aborted) setData(result);
@@ -79,13 +76,13 @@ export function SearchPage({
             if (!controller.signal.aborted) setLoading(false);
           });
       },
-      query.trim() || category || author || year ? 300 : 0,
+      query.trim() || category || author ? 300 : 0,
     );
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query, page, attempt, visible, kind, category, author, year]);
+  }, [query, page, attempt, visible, kind, category, author]);
   const seenState = useSeenBooks(
     data?.books.map((book) => book.id) ?? [],
     visible && kind === "books",
@@ -96,8 +93,8 @@ export function SearchPage({
         <div>
           <h1>Encontre sua próxima história</h1>
           <p className="br-muted">
-            Busque livros por título, autor, ano, descrição ou categoria e
-            pessoas por nome ou @usuário.
+            Busque livros por título, autor, descrição ou categoria e pessoas
+            por nome ou @usuário.
           </p>
         </div>
       </PageHeader>
@@ -116,7 +113,7 @@ export function SearchPage({
           placeholder={
             kind === "people"
               ? "Um nome ou @usuário…"
-              : "Título, autor, ano ou categoria…"
+              : "Título, autor ou categoria…"
           }
           maxLength={kind === "people" ? 100 : 500}
           onChange={(event) => onQuery(event.target.value)}
@@ -155,23 +152,10 @@ export function SearchPage({
                 onChange={(event) => setAuthor(event.target.value)}
               />
             </label>
-            <label htmlFor="search-year">
-              Ano de publicação
-              <Input
-                id="search-year"
-                type="number"
-                min={-9999}
-                max={9999}
-                step={1}
-                value={year}
-                placeholder="Ex.: 1899"
-                onChange={(event) => setYear(event.target.value)}
-              />
-            </label>
             <Button
               type="button"
               variant="ghost"
-              disabled={!category && !author && !year}
+              disabled={!category && !author}
               onClick={clearFilters}
             >
               Limpar filtros
@@ -265,10 +249,8 @@ export function SearchPage({
                   </h2>
                   <p>
                     {book.author}
-                    {book.publicationYear != null
-                      ? ` · ${book.publicationYear}`
-                      : ""}{" "}
-                    · {book.genre}
+                    {" · "}
+                    {book.genre}
                   </p>
                   {book.description && (
                     <p className="br-search-result__description">

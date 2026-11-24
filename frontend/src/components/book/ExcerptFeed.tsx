@@ -234,9 +234,6 @@ export function ExcerptFeed({
                     </h2>
                     <p>
                       {book.author}
-                      {book.publicationYear != null
-                        ? ` · ${book.publicationYear}`
-                        : ""}
                     </p>
                     <div className="br-excerpt-classification">
                       <span className="br-book-category" title={book.genre}>

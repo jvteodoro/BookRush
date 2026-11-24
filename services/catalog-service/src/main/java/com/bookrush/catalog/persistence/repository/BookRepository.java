@@ -28,7 +28,7 @@ public interface BookRepository extends JpaRepository<Book, UUID> {
                    WHERE ba.book_id=b.id AND ba.role='AUTHOR' AND a.name ILIKE '%' || :q || '%')
         OR EXISTS (SELECT 1 FROM catalog.book_subject bs JOIN catalog.subject sub ON sub.id=bs.subject_id
                    WHERE bs.book_id=b.id AND
-      """ + VISIBLE_CATEGORY + " AND " + CATEGORY_NAME + " ILIKE '%' || :q || '%') OR CAST(" + EFFECTIVE_YEAR + " AS text)=:q)" + """
+      """ + VISIBLE_CATEGORY + " AND " + CATEGORY_NAME + " ILIKE '%' || :q || '%'))" + """
       AND (:category='' OR EXISTS (SELECT 1 FROM catalog.book_subject bs JOIN catalog.subject sub ON sub.id=bs.subject_id
                                   WHERE bs.book_id=b.id AND
       """ + VISIBLE_CATEGORY + " AND " + CATEGORY_NAME + " ILIKE '%' || :category || '%'))" + """

@@ -20,7 +20,6 @@ export type DetailsBook = {
   id: string;
   title: string;
   author?: string;
-  publicationYear?: number | null;
   description?: string;
   categories?: BookCategory[];
   language?: string | null;
@@ -200,12 +199,6 @@ export function BookDetailsDrawer({
                 <>
                   <dt>Autor</dt>
                   <dd>{book.author}</dd>
-                </>
-              )}
-              {book.publicationYear != null && (
-                <>
-                  <dt>Ano de publicação</dt>
-                  <dd>{book.publicationYear}</dd>
                 </>
               )}
               <dt>Categorias</dt>
