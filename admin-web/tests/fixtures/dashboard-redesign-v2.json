@@ -1,0 +1,35 @@
+{
+  "default": {
+    "schemaVersion": "dashboard-response-v1",
+    "status": "OK",
+    "unit": "aggregate",
+    "population": "PRODUCT",
+    "definitionVersion": "fixture-v1",
+    "series": [{
+      "day": "2026-11-17", "active_users": 186, "weekly_active_users": 412,
+      "monthly_active_users": 901, "sessions": 238, "active_seconds": 298800,
+      "book_opens": 154, "meaningful_reads": 96, "completions": 23,
+      "engaged_readers": 38, "weekly_significant_readers": 84, "weekly_active_seconds": 298800, "weekly_sessions": 238, "weekly_books_started": 154,
+      "served_count": 6800, "mature_served_count": 4700, "viewable_count": 4920, "eligible_viewable_count": 3410, "attributed_open_count": 810, "mature_attributed_open_count": 620,
+      "mature_attributed_significant_read_count": 125, "mature_attributed_complete_count": 41, "attributed_read_60_count": 125, "repeat_viewable_count": 376,
+      "personalized_count": 4100, "fallback_count": 1800, "cold_start_count": 900,
+      "read_count": 125, "selected_count": 5100, "retrieved_count": 9100,
+      "candidate_count": 9100, "scored_candidate_count": 6800, "item_count": 5100,
+      "unique_readers": 84, "dwell_observations": 4100, "dwell_seconds": 32800,
+      "previous_week_significant_readers": 72, "previous_week_active_seconds": 276000,
+      "previous_week_sessions": 210, "previous_week_books_started": 139,
+      "aggregation_level": "BOOK", "aggregation_key": "fixture-book", "book_title": "Fixture Book",
+      "period_active_minutes": 129, "entity_rank": 1,
+      "total_books": 3200, "reader_ready_books": 2140, "analyzed_books": 1460,
+      "ranked_books": 910, "recommended_books": 620, "never_recommended_books": 290,
+      "blocked_books": 340, "pending_count": 74, "running_count": 18,
+      "completed_count": 182, "failed_count": 4, "median_seconds": 36,
+      "p95_seconds": 214, "items_discovered": 72, "items_processed": 68,
+      "accepted_count": 18200, "rejected_count": 26, "duplicate_count": 41,
+      "valid_count": 125, "organic_count": 77, "orphan_count": 3,
+      "processing_lag_seconds": 34, "refreshed_at": "2026-11-17T15:00:00Z",
+      "source_watermark": "2026-11-17T14:59:26Z"
+    }]
+  },
+  "health": [{"projection_name":"reader_day","refresh_status":"SUCCESS","record_count":42,"last_successful_refresh":"2026-11-17T15:00:00Z","source_watermark":"2026-11-17T14:59:26Z"}]
+}

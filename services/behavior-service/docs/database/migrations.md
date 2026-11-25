@@ -24,3 +24,9 @@ append-only; o job continua reconstruível e aceita correlação por
 
 Os agregados de `BOOK_OPEN` deduplicam somente eventos correlacionados pela
 mesma impressão/item; eventos orgânicos não são unidos por heurística temporal.
+
+`V13__behavior_event_population.sql` adiciona `identity_population` com default
+`UNKNOWN` e índice por população/tempo. Eventos já armazenados permanecem
+`UNKNOWN`; novos eventos recebem categoria do issuer e das claims assinadas do
+JWT validado pelo serviço. Campos de issuer, subject e população enviados no
+payload do cliente não definem identidade.

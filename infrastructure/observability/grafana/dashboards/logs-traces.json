@@ -1,0 +1,80 @@
+{
+  "id": null,
+  "uid": "bookrush-logs-traces",
+  "title": "BookRush / Logs & Traces",
+  "tags": [
+    "bookrush",
+    "operations",
+    "technical-detail"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "bookrush-prometheus"
+        },
+        "query": "label_values(up, service)",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Logs por servi\u00e7o",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "bookrush-loki"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=~\"$service\"}"
+        }
+      ],
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "Busca de traces",
+      "type": "traces",
+      "datasource": {
+        "type": "tempo",
+        "uid": "bookrush-tempo"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "traceql",
+          "query": "{ resource.service.name =~ \"$service\" }"
+        }
+      ],
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      }
+    }
+  ]
+}

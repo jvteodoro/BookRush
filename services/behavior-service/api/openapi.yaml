@@ -7,10 +7,50 @@ info:
     Recommendation-originated event payloads may include the optional UUID
     strings recommendationItemId and impressionId; attribution is scoped to the
     authenticated subject. Product JWTs are normalized to the opaque technical
-    identity formed from issuer and sub, matching recommendation serving.
+    identity formed from issuer and sub, matching recommendation serving. Persisted issuer is
+    separate from the unchanged PFV1 subject key. Population is inferred only from verified JWT
+    claims and configured issuer; client event fields cannot set it. Historical rows without
+    classification remain UNKNOWN.
 servers:
   - url: /
 paths:
+  /api/v1/behavior/events:
+    post:
+      summary: Ingest authenticated behavior events
+      description: >-
+        The server derives identity issuer, PFV1-compatible technical subject and population from
+        the validated JWT. Body issuer and subject are accepted for compatibility but ignored.
+        Population may come from the signed bookrush_population claim (PRODUCT, ADMIN_SEED or TEST);
+        otherwise the configured product realm is PRODUCT and unrecognized origin is UNKNOWN.
+      operationId: ingestBehaviorEvents
+      security: [{ productBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [eventKey, eventType, occurredAt]
+                    properties:
+                      eventKey: { type: string, minLength: 1, maxLength: 200 }
+                      eventType: { type: string, minLength: 1, maxLength: 80 }
+                      issuer: { type: string, deprecated: true, description: Ignored; server uses JWT issuer }
+                      subject: { type: string, deprecated: true, description: Ignored; server uses JWT subject }
+                      bookId: { type: string, format: uuid, nullable: true }
+                      occurredAt: { type: string, format: date-time }
+                      payload: { type: object, additionalProperties: true }
+      responses:
+        '202': { description: Accepted and duplicate counts }
+        '400': { description: Invalid batch or event data }
+        '401': { description: Missing or invalid product token }
   /api/internal/v1/publisher/metrics/books/{bookId}:
     get:
       summary: Daily aggregates for the publisher metrics service
@@ -161,6 +201,10 @@ paths:
         '403': { description: Missing S2S scope or audience }
 components:
   securitySchemes:
+    productBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
     behaviorSignalsS2S:
       type: http
       scheme: bearer
