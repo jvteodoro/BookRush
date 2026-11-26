@@ -22,13 +22,13 @@ trap cleanup EXIT
 if docker inspect "$HOSTNAME" >/dev/null 2>&1; then
   work_dir="$(mktemp -d "$repo_dir/.bookrush-user-management.XXXXXX")"
   docker run --rm --user "$(id -u):$(id -g)" --volumes-from "$HOSTNAME" \
-    -w "$repo_dir" -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
+    -w "$repo_dir" -e SUBSCRIPTION_FAMILY_CLIENT_SECRET=disposable-family -e SUBSCRIPTION_BILLING_CLIENT_SECRET=disposable-billing -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
     python:3.12-slim python3 infrastructure/keycloak/render-config.py \
     infrastructure/keycloak "$work_dir/rendered"
 else
   work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookrush-user-management.XXXXXX")"
   docker run --rm --user "$(id -u):$(id -g)" \
-    -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
+    -e SUBSCRIPTION_FAMILY_CLIENT_SECRET=disposable-family -e SUBSCRIPTION_BILLING_CLIENT_SECRET=disposable-billing -e KEYCLOAK_ADMIN_CLIENT_SECRET="$client_secret" \
     -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
     python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
     /repo/infrastructure/keycloak /out/rendered
