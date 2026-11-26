@@ -108,3 +108,64 @@ visível do mesmo livro; pai indisponível retorna 409. GET com
 `includeUnavailable=true` inclui marcadores sem conteúdo ou autor para ancestrais
 indisponíveis de respostas visíveis. Sem o parâmetro, somente comentários visíveis
 são retornados. Remoção e moderação não removem respostas.
+
+## Autorização de produto e moderação
+
+Com `COMMUNITY_PRODUCT_ACCESS_ENABLED=true`, as 15 operações de leitor do
+inventário v1 exigem `PRODUCT_USE:COMMENT`. O serviço preserva os subjects
+históricos do realm de produto. O catálogo recebe o JWT do leitor validado
+pelo serviço para confirmar livros em uma avaliação. Autoria, moderação e
+privacidade continuam verificadas pelo dono da operação. Comentários,
+denúncias, remoção autoral e avaliações sensíveis reavaliam junto à escrita.
+
+A chain de moderação verifica issuer, JWKS e audience do realm administrativo
+antes de requerer grupo de operador. Configure `SOCIAL_ADMIN_ISSUER`,
+`SOCIAL_ADMIN_JWKS` e `SOCIAL_ADMIN_AUDIENCE`. O acesso ao produto nunca
+concede autoridade de moderação. Contadores de seguidores de terceiros
+exigem elegibilidade atual do perfil e preservam as regras de visibilidade.
+
+Provisione `bookrush-social-product-access-s2s` e configure
+`bookrush-social-product-access-s2s=PRODUCT_USE:COMMENT` na allowlist do
+avaliador. O starter mede decisões e indisponibilidade sem labels pessoais.
+
+
+## Comentários supervisionados
+
+O BFF atende `GET /api/v1/reader/supervision/{memberId}/comments`. O UUID
+identifica uma concessão do próprio responsável em `/api/v1/family/supervision/me`.
+A projeção aceita apenas o escopo COMMENTS, inclusive após estorno ou
+vencimento comercial. Cada página reavalia `SUPERVISE_COMMENTS` e aplica a
+janela da concessão, de até 90 dias. Maioridade, suspensão e revogação encerram
+novas consultas com o mesmo JWT.
+
+O social exige o JWT humano do realm de produto (audience
+`bookrush-reader-bff`, scope `supervision.read`) e um JWT técnico do BFF
+(issuer de plataforma, audience `bookrush-social-supervision`, scope
+`supervision.comments.read`). A cadeia administrativa de moderação mantém
+seus requisitos próprios. O endpoint interno fica fora do roteamento público.
+
+O resultado contém apenas `id`, `bookId`, `body` e `createdAt`. O social
+aplica o predicado existente de visibilidade. Comentários excluídos pelo
+autor ou moderados como HIDDEN ou REMOVED ficam fora da página, inclusive
+após mudança de estado entre páginas. O cursor opaco vence em até dez minutos
+e vincula ator, alvo, concessão, versão e escopo. São retornados de 1 a 50
+itens por página quando há resultados, com padrão 25 e sem armazenamento
+em cache.
+
+A V12 adiciona índice, cursor e auditoria no schema social. A auditoria
+guarda identidades técnicas quando resolvidas, concessão, escopo, status,
+correlação e instante por 180 dias. O conteúdo não é copiado. Consultas
+supervisionadas não emitem eventos de engajamento.
+
+Habilite `SOCIAL_SUPERVISED_COMMENTS_ENABLED` e
+`READER_BFF_SUPERVISED_COMMENTS_ENABLED` com a infraestrutura do histórico
+supervisionado ativa. Acrescente `SUPERVISE_COMMENTS:COMMENT` ao workload
+`bookrush-social-product-access-s2s` no family-service. A atualização
+declarativa do Keycloak concede ao BFF o scope técnico opcional
+`supervision.comments.read`.
+
+O E2E conjunto com o histórico existente roda em ambiente descartável.
+
+```bash
+BOOKRUSH_E2E_READER_STATE=1 BOOKRUSH_E2E_COMMUNITY=1 bash scripts/test-premium-family-e2e.sh
+```

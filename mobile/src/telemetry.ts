@@ -32,6 +32,7 @@ function eventKey(eventType: string, bookId?: string): string {
 }
 
 export function createTelemetry(send: Sender, flushMs = 3000) {
+  let disposed = false;
   let queue: BehaviorEvent[] = [];
   let retry = 0;
   let flushing: Promise<void> | undefined;
@@ -46,7 +47,8 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
   };
 
   const flush = async (): Promise<void> => {
-    if (flushing || !queue.length) return flushing ?? Promise.resolve();
+    if (disposed || flushing || !queue.length)
+      return flushing ?? Promise.resolve();
     if (timer !== undefined) {
       clearTimeout(timer);
       timer = undefined;
@@ -57,6 +59,7 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
         retry = 0;
       })
       .catch(() => {
+        if (disposed) return;
         queue = [...batch, ...queue].slice(-MAX_QUEUE);
         retry = Math.min(retry + 1, 6);
         schedule(Math.min(flushMs * 2 ** retry, 60_000));
@@ -72,6 +75,7 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
     bookId?: string,
     payload: Record<string, unknown> = {},
   ) => {
+    if (disposed) return;
     queue.push({
       eventKey: eventKey(eventType, bookId),
       eventType,
@@ -102,5 +106,10 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
     dwell,
     flush,
     pending: () => queue.length,
+    dispose() {
+      disposed = true;
+      queue = [];
+      if (timer !== undefined) clearTimeout(timer);
+    },
   };
 }

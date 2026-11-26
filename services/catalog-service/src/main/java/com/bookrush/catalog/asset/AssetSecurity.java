@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.annotation.Order;
@@ -57,6 +59,40 @@ public class AssetSecurity {
   }
 
   @Bean
+  @Order(-1)
+  @ConditionalOnProperty(name = "bookrush.security.product-access.enabled", havingValue = "true")
+  SecurityFilterChain readerDistributionSecurity(HttpSecurity http, CatalogProductOidcProperties oidc,
+      @Value("${catalog.security.public-bibliography:false}") boolean publicBibliography) throws Exception {
+    org.springframework.security.web.util.matcher.RequestMatcher bibliography =
+        request -> routePath(request).matches("/api/v1/books(/[^/]+)?");
+    return http.securityMatcher(request -> {
+          String path = routePath(request);
+          return bibliography.matches(request)
+              || path.matches("/api/v1/books/[^/]+/(thumbnail|reader-assets)(/.*)?")
+              || path.matches("/api/books/[^/]+/assets/[^/]+/download-url");
+        })
+        .csrf(config -> config.disable())
+        .cors(Customizer.withDefaults())
+        .sessionManagement(config -> config.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .headers(headers -> headers.cacheControl(Customizer.withDefaults()))
+        .authorizeHttpRequests(registry -> {
+          if (publicBibliography) {
+            registry.requestMatchers(request -> bibliography.matches(request)
+                && List.of("GET", "HEAD").contains(request.getMethod())).permitAll();
+          }
+          registry.requestMatchers(HttpMethod.GET, "/**").authenticated()
+              .requestMatchers(HttpMethod.HEAD, "/**").authenticated().anyRequest().denyAll();
+        })
+        .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(productJwtDecoder(oidc))
+            .jwtAuthenticationConverter(catalogRolesConverter())))
+        .build();
+  }
+
+  private static String routePath(HttpServletRequest request) {
+    return request.getRequestURI().substring(request.getContextPath().length());
+  }
+
+  @Bean
   @Order(0)
   SecurityFilterChain productThumbnailSecurity(
       HttpSecurity http, CatalogProductOidcProperties productOidc) throws Exception {
@@ -97,7 +133,7 @@ public class AssetSecurity {
     OAuth2TokenValidator<Jwt> issuer = JwtValidators.createDefaultWithIssuer(productOidc.issuer());
     OAuth2TokenValidator<Jwt> audience =
         token ->
-            token.getAudience().contains(productOidc.audience())
+            token.getAudience() != null && token.getAudience().contains(productOidc.audience())
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(
                     new OAuth2Error("invalid_token", "product audience mismatch", null));
@@ -113,7 +149,7 @@ public class AssetSecurity {
     OAuth2TokenValidator<Jwt> issuer = JwtValidators.createDefaultWithIssuer(oidc.issuer());
     OAuth2TokenValidator<Jwt> audience =
         token ->
-            token.getAudience().contains(oidc.audience())
+            token.getAudience() != null && token.getAudience().contains(oidc.audience())
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(
                     new OAuth2Error("invalid_token", "catalog audience mismatch", null));
@@ -127,7 +163,8 @@ public class AssetSecurity {
       HttpSecurity http,
       StorageProperties props,
       CanonicalServiceProperties canonical,
-      CatalogOidcProperties oidc)
+      CatalogOidcProperties oidc,
+      @Value("${bookrush.security.product-access.enabled:false}") boolean protectedDistribution)
       throws Exception {
     var filter =
         new OncePerRequestFilter() {
@@ -139,7 +176,7 @@ public class AssetSecurity {
             // accidentally reinterpret the service credential as a user bearer token.
             String serviceToken = request.getHeader("X-Canonical-Service-Token");
             String readerToken = request.getHeader("X-Content-Service-Token");
-            if (!oidc.readerInternalToken().isBlank()
+            if (!protectedDistribution && !oidc.readerInternalToken().isBlank()
                 && readerToken != null
                 && MessageDigest.isEqual(readerToken.getBytes(StandardCharsets.UTF_8), oidc.readerInternalToken().getBytes(StandardCharsets.UTF_8))) {
               SecurityContextHolder.getContext().setAuthentication(
@@ -186,7 +223,7 @@ public class AssetSecurity {
         .requestCache(c -> c.disable())
         .addFilterBefore(filter, AnonymousAuthenticationFilter.class)
         .authorizeHttpRequests(
-            a ->
+            a -> {
                 a.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                     .requestMatchers(
                         HttpMethod.GET,
@@ -216,21 +253,22 @@ public class AssetSecurity {
                     .hasAnyAuthority("SCOPE_bookrush.catalog.read", "ROLE_CATALOG_SERVICE")
                     .requestMatchers(
                         HttpMethod.GET,
-                        "/api/v1/books",
-                        "/api/v1/books/**",
                         "/api",
                         "/api/",
                         "/api/status",
                         "/actuator/health",
                         "/actuator/health/**",
                         "/actuator/prometheus",
-                        "/api/books/*/assets/*/download-url",
                         "/swagger-ui.html",
                         "/swagger-ui/**",
                         "/v3/api-docs/**")
-                    .permitAll()
-                    .anyRequest()
-                    .denyAll())
+                    .permitAll();
+                if (!protectedDistribution) {
+                  a.requestMatchers(HttpMethod.GET, "/api/v1/books", "/api/v1/books/**",
+                      "/api/books/*/assets/*/download-url").permitAll();
+                }
+                a.anyRequest().denyAll();
+             })
         .exceptionHandling(
             e ->
                 e.authenticationEntryPoint(
@@ -284,9 +322,16 @@ public class AssetSecurity {
     source.registerCorsConfiguration("/api/internal/v1/catalog/**", configuration);
     source.registerCorsConfiguration("/api/admin/**", configuration);
     var metadata = new CorsConfiguration(configuration);
-    metadata.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.OPTIONS.name()));
+    metadata.setAllowedMethods(List.of(HttpMethod.GET.name(), HttpMethod.HEAD.name(), HttpMethod.OPTIONS.name()));
     source.registerCorsConfiguration("/api/v1/books", metadata);
     source.registerCorsConfiguration("/api/v1/books/*", metadata);
+    var content = new CorsConfiguration(metadata);
+    content.setAllowedMethods(List.of("GET", "HEAD", "OPTIONS"));
+    content.setAllowedHeaders(List.of("Authorization", "Accept", "Range", "X-Correlation-ID"));
+    content.setExposedHeaders(List.of("Accept-Ranges", "Content-Range", "X-Correlation-ID"));
+    source.registerCorsConfiguration("/api/v1/books/*/reader-assets/**", content);
+    source.registerCorsConfiguration("/api/books/*/assets/*/download-url", content);
+    source.registerCorsConfiguration("/api/v1/books/*/thumbnail", content);
     return source;
   }
 

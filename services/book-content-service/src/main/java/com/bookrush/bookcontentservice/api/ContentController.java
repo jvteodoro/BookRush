@@ -5,6 +5,9 @@ import org.springframework.http.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
+import com.bookrush.bookcontentservice.CatalogReaderBearer;
 import org.springframework.web.server.ResponseStatusException;
 import com.bookrush.bookcontentservice.storage.ReaderArtifactStore;
 import com.bookrush.bookcontentservice.epub.EpubPublicationService;
@@ -16,17 +19,25 @@ public class ContentController {
   private final String catalogServiceToken;
   private final ReaderArtifactStore artifactStore;
   private final EpubPublicationService epub;
+  private final boolean protectedDistribution;
   public ContentController(
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String url,
       @Value("${bookrush.catalog-service-token:}") String catalogServiceToken,
-      ReaderArtifactStore artifactStore, EpubPublicationService epub) {
-    catalog=RestClient.builder().baseUrl(url).build();
+      ReaderArtifactStore artifactStore, EpubPublicationService epub, CatalogReaderBearer bearer,
+      @Value("${bookrush.security.product-access.enabled:false}") boolean protectedDistribution) {
+    catalog=RestClient.builder().baseUrl(url).requestInterceptor(bearer).build();
+    this.protectedDistribution = protectedDistribution;
     this.catalogServiceToken = catalogServiceToken;
     this.artifactStore = artifactStore;
     this.epub = epub;
   }
   @GetMapping("/books/{bookId}")
   public Map<String,Object> book(@PathVariable UUID bookId) {
+    if (protectedDistribution) {
+      Map<?, ?> metadata = catalog.get().uri("/api/v1/books/{id}", bookId).retrieve().body(Map.class);
+      if (metadata == null) throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Catalog metadata unavailable");
+      return Map.of("book", metadata, "bookId", bookId, "status", "CATALOG_METADATA_AVAILABLE", "source", "catalog-service");
+    }
     Map<?,?> page=catalog.get().uri("/api/v1/books?page=0&size=100").retrieve().body(Map.class);
     Object found=null;
     if(page!=null && page.get("items") instanceof List<?> items) for(Object item:items) if(item instanceof Map<?,?> m && bookId.toString().equals(String.valueOf(m.get("id")))) found=item;
@@ -69,7 +80,7 @@ public class ContentController {
     manifest.put("metadata", metadata(bookId));
     manifest.put("readingOrder", readingOrder);
     manifest.put("toc", toc);
-    String artifactKey = artifactStore.persist(bookId.toString(), manifest);
+    String artifactKey = protectedDistribution ? null : artifactStore.persist(bookId.toString(), manifest);
     if (artifactKey != null) manifest.put("bookrushArtifactKey", artifactKey);
     return manifest;
   }
@@ -105,7 +116,7 @@ public class ContentController {
     manifest.put("metadata", metadata(publication.bookId()));
     manifest.put("readingOrder", readingOrder);
     manifest.put("toc", roots);
-    String artifactKey = artifactStore.persist(publication.bookId().toString(), manifest);
+    String artifactKey = protectedDistribution ? null : artifactStore.persist(publication.bookId().toString(), manifest);
     if (artifactKey != null) manifest.put("bookrushArtifactKey", artifactKey);
     return manifest;
   }
@@ -117,7 +128,10 @@ public class ContentController {
       byte[] bytes = epub.resource(publication, resource);
       var type = java.nio.file.Files.probeContentType(java.nio.file.Path.of(resource));
       MediaType mediaType = type == null ? MediaType.APPLICATION_OCTET_STREAM : MediaType.parseMediaType(type);
-      return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(mediaType).body(bytes);
+      return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
+          .header("Accept-Ranges", "none").header("X-Content-Type-Options", "nosniff")
+          .header("Content-Security-Policy", "script-src 'none'; object-src 'none'; base-uri 'none'")
+          .contentType(mediaType).body(bytes);
     } catch (Exception ignored) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "EPUB resource not found");
     }
@@ -129,7 +143,7 @@ public class ContentController {
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chapter not found"));
     UUID version = UUID.fromString(String.valueOf(chapter.get("text_asset_version_id")));
     String text = catalog.get().uri("/api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/content", bookId, version)
-        .header("X-Content-Service-Token", catalogServiceToken).retrieve().body(String.class);
+        .header("X-Content-Service-Token", protectedDistribution ? "" : catalogServiceToken).retrieve().body(String.class);
     if (text == null) throw new ResponseStatusException(HttpStatus.CONFLICT, "Text artifact unavailable");
     int count = text.codePointCount(0, text.length());
     int start = Math.min(Math.max(((Number) chapter.getOrDefault("start_offset", 0)).intValue(), 0), count);
@@ -141,7 +155,7 @@ public class ContentController {
     String html = "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>" + title + "</title><style>"
         + ":root{color-scheme:light}*{box-sizing:border-box}html{background:#f7f4ee}body{color:#29261f;background:#f7f4ee;font-family:Georgia,\"Times New Roman\",serif;font-size:clamp(1.08rem,1.25vw,1.32rem);line-height:1.82;max-width:46rem;margin:0 auto;padding:clamp(3.5rem,9vh,7rem) clamp(1.25rem,4vw,3rem) 8rem}h1{font-size:clamp(1.8rem,3vw,2.6rem);font-weight:600;line-height:1.2;text-align:center;margin:0 0 3rem;color:#342f28}p{margin:0 0 1.35em;text-wrap:pretty}p:first-of-type:first-letter{float:left;font-size:4.1em;line-height:.8;padding:0 .1em 0 0;color:#6c5d4c}@media(max-width:640px){body{font-size:1.08rem;line-height:1.76;padding:3.5rem 1.2rem 6rem}h1{margin-bottom:2.4rem}}"
         + "</style></head><body><h1>" + title + "</h1>" + body + "</body></html>";
-    return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+    return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
         .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
         .body(html);
   }
@@ -167,6 +181,17 @@ public class ContentController {
       return Map.of("title", String.valueOf(title), "identifier", bookId.toString(), "language", "und");
     }
     return Map.of("title", bookId.toString(), "identifier", bookId.toString(), "language", "und");
+  }
+
+  @ExceptionHandler(RestClientException.class)
+  ResponseEntity<ProblemDetail> catalogUnavailable(RestClientException failure) {
+    HttpStatusCode status = HttpStatus.BAD_GATEWAY;
+    if (failure instanceof RestClientResponseException upstream
+        && (upstream.getStatusCode().is4xxClientError() || upstream.getStatusCode().value() == 503)) {
+      status = upstream.getStatusCode();
+    }
+    return ResponseEntity.status(status).cacheControl(CacheControl.noStore().cachePrivate())
+        .body(ProblemDetail.forStatus(status));
   }
 
   private static String sliceCodePoints(String value, int start, int end) {

@@ -12,7 +12,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 class PublisherControllerTest {
   private final PublisherController controller = new PublisherController(
-      mock(JdbcTemplate.class), mock(PublisherIngestionClient.class), mock(BehaviorEventPublisher.class));
+      mock(JdbcTemplate.class), mock(PublisherIngestionClient.class), mock(BehaviorEventPublisher.class),
+      PublisherTestIdentity.identities(), mock(PublisherOwnership.class),
+      mock(org.springframework.transaction.PlatformTransactionManager.class), new com.fasterxml.jackson.databind.ObjectMapper());
 
   @Test
   void submissionDetailsRequireAuthenticatedPublisher() {

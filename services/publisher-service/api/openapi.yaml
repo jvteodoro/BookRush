@@ -1,7 +1,8 @@
 openapi: 3.0.3
 info:
   title: publisher-service
-  version: 0.1.0
+  version: 0.2.0
+  description: Author identity is issuer plus subject. Production routing for product author requests is delivered separately in bookrush-rrnt. Editorial operations and the legacy authenticated callback retain their existing transport.
 paths:
   /api/internal/v1/publisher/submissions/{submissionId}/catalog-link:
     post:
@@ -31,11 +32,12 @@ paths:
       responses:
         '200': {description: Link applied}
         '401': {description: Invalid callback credential}
+        '404': {description: Submission not found}
         '409': {description: Conflicting existing link}
   /api/v1/publisher/submissions/{id}/metrics:
     get:
       summary: Daily statistics for the authenticated publisher's own published book
-      description: Requires platform bearer (issuer bookrush-platform, audience bookrush-ingestion). Ownership is verified against submission and published_work. No reader identities are exposed. A draft's user-supplied catalog ID does not grant metrics access.
+      description: Requires a validated product author, and matches issuer and subject on both the submission and published work. Product routing is enabled by bookrush-rrnt. A draft's client-supplied catalog ID never grants metrics access.
       security: [{publisherBearer: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -59,12 +61,241 @@ paths:
                       $ref: '#/components/schemas/DailyMetrics'
         '400': {description: Invalid days or UUID}
         '401': {description: Missing or invalid bearer}
-        '404': {description: Submission absent or owned by another publisher}
+        '403': {description: Authenticated caller is outside the product author boundary}
+        '404': {description: 'Submission absent, quarantined or owned by another publisher'}
         '503': {description: Metrics service or dedicated credential unavailable; never reported as zero activity}
+  /api/v1/publisher/membership:
+    get:
+      summary: Read the caller’s local membership record
+      security: [{publisherBearer: []}]
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+
+  /api/v1/publisher/submissions:
+    get:
+      summary: List submissions owned by the caller
+      security: [{publisherBearer: []}]
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+    post:
+      summary: Create a draft for the authenticated author
+      security: [{publisherBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Submission'}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '400': {description: Invalid request}
+
+  /api/v1/publisher/submissions/{id}:
+    get:
+      summary: Read the caller’s submission
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '404': {description: No matching resource visible to caller}
+
+  /api/v1/publisher/submissions/{id}/reviews:
+    get:
+      summary: Read the editorial history of the caller’s submission
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '404': {description: No matching resource visible to caller}
+
+  /api/v1/publisher/submissions/{id}/metadata:
+    put:
+      summary: Update an editable submission owned by the caller
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Metadata'}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '400': {description: Invalid request}
+        '404': {description: No matching resource visible to caller}
+        '409': {description: Identity provenance or workflow state conflicts with the requested operation}
+
+  /api/v1/publisher/submissions/{id}/rights:
+    post:
+      summary: Record a rights assertion by the authenticated owner
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Rights'}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '400': {description: Invalid request}
+        '404': {description: No matching resource visible to caller}
+        '409': {description: Identity provenance or workflow state conflicts with the requested operation}
+
+  /api/v1/publisher/submissions/{id}/submit:
+    post:
+      summary: Submit the caller’s draft for processing
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '404': {description: No matching resource visible to caller}
+        '409': {description: Identity provenance or workflow state conflicts with the requested operation}
+
+  /api/v1/publisher/submissions/{id}/withdraw:
+    post:
+      summary: Withdraw the caller’s published work
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '404': {description: No matching resource visible to caller}
+
+  /api/v1/publisher/submissions/{submissionId}/upload:
+    post:
+      summary: Request a staged upload for the caller’s editable draft
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: submissionId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Upload'}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '400': {description: Invalid request}
+        '404': {description: No matching resource visible to caller}
+        '409': {description: Identity provenance or workflow state conflicts with the requested operation}
+
+  /api/v1/publisher/submissions/{submissionId}/upload/{uploadId}/finalize:
+    post:
+      summary: Finalize a staged upload owned by the caller
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: submissionId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: uploadId, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinalizeUpload'}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '400': {description: Invalid request}
+        '404': {description: No matching resource visible to caller}
+        '409': {description: Identity provenance or workflow state conflicts with the requested operation}
+
+  /api/v1/publisher/review:
+    get:
+      summary: Read the editorial review queue
+      security: [{publisherBearer: []}]
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+
+  /api/v1/publisher/submissions/{id}/review:
+    post:
+      summary: Review a submission as an editorial operator
+      security: [{publisherBearer: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Review'}
+      responses:
+        '200': {description: Operation completed}
+        '401': {description: Missing or invalid JWT}
+        '403': {description: Authenticated identity is outside the permitted role}
+        '400': {description: Invalid request}
+        '404': {description: No matching resource visible to caller}
+        '409': {description: Identity provenance or workflow state conflicts with the requested operation}
+
 components:
   securitySchemes:
     publisherBearer: {type: http, scheme: bearer, bearerFormat: JWT}
   schemas:
+    Submission:
+      type: object
+      required: [title]
+      properties:
+        title: {type: string, maxLength: 300}
+        catalogBookId: {type: string, format: uuid, description: Optional hint. Editorial approval requires a confirmed ingestion link.}
+        sourceCode: {type: string}
+        sourceExternalId: {type: string}
+    Metadata:
+      type: object
+      properties:
+        synopsis: {type: string}
+        language: {type: string}
+        isbn: {type: string}
+        publisherName: {type: string}
+        keywords: {type: array, items: {type: string}}
+    Rights:
+      type: object
+      required: [rightType]
+      properties:
+        rightType: {type: string, enum: [DISTRIBUTION, PROCESSING, DISPLAY]}
+        territory: {type: string, default: GLOBAL}
+        evidenceReference: {type: string}
+        claimsOwnRights:
+          type: boolean
+          default: false
+          description: An explicit assertion that the authenticated affirmer is the declared holder.
+    Upload:
+      type: object
+      properties:
+        filename: {type: string}
+        contentType: {type: string}
+    FinalizeUpload:
+      type: object
+      properties:
+        sha256: {type: string}
+    Review:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [APPROVED, REJECTED, CHANGES_REQUESTED]}
+        reasonCode: {type: string}
+        notes: {type: string}
     DailyMetrics:
       type: object
       required: [day, impressions, opens, reads, likes, shares, comments]

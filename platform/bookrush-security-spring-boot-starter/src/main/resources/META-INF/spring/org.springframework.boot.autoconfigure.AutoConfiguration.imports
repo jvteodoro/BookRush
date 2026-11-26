@@ -1,1 +1,2 @@
 com.bookrush.platform.security.BookrushSecurityAutoConfiguration
+com.bookrush.platform.security.ProductAccessAutoConfiguration

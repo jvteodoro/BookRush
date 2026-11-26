@@ -5,6 +5,7 @@ RUN mvn -q -f platform/pom.xml install -DskipTests
 COPY services/family-service/pom.xml pom.xml
 RUN mvn -q -DskipTests dependency:go-offline
 COPY services/family-service/src src
+COPY docs/productization/age-supervision-v1/fixtures.tsv src/test/resources/age-supervision-fixtures.tsv
 RUN mvn -q package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S bookrush && adduser -S bookrush -G bookrush

@@ -33,6 +33,10 @@ export KEYCLOAK_CONFIG_DIR="$config_dir"
 docker compose --project-name bookrush --env-file "$env_file" \
   -f "$repo_dir/infrastructure/compose.yaml" --profile auth --profile iam-reconcile \
   run --rm keycloak-config-cli
+if [[ "${KEYCLOAK_AGE_PROFILE_ENABLED:-false}" == "true" ]]; then
+  export KEYCLOAK_AGE_ADMIN_URL="${KEYCLOAK_AGE_ADMIN_URL:-http://127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}}"
+  python3 "$repo_dir/infrastructure/keycloak/reconcile-age-profile.py"
+fi
 if [[ "${KEYCLOAK_ADMIN_SERVICE_GRANT_ROLES:-true}" == "true" ]]; then
   export KEYCLOAK_ADMIN_TOKEN_URI="${KEYCLOAK_ADMIN_TOKEN_URI:-http://127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}/realms/bookrush/protocol/openid-connect/token}"
   export KEYCLOAK_ADMIN_BASE="${KEYCLOAK_ADMIN_BASE:-http://127.0.0.1:${BOOKRUSH_KEYCLOAK_PORT:-18088}/admin/realms/bookrush}"

@@ -7,9 +7,10 @@ import { mountReaderPanels } from "./reader/readerPanels";
 import "./styles/reader-appearance.css";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { authClient, type AuthState } from "./auth";
+import { authClient, setProductGate, type AuthState } from "./auth";
 import { createTelemetry } from "./telemetry";
 import "./styles.css";
+import "./styles/session.css";
 import "./styles/design-system.css";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import { DesignSystemPreview } from "./design-system/DesignSystemPreview";
@@ -25,6 +26,13 @@ import { readiumBridge } from "./reader/lazyReadiumBridge";
 import { createBookmarksClient } from "./reader/bookmarks";
 import { bookmarkDialogs } from "./reader/bookmarkDialogs";
 import { AuthenticatedShell } from "./app/AuthenticatedShell";
+import {
+  allowsProduct,
+  createSessionGate,
+  type SessionView,
+} from "../../packages/session/session";
+import type { User } from "oidc-client-ts";
+import { RestrictedSession } from "./app/RestrictedSession";
 import { AuthLanding } from "./app/AuthLanding";
 import {
   loadLibrary,
@@ -40,10 +48,6 @@ import { readerSessionOrigin } from "./reader/readerSessionOrigin";
 
 function App() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
-  const [error, setError] = useState("");
-  const [feedReady, setFeedReady] = useState(false);
-  const { bookPath, legacyQuery, legacyVisible, readerTab, showLegacy } =
-    useLegacyNavigation();
   useEffect(() => {
     let active = true;
     async function restore() {
@@ -80,19 +84,153 @@ function App() {
       active = false;
     };
   }, []);
+  async function login() {
+    setAuth({ status: "loading" });
+    try {
+      await authClient.login(window.location.pathname + window.location.search);
+    } catch (cause) {
+      setAuth({
+        status: "error",
+        error:
+          cause instanceof Error
+            ? cause.message
+            : "Não foi possível iniciar o login.",
+      });
+    }
+  }
+  if (auth.status === "authenticated" && auth.user)
+    return (
+      <SessionApp
+        key={`${auth.user.profile.iss}:${auth.user.profile.sub}`}
+        user={auth.user}
+        onLogin={() => void login()}
+        onLogout={() => {
+          setAuth({ status: "anonymous" });
+          void authClient.logout().catch(() => undefined);
+        }}
+      />
+    );
+  if (auth.status === "loading")
+    return (
+      <div className="splash">
+        <div className="brand-mark">B</div>
+        <p>Preparando seu feed…</p>
+      </div>
+    );
+  return <AuthLanding auth={auth} onLogin={() => void login()} />;
+}
+
+function SessionApp({
+  user,
+  onLogin,
+  onLogout,
+}: {
+  user: User;
+  onLogin: () => void;
+  onLogout: () => void;
+}) {
+  const [view, setView] = useState<SessionView>({ status: "loading" });
+  const [gate, setGate] = useState<ReturnType<typeof createSessionGate>>();
   useEffect(() => {
-    if (auth.status !== "authenticated") return;
+    let product: AbortController | undefined;
+    let lastDenial = 0;
+    const session = createSessionGate(
+      authClient.fetch.bind(authClient),
+      (next) => {
+        if (allowsProduct(next)) product ??= new AbortController();
+        else {
+          product?.abort();
+          product = undefined;
+        }
+        setView(next);
+      },
+      () => document.visibilityState !== "hidden",
+    );
+    setGate(session);
+    setProductGate({
+      signal: () => (session.allowsProduct() ? product?.signal : undefined),
+      observe(status) {
+        if (
+          (status === 401 || status === 403 || status === 503) &&
+          Date.now() - lastDenial > 3000
+        ) {
+          lastDenial = Date.now();
+          session.refresh(true);
+        }
+      },
+    });
+    const resume = () => session.refresh();
+    window.addEventListener("focus", resume);
+    document.addEventListener("visibilitychange", resume);
+    session.refresh();
+    return () => {
+      session.dispose();
+      product?.abort();
+      setProductGate({ signal: () => undefined, observe: () => undefined });
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("visibilitychange", resume);
+    };
+  }, []);
+  if (view.status === "ready" && allowsProduct(view))
+    return <ProductApp user={user} onLogout={onLogout} />;
+  if (view.status === "ready")
+    return (
+      <RestrictedSession
+        session={view.session}
+        onRefresh={() => gate?.refresh(true)}
+        onLogout={onLogout}
+      />
+    );
+  return (
+    <main className="landing restricted-session">
+      <p role="status">
+        {view.status === "loading"
+          ? "Verificando seu acesso…"
+          : view.authenticate
+            ? "Sua sessão precisa ser renovada."
+            : "Não foi possível verificar seu acesso. Tente novamente."}
+      </p>
+      {view.status === "error" && (
+        <button
+          className="primary-button"
+          onClick={view.authenticate ? onLogin : () => gate?.refresh(true)}
+        >
+          {view.authenticate ? "Entrar novamente" : "Tentar novamente"}
+        </button>
+      )}
+      <button onClick={onLogout}>Sair da conta</button>
+    </main>
+  );
+}
+
+function ProductApp({ user, onLogout }: { user: User; onLogout: () => void }) {
+  const [error, setError] = useState("");
+  const [feedReady, setFeedReady] = useState(false);
+  const { bookPath, legacyQuery, legacyVisible, readerTab, showLegacy } =
+    useLegacyNavigation();
+  useEffect(() => {
     let active = true;
+    const urls = new Set<string>();
+    let telemetry: ReturnType<typeof createTelemetry> | undefined;
+    let ownsLegacy = false;
+    const productFetch: typeof authClient.fetch = (path, init) => {
+      if (!active)
+        return Promise.reject(
+          new DOMException("Session changed", "AbortError"),
+        );
+      return authClient.fetch(path, init);
+    };
     async function startPrototype() {
       try {
-        const telemetry = createTelemetry(async (events) => {
-          const response = await authClient.fetch(apiRoutes.behavior(), {
+        const sender = createTelemetry(async (events) => {
+          const response = await productFetch(apiRoutes.behavior(), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ events }),
           });
           if (!response.ok) throw new Error("telemetry rejected");
         });
+        telemetry = sender;
         const recommendations = await loadRecommendationFeed().catch(() => []);
         if (!active) return;
         const recommendationFor = (bookId: string) =>
@@ -159,6 +297,13 @@ function App() {
             };
           }),
         );
+        for (const book of books) {
+          if (book.thumbnailUrl?.startsWith("blob:")) {
+            if (active) urls.add(book.thumbnailUrl);
+            else URL.revokeObjectURL(book.thumbnailUrl);
+          }
+        }
+        if (!active) return;
         const socialCounts = await Promise.all(
           books.map((book) =>
             loadSocialCounts(book.id).catch(() => ({
@@ -168,6 +313,7 @@ function App() {
             })),
           ),
         );
+        if (!active) return;
         books.forEach((book, index) =>
           Object.assign(book, socialCounts[index]),
         );
@@ -177,7 +323,9 @@ function App() {
           books.map((book, index) => [book.id, socialCounts[index].liked]),
         );
         const saved = new Set(await loadLibrary());
+        if (!active) return;
         const recent = await loadRecent();
+        if (!active) return;
         // Publisher and administration APIs belong to the platform realm and
         // are intentionally not called by the product-realm reader session.
         // The dedicated admin console obtains the correct platform token.
@@ -198,15 +346,16 @@ function App() {
           window as Window & { __BOOKRUSH_PUBLISHER_SUBMISSIONS__?: unknown[] }
         ).__BOOKRUSH_PUBLISHER_SUBMISSIONS__ = submissions;
         try {
-          const profileResponse = await authClient.fetch(
-            apiRoutes.profile.self(),
-          );
-          (
-            window as Window & { __BOOKRUSH_PROFILE__?: unknown }
-          ).__BOOKRUSH_PROFILE__ = profileResponse.ok
+          const profileResponse = await productFetch(apiRoutes.profile.self());
+          const value = profileResponse.ok
             ? await profileResponse.json()
             : null;
+          if (!active) return;
+          (
+            window as Window & { __BOOKRUSH_PROFILE__?: unknown }
+          ).__BOOKRUSH_PROFILE__ = value;
         } catch {
+          if (!active) return;
           (
             window as Window & { __BOOKRUSH_PROFILE__?: unknown }
           ).__BOOKRUSH_PROFILE__ = null;
@@ -218,35 +367,33 @@ function App() {
           window as Window & { __BOOKRUSH_ADMIN_REPORTS__?: unknown[] }
         ).__BOOKRUSH_ADMIN_REPORTS__ = [];
         try {
-          const streakResponse = await authClient.fetch(
-            apiRoutes.reader.streak(),
-          );
+          const streakResponse = await productFetch(apiRoutes.reader.streak());
+          const value = streakResponse.ok ? await streakResponse.json() : null;
+          if (!active) return;
           (
             window as Window & { __BOOKRUSH_STREAK__?: unknown }
-          ).__BOOKRUSH_STREAK__ = streakResponse.ok
-            ? await streakResponse.json()
-            : null;
+          ).__BOOKRUSH_STREAK__ = value;
         } catch {
+          if (!active) return;
           (
             window as Window & { __BOOKRUSH_STREAK__?: unknown }
           ).__BOOKRUSH_STREAK__ = null;
         }
         try {
-          const plantResponse = await authClient.fetch(
-            apiRoutes.reader.plant(),
-          );
+          const plantResponse = await productFetch(apiRoutes.reader.plant());
+          const value = plantResponse.ok ? await plantResponse.json() : null;
+          if (!active) return;
           (
             window as Window & { __BOOKRUSH_PLANT__?: unknown }
-          ).__BOOKRUSH_PLANT__ = plantResponse.ok
-            ? await plantResponse.json()
-            : null;
+          ).__BOOKRUSH_PLANT__ = value;
         } catch {
+          if (!active) return;
           (
             window as Window & { __BOOKRUSH_PLANT__?: unknown }
           ).__BOOKRUSH_PLANT__ = null;
         }
         const bookmarksClient = createBookmarksClient(
-          (url, init) => authClient.fetch(url, init),
+          (url, init) => productFetch(url, init),
           apiRoutes.reader.bookmarks,
         );
         (
@@ -261,7 +408,7 @@ function App() {
             readerSessionOrigin.clear();
           },
           save: async (id: string, enabled: boolean) => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.reader.libraryBook(id),
               {
                 method: enabled ? "PUT" : "DELETE",
@@ -274,7 +421,7 @@ function App() {
             else saved.delete(id);
           },
           like: async (id: string, enabled: boolean) => {
-            const response = await authClient.fetch(apiRoutes.social.like(id), {
+            const response = await productFetch(apiRoutes.social.like(id), {
               method: enabled ? "PUT" : "DELETE",
               headers: correlationHeaders(id),
             });
@@ -282,35 +429,27 @@ function App() {
               throw new Error("Não foi possível atualizar a curtida.");
           },
           share: async (id: string) => {
-            const response = await authClient.fetch(
-              apiRoutes.social.share(id),
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  ...correlationHeaders(id),
-                },
-                body: JSON.stringify({ channel: "copy-link" }),
+            const response = await productFetch(apiRoutes.social.share(id), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...correlationHeaders(id),
               },
-            );
+              body: JSON.stringify({ channel: "copy-link" }),
+            });
             if (!response.ok)
               throw new Error("Não foi possível registrar o compartilhamento.");
           },
           comments: async (id: string) => {
-            const response = await authClient.fetch(
-              apiRoutes.social.comments(id),
-            );
+            const response = await productFetch(apiRoutes.social.comments(id));
             return response.ok ? response.json() : [];
           },
           comment: async (id: string, text: string) => {
-            const response = await authClient.fetch(
-              apiRoutes.social.comments(id),
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ body: text }),
-              },
-            );
+            const response = await productFetch(apiRoutes.social.comments(id), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ body: text }),
+            });
             if (!response.ok)
               throw new Error("Não foi possível publicar o comentário.");
           },
@@ -338,11 +477,11 @@ function App() {
             return counts;
           },
           profile: async () => {
-            const response = await authClient.fetch(apiRoutes.profile.self());
+            const response = await productFetch(apiRoutes.profile.self());
             return response.ok ? response.json() : null;
           },
           publicProfile: async (subject: string) => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.profile.public(subject),
             );
             if (!response.ok)
@@ -359,7 +498,7 @@ function App() {
             bio?: string;
             isPublic?: boolean;
           }) => {
-            const response = await authClient.fetch(apiRoutes.profile.self(), {
+            const response = await productFetch(apiRoutes.profile.self(), {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(profile),
@@ -369,9 +508,7 @@ function App() {
             return response.json();
           },
           privacy: async () => {
-            const response = await authClient.fetch(
-              apiRoutes.profile.privacy(),
-            );
+            const response = await productFetch(apiRoutes.profile.privacy());
             if (!response.ok)
               throw new Error("Não foi possível carregar a privacidade.");
             return response.json();
@@ -383,21 +520,18 @@ function App() {
             recentVisibility: string;
             socialGraphVisibility: string;
           }) => {
-            const response = await authClient.fetch(
-              apiRoutes.profile.privacy(),
-              {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(privacy),
-              },
-            );
+            const response = await productFetch(apiRoutes.profile.privacy(), {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(privacy),
+            });
             if (!response.ok)
               throw new Error("Não foi possível salvar a privacidade.");
             return response.json();
           },
           followerStats: (subject?: string) => loadFollowerStats(subject),
           follow: async (subject: string, enabled: boolean) => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.social.follow(subject),
               { method: enabled ? "PUT" : "DELETE" },
             );
@@ -405,7 +539,7 @@ function App() {
               throw new Error("Não foi possível atualizar o acompanhamento.");
           },
           followStatus: async (subject: string) => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.social.follow(subject),
             );
             if (!response.ok)
@@ -414,19 +548,19 @@ function App() {
               .following;
           },
           adminUsers: async () => {
-            const response = await authClient.fetch(apiRoutes.admin.users());
+            const response = await productFetch(apiRoutes.admin.users());
             if (!response.ok)
               throw new Error("Não foi possível carregar os usuários.");
             return response.json();
           },
           adminReports: async () => {
-            const response = await authClient.fetch(apiRoutes.admin.reports());
+            const response = await productFetch(apiRoutes.admin.reports());
             if (!response.ok)
               throw new Error("Não foi possível carregar as denúncias.");
             return response.json();
           },
           adminAudit: async (action: string, target: string) => {
-            const response = await authClient.fetch(apiRoutes.admin.audit(), {
+            const response = await productFetch(apiRoutes.admin.audit(), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ action, target }),
@@ -438,14 +572,11 @@ function App() {
             return response.json();
           },
           adminModerate: async (target: string, decision: string) => {
-            const response = await authClient.fetch(
-              apiRoutes.admin.moderation(),
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ target, decision }),
-              },
-            );
+            const response = await productFetch(apiRoutes.admin.moderation(), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ target, decision }),
+            });
             if (!response.ok)
               throw new Error(
                 "Não foi possível registrar a decisão de moderação.",
@@ -453,7 +584,7 @@ function App() {
             return response.json();
           },
           publisherSubmissions: async () => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.publisher.submissions(),
             );
             if (!response.ok)
@@ -461,7 +592,7 @@ function App() {
             return response.json();
           },
           createSubmission: async (title: string) => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.publisher.submissions(),
               {
                 method: "POST",
@@ -474,7 +605,7 @@ function App() {
             return response.json();
           },
           submitSubmission: async (id: string) => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.publisher.submit(id),
               { method: "POST" },
             );
@@ -485,7 +616,7 @@ function App() {
             return response.json();
           },
           publisherMetrics: async (id: string) => {
-            const response = await authClient.fetch(
+            const response = await productFetch(
               apiRoutes.publisher.metrics(id),
             );
             if (!response.ok)
@@ -493,7 +624,7 @@ function App() {
             return response.json();
           },
           uploadSubmissionFile: async (submissionId: string, file: File) => {
-            const request = await authClient.fetch(
+            const request = await productFetch(
               apiRoutes.publisher.upload(submissionId),
               {
                 method: "POST",
@@ -525,7 +656,7 @@ function App() {
             const sha256 = Array.from(new Uint8Array(digest), (byte) =>
               byte.toString(16).padStart(2, "0"),
             ).join("");
-            const complete = await authClient.fetch(
+            const complete = await productFetch(
               apiRoutes.publisher.finalize(submissionId, reservation.uploadId),
               {
                 method: "POST",
@@ -550,15 +681,13 @@ function App() {
             await recordOpenedBook(id, readerSessionOrigin.activeFor(id));
           },
           chapters: async (id: string) => {
-            const response = await authClient.fetch(
-              apiRoutes.reader.chapters(id),
-            );
+            const response = await productFetch(apiRoutes.reader.chapters(id));
             return response.ok ? response.json() : [];
           },
           viewable: async (id: string) => {
             const item = recommendationFor(id);
             if (item?.impressionId) {
-              const response = await authClient.fetch(
+              const response = await productFetch(
                 apiRoutes.reader.impressionViewable(item.impressionId),
                 { method: "POST" },
               );
@@ -572,7 +701,7 @@ function App() {
             excerpt?: FeedExcerpt | null,
             payload: Record<string, unknown> = {},
           ) => {
-            telemetry.track(eventType, bookId, {
+            sender.track(eventType, bookId, {
               ...payload,
               recommendationItemId:
                 recommendationFor(bookId)?.recommendationItemId,
@@ -624,6 +753,7 @@ function App() {
               "Não foi possível carregar a navegação. Recarregue a página para tentar novamente.",
             );
         };
+        ownsLegacy = true;
         document.body.appendChild(script);
       } catch (cause) {
         if (active)
@@ -637,44 +767,49 @@ function App() {
     void startPrototype();
     return () => {
       active = false;
+      telemetry?.dispose();
+      for (const url of urls) URL.revokeObjectURL(url);
+      const globals = window as unknown as Window & Record<string, unknown>;
+      if (ownsLegacy) {
+        (globals.__BOOKRUSH_LEGACY_DISPOSE__ as (() => void) | undefined)?.();
+        document.querySelector("script[data-bookrush-pageloop]")?.remove();
+        document.getElementById("bookrush-pageloop-style")?.remove();
+        document.querySelector('link[href^="/thumbnails.css"]')?.remove();
+      }
+      void readiumBridge.unmount();
+      for (const key of [
+        "API",
+        "BOOKS",
+        "RECENT",
+        "READIUM",
+        "PROFILE",
+        "LIKES",
+        "STREAK",
+        "PLANT",
+        "ADMIN_USERS",
+        "ADMIN_REPORTS",
+        "PUBLISHER_SUBMISSIONS",
+        "BOOKMARK_DIALOGS",
+        "APPEARANCE",
+      ]) {
+        delete globals[`__BOOKRUSH_${key}__`];
+      }
     };
-  }, [auth.status]);
-  async function login() {
-    setAuth({ status: "loading" });
-    try {
-      await authClient.login(window.location.pathname + window.location.search);
-    } catch (cause) {
-      setAuth({
-        status: "error",
-        error:
-          cause instanceof Error
-            ? cause.message
-            : "Não foi possível iniciar o login.",
-      });
-    }
-  }
-  if (auth.status === "authenticated")
-    return (
-      <AuthenticatedShell
-        error={error}
-        bookPath={bookPath}
-        feedReady={feedReady}
-        legacyQuery={legacyQuery}
-        legacyVisible={legacyVisible}
-        onRetry={() => window.location.reload()}
-        onShowLegacy={showLegacy}
-        readerTab={readerTab}
-        user={auth.user}
-      />
-    );
-  if (auth.status === "loading")
-    return (
-      <div className="splash">
-        <div className="brand-mark">B</div>
-        <p>Preparando seu feed…</p>
-      </div>
-    );
-  return <AuthLanding auth={auth} onLogin={() => void login()} />;
+  }, []);
+  return (
+    <AuthenticatedShell
+      error={error}
+      bookPath={bookPath}
+      feedReady={feedReady}
+      legacyQuery={legacyQuery}
+      legacyVisible={legacyVisible}
+      onRetry={() => window.location.reload()}
+      onShowLegacy={showLegacy}
+      readerTab={readerTab}
+      user={user}
+      onLogout={onLogout}
+    />
+  );
 }
 
 createRoot(document.getElementById("root")!).render(

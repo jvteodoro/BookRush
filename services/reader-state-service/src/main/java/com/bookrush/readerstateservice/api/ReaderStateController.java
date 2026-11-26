@@ -4,6 +4,11 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.servlet.http.HttpServletRequest;
 import com.bookrush.readerstateservice.BehaviorEventPublisher;
+import com.bookrush.platform.core.TechnicalIdentity;
+import com.bookrush.platform.security.ProductAccessAuthorization;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import java.security.Principal;
 import java.time.Instant;
 import java.util.Map;
@@ -37,13 +42,30 @@ public class ReaderStateController {
   private final BehaviorEventPublisher behavior;
   private final DailyPlantService dailyPlant;
 
-  public ReaderStateController(JdbcTemplate jdbc, BehaviorEventPublisher behavior, DailyPlantService dailyPlant) {
+  private final Optional<ProductAccessAuthorization> productAccess;
+
+  ReaderStateController(JdbcTemplate jdbc, BehaviorEventPublisher behavior, DailyPlantService dailyPlant) {
+    this(jdbc, behavior, dailyPlant, Optional.empty());
+  }
+
+  @Autowired
+  public ReaderStateController(JdbcTemplate jdbc, BehaviorEventPublisher behavior, DailyPlantService dailyPlant,
+      Optional<ProductAccessAuthorization> productAccess) {
     this.jdbc = jdbc;
     this.behavior = behavior;
     this.dailyPlant = dailyPlant;
+    this.productAccess = productAccess;
   }
 
   private String subject(Principal principal) {
+    if (principal instanceof JwtAuthenticationToken authenticated && authenticated.isAuthenticated()) {
+      var jwt = authenticated.getToken();
+      if (jwt.getIssuer() == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
+      }
+      // Preserve the exact persisted name emitted by the historical reader-state JWT converter.
+      return new TechnicalIdentity(jwt.getIssuer().toString(), jwt.getSubject()).toString();
+    }
     if (principal == null || principal.getName() == null || principal.getName().isBlank()) {
       throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
     }
@@ -107,12 +129,32 @@ public class ReaderStateController {
   @PostMapping("/books/{bookId}/opened")
   public Map<String, Object> opened(@PathVariable UUID bookId, Principal principal, HttpServletRequest request) {
     String subject = subject(principal);
+    UUID requestId = request == null ? null : uuidValue(request.getHeader("Idempotency-Key"));
+    if (request != null && request.getHeader("Idempotency-Key") != null && requestId == null) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key must be a UUID");
+    }
+    productAccess.ifPresent(gate -> gate.recheck(request));
+    if (requestId != null && jdbc.update("""
+        INSERT INTO reader_state.book_open(subject_key, book_id, request_id) VALUES (?, ?, ?)
+        ON CONFLICT DO NOTHING
+        """, subject, bookId, requestId) == 0) {
+      return Map.of("bookId", bookId, "recorded", true);
+    }
     jdbc.update("insert into reader_state.recent(subject_key,book_id) values(?,?) "
         + "on conflict(subject_key,book_id) do update set last_opened_at=now()",
         subject, bookId);
     jdbc.update("INSERT INTO reader_state.seen_book(subject_key,book_id) VALUES (?,?) "
         + "ON CONFLICT(subject_key,book_id) DO UPDATE SET last_seen_at=clock_timestamp()",
         subject, bookId);
+    if (requestId == null) {
+      // The recent row is already locked by the upsert. Legacy callers have no stable retry key.
+      jdbc.update("""
+          INSERT INTO reader_state.book_open(subject_key, book_id, request_id)
+          SELECT ?, ?, gen_random_uuid() WHERE NOT EXISTS (
+            SELECT 1 FROM reader_state.book_open WHERE subject_key=? AND book_id=?
+              AND occurred_at >= clock_timestamp() - interval '5 seconds')
+          """, subject, bookId, subject, bookId);
+    }
     behavior.publish("BOOK_OPEN", bookId, correlation(request), authorization(request));
     return Map.of("bookId", bookId, "recorded", true);
   }
@@ -170,6 +212,7 @@ public class ReaderStateController {
         },
         id, subject);
     UUID bookId = (UUID) sessionOrigin.get("bookId");
+    productAccess.ifPresent(gate -> gate.recheck(request));
     Integer persistedSeconds = jdbc.query(END_SESSION_SQL,
         rs -> rs.next() ? rs.getInt("active_seconds") : null,
         seconds, MAX_SESSION_ACTIVE_SECONDS, id, subject);

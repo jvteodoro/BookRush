@@ -58,3 +58,24 @@ produção, origem, cliente Keycloak ou porta nova é necessária. O teste usa
 direct grants somente no realm descartável; o login de produção continua PKCE.
 O smoke de produção deve repetir a pesquisa e abertura de perfil pelo gateway
 público com token de produto novo após publicar a branch.
+
+## Elegibilidade e descoberta
+
+O opt-in `COMMUNITY_PRODUCT_ACCESS_ENABLED` protege as seis operações com
+`PRODUCT_USE:PROFILE`. As escritas usam a chave histórica derivada do JWT.
+Busca e consulta pública de terceiros exigem privacidade pública e fato atual
+de maioridade. Perfis sem comprovação suficiente são omitidos. A API devolve
+o mesmo 404 para perfil não descobrível ou ausente e nunca inclui a data de
+nascimento.
+
+A busca seleciona até 500 candidatos locais, passa os subjects ao
+family-service em uma única chamada técnica e filtra antes de calcular
+paginação e totais. O family-service usa uma única consulta atual de até
+500 contas habilitadas por lote no Keycloak. Candidatos fora desses limites
+ficam ocultos até uma futura estratégia de escala. Indisponibilidade da fonte
+retorna 503. Nenhum resultado positivo é reutilizado entre requisições.
+
+Provisione `bookrush-reader-profile-product-access-s2s` e configure
+`bookrush-reader-profile-product-access-s2s=PRODUCT_USE:PROFILE` no
+family-service. A rota técnica de descoberta recebe apenas os candidatos e
+retorna apenas os subjects elegíveis. Seu contrato consta no OpenAPI de família.

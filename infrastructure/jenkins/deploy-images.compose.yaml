@@ -1,4 +1,6 @@
 services:
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:?Imagem Keycloak com provider de idade ausente}
   reverse-proxy:
     environment:
       BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG: ${BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG:?Configuração de rotas da revisão ausente}
@@ -61,6 +63,10 @@ services:
       FEED_PERSONALIZED_BEHAVIOR_MAX_SIGNALS: ${FEED_PERSONALIZED_BEHAVIOR_MAX_SIGNALS:-50}
   reader-bff-service:
     image: ${READER_BFF_IMAGE:?Imagem reader-bff ausente}
+  book-content-service:
+    image: ${BOOK_CONTENT_IMAGE:?Imagem book-content ausente}
+  publisher-service:
+    image: ${PUBLISHER_IMAGE:?Imagem publisher ausente}
   book-analytics-runtime:
     image: ${ANALYTICS_RUNTIME_IMAGE:?Imagem analytics-runtime ausente}
   reader-state-service:
@@ -82,3 +88,9 @@ services:
       context: ../../admin-web
       args:
         VITE_GRAFANA_URL: ${ADMIN_WEB_GRAFANA_URL:-https://grafana-bookrush.jteodoro.tec.br}
+  family-service:
+    image: ${FAMILY_IMAGE:?Imagem family ausente}
+  subscription-service:
+    image: ${SUBSCRIPTION_IMAGE:?Imagem subscription ausente}
+  seaweedfs:
+    image: ${SEAWEEDFS_IMAGE:?Imagem SeaweedFS ausente}

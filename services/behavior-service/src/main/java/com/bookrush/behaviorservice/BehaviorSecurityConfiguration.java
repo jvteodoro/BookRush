@@ -33,10 +33,21 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class BehaviorSecurityConfiguration {
   @Bean
   SecurityFilterChain behaviorSecurity(HttpSecurity http,
-      AuthenticationManagerResolver<HttpServletRequest> authenticationManagerResolver) throws Exception {
+      AuthenticationManagerResolver<HttpServletRequest> authenticationManagerResolver,
+      java.util.Optional<BehaviorOperationsPolicy> operations) throws Exception {
     http.csrf(csrf -> csrf.disable()).cors(cors -> {})
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+        .authorizeHttpRequests(auth -> {
+            operations.ifPresent(policy -> {
+              auth.requestMatchers(HttpMethod.POST, "/api/v1/behavior/aggregates/rebuild")
+                  .access(operations(policy, BehaviorOperationsPolicy.REBUILD));
+              auth.requestMatchers(HttpMethod.GET, "/api/v1/behavior/aggregates", "/api/v1/behavior/aggregates/books/*",
+                  "/api/v1/behavior/aggregates/dashboard", "/api/v1/behavior/events/count",
+                  "/api/v1/behavior/operations/metrics", "/actuator/metrics", "/actuator/metrics/**").access(operations(policy, BehaviorOperationsPolicy.READ));
+              auth.requestMatchers(HttpMethod.HEAD, "/api/v1/behavior/aggregates", "/api/v1/behavior/aggregates/books/*",
+                  "/api/v1/behavior/aggregates/dashboard", "/api/v1/behavior/events/count",
+                  "/api/v1/behavior/operations/metrics", "/actuator/metrics", "/actuator/metrics/**").access(operations(policy, BehaviorOperationsPolicy.READ));
+            });
+            auth.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers("/api/internal/v1/recommendation/signals")
                 .hasAuthority("SCOPE_bookrush.behavior.read")
@@ -44,7 +55,8 @@ public class BehaviorSecurityConfiguration {
                 .hasAuthority("SCOPE_bookrush.behavior.read")
             .requestMatchers("/api/internal/v1/publisher/metrics/**")
                 .hasAuthority("SCOPE_bookrush.publisher.metrics.read")
-            .anyRequest().authenticated())
+            .anyRequest().authenticated();
+        })
         .oauth2ResourceServer(oauth -> oauth.authenticationManagerResolver(authenticationManagerResolver));
     return http.build();
   }
@@ -54,7 +66,8 @@ public class BehaviorSecurityConfiguration {
       JwtDecoder productDecoder,
       @Value("${bookrush.security.s2s-issuer}") String s2sIssuer,
       @Value("${bookrush.security.s2s-jwk-set-uri}") String s2sJwkSetUri,
-      @Value("${bookrush.security.s2s-audience}") String s2sAudience) {
+      @Value("${bookrush.security.s2s-audience}") String s2sAudience,
+      @Value("${bookrush.security.product-access.enabled:false}") boolean gate) {
     JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
     AuthenticationManager product = manager(productDecoder, converter);
     // Keycloak signs service tokens with RS256.  Make the accepted algorithm
@@ -71,9 +84,25 @@ public class BehaviorSecurityConfiguration {
     s2sDecoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
         JwtValidators.createDefaultWithIssuer(s2sIssuer), audience));
     AuthenticationManager s2s = manager(s2sDecoder, converter);
-    return request -> (request.getRequestURI().startsWith("/api/internal/v1/recommendation/")
-        || request.getRequestURI().startsWith("/api/internal/v1/publisher/metrics/"))
-        ? s2s : product;
+    return request -> {
+      String path = request.getRequestURI().substring(request.getContextPath().length());
+      return path.startsWith("/api/internal/v1/recommendation/")
+          || path.startsWith("/api/internal/v1/publisher/metrics/") || (gate && operationalPath(path))
+          ? s2s : product;
+    };
+  }
+
+  private static boolean operationalPath(String path) {
+    return path.matches("/api/v1/behavior/aggregates(/(books/[^/]+|dashboard|rebuild))?")
+        || path.equals("/api/v1/behavior/operations/metrics") || path.equals("/api/v1/behavior/events/count")
+        || path.equals("/actuator/metrics") || path.startsWith("/actuator/metrics/");
+  }
+
+  private static org.springframework.security.authorization.AuthorizationManager<
+      org.springframework.security.web.access.intercept.RequestAuthorizationContext> operations(
+          BehaviorOperationsPolicy policy, String scope) {
+    return (principal, request) -> new org.springframework.security.authorization.AuthorizationDecision(
+        policy.allows(principal.get(), scope));
   }
 
   private static AuthenticationManager manager(JwtDecoder decoder,

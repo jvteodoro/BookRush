@@ -196,7 +196,17 @@ public class ReaderBffController {
   public ResponseEntity<byte[]> resource(@PathVariable UUID bookId, @PathVariable String resource,
       Principal principal, HttpServletRequest request) {
     requireReader(principal);
-    return getBytes(content, "/api/v1/content/books/" + bookId + "/resources/" + resource, request);
+    String path = resource.startsWith("/") ? resource.substring(1) : resource;
+    String[] segments = path.split("/", -1);
+    if (java.util.Arrays.stream(segments).anyMatch(part -> part.isEmpty() || part.equals(".")
+        || part.equals("..") || part.indexOf('\\') >= 0 || part.indexOf(0) >= 0)) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+    return getBytes(content, builder -> {
+      builder.path("/api/v1/content/books/" + bookId + "/resources");
+      for (int i = 0; i < segments.length; i++) builder.pathSegment("{part" + i + "}");
+      return builder.build((Object[]) segments);
+    }, request);
   }
 
   private void requireReader(Principal principal) {
@@ -237,6 +247,7 @@ public class ReaderBffController {
           .headers(headers -> {
             if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
             copyReaderCorrelation(request, headers);
+            if (client == state) copyDecisionCorrelation(request, headers);
             if ("/api/v1/recommendations/feed".equals(path)) {
               String platform = request.getHeader("X-BookRush-Platform");
               if ("web".equalsIgnoreCase(platform) || "mobile".equalsIgnoreCase(platform)) {
@@ -247,7 +258,9 @@ public class ReaderBffController {
           .retrieve()
           .body(Object.class);
     } catch (HttpStatusCodeException exception) {
-      throw translateUpstreamFailure("reader dependency rejected request", exception);
+      throw (client == state || client == content) && exception.getStatusCode().value() == 503
+          ? new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "reader dependency cannot authorize the operation")
+          : translateUpstreamFailure("reader dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "reader dependency unavailable", exception);
     }
@@ -259,27 +272,55 @@ public class ReaderBffController {
       var requestSpec = client.method(method).uri(path).headers(headers -> {
         if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
         copyReaderCorrelation(request, headers);
+        if (client == state) copyDecisionCorrelation(request, headers);
+        if (client == state && path.endsWith("/opened") && request.getHeader("Idempotency-Key") != null) {
+          headers.set("Idempotency-Key", request.getHeader("Idempotency-Key"));
+        }
         if (body != null) headers.set(HttpHeaders.CONTENT_TYPE, "application/json");
       });
       return body == null ? requestSpec.retrieve().body(Object.class) : requestSpec.body(body).retrieve().body(Object.class);
     } catch (HttpStatusCodeException exception) {
-      throw translateUpstreamFailure("reader dependency rejected request", exception);
+      throw (client == state || client == content) && exception.getStatusCode().value() == 503
+          ? new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "reader dependency cannot authorize the operation")
+          : translateUpstreamFailure("reader dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "reader dependency unavailable", exception);
     }
   }
 
   private ResponseEntity<byte[]> getBytes(RestClient client, String path, HttpServletRequest request) {
+    return getBytes(client, builder -> builder.path(path).build(), request);
+  }
+
+  private ResponseEntity<byte[]> getBytes(RestClient client,
+      java.util.function.Function<org.springframework.web.util.UriBuilder, java.net.URI> path,
+      HttpServletRequest request) {
     String bearer = request.getHeader(HttpHeaders.AUTHORIZATION);
     try {
       return client.get().uri(path).headers(headers -> {
         if (bearer != null && !bearer.isBlank()) headers.set(HttpHeaders.AUTHORIZATION, bearer);
         copyReaderCorrelation(request, headers);
+        copyDecisionCorrelation(request, headers);
       }).retrieve().toEntity(byte[].class);
     } catch (HttpStatusCodeException exception) {
+      if (exception.getStatusCode().value() == 503) {
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "content authorization unavailable");
+      }
       throw translateUpstreamFailure("content dependency rejected request", exception);
     } catch (RestClientException exception) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "content dependency unavailable", exception);
+    }
+  }
+
+  private void copyDecisionCorrelation(HttpServletRequest request, HttpHeaders headers) {
+    String correlation = org.slf4j.MDC.get("correlationId");
+    if (correlation == null) correlation = request.getHeader("X-Correlation-ID");
+    if (correlation != null) {
+      try {
+        headers.set("X-Correlation-ID", com.bookrush.platform.core.CorrelationId.parse(correlation).value());
+      } catch (IllegalArgumentException ignored) {
+        // Reader state generates a safe correlation identifier if none was provided.
+      }
     }
   }
 

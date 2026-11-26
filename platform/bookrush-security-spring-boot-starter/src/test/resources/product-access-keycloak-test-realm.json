@@ -1,0 +1,33 @@
+{
+  "realm": "product-access-test",
+  "enabled": true,
+  "clientScopes": [
+    {
+      "name": "product-access.evaluate",
+      "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true"},
+      "protocolMappers": [
+        {
+          "name": "Product Access Audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {"included.custom.audience": "bookrush-family", "access.token.claim": "true"}
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "workload",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "synthetic-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "optionalClientScopes": ["product-access.evaluate"]
+    }
+  ]
+}

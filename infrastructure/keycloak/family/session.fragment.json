@@ -1,0 +1,34 @@
+{
+  "scope": {
+    "name": "session.view",
+    "protocol": "openid-connect",
+    "attributes": {
+      "include.in.token.scope": "true"
+    },
+    "protocolMappers": [
+      {
+        "name": "reader BFF audience",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "config": {
+          "included.custom.audience": "bookrush-reader-bff",
+          "access.token.claim": "true",
+          "id.token.claim": "false"
+        }
+      }
+    ]
+  },
+  "client": {
+    "clientId": "bookrush-reader-bff-session-s2s",
+    "protocol": "openid-connect",
+    "enabled": true,
+    "publicClient": false,
+    "serviceAccountsEnabled": true,
+    "standardFlowEnabled": false,
+    "directAccessGrantsEnabled": false,
+    "fullScopeAllowed": false,
+    "defaultClientScopes": [
+      "product-access.evaluate"
+    ]
+  }
+}

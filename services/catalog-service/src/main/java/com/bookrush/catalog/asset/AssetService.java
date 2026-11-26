@@ -466,6 +466,86 @@ ON CONFLICT (operation_key) DO UPDATE SET state='PLANNED', last_error=NULL, next
         });
   }
 
+  public List<AssetView> approvedReaderAssets(UUID book) {
+    return tx.execute(status -> {
+      var title = em.find(Book.class, book);
+      if (title == null || title.getStatus() != BookStatus.ACTIVE) throw missing();
+      return em.createQuery("""
+          select a from BookAsset a where a.bookId=:book and a.status=:active
+          """, BookAsset.class).setParameter("book", book)
+          .setParameter("active", BookAssetStatus.ACTIVE)
+          .getResultStream()
+          .filter(a -> a.getAssetRole() == BookAssetAssetRole.PUBLIC || a.getAssetRole() == BookAssetAssetRole.COVER)
+          .filter(this::distributionAllowed).map(this::view).toList();
+    });
+  }
+
+  public ReaderDownload operatorDownload(UUID book, UUID id) {
+    return tx.execute(status -> {
+      if (asset(book, id).getStatus() == BookAssetStatus.DELETED) throw missing();
+      return describe(latest(id));
+    });
+  }
+
+  public DownloadLink authenticatedOperatorLink(UUID book, UUID id) {
+    operatorDownload(book, id);
+    return new DownloadLink(URI.create("/api/admin/books/" + book + "/assets/" + id + "/content"), null);
+  }
+
+  public DownloadLink authenticatedLink(UUID book, UUID id) {
+    tx.executeWithoutResult(status -> approvedDownload(book, id, false));
+    return new DownloadLink(URI.create("/api/v1/books/" + book + "/reader-assets/" + id + "/content"), null);
+  }
+
+  public DownloadLink authenticatedTextLink(UUID book, UUID versionId) {
+    tx.executeWithoutResult(status -> currentReaderText(book, versionId));
+    return new DownloadLink(URI.create("/api/v1/books/" + book + "/reader-assets/text-versions/" + versionId + "/content"),
+        null);
+  }
+
+  public record ReaderDownload(ObjectStorage.Location location, String contentType, Long size) {}
+
+  public ReaderDownload readerDownload(UUID book, UUID id, boolean thumbnail) {
+    return tx.execute(status -> describe(approvedDownload(book, id, thumbnail)));
+  }
+
+  public ReaderDownload readerText(UUID book, UUID versionId) {
+    return tx.execute(status -> describe(currentReaderText(book, versionId)));
+  }
+
+  public InputStream readerBytes(ReaderDownload download) {
+    return storage.download(download.location());
+  }
+
+  private ReaderDownload describe(BookAssetVersion version) {
+    return new ReaderDownload(location(version), version.getContentType(), version.getSizeBytes());
+  }
+
+  private BookAssetVersion approvedDownload(UUID book, UUID id, boolean thumbnail) {
+    var selected = asset(book, id);
+    if (selected.getStatus() != BookAssetStatus.ACTIVE
+        || (selected.getAssetRole() != BookAssetAssetRole.PUBLIC && selected.getAssetRole() != BookAssetAssetRole.COVER)
+        || (thumbnail && selected.getAssetType() != BookAssetAssetType.THUMBNAIL)
+        || (!thumbnail && em.find(Book.class, book).getStatus() != BookStatus.ACTIVE)
+        || !distributionAllowed(selected)) throw missing();
+    return latest(id);
+  }
+
+  private BookAssetVersion currentReaderText(UUID book, UUID versionId) {
+    var title = em.find(Book.class, book);
+    if (title == null || title.getStatus() != BookStatus.ACTIVE) throw missing();
+    var versions = jdbc.queryForList("""
+        SELECT v.id FROM catalog.book_asset_version v
+        JOIN catalog.book_asset a ON a.id=v.book_asset_id
+        WHERE a.book_id=? AND a.asset_type='TXT' AND a.status<>'DELETED' AND v.status='AVAILABLE'
+        ORDER BY v.created_at DESC, v.id DESC LIMIT 1
+        """, UUID.class, book);
+    if (versions.isEmpty() || !versions.getFirst().equals(versionId)) throw missing();
+    var version = em.find(BookAssetVersion.class, versionId);
+    if (!distributionAllowed(asset(book, version.getBookAssetId()))) throw missing();
+    return version;
+  }
+
   /** Signs the exact version requested by a reader projection; never substitutes the latest version. */
   public DownloadLink linkVersion(UUID book, UUID versionId) {
     return tx.execute(s -> {

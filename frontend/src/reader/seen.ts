@@ -42,7 +42,7 @@ export async function recordOpenedBook(
 ) {
   const response = await fetcher(apiRoutes.reader.opened(bookId), {
     method: "POST",
-    headers,
+    headers: { "Idempotency-Key": globalThis.crypto.randomUUID(), ...headers },
   });
   if (!response.ok)
     throw new Error(

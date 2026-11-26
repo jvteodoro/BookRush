@@ -11,9 +11,12 @@ import org.springframework.web.bind.annotation.*;
 @ConditionalOnProperty(name = "storage.enabled", havingValue = "true")
 @Tag(
     name = "Distribuição",
-    description = "Acesso de leitura a assets aprovados por URL pré-assinada.")
+    description = "Entrega de assets aprovados.")
 public class DistributionController {
   private final AssetService service;
+
+  @org.springframework.beans.factory.annotation.Value("${bookrush.security.product-access.enabled:false}")
+  private boolean protectedDistribution;
 
   public DistributionController(AssetService service) {
     this.service = service;
@@ -21,14 +24,13 @@ public class DistributionController {
 
   @GetMapping("/api/books/{bookId}/assets/{assetId}/download-url")
   @Operation(
-      summary = "Gerar URL pública temporária",
+      summary = "Obter link de download",
       description =
-          "Retorna uma URL pré-assinada somente quando o asset está aprovado. O arquivo é baixado"
-              + " diretamente do object storage.")
+          "No modo protegido, retorna a rota autenticada do asset aprovado.")
   public ResponseEntity<AssetService.DownloadLink> download(
       @PathVariable UUID bookId, @PathVariable UUID assetId) {
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
-        .body(service.link(bookId, assetId, true));
+        .body(protectedDistribution ? service.authenticatedLink(bookId, assetId) : service.link(bookId, assetId, true));
   }
 }

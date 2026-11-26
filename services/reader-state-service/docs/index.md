@@ -188,3 +188,81 @@ A valida??o de banco est? em BookmarkDatabaseTest e exige PostgreSQL descart?vel
 consulte database/bookmark-names.md. Para smoke p?blico ap?s deploy, criar com
 nome, listar, renomear, relistar, excluir, confirmar 204 e testar dois usu?rios,
 livro errado, nome inv?lido e preflight com a origem real e token novo.
+
+## Autorização de produto
+
+`READER_STATE_PRODUCT_ACCESS_ENABLED=true` ativa o starter nas 17 operações MVC
+de estado próprio. As rotas consultam o avaliador do family-service com
+`PRODUCT_USE` e `READER_STATE`. O proprietário é a tupla `(issuer, subject)`
+extraída do JWT de produto. O banco mantém a representação histórica
+`TechnicalIdentity[issuer=…, subject=…]` em `subject_key`. Registros e IDs
+existentes continuam acessíveis sem migração. Identificadores de sessão e
+bookmark só selecionam registros dentro do `subject_key` autenticado.
+
+A implantação inclui o cliente confidencial `bookrush-reader-state-s2s` do
+realm de plataforma e o scope `product-access.evaluate`, com audience
+`bookrush-family`. Para provisionar no reconciliador declarativo, configure
+`KEYCLOAK_READER_STATE_CLIENT_ENABLED=true` e forneça o segredo via ambiente
+protegido. Essa configuração é independente da ativação do gate. Acrescente
+`bookrush-reader-state-s2s=PRODUCT_USE:READER_STATE` à configuração
+`FAMILY_PRODUCT_ACCESS_WORKLOADS`. Preencha a origem interna do family-service,
+issuer, endpoint de tokens, JWKS e segredo conforme `.env.example`. A
+allowlist humana padrão contém os clientes web e mobile. Use HTTPS e valide
+o mapeamento e as credenciais antes de habilitar o gate.
+
+O Reader BFF encaminha o bearer humano e a correlação. O starter do estado
+troca credenciais separadas para a chamada técnica. Bearer humano inválido
+resulta em 401, elegibilidade insuficiente em 403 e decisão indisponível em
+503, inclusive pelo BFF. O encerramento de sessão reavalia antes de
+alterar minutos ou emitir o evento de comportamento. As métricas do
+starter são agregadas por resultado, sem identificadores pessoais.
+
+`reader_state.seen_book` registra primeiro e último acesso efetivo para
+o mesmo leitor e livro. Isso preserva o histórico disponível, que pode
+omitir acessos intermediários. A projeção supervisionada, seus endpoints
+S2S e a avaliação da janela são escopo de `bookrush-phx3`. O trabalho
+deverá manter a distinção entre abertura efetiva e impressão do feed.
+
+O E2E local usa `BOOKRUSH_E2E_READER_STATE=1 bash scripts/test-premium-family-e2e.sh`.
+
+
+## Histórico supervisionado de leitura
+
+O Reader BFF encaminha o JWT do responsável e uma segunda credencial assinada
+do realm administrativo ao reader-state. Apenas o workload
+`bookrush-reader-bff-supervision-s2s`, com audience
+`bookrush-reader-state-supervision` e scope `supervision.history.read`, pode
+consultar `GET /api/internal/v1/reader/supervision/{memberId}/history`. O header
+interno `X-BookRush-Workload` contém o JWT técnico validado. O JWT de produto
+em Authorization comprova o ator. Nenhum subject enviado pelo cliente é aceito.
+
+O family-service resolve o UUID da concessão do próprio responsável, devolve
+a janela para o escopo exato e avalia `SUPERVISE_HISTORY`. O reader-state
+reavalia antes de devolver cada página. A consulta não verifica Premium ou
+PRODUCT_USE do menor. Revogação, suspensão e maioridade encerram consultas
+mesmo com um JWT válido anterior. O limite é de 50 itens, com 25 por padrão.
+O cursor do servidor vence em até dez minutos e vincula ator, concessão, versão
+e escopo. Uma página vazia só é retornada após autorização válida.
+
+A migration V12 registra o horário do servidor quando o leitor sinaliza sucesso
+no carregamento em `/opened`. O servidor depende desse sinal do cliente.
+Repetições com a mesma chave UUID de idempotência preservam um único evento.
+Clientes antigos sem chave têm uma deduplicação de cinco segundos por livro.
+Impressões, progresso, estante e tentativas de carga não criam eventos novos.
+Para o legado, somente os extremos distintos e posteriores à V9 da tabela
+`seen_book` são importados, até o limite de 90 dias. Pares iguais e instantes
+anteriores à V9 podem ter vindo de progresso migrado e são omitidos. A V12
+não reconstrói acessos intermediários.
+
+Atividade usa a duração contabilizada pela sessão encerrada, incluindo apenas
+sessões integralmente dentro da janela. Sessões cruzando o início da concessão
+ou o limite móvel são omitidas por não haver localização temporal dos segundos
+ativos. O total de segundos é arredondado para baixo em minutos por data de
+encerramento em America/Sao_Paulo. Planta, posição e locators não fazem parte
+da projeção. A janela respeita a concessão e os 90 dias anteriores à consulta.
+A auditoria guarda ator técnico, UUID da concessão, escopo, resultado e instante
+por 180 dias. Métricas usam apenas valores agregados.
+
+A V13 acrescenta alvo técnico e correlação à infraestrutura de consulta
+compartilhada com comentários. Cursores de histórico existentes continuam
+vinculados à concessão, ao ator, à versão e ao escopo até seu vencimento.

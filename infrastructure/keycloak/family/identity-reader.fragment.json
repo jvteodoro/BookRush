@@ -1,0 +1,37 @@
+{
+  "clients": [
+    {
+      "clientId": "bookrush-family-age-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": false,
+      "secret": "${FAMILY_IDENTITY_CLIENT_SECRET}"
+    }
+  ],
+  "clientScopeMappings": {
+    "realm-management": [
+      {
+        "client": "bookrush-family-age-s2s",
+        "roles": [
+          "view-users"
+        ]
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-bookrush-family-age-s2s",
+      "enabled": true,
+      "serviceAccountClientId": "bookrush-family-age-s2s",
+      "clientRoles": {
+        "realm-management": [
+          "view-users"
+        ]
+      }
+    }
+  ]
+}

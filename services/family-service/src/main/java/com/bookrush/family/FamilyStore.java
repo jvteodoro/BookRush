@@ -15,6 +15,9 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,19 +39,36 @@ class FamilyStore {
   record Address(String code, Instant expiresAt) {}
   record Household(UUID id) {}
   record HouseholdView(UUID id, int additionalSeats, int occupiedOrReserved, List<Member> members) {}
-  record Member(UUID id, String state, boolean delegationEnabled) {}
+  enum MemberState { ACTIVE, SUSPENDED, REMOVED }
+  record Member(UUID id, MemberState state, boolean delegationEnabled, long version, long permissionVersion) {}
+  record Accepted(UUID membershipId, UUID householdId) {}
+  record MembershipFacts(String state, UUID householdId, UUID membershipId, boolean delegationEnabled,
+                         long membershipVersion, long permissionVersion, Instant holderPremiumUntil) {}
+  private record MemberRow(Member member, TechnicalIdentity identity) {}
+
+  private static final String MEMBERS = """
+      SELECT m.*, COALESCE(p.can_publish, false) AS delegation, COALESCE(p.version, 0) AS permission_version
+      FROM family.membership m LEFT JOIN family.member_permission p ON p.membership_id = m.id
+      """;
+
+  private static final RowMapper<MemberRow> MEMBER = (r, n) -> new MemberRow(
+      new Member(r.getObject("id", UUID.class), MemberState.valueOf(r.getString("state")),
+          r.getBoolean("delegation"), r.getLong("version"), r.getLong("permission_version")),
+      new TechnicalIdentity(r.getString("identity_issuer"), r.getString("identity_subject")));
   record Invitation(UUID id, UUID householdId, String state, Instant expiresAt) {}
 
   private final JdbcTemplate db;
   private final Clock clock;
   private final ObjectMapper json;
   private final SubscriptionEntitlements entitlements;
+  private final MeterRegistry metrics;
 
-  FamilyStore(JdbcTemplate db, Clock clock, ObjectMapper json, SubscriptionEntitlements entitlements) {
+  FamilyStore(JdbcTemplate db, Clock clock, ObjectMapper json, SubscriptionEntitlements entitlements, MeterRegistry metrics) {
     this.db = db;
     this.clock = clock;
     this.json = json;
     this.entitlements = entitlements;
+    this.metrics = metrics;
   }
 
   @Transactional
@@ -57,7 +77,7 @@ class FamilyStore {
     if (!existing.isEmpty()) {
       return new Household(existing.getFirst());
     }
-    // Future membership writers acquire the same identity lock before any household lock.
+    // Membership writers acquire the same identity lock before any household lock.
     lockIdentity(owner);
     existing = findHousehold(owner);
     if (!existing.isEmpty()) {
@@ -83,11 +103,7 @@ class FamilyStore {
   @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
   HouseholdView mine(TechnicalIdentity owner) {
     UUID id = findHousehold(owner).stream().findFirst().orElseThrow(FamilyStore::notFound);
-    var members = db.query("""
-        SELECT m.id, m.state, COALESCE(p.can_publish, false) AS delegation
-        FROM family.membership m LEFT JOIN family.member_permission p ON p.membership_id = m.id
-        WHERE m.household_id = ? AND m.state IN ('ACTIVE', 'SUSPENDED') ORDER BY m.created_at, m.id
-        """, (r, n) -> new Member(r.getObject("id", UUID.class), r.getString("state"), r.getBoolean("delegation")), id);
+    var members = members(owner, id);
     return new HouseholdView(id, ADDITIONAL_SEATS, members.size() + reservationCount(id, now()), members);
   }
 
@@ -187,6 +203,188 @@ class FamilyStore {
     emit(household, invitation, owner, "InvitationCanceled");
   }
 
+  @Transactional
+  Accepted accept(TechnicalIdentity recipient, UUID invitationId) {
+    lockIdentity(recipient);
+    var invitation = ownInvitation(recipient, invitationId);
+    TechnicalIdentity owner = lockHousehold(invitation.householdId());
+    invitation = ownInvitation(recipient, invitationId);
+    UUID household = invitation.householdId();
+    if ("ACCEPTED".equals(invitation.state())) {
+      UUID membership = db.queryForObject("SELECT id FROM family.membership WHERE invitation_id = ?",
+          UUID.class, invitationId);
+      return new Accepted(membership, household);
+    }
+    ensurePending(invitation);
+    if (owner.equals(recipient) || unavailableInHousehold(recipient)) {
+      throw FamilyProblem.conflict("FAMILY_MEMBERSHIP_CONFLICT");
+    }
+    Instant deadline = entitlements.requirePremium(owner);
+    ensurePending(invitation);
+    entitlements.checkDeadline(deadline);
+    var membership = UUID.randomUUID();
+    var now = now();
+    db.update("""
+        INSERT INTO family.membership(id, household_id, identity_issuer, identity_subject,
+            state, created_at, updated_at, invitation_id)
+        VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?)
+        """, membership, household, recipient.issuer(), recipient.subject(), now, now, invitationId);
+    db.update("INSERT INTO family.member_permission(membership_id) VALUES (?)", membership);
+    db.update("UPDATE family.invitation SET state = 'ACCEPTED', updated_at = ? WHERE id = ?", now, invitationId);
+    emit(household, invitationId, recipient, "InvitationAccepted");
+    emit(household, membership, recipient, "MemberAdded");
+    ensurePending(invitation);
+    entitlements.checkDeadline(deadline);
+    return new Accepted(membership, household);
+  }
+
+  @Transactional
+  void decline(TechnicalIdentity recipient, UUID invitationId) {
+    lockIdentity(recipient);
+    var invitation = ownInvitation(recipient, invitationId);
+    lockHousehold(invitation.householdId());
+    invitation = ownInvitation(recipient, invitationId);
+    if ("DECLINED".equals(invitation.state())) {
+      return;
+    }
+    ensurePending(invitation);
+    db.update("UPDATE family.invitation SET state = 'DECLINED', updated_at = ? WHERE id = ?", now(), invitationId);
+    emit(invitation.householdId(), invitationId, recipient, "InvitationDeclined");
+  }
+
+  List<Member> members(TechnicalIdentity owner, UUID household) {
+    requireOwner(owner, household);
+    return db.query(MEMBERS + """
+        WHERE m.household_id = ? AND m.state IN ('ACTIVE','SUSPENDED') ORDER BY m.created_at, m.id
+        """, MEMBER, household).stream().map(MemberRow::member).toList();
+  }
+
+  Member permission(TechnicalIdentity owner, UUID household, UUID member) {
+    requireOwner(owner, household);
+    return member(household, member);
+  }
+
+  @Transactional
+  void changeState(TechnicalIdentity owner, UUID household, UUID id, MemberState wanted, long expected) {
+    requireOwner(owner, household);
+    lockIdentity(memberRow(household, id).identity());
+    lockOwned(owner, household);
+    Member current = member(household, id);
+    verifyVersion(current.version(), expected, current.state() == wanted);
+    if (current.state() == wanted) {
+      return;
+    }
+    if (current.state() == MemberState.REMOVED) {
+      throw FamilyProblem.conflict("MEMBERSHIP_REMOVED");
+    }
+    Instant deadline = wanted == MemberState.ACTIVE ? entitlements.requirePremium(owner) : null;
+    db.update("UPDATE family.membership SET state = ?, version = version + 1, updated_at = ? WHERE id = ?",
+        wanted.name(), now(), id);
+    if (wanted == MemberState.REMOVED && current.delegationEnabled()) {
+      writePermission(id, false);
+      emit(household, id, owner, "PublicationDelegationRevoked");
+    }
+    emit(household, id, owner, switch (wanted) {
+      case ACTIVE -> "MemberReactivated";
+      case SUSPENDED -> "MemberSuspended";
+      case REMOVED -> "MemberRemoved";
+    });
+    if (wanted == MemberState.ACTIVE) {
+      entitlements.checkDeadline(deadline);
+    }
+  }
+
+  @Transactional
+  Member changePermission(TechnicalIdentity owner, UUID household, UUID id, boolean enabled, long expected) {
+    lockOwned(owner, household);
+    Member current = member(household, id);
+    if (current.state() == MemberState.REMOVED || (enabled && current.state() != MemberState.ACTIVE)) {
+      throw FamilyProblem.conflict("MEMBERSHIP_NOT_ACTIVE");
+    }
+    verifyVersion(current.permissionVersion(), expected, current.delegationEnabled() == enabled);
+    if (current.delegationEnabled() == enabled) {
+      return current;
+    }
+    Instant deadline = enabled ? entitlements.requirePremium(owner) : null;
+    writePermission(id, enabled);
+    emit(household, id, owner, enabled ? "PublicationDelegationGranted" : "PublicationDelegationRevoked");
+    if (enabled) {
+      entitlements.checkDeadline(deadline);
+    }
+    return member(household, id);
+  }
+
+  @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+  MembershipFacts membershipFacts(TechnicalIdentity identity) {
+    var local = localMembership(identity);
+    var view = local.facts();
+    return new MembershipFacts(view.state(), view.householdId(), view.membershipId(), view.delegationEnabled(),
+        view.membershipVersion(), view.permissionVersion(),
+        "ACTIVE".equals(view.state()) ? entitlements.premiumUntil(local.holder()) : null);
+  }
+
+  record LocalMembership(MembershipFacts facts, TechnicalIdentity holder) {}
+
+  LocalMembership localMembership(TechnicalIdentity identity) {
+    return db.query("""
+        SELECT m.id, m.household_id, m.state, m.version, h.owner_issuer, h.owner_subject,
+               COALESCE(p.can_publish, false) AS delegation, COALESCE(p.version, 0) AS permission_version
+        FROM family.membership m JOIN family.household h ON h.id = m.household_id
+        LEFT JOIN family.member_permission p ON p.membership_id = m.id
+        WHERE m.identity_issuer = ? AND m.identity_subject = ? AND m.state IN ('ACTIVE', 'SUSPENDED')
+        """, (row, index) -> new LocalMembership(
+            new MembershipFacts(row.getString("state"), row.getObject("household_id", UUID.class),
+                row.getObject("id", UUID.class), row.getBoolean("delegation"), row.getLong("version"),
+                row.getLong("permission_version"), null),
+            new TechnicalIdentity(row.getString("owner_issuer"), row.getString("owner_subject"))),
+        identity.issuer(), identity.subject()).stream().findFirst()
+        .orElse(new LocalMembership(new MembershipFacts("ABSENT", null, null, false, 0, 0, null), null));
+  }
+
+  boolean ownsHousehold(TechnicalIdentity actor, UUID id) {
+    return findHousehold(actor).contains(id);
+  }
+
+  private void writePermission(UUID member, boolean enabled) {
+    db.update("""
+        INSERT INTO family.member_permission(membership_id, can_publish, version) VALUES (?, ?, 1)
+        ON CONFLICT (membership_id) DO UPDATE SET can_publish = EXCLUDED.can_publish,
+          version = family.member_permission.version + 1
+        """, member, enabled);
+  }
+
+  private static void verifyVersion(long actual, long expected, boolean sameState) {
+    if (expected != actual && !(sameState && expected >= 0 && expected == actual - 1)) {
+      throw FamilyProblem.conflict("VERSION_CONFLICT");
+    }
+  }
+
+  private Member member(UUID household, UUID member) {
+    return memberRow(household, member).member();
+  }
+
+  private MemberRow memberRow(UUID household, UUID member) {
+    return db.query(MEMBERS + " WHERE m.household_id = ? AND m.id = ?", MEMBER, household, member)
+        .stream().findFirst().orElseThrow(FamilyStore::notFound);
+  }
+
+  private Invitation ownInvitation(TechnicalIdentity recipient, UUID id) {
+    return db.query(INVITES + " WHERE id = ? AND recipient_issuer = ? AND recipient_subject = ?",
+        INVITATION, id, recipient.issuer(), recipient.subject()).stream().findFirst().orElseThrow(FamilyStore::notFound);
+  }
+
+  private TechnicalIdentity lockHousehold(UUID household) {
+    return db.query("SELECT owner_issuer, owner_subject FROM family.household WHERE id = ? FOR UPDATE",
+        (r, n) -> new TechnicalIdentity(r.getString(1), r.getString(2)), household)
+        .stream().findFirst().orElseThrow(FamilyStore::notFound);
+  }
+
+  private void ensurePending(Invitation invitation) {
+    if (!"PENDING".equals(invitation.state()) || !invitation.expiresAt().isAfter(clock.instant())) {
+      throw FamilyProblem.conflict("INVITATION_NOT_PENDING");
+    }
+  }
+
   @Scheduled(fixedDelayString = "${family.expiration-delay}", initialDelayString = "${family.expiration-delay}")
   @Transactional
   void expirePending() {
@@ -272,6 +470,12 @@ class FamilyStore {
     } catch (JsonProcessingException failure) {
       throw new IllegalStateException("cannot encode family event", failure);
     }
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        metrics.counter("bookrush.family.events", "event", type).increment();
+      }
+    });
   }
 
   private OffsetDateTime now() {

@@ -103,13 +103,15 @@ paths:
       - name: id
         in: path
         required: true
-        schema: &id001
+        schema:
           type: string
           format: uuid
       - name: Idempotency-Key
         in: header
         required: true
-        schema: *id001
+        schema:
+          type: string
+          format: uuid
     get:
       operationId: listSentInvitations
       description: Scope family.manage. Owner only; at most the 100 most recent invitations.
@@ -138,7 +140,9 @@ paths:
       - name: id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          format: uuid
   /api/v1/family/invitations/me:
     get:
       operationId: listOwnPendingInvitations
@@ -187,11 +191,629 @@ paths:
       - name: id
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          format: uuid
       - name: invitationId
         in: path
         required: true
-        schema: *id001
+        schema:
+          type: string
+          format: uuid
+  /api/v1/family/invitations/{id}/accept:
+    post:
+      operationId: acceptOwnInvitation
+      description: Scope family.invites. Recipient only; atomically exchange a live
+        reservation with current Premium.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Accepted'
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource absent or hidden by ownership
+        '409':
+          description: Version, invitation state or membership conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/family/invitations/{id}/decline:
+    post:
+      operationId: declineOwnInvitation
+      description: Scope family.invites. Recipient only; release pending reservation
+        without requiring Premium.
+      security:
+      - productBearer: []
+      responses:
+        '204':
+          description: Success
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource absent or hidden by ownership
+        '409':
+          description: Version, invitation state or membership conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/family/{id}/members:
+    get:
+      operationId: listMembers
+      description: Scope family.manage. Holder only; list active or suspended members.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource absent or hidden by ownership
+        '409':
+          description: Version, invitation state or membership conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /api/v1/family/{id}/members/{memberId}:
+    delete:
+      operationId: removeMember
+      description: Scope family.manage. Holder only; remove membership and release
+        its seat.
+      security:
+      - productBearer: []
+      responses:
+        '204':
+          description: Success
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource absent or hidden by ownership
+        '409':
+          description: Version, invitation state or membership conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: expectedVersion
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+  /api/v1/family/{id}/members/{memberId}/state:
+    put:
+      operationId: changeMemberState
+      description: Scope family.manage. Holder only; suspension retains the seat and
+        reactivation requires current Premium.
+      security:
+      - productBearer: []
+      responses:
+        '204':
+          description: Success
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource absent or hidden by ownership
+        '409':
+          description: Version, invitation state or membership conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StateChange'
+  /api/v1/family/{id}/members/{memberId}/publication:
+    get:
+      operationId: readMemberDelegation
+      description: Scope family.manage. Holder only; return stored delegation and
+        versions.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource absent or hidden by ownership
+        '409':
+          description: Version, invitation state or membership conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: updateMemberDelegation
+      description: Scope family.manage. Holder only; grant on active membership with
+        current Premium or revoke.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource absent or hidden by ownership
+        '409':
+          description: Version, invitation state or membership conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DelegationChange'
+  /api/internal/v1/family/membership/evaluate:
+    post:
+      operationId: evaluateCommercialMembership
+      description: Scope family.membership.read. Private allowlisted platform workload.
+        Product identity query returns commercial facts only.
+      security:
+      - workloadBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipFacts'
+        '401':
+          description: Invalid authentication, issuer or audience
+        '403':
+          description: Missing necessary scope, allowlist or current holder entitlement
+        '503':
+          description: Required storage or entitlement state unavailable
+        '400':
+          description: Invalid request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipQuery'
+  /api/v1/family/supervision:
+    post:
+      operationId: requestSupervision
+      description: Scope supervision.request. Authenticated adult, exact minor, explicit
+        requested scopes. Does not activate supervision.
+      security:
+      - productBearer: []
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionReceipt'
+        '401':
+          description: Missing/invalid bearer, realm or audience
+        '403':
+          description: Forbidden or simulation disabled
+        '503':
+          description: Mandatory identity, entitlement or storage fact unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource unavailable or hidden
+        '409':
+          description: Command, version or state conflict
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupervisionRequest'
+  /api/v1/family/supervision/me:
+    get:
+      operationId: listOwnSupervision
+      description: Scope supervision.request. Only own requests and grants, without
+        verification evidence.
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SupervisionView'
+        '401':
+          description: Missing/invalid bearer, realm or audience
+        '403':
+          description: Forbidden or simulation disabled
+        '503':
+          description: Mandatory identity, entitlement or storage fact unavailable
+  /api/internal/v1/family/supervision/admin/{id}:
+    post:
+      operationId: changeSupervision
+      description: Scope supervision.manage. Allowlisted workload and academic profile
+        required. Exact pair, expected version and opaque verification reference.
+        Approval requires a non-retroactive window.
+      security:
+      - supervisionAdminBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionReceipt'
+        '401':
+          description: Missing/invalid bearer, realm or audience
+        '403':
+          description: Forbidden or simulation disabled
+        '503':
+          description: Mandatory identity, entitlement or storage fact unavailable
+        '400':
+          description: Invalid request
+        '404':
+          description: Resource unavailable or hidden
+        '409':
+          description: Command, version or state conflict
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupervisionCommand'
+  /api/internal/v1/family/supervision/evaluate:
+    post:
+      operationId: evaluateSupervisionScope
+      description: Scope supervision.evaluate. Exact guardian and minor, current age,
+        granted scope and time window. Independent of Premium.
+      security:
+      - workloadBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionFacts'
+        '401':
+          description: Missing/invalid bearer, realm or audience
+        '403':
+          description: Forbidden or simulation disabled
+        '503':
+          description: Mandatory identity, entitlement or storage fact unavailable
+        '400':
+          description: Invalid request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopeQuery'
+  /api/internal/v1/family/product-access/evaluate:
+    post:
+      operationId: evaluateProductEligibilityFacts
+      description: Scope supervision.evaluate. Returns current product eligibility
+        facts for a technical identity. For a minor, requires current age, membership,
+        Premium and PRODUCT_ACCESS.
+      security:
+      - workloadBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupervisionFacts'
+        '401':
+          description: Missing/invalid bearer, realm or audience
+        '403':
+          description: Forbidden or simulation disabled
+        '503':
+          description: Mandatory identity, entitlement or storage fact unavailable
+        '400':
+          description: Invalid request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipQuery'
+  /api/internal/v1/product-access/decisions:
+    post:
+      operationId: evaluateProductAccessV1
+      security:
+      - productDecisionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductAccessRequest'
+      responses:
+        '200':
+          description: Evaluated allow or deny
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductAccessDecision'
+        '400':
+          description: Invalid decision request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProductAccessProblem'
+        '401':
+          description: Invalid workload authentication
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProductAccessProblem'
+        '403':
+          description: Caller outside registered permissions
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProductAccessProblem'
+        '503':
+          description: Cannot evaluate securely
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProductAccessProblem'
+      description: Platform workload JWT with bookrush-family audience, product-access.evaluate
+        scope and an action/resource allowlist. The workload asserts the actor after
+        validating the human JWT.
+  /api/internal/v1/product-access/profile-discovery:
+    post:
+      description: Current bounded discovery facts for the profile and social workloads. Returns only requested subjects eligible for external profile discovery.
+      security: [{ productDecisionBearer: [] }]
+      parameters:
+        - { name: X-Correlation-ID, in: header, required: true, schema: { type: string, maxLength: 128 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subjects]
+              properties:
+                subjects: { type: array, maxItems: 500, uniqueItems: true, items: { type: string, minLength: 1, maxLength: 256 } }
+      responses:
+        '200':
+          description: Verified current subset of candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subjects, correlationId, validUntil]
+                properties:
+                  subjects: { type: array, uniqueItems: true, items: { type: string } }
+                  correlationId: { type: string }
+                  validUntil: { type: string, format: date-time }
+        '400': { description: Invalid candidates or correlation }
+        '401': { description: Invalid platform JWT }
+        '403': { description: Caller lacks profile-discovery permission }
+        '503': { description: Current authoritative roster unavailable }
+  /api/internal/v1/family/supervision/history-window:
+    post:
+      operationId: supervisedReadingWindow
+      summary: Resolve a guardian-owned grant for a supervised projection
+      security: [{productDecisionBearer: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [guardian, memberId, scope]
+              properties:
+                guardian: {$ref: '#/components/schemas/ProductAccessIdentity'}
+                memberId: {type: string, format: uuid}
+                scope: {type: string, enum: [BOOKS_ACCESSED, READING_ACTIVITY, COMMENTS]}
+      responses:
+        '200':
+          description: Current grant window or a negative scope fact
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [minor, facts]
+                properties:
+                  minor: {$ref: '#/components/schemas/ProductAccessIdentity'}
+                  facts:
+                    type: object
+                    required: [allowed, validUntil]
+                    properties:
+                      allowed: {type: boolean}
+                      reason: {type: string, nullable: true}
+                      validUntil: {type: string, format: date-time}
+                      grantId: {type: string, format: uuid, nullable: true}
+                      grantVersion: {type: integer, format: int64, nullable: true}
+                      windowFrom: {type: string, format: date-time, nullable: true}
+                      windowUntil: {type: string, format: date-time, nullable: true}
+        '400': {description: Invalid identity or scope}
+        '401': {description: Invalid workload authentication}
+        '403': {description: Workload lacks access}
+        '404': {description: Grant not visible to this guardian}
+        '503': {description: Current supervision facts are unavailable}
+
+  /api/internal/v1/product-access/session:
+    post:
+      operationId: evaluateReaderSession
+      summary: Evaluate session visibility and product eligibility using current facts
+      description: Only the reader BFF session workload may request a snapshot for the user whose JWT it validated.
+      security: [{ productDecisionBearer: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actor, invitationScope, correlationId]
+              properties:
+                actor: {$ref: '#/components/schemas/ProductAccessIdentity'}
+                invitationScope: {type: boolean, description: The verified product token carries family.invites and the family audience.}
+                correlationId: {type: string, maxLength: 128}
+      responses:
+        '200':
+          description: Session decisions and their validity
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessState, capabilities, validUntil, correlationId]
+                properties:
+                  accessState:
+                    type: string
+                    enum: [ADULT_ELIGIBLE, MINOR_AUTHORIZED, MINOR_AWAITING_AUTHORIZATION, MINOR_FAMILY_INACTIVE, AGE_PROFILE_INCOMPLETE, SUSPENDED]
+                  reasonCode: {type: string, nullable: true, enum: [ACCOUNT_RESTRICTED, ACCOUNT_SUSPENDED, SUPERVISION_REQUIRED, null]}
+                  capabilities:
+                    type: array
+                    uniqueItems: true
+                    items: {type: string, enum: [SESSION_VIEW, PRODUCT_USE, INVITE_SELF]}
+                  validUntil: {type: string, format: date-time}
+                  correlationId: {type: string}
+        '400': {description: Invalid request}
+        '401': {description: Invalid workload authentication}
+        '403': {description: Workload lacks access}
+        '503': {description: Current authorization facts are unavailable}
+
 components:
   securitySchemes:
     productBearer:
@@ -199,14 +821,223 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: Product realm bookrush; audience bookrush-family
+    workloadBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform realm bookrush-platform, audience bookrush-family and
+        allowlisted membership workload
+    supervisionAdminBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform issuer, audience bookrush-family-supervision-admin, scope
+        supervision.manage and dedicated client only
+    productDecisionBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform realm, bookrush-family audience, product-access.evaluate scope and action/resource allowlist.
   schemas:
+    ProductAccessIdentity:
+      type: object
+      additionalProperties: false
+      required:
+      - issuer
+      - subject
+      properties:
+        issuer:
+          type: string
+          minLength: 1
+          maxLength: 256
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ProductAccessAuthentication:
+      type: object
+      additionalProperties: false
+      required:
+      - clientId
+      - audience
+      - scopes
+      properties:
+        clientId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        audience:
+          type: string
+          minLength: 1
+          maxLength: 256
+        scopes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+    ProductAccessResource:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - SESSION
+          - INVITATION
+          - CATALOG
+          - BOOK
+          - ASSET
+          - FEED
+          - PROFILE
+          - READER_STATE
+          - COMMENT
+          - SUBMISSION
+          - FAMILY
+          - READING_HISTORY
+          - TELEMETRY
+        id:
+          type: string
+          minLength: 1
+          maxLength: 256
+        owner:
+          $ref: '#/components/schemas/ProductAccessIdentity'
+    ProductAccessRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - actor
+      - action
+      - authentication
+      - resource
+      - correlationId
+      properties:
+        actor:
+          $ref: '#/components/schemas/ProductAccessIdentity'
+        action:
+          type: string
+          enum:
+          - SESSION_VIEW
+          - INVITE_SELF
+          - PRODUCT_USE
+          - PUBLISH_READ
+          - PUBLISH_WRITE
+          - PUBLISH_WITHDRAW
+          - FAMILY_MANAGE
+          - SUPERVISE_HISTORY
+          - SUPERVISE_COMMENTS
+        authentication:
+          $ref: '#/components/schemas/ProductAccessAuthentication'
+        resource:
+          $ref: '#/components/schemas/ProductAccessResource'
+        correlationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ProductAccessDecision:
+      type: object
+      additionalProperties: false
+      required:
+      - allowed
+      - correlationId
+      - policyVersion
+      - validUntil
+      - factVersions
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+          enum:
+          - ACCOUNT_RESTRICTED
+          - ACCOUNT_SUSPENDED
+          - AGE_INELIGIBLE
+          - ENTITLEMENT_REQUIRED
+          - DELEGATION_REQUIRED
+          - OWNERSHIP_REQUIRED
+          - SUPERVISION_REQUIRED
+          - TARGET_NOT_ELIGIBLE
+          - SCOPE_REQUIRED
+        correlationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        policyVersion:
+          type: string
+          enum:
+          - '1'
+        validUntil:
+          type: string
+          format: date-time
+        factVersions:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+            maxLength: 256
+      oneOf:
+      - properties:
+          allowed:
+            type: boolean
+            enum:
+            - true
+        not:
+          required:
+          - reason
+      - properties:
+          allowed:
+            type: boolean
+            enum:
+            - false
+        required:
+        - reason
+    ProductAccessProblem:
+      type: object
+      additionalProperties: false
+      required:
+      - status
+      - code
+      - correlationId
+      properties:
+        status:
+          type: integer
+          enum:
+          - 400
+          - 401
+          - 403
+          - 503
+        code:
+          type: string
+          enum:
+          - INVALID_REQUEST
+          - INVALID_AUTHENTICATION
+          - CALLER_FORBIDDEN
+          - DECISION_UNAVAILABLE
+          - ACCOUNT_RESTRICTED
+          - ACCOUNT_SUSPENDED
+          - AGE_INELIGIBLE
+          - ENTITLEMENT_REQUIRED
+          - DELEGATION_REQUIRED
+          - OWNERSHIP_REQUIRED
+          - SUPERVISION_REQUIRED
+          - TARGET_NOT_ELIGIBLE
+          - SCOPE_REQUIRED
+        correlationId:
+          type: string
+          minLength: 1
+          maxLength: 256
     Household:
       type: object
       required:
       - id
       additionalProperties: false
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
     HouseholdView:
       type: object
       required:
@@ -216,11 +1047,15 @@ components:
       - members
       additionalProperties: false
       properties:
-        id: *id001
-        additionalSeats: &id002
+        id:
+          type: string
+          format: uuid
+        additionalSeats:
           type: integer
           minimum: 0
-        occupiedOrReserved: *id002
+        occupiedOrReserved:
+          type: integer
+          minimum: 0
         members:
           type: array
           items:
@@ -231,16 +1066,29 @@ components:
       - id
       - state
       - delegationEnabled
+      - version
+      - permissionVersion
       additionalProperties: false
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         state:
           type: string
           enum:
           - ACTIVE
           - SUSPENDED
+          - REMOVED
         delegationEnabled:
           type: boolean
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+        permissionVersion:
+          type: integer
+          format: int64
+          minimum: 0
     InviteAddress:
       type: object
       required:
@@ -248,8 +1096,10 @@ components:
       - expiresAt
       additionalProperties: false
       properties:
-        code: *id001
-        expiresAt: &id003
+        code:
+          type: string
+          format: uuid
+        expiresAt:
           type: string
           format: date-time
     InvitationRequest:
@@ -258,7 +1108,9 @@ components:
       - recipientCode
       additionalProperties: false
       properties:
-        recipientCode: *id001
+        recipientCode:
+          type: string
+          format: uuid
     Invitation:
       type: object
       required:
@@ -268,8 +1120,12 @@ components:
       - expiresAt
       additionalProperties: false
       properties:
-        id: *id001
-        householdId: *id001
+        id:
+          type: string
+          format: uuid
+        householdId:
+          type: string
+          format: uuid
         state:
           type: string
           enum:
@@ -278,4 +1134,295 @@ components:
           - DECLINED
           - CANCELED
           - EXPIRED
-        expiresAt: *id003
+        expiresAt:
+          type: string
+          format: date-time
+    Accepted:
+      type: object
+      additionalProperties: false
+      required:
+      - householdId
+      - membershipId
+      properties:
+        householdId:
+          type: string
+          format: uuid
+        membershipId:
+          type: string
+          format: uuid
+    StateChange:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - expectedVersion
+      properties:
+        state:
+          type: string
+          enum:
+          - ACTIVE
+          - SUSPENDED
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+    DelegationChange:
+      type: object
+      additionalProperties: false
+      required:
+      - canPublish
+      - expectedVersion
+      properties:
+        canPublish:
+          type: boolean
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+    MembershipQuery:
+      type: object
+      additionalProperties: false
+      required:
+      - issuer
+      - subject
+      properties:
+        issuer:
+          type: string
+          minLength: 1
+          maxLength: 512
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 255
+    MembershipFacts:
+      type: object
+      additionalProperties: false
+      required:
+      - state
+      - householdId
+      - membershipId
+      - delegationEnabled
+      - membershipVersion
+      - permissionVersion
+      - holderPremiumUntil
+      properties:
+        state:
+          type: string
+          enum:
+          - ABSENT
+          - ACTIVE
+          - SUSPENDED
+        householdId:
+          type: string
+          format: uuid
+          nullable: true
+        membershipId:
+          type: string
+          format: uuid
+          nullable: true
+        delegationEnabled:
+          type: boolean
+          description: Stored commercial flag only, never authorization.
+        membershipVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        permissionVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        holderPremiumUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: Fresh Premium deadline for active membership, or null.
+    SupervisionScope:
+      type: string
+      enum:
+      - PRODUCT_ACCESS
+      - BOOKS_ACCESSED
+      - READING_ACTIVITY
+      - COMMENTS
+    SupervisionState:
+      type: string
+      enum:
+      - REQUESTED
+      - PENDING_VERIFICATION
+      - ACTIVE
+      - SUSPENDED
+      - REJECTED
+      - REVOKED
+      - EXPIRED
+    SupervisionRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - minor
+      - scopes
+      properties:
+        minor:
+          $ref: '#/components/schemas/MembershipQuery'
+        scopes:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/SupervisionScope'
+          minItems: 1
+    SupervisionReceipt:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - state
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        state:
+          $ref: '#/components/schemas/SupervisionState'
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    SupervisionView:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - minor
+      - state
+      - requestedScopes
+      - scopes
+      - effectiveFrom
+      - effectiveUntil
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        minor:
+          $ref: '#/components/schemas/MembershipQuery'
+        state:
+          $ref: '#/components/schemas/SupervisionState'
+        requestedScopes:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/SupervisionScope'
+        scopes:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/SupervisionScope'
+        effectiveFrom:
+          type: string
+          format: date-time
+          nullable: true
+        effectiveUntil:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          minimum: 0
+    ScopeQuery:
+      type: object
+      additionalProperties: false
+      required:
+      - guardian
+      - minor
+      - scope
+      properties:
+        guardian:
+          $ref: '#/components/schemas/MembershipQuery'
+        minor:
+          $ref: '#/components/schemas/MembershipQuery'
+        scope:
+          $ref: '#/components/schemas/SupervisionScope'
+    SupervisionFacts:
+      type: object
+      additionalProperties: false
+      required:
+      - allowed
+      - reason
+      - validUntil
+      - grantId
+      - grantVersion
+      - windowFrom
+      - windowUntil
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+          nullable: true
+        validUntil:
+          type: string
+          format: date-time
+        grantId:
+          type: string
+          format: uuid
+          nullable: true
+        grantVersion:
+          type: integer
+          format: int64
+          minimum: 0
+          nullable: true
+        windowFrom:
+          type: string
+          format: date-time
+          nullable: true
+        windowUntil:
+          type: string
+          format: date-time
+          nullable: true
+    SupervisionCommand:
+      type: object
+      additionalProperties: false
+      required:
+      - guardian
+      - minor
+      - expectedVersion
+      - action
+      properties:
+        guardian:
+          $ref: '#/components/schemas/MembershipQuery'
+        minor:
+          $ref: '#/components/schemas/MembershipQuery'
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        action:
+          type: string
+          enum:
+          - REVIEW
+          - APPROVE
+          - REJECT
+          - SUSPEND
+          - CONTEST
+          - REDUCE
+          - REVOKE
+        scopes:
+          type: array
+          uniqueItems: true
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/SupervisionScope'
+        effectiveFrom:
+          type: string
+          format: date-time
+          nullable: true
+        effectiveUntil:
+          type: string
+          format: date-time
+          nullable: true
+        verificationRef:
+          type: string
+          format: uuid
+          nullable: true

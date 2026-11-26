@@ -1,9 +1,10 @@
 # Política etária e de supervisão v1
 
-Especificação proposta para o Bead `bookrush-fyw9`. Aprovação de Produto,
-Privacidade e Jurídico pendente. Integra o [contrato de decisão v1](../product-access-v1/README.md)
-e detalha os [ADRs de ownership](../../adr/ADR-0035-premium-family-ownership.md)
-e [autorização](../../adr/ADR-0036-product-access-and-publisher.md).
+Política v1 definida pelo responsável do projeto em 24/11/2026 para o
+protótipo acadêmico, com identidades sintéticas e cobrança simulada. O
+[registro da decisão](approval-record.md) documenta os limites do aceite.
+A [integração com Keycloak](keycloak.md) descreve a configuração e a regularização.
+Integra o [contrato de decisão v1](../product-access-v1/README.md).
 
 ## Estado derivado
 
@@ -14,10 +15,9 @@ versionada do servidor define se é necessária verificação e qual evidência
 é suficiente. Até aprovação do nível por fluxo, operações que dependem de
 idade verificada permanecem fechadas. Suspensão global confirmada precede
 todas as regras de acesso. Em seguida, derive a classificação com o relógio
-do servidor. No Brasil, a proposta usa meia-noite em America/Sao_Paulo na
+do servidor. No Brasil, a política usa meia-noite em America/Sao_Paulo na
 data civil correspondente, e 1º de março para nascimento em 29/02 quando o
-ano do 18º aniversário não for bissexto. A regra de calendário precisa de
-ratificação jurídica. Nunca derive idade de claim antiga ou dias/365.
+ano do 18º aniversário não for bissexto. Essa regra é uma convenção acadêmica. Nunca derive idade de claim antiga ou dias/365.
 O JWT autentica a identidade e não congela sua classificação.
 
 | Estado efetivo | Condição e acesso |
@@ -97,9 +97,8 @@ e independentes de pagamento. A autorização de consulta usa o vínculo legal
 vigente, mesmo quando o benefício familiar expira. Nunca se cria conexão
 parental apenas por selecionar uma família. Vencimento fecha novas leituras
 do produto pelo menor sob a regra comercial atual e mantém as ferramentas
-gratuitas acessíveis. Confirmar com Jurídico se exigir família comercial
-para uso geral do menor é aceitável; se não for, definir vínculo gratuito
-e rever essa regra de produto antes do lançamento.
+gratuitas acessíveis. A exigência de vínculo comercial para uso geral é uma decisão acadêmica.
+Sua adequação deverá ser revisada antes de qualquer lançamento comercial.
 
 ## Aplicação do contrato v1
 
@@ -116,7 +115,7 @@ servidor, sem alegações de idade, pagamento ou parentesco no request.
 | Consultar / aceitar / recusar convite | INVITE_SELF, resource.owner igual ao destinatário autenticado. Aceite consulta a reserva e o plano atuais; listar/recusar não ganha acesso ao produto. |
 | Publicar | PUBLISH_WRITE, adulto e escopo de rota, ownership e direito próprio ou delegado. AGE_INELIGIBLE para menor, ENTITLEMENT_REQUIRED ou DELEGATION_REQUIRED quando aplicável. |
 | Livros acessados | SUPERVISE_HISTORY com resource.type READING_HISTORY e resource.id fixo `books-accessed`, definido pelo backend. resource.owner é o alvo validado. Exige BOOKS_ACCESSED. |
-| Atividade de leitura | SUPERVISE_HISTORY com READING_HISTORY e resource.id fixo `reading-activity`. Exige READING_ACTIVITY. Uma projeção futura define rota e payload. Qualquer seletor ausente ou desconhecido é negado. |
+| Atividade de leitura | SUPERVISE_HISTORY com READING_HISTORY e resource.id fixo `reading-activity`. Exige READING_ACTIVITY. A projeção é retornada pelo Reader BFF com `scope=READING_ACTIVITY`. Qualquer seletor ausente ou desconhecido é negado. |
 | Comentários | SUPERVISE_COMMENTS com resource.type COMMENT e owner validado; exige COMMENTS. |
 | Modificar/revogar | Operação administrativa dedicada, autoridade de plataforma `supervision.manage` e trilha. Renúncia ou contestação do usuário usa fluxo próprio autenticado com escopo restrito a si. Nunca reutilizar FAMILY_MANAGE. Dono reavalia escopo e versões na transação. |
 
@@ -126,8 +125,9 @@ indeterminado ou não elegível gera TARGET_NOT_ELIGIBLE; grant ausente,
 revogado ou insuficiente gera SUPERVISION_REQUIRED. Uma resposta pública
 pode usar motivo genérico ou 404 conforme o contrato. A cada página,
 revalidar o par e a versão, sem cache de allow, encerrando a janela no corte
-civil ou na vigência do grant. O histórico visível começa no maior valor
-entre o início do grant daquele escopo e o limite de retenção aplicável.
+civil ou na vigência do grant. O histórico visível começa no maior valor entre o início do grant daquele
+escopo, o limite de 90 dias e o limite de retenção aplicável. A auditoria
+de acessos supervisionados tem prazo de 180 dias no protótipo.
 
 ## Brasil: exigências e decisões de lançamento
 
@@ -204,10 +204,6 @@ novos acessos dependentes, sem reativar grants por fallback.
 
 [Casos de fronteira](fixtures.tsv) registram entradas e saídas para os
 futuros testes de identidade, família e integração. As respostas HTTP
-esperadas referem-se à rota protegida. Para aprovação da política,
-Produto confirma a regra comercial e escopos, Privacidade confirma
-minimização, finalidade, retenção e impacto, e Jurídico confirma
-enquadramento, gratuidade, verificação, responsabilidade e regra civil.
-Enquanto essas aprovações não forem registradas, o contrato permanece proposto.
-O [registro de aprovação](approval-record.md) detalha cada decisão, seus
-responsáveis, testes e evidências esperadas.
+esperadas referem-se à rota protegida. A decisão acadêmica está no [registro de aprovação](approval-record.md).
+Os fluxos de verificação etária ou legal usam exclusivamente contas
+sintéticas. Nenhuma implantação comercial foi aprovada.

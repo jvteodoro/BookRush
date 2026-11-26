@@ -22,3 +22,19 @@ management:
 bookrush:
   security:
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
+    product-access:
+      enabled: ${READER_STATE_PRODUCT_ACCESS_ENABLED:false}
+      decision-base-uri: ${READER_STATE_PRODUCT_ACCESS_ORIGIN:}
+      token-uri: ${READER_STATE_PRODUCT_ACCESS_TOKEN_URI:}
+      jwk-set-uri: ${READER_STATE_PRODUCT_ACCESS_JWKS_URI:}
+      workload-issuer: ${READER_STATE_PRODUCT_ACCESS_WORKLOAD_ISSUER:}
+      client-id: ${READER_STATE_PRODUCT_ACCESS_CLIENT_ID:bookrush-reader-state-s2s}
+      client-secret: ${READER_STATE_PRODUCT_ACCESS_CLIENT_SECRET:}
+      connect-timeout: ${READER_STATE_PRODUCT_ACCESS_CONNECT_TIMEOUT:500ms}
+      request-timeout: ${READER_STATE_PRODUCT_ACCESS_REQUEST_TIMEOUT:2s}
+      allow-insecure-http: ${READER_STATE_PRODUCT_ACCESS_ALLOW_INSECURE_HTTP:false}
+reader-state:
+  supervision:
+    enabled: ${READER_STATE_SUPERVISION_ENABLED:false}
+  product-access:
+    human-clients: ${READER_STATE_PRODUCT_ACCESS_HUMAN_CLIENTS:bookrush-web,bookrush-mobile}

@@ -28,10 +28,23 @@ class BookmarkDatabaseTest {
     UUID upgradeBook = UUID.randomUUID();
     jdbc.update("INSERT INTO reader_state.bookmarks(id, subject_key, book_id, position_codepoint, locator) VALUES (?,?,?,?,?::jsonb)",
         UUID.randomUUID(), reader, upgradeBook, 0L, "{\"href\":\"chapter\",\"type\":\"text/html\",\"locations\":{\"progression\":0.25}}");
+    Flyway.configure().dataSource(ds).schemas("reader_state").target("11").load().migrate();
+    var reopened = UUID.randomUUID();
+    var ambiguous = UUID.randomUUID();
+    jdbc.update("""
+        INSERT INTO reader_state.seen_book(subject_key,book_id,first_seen_at,last_seen_at)
+        SELECT ?,?, clock_timestamp()-interval '1 hour', clock_timestamp()
+        """, reader, reopened);
+    jdbc.update("""
+        INSERT INTO reader_state.seen_book(subject_key,book_id,first_seen_at,last_seen_at)
+        SELECT ?,?, t,t FROM (SELECT clock_timestamp() t) evidence
+        """, reader, ambiguous);
     var latest = Flyway.configure().dataSource(ds).schemas("reader_state").load();
     latest.migrate();
     latest.validate();
     latest.migrate();
+    assertEquals(List.of(reopened), jdbc.queryForList(
+        "SELECT book_id FROM reader_state.book_open WHERE subject_key=?", UUID.class, reader));
     var controller = new ReaderStateController(jdbc, null, null);
     var upgraded = (List<?>) controller.bookmarks(upgradeBook, () -> reader);
     assertEquals("", ((Map<?, ?>) upgraded.get(0)).get("name"));

@@ -1,0 +1,26 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bookrush</groupId>
+    <artifactId>bookrush-build-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../../../platform/bookrush-build-parent/pom.xml</relativePath>
+  </parent>
+  <artifactId>bookrush-keycloak-age</artifactId>
+  <properties>
+    <keycloak.version>25.0.6</keycloak.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-server-spi</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.bookrush</groupId>
+      <artifactId>bookrush-common-core</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+</project>

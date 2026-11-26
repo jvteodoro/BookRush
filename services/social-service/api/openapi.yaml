@@ -65,6 +65,8 @@ paths:
       parameters:
         - { name: user, in: query, description: Omit to read the authenticated reader's own count, schema: { type: string, maxLength: 200 } }
       responses:
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200':
           description: Authoritative count or visible false with no count for a private social graph
           content:
@@ -89,6 +91,8 @@ paths:
       parameters:
         - { name: includeUnavailable, in: query, required: false, schema: { type: boolean, default: false } }
       responses:
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200':
           description: Comments with server-derived ownership capability
           content:
@@ -110,6 +114,8 @@ paths:
                 body: { type: string, minLength: 1, maxLength: 2000 }
                 parentCommentId: { type: string, format: uuid, nullable: true, description: Visible parent in the same book }
       responses:
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200': { description: Published comment ID and canDelete true }
         '400': { description: Invalid comment body or parent UUID }
         '409': { description: Parent does not exist in this book or is unavailable }
@@ -121,15 +127,245 @@ paths:
       parameters:
         - { name: commentId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
+        '503': { description: Current product authorization or required facts unavailable }
         '204': { description: Removed or already removed by this author; no response body }
         '400': { description: Invalid comment UUID }
         '401': { description: Authentication required }
         '403': { description: Comment belongs to another reader }
         '404': { description: Comment does not exist }
+  /api/v1/social/books/{bookId}/like:
+    delete:
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+    put:
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+  /api/v1/social/follow:
+    delete:
+      parameters:
+      - name: user
+        in: query
+        required: true
+        schema:
+          type: string
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+    get:
+      parameters:
+      - name: user
+        in: query
+        required: true
+        schema:
+          type: string
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+    put:
+      parameters:
+      - name: user
+        in: query
+        required: true
+        schema:
+          type: string
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+  /api/v1/social/books/{bookId}/likes:
+    get:
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+  /api/v1/social/moderation/reports:
+    get:
+      security:
+      - socialModeratorBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+  /api/v1/social/books/{bookId}/share:
+    post:
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+  /api/v1/social/reports:
+    post:
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+  /api/v1/social/moderation/comments/{commentId}:
+    put:
+      parameters:
+      - name: commentId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - socialModeratorBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+  /api/internal/v1/social/supervision/{memberId}/comments:
+    get:
+      operationId: supervisedComments
+      summary: List visible comments from the exact supervised minor
+      description: The memberId is the guardian’s grant UUID. Requires a current COMMENTS grant and a product JWT with audience bookrush-reader-bff and scope supervision.read. The owner rechecks the grant and moderation on every page.
+      security: [{ bearerAuth: [], supervisionWorkload: [] }]
+      parameters:
+        - {name: memberId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 25}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}, description: Opaque cursor bound to the guardian and grant.}
+      responses:
+        '200':
+          description: An authorized page
+          headers:
+            Cache-Control: {schema: {type: string, example: no-store}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupervisedCommentsPage'}
+        '400': {description: Invalid pagination}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Required scope or current supervision missing}
+        '404': {description: No matching grant visible to this guardian}
+        '503': {description: Supervision could not be evaluated or the page could not be returned}
+
 components:
   securitySchemes:
+    supervisionWorkload:
+      type: apiKey
+      in: header
+      name: X-BookRush-Workload
+      description: Signed platform JWT for bookrush-reader-bff-supervision-s2s with audience bookrush-social-supervision and scope supervision.comments.read.
+    socialModeratorBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform realm JWT, configured admin audience and moderator authority.
     bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
   schemas:
+    SupervisedCommentsPage:
+      type: object
+      additionalProperties: false
+      required: [scope, items]
+      properties:
+        scope: {type: string, enum: [COMMENTS]}
+        nextCursor: {type: string, format: uuid, nullable: true}
+        items:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, bookId, body, createdAt]
+            properties:
+              id: {type: string, format: uuid}
+              bookId: {type: string, format: uuid}
+              body: {type: string}
+              createdAt: {type: string, format: date-time}
     RatingSummary:
       type: object
       required: [bookId, totalRatings]

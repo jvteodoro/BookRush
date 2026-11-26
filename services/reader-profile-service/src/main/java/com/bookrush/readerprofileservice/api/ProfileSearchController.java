@@ -14,6 +14,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/v1/profile/search")
 public class ProfileSearchController {
   private final JdbcTemplate jdbc;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private ProfileDiscovery discovery;
 
   public ProfileSearchController(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
@@ -47,6 +49,7 @@ public class ProfileSearchController {
     if (query.startsWith("@")) query = query.substring(1).strip();
     if (query.isBlank()) return new Page(List.of(), 0, 0, page, size);
     query = query.toLowerCase(Locale.ROOT);
+    if (discovery != null) return protectedSearch(query, page, size);
     long count = jdbc.queryForObject("select count(*) " + FILTER, Long.class, query, query);
     var users = jdbc.query(
         "select p.subject_key,p.display_name,p.username " + FILTER
@@ -54,5 +57,22 @@ public class ProfileSearchController {
         (row, index) -> new User(row.getString("subject_key"), row.getString("display_name"), row.getString("username")),
         query, query, size, (long) page * size);
     return new Page(users, count, (count + size - 1) / size, page, size);
+  }
+  private Page protectedSearch(String query, int page, int size) {
+    var ordered = jdbc.query(
+        "select p.subject_key,p.display_name,p.username " + FILTER
+            + " order by lower(coalesce(nullif(p.display_name,''),p.username,'')),p.subject_key limit 500",
+        (row, index) -> new User(row.getString("subject_key"), row.getString("display_name"), row.getString("username")),
+        query, query);
+    var candidates = ordered.stream().map(user -> discovery.subject(user.subject()))
+        .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toUnmodifiableSet());
+    var permitted = discovery.visible(candidates);
+    var eligible = ordered.stream().filter(user -> {
+      String candidate = discovery.subject(user.subject());
+      return candidate != null && permitted.contains(candidate) && discovery.storedKey(candidate).equals(user.subject());
+    }).toList();
+    long count = eligible.size();
+    return new Page(eligible.stream().skip((long) page * size).limit(size).toList(),
+        count, (count + size - 1) / size, page, size);
   }
 }

@@ -2,8 +2,10 @@ pipeline {
   agent any
 
   parameters {
-    string(name: 'BRANCH', defaultValue: 'main', description: 'Branch a compilar e implantar (ex.: main ou feature/catalogo).')
+    string(name: 'BRANCH', defaultValue: 'feature/premium-family', description: 'Branch a compilar e implantar.')
     choice(name: 'DEPLOY_TARGET', choices: ['compose', 'kubernetes'], description: 'Destino do deploy.')
+    choice(name: 'DEPLOY_ENVIRONMENT', choices: ['demo', 'production'], description: 'Compose isolado de demonstração por padrão; produção exige seleção explícita.')
+    string(name: 'DEMO_ENV_CREDENTIAL_ID', defaultValue: 'bookrush-demo-env', description: 'Credential Jenkins Secret file com ambiente isolado, URLs localhost e segredos sintéticos da demonstração.')
     string(name: 'GIT_CREDENTIAL_ID', defaultValue: '', description: 'Credential Git opcional para repositório privado (HTTPS).')
     string(name: 'REGISTRY', defaultValue: '', description: 'Registry sem barra final. Vazio: não publica imagens.')
     string(name: 'REGISTRY_CREDENTIAL_ID', defaultValue: 'docker-registry', description: 'Credential Jenkins de usuário/senha do registry.')
@@ -24,7 +26,7 @@ pipeline {
     choice(name: 'GUTENBERG_TIMEOUT_MINUTES', choices: ['5', '15', '30', '60'], description: 'Tempo máximo de polling do job Gutenberg.')
   }
 
-  options { timestamps(); disableConcurrentBuilds(); skipDefaultCheckout(); timeout(time: 30, unit: 'MINUTES'); buildDiscarder(logRotator(numToKeepStr: '20')) }
+  options { timestamps(); disableConcurrentBuilds(); skipDefaultCheckout(); timeout(time: 180, unit: 'MINUTES'); buildDiscarder(logRotator(numToKeepStr: '20')) }
 
   stages {
     stage('Checkout da branch') {
@@ -94,6 +96,8 @@ pipeline {
           bash scripts/test-keycloak-user-management.sh
           bash scripts/test-admin-user-management-e2e.sh
           bash scripts/test-keycloak-jwks-rotation.sh
+          BOOKRUSH_E2E_READER_STATE=1 BOOKRUSH_E2E_COMMUNITY=1 BOOKRUSH_E2E_CONTENT=1 \
+            bash scripts/test-premium-family-e2e.sh
         '''
       }
     }
@@ -101,26 +105,52 @@ pipeline {
     stage('Imagens') {
       steps {
         script {
-          def registry = params.REGISTRY?.trim() ? params.REGISTRY.trim().replaceAll('/$', '') : 'local'
-          env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
-          env.BACKEND_IMAGE = "${registry}/bookrush/catalog-service:${env.IMAGE_TAG}"
-          env.FRONTEND_IMAGE = "${registry}/bookrush/frontend:${env.IMAGE_TAG}"
-          env.INGESTION_IMAGE = "${registry}/bookrush/book-ingestion-service:${env.IMAGE_TAG}"
-          env.ANALYTICS_IMAGE = "${registry}/bookrush/book-analytics-service:${env.IMAGE_TAG}"
-          env.ANALYTICS_RUNTIME_IMAGE = "${registry}/bookrush/book-analytics-runtime:${env.IMAGE_TAG}"
-          env.BEHAVIOR_IMAGE = "${registry}/bookrush/behavior-service:${env.IMAGE_TAG}"
-          env.RECOMMENDATION_IMAGE = "${registry}/bookrush/recommendation-service:${env.IMAGE_TAG}"
-          env.READER_BFF_IMAGE = "${registry}/bookrush/reader-bff-service:${env.IMAGE_TAG}"
-          env.READER_STATE_IMAGE = "${registry}/bookrush/reader-state-service:${env.IMAGE_TAG}"
-          env.READER_PROFILE_IMAGE = "${registry}/bookrush/reader-profile-service:${env.IMAGE_TAG}"
-          env.SOCIAL_IMAGE = "${registry}/bookrush/social-service:${env.IMAGE_TAG}"
-          env.ADMIN_SERVICE_IMAGE = "${registry}/bookrush/admin-service:${env.IMAGE_TAG}"
-          env.ADMIN_WEB_IMAGE = "${registry}/bookrush/admin-web:${env.IMAGE_TAG}"
+          def registry = params.REGISTRY?.trim() ? params.REGISTRY.trim().replaceAll('/$', '') + '/bookrush' : 'bookrush'
+          env.IMAGE_TAG = "sha-${env.GIT_COMMIT}"
+          env.BACKEND_IMAGE = "${registry}/catalog-service:${env.IMAGE_TAG}"
+          env.FRONTEND_IMAGE = "${registry}/frontend:${env.IMAGE_TAG}"
+          env.INGESTION_IMAGE = "${registry}/book-ingestion-service:${env.IMAGE_TAG}"
+          env.ANALYTICS_IMAGE = "${registry}/book-analytics-service:${env.IMAGE_TAG}"
+          env.ANALYTICS_RUNTIME_IMAGE = "${registry}/book-analytics-runtime:${env.IMAGE_TAG}"
+          env.BEHAVIOR_IMAGE = "${registry}/behavior-service:${env.IMAGE_TAG}"
+          env.RECOMMENDATION_IMAGE = "${registry}/recommendation-service:${env.IMAGE_TAG}"
+          env.READER_BFF_IMAGE = "${registry}/reader-bff-service:${env.IMAGE_TAG}"
+          env.READER_STATE_IMAGE = "${registry}/reader-state-service:${env.IMAGE_TAG}"
+          env.READER_PROFILE_IMAGE = "${registry}/reader-profile-service:${env.IMAGE_TAG}"
+          env.SOCIAL_IMAGE = "${registry}/social-service:${env.IMAGE_TAG}"
+          env.ADMIN_SERVICE_IMAGE = "${registry}/admin-service:${env.IMAGE_TAG}"
+          env.ADMIN_WEB_IMAGE = "${registry}/admin-web:${env.IMAGE_TAG}"
+          env.PUBLISHER_IMAGE = "${registry}/publisher-service:${env.IMAGE_TAG}"
+          env.BOOK_CONTENT_IMAGE = "${registry}/book-content-service:${env.IMAGE_TAG}"
+          env.FAMILY_IMAGE = "${registry}/family-service:${env.IMAGE_TAG}"
+          env.SUBSCRIPTION_IMAGE = "${registry}/subscription-service:${env.IMAGE_TAG}"
+          env.SEAWEEDFS_IMAGE = "${registry}/seaweedfs:${env.IMAGE_TAG}"
+          env.KEYCLOAK_IMAGE = "${registry}/keycloak:${env.IMAGE_TAG}"
         }
         sh 'docker build --target build -t "bookrush/catalog-test:$BUILD_NUMBER" -f services/catalog-service/Dockerfile .'
         sh 'docker run --rm "bookrush/catalog-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$BACKEND_IMAGE" -f services/catalog-service/Dockerfile .'
-        sh 'docker build -t "$FRONTEND_IMAGE" -f frontend/Dockerfile .'
+        script {
+          if (params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'demo') {
+            withCredentials([file(credentialsId: params.DEMO_ENV_CREDENTIAL_ID, variable: 'BOOKRUSH_DEMO_ENV_FILE')]) {
+              sh '''#!/usr/bin/env bash
+                set -euo pipefail
+                set +x
+                authority="$(awk -F= '$1 == "VITE_OIDC_AUTHORITY" {sub(/^[^=]*=/, ""); print; exit}' "$BOOKRUSH_DEMO_ENV_FILE")"
+                [[ "$authority" == http://localhost:*/realms/bookrush ]] || { echo 'VITE_OIDC_AUTHORITY da demo deve usar localhost e o Keycloak isolado.' >&2; exit 2; }
+                docker build --build-arg "VITE_OIDC_AUTHORITY=$authority" -t "$FRONTEND_IMAGE" -f frontend/Dockerfile .
+              '''
+            }
+          } else {
+            sh 'docker build -t "$FRONTEND_IMAGE" -f frontend/Dockerfile .'
+          }
+        }
+        sh 'docker build -t "$BOOK_CONTENT_IMAGE" -f services/book-content-service/Dockerfile .'
+        sh 'docker build -t "$PUBLISHER_IMAGE" -f services/publisher-service/Dockerfile .'
+        sh 'docker build -t "$SUBSCRIPTION_IMAGE" -f services/subscription-service/Dockerfile .'
+        sh 'docker build -t "$FAMILY_IMAGE" -f services/family-service/Dockerfile .'
+        sh 'docker build -t "$SEAWEEDFS_IMAGE" -f infrastructure/seaweedfs/Dockerfile infrastructure/seaweedfs'
+        sh 'docker build -t "$KEYCLOAK_IMAGE" -f infrastructure/keycloak/age-provider/Dockerfile .'
         sh 'docker build --target build -t "bookrush/ingestion-test:$BUILD_NUMBER" -f services/book-ingestion-service/Dockerfile .'
         sh 'docker run --rm "bookrush/ingestion-test:$BUILD_NUMBER" mvn -B verify'
         sh 'docker build -t "$INGESTION_IMAGE" -f services/book-ingestion-service/Dockerfile .'
@@ -144,11 +174,17 @@ pipeline {
     stage('Integração PostgreSQL e S3') {
       steps {
         sh 'bash scripts/test-storage.sh'
+        sh '''#!/usr/bin/env bash
+          set -euo pipefail
+          for service in subscription-service family-service publisher-service book-content-service reader-bff-service reader-profile-service social-service behavior-service; do
+            bash scripts/test-microservice.sh "$service"
+          done
+        '''
       }
     }
 
     stage('Reconciliar Keycloak Compose') {
-      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'production' } }
       steps {
         script {
           withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_ADMIN_CLIENT_SECRET')]) {
@@ -170,7 +206,7 @@ pipeline {
     }
 
     stage('Processar amostra de scores analíticos') {
-      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.RUN_ANALYTICS_SAMPLE } }
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'production' && params.RUN_ANALYTICS_SAMPLE } }
       steps {
         script {
           withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'ANALYTICS_OPERATOR_TOKEN')]) {
@@ -185,7 +221,7 @@ pipeline {
     }
 
     stage('Importação Gutenberg (opt-in)') {
-      when { expression { return params.RUN_GUTENBERG_IMPORT } }
+      when { expression { return params.DEPLOY_ENVIRONMENT == 'production' && params.RUN_GUTENBERG_IMPORT } }
       steps {
         script {
           withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_CLIENT_SECRET')]) {
@@ -270,7 +306,12 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIAL_ID, usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASSWORD')]) {
           sh 'echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" -u "$REGISTRY_USER" --password-stdin'
-          sh 'docker push "$BACKEND_IMAGE" && docker push "$FRONTEND_IMAGE" && docker push "$INGESTION_IMAGE" && docker push "$ANALYTICS_IMAGE" && docker push "$ANALYTICS_RUNTIME_IMAGE" && docker push "$BEHAVIOR_IMAGE" && docker push "$RECOMMENDATION_IMAGE" && docker push "$READER_BFF_IMAGE" && docker push "$READER_STATE_IMAGE" && docker push "$READER_PROFILE_IMAGE" && docker push "$SOCIAL_IMAGE" && docker push "$ADMIN_SERVICE_IMAGE" && docker push "$ADMIN_WEB_IMAGE"'
+          sh '''#!/usr/bin/env bash
+            set -euo pipefail
+            for image in "$BACKEND_IMAGE" "$FRONTEND_IMAGE" "$INGESTION_IMAGE" "$ANALYTICS_IMAGE" "$ANALYTICS_RUNTIME_IMAGE" "$BEHAVIOR_IMAGE" "$RECOMMENDATION_IMAGE" "$READER_BFF_IMAGE" "$READER_STATE_IMAGE" "$READER_PROFILE_IMAGE" "$SOCIAL_IMAGE" "$ADMIN_SERVICE_IMAGE" "$ADMIN_WEB_IMAGE" "$PUBLISHER_IMAGE" "$BOOK_CONTENT_IMAGE" "$FAMILY_IMAGE" "$SUBSCRIPTION_IMAGE" "$SEAWEEDFS_IMAGE" "$KEYCLOAK_IMAGE"; do
+              docker push "$image"
+            done
+          '''
         }
       }
     }
@@ -278,9 +319,27 @@ pipeline {
     stage('Deploy Compose') {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' } }
       steps {
-          withEnv(["ANALYTICS_GPU=${params.ANALYTICS_GPU}", "FEED_PERSONALIZED_MODE=${params.FEED_PERSONALIZED_MODE}"]) {
-            sh 'bash infrastructure/jenkins/deploy-compose.sh'
+        script {
+          withEnv(["ANALYTICS_GPU=${params.ANALYTICS_GPU}", "FEED_PERSONALIZED_MODE=${params.FEED_PERSONALIZED_MODE}", "DEPLOY_ENVIRONMENT=${params.DEPLOY_ENVIRONMENT}"]) {
+            if (params.DEPLOY_ENVIRONMENT == 'demo') {
+              withCredentials([file(credentialsId: params.DEMO_ENV_CREDENTIAL_ID, variable: 'BOOKRUSH_DEMO_ENV_FILE')]) {
+                sh 'bash infrastructure/jenkins/deploy-compose.sh'
+              }
+            } else {
+              sh 'bash infrastructure/jenkins/deploy-compose.sh'
+            }
           }
+        }
+      }
+    }
+
+    stage('Smoke da demonstração pelo gateway') {
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'demo' } }
+      steps {
+        withCredentials([file(credentialsId: params.DEMO_ENV_CREDENTIAL_ID, variable: 'BOOKRUSH_DEMO_ENV_FILE')]) {
+          sh 'bash scripts/test-premium-family-demo-smoke.sh'
+          archiveArtifacts artifacts: 'artifacts/premium-family-*.png,artifacts/premium-family-demo-release.json', allowEmptyArchive: false, fingerprint: true
+        }
       }
     }
 

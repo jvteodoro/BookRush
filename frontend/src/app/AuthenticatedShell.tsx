@@ -11,6 +11,7 @@ type AuthenticatedShellProps = {
   legacyVisible: boolean;
   onRetry: () => void;
   onShowLegacy: () => void;
+  onLogout: () => void;
   readerTab: ReaderTab;
   user?: User;
 };
@@ -23,6 +24,7 @@ export function AuthenticatedShell({
   legacyVisible,
   onRetry,
   onShowLegacy,
+  onLogout,
   readerTab,
   user,
 }: AuthenticatedShellProps) {
@@ -61,6 +63,7 @@ export function AuthenticatedShell({
                 "Leitor",
             )}
             onLegacy={onShowLegacy}
+            onLogout={onLogout}
           />
         </div>
       )}

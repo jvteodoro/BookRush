@@ -549,3 +549,16 @@ Os filtros utilizam autores e categorias bibliográficas fornecidos pelo catálo
 O site não exibe nem utiliza o ano de publicação, mesmo quando fornecido pela
 API. Não há filtro por ano; a busca livre não usa os campos bibliográficos de ano.
 Autores, categorias e demais metadados continuam disponíveis.
+
+## Sessão de produto
+
+Depois do callback OIDC, o cliente consulta `/api/v1/session` antes de montar
+feed, recomendações, biblioteca, leitor ou telemetria. A interface restrita
+apresenta o motivo e, com INVITE_SELF, permite consultar convites próprios,
+gerar código, aceitar e recusar. A regularização etária é feita por operador.
+
+O snapshot é reavaliado no foco, ao concluir uma operação familiar e após
+negativas relevantes. A perda de acesso desmonta a experiência de produto,
+cancela suas requisições e descarta a fila de eventos e os dados da sessão.
+Um erro temporário oferece nova tentativa. Um 401 após tentativa de refresh
+oferece reautenticação sem redirecionamento automático.

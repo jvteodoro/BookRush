@@ -43,13 +43,23 @@ public class BookRatingsController {
     return principal.getName();
   }
 
-  private void requireBook(UUID bookId) {
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.bookrush.platform.security.ProductAccessAuthorization productAccess;
+
+  private void requireBook(UUID bookId, Principal principal) {
     try {
-      // Catalogue metadata is public; product tokens must not cross the platform realm.
-      catalog.get().uri("/api/v1/books/{id}", bookId).retrieve().toBodilessEntity();
+      // Protected catalogue metadata revalidates the same product bearer.
+      catalog.get().uri("/api/v1/books/{id}", bookId).headers(headers -> {
+        if (productAccess != null && principal instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwt) {
+          headers.setBearerAuth(jwt.getToken().getTokenValue());
+        }
+      }).retrieve().toBodilessEntity();
     } catch (RestClientResponseException error) {
       if (error.getStatusCode().value() == 404) {
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "book not found");
+      }
+      if (productAccess != null && (error.getStatusCode().value() == 401 || error.getStatusCode().value() == 403)) {
+        throw new ResponseStatusException(error.getStatusCode(), "catalog denied access");
       }
       throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "catalog unavailable");
     } catch (RestClientException error) {
@@ -69,7 +79,7 @@ public class BookRatingsController {
   @GetMapping
   public Summary get(@PathVariable UUID bookId, Principal principal) {
     String subject = subject(principal);
-    requireBook(bookId);
+    requireBook(bookId, principal);
     return summary(bookId, subject);
   }
 
@@ -83,7 +93,8 @@ public class BookRatingsController {
     } catch (ArithmeticException error) {
       throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stars must be an integer from 1 to 5");
     }
-    requireBook(bookId);
+    requireBook(bookId, principal);
+    if (productAccess != null) productAccess.recheck(SocialController.currentRequest());
     jdbc.update("""
         insert into social.book_rating(subject_key,book_id,stars) values(?,?,?)
         on conflict(subject_key,book_id) do update set stars=excluded.stars,updated_at=clock_timestamp()
@@ -96,7 +107,8 @@ public class BookRatingsController {
   @Transactional
   public Summary delete(@PathVariable UUID bookId, Principal principal) {
     String subject = subject(principal);
-    requireBook(bookId);
+    requireBook(bookId, principal);
+    if (productAccess != null) productAccess.recheck(SocialController.currentRequest());
     jdbc.update("delete from social.book_rating where subject_key=? and book_id=?", subject, bookId);
     return summary(bookId, subject);
   }

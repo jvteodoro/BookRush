@@ -10,7 +10,14 @@ test -f infrastructure/jenkins/bookrush.Jenkinsfile || fail 'cópia do Jenkinsfi
 cmp -s Jenkinsfile infrastructure/jenkins/bookrush.Jenkinsfile || fail 'Jenkinsfiles principais divergem'
 grep -Fq "booleanParam(name: 'RUN_INFRA_CONTRACTS'" Jenkinsfile || fail 'Jenkinsfile principal sem opção RUN_INFRA_CONTRACTS'
 grep -Fq "BooleanParameterDefinition('RUN_INFRA_CONTRACTS'" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bootstrap Jenkins sem definição persistente de RUN_INFRA_CONTRACTS'
-grep -Fq "new BranchSpec('*/main')" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bookrush-deploy não fixa a definição da pipeline em main'
+grep -Fq "new BranchSpec('*/feature/premium-family')" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bookrush-deploy não fixa a pipeline na branch autorizada da demonstração'
+grep -Fq "ChoiceParameterDefinition('DEPLOY_ENVIRONMENT'" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bootstrap Jenkins sem ambiente demo/produção'
+grep -Fq "StringParameterDefinition('DEMO_ENV_CREDENTIAL_ID'" infrastructure/jenkins/init.groovy.d/bookrush.groovy || fail 'bootstrap Jenkins sem credencial demo'
+grep -Fq 'deploy-demo.sh' infrastructure/jenkins/deploy-compose.sh || fail 'deploy Compose sem fluxo demo'
+test -f infrastructure/jenkins/deploy-demo.sh || fail 'deploy isolado demo ausente'
+test -f scripts/test-premium-family-demo-smoke.sh || fail 'smoke demo ausente'
+test -f scripts/test-premium-family-demo-browser.mjs || fail 'teste Chromium demo ausente'
+grep -Fq 'KEYCLOAK_IMAGE' Jenkinsfile || fail 'pipeline sem build/versionamento do provider etário Keycloak'
 if command -v python3 >/dev/null 2>&1; then
   python3 scripts/test-deploy-compose-images.py || fail 'contrato de imagens do deploy Compose inválido'
 elif command -v docker >/dev/null 2>&1; then

@@ -23,6 +23,7 @@ paths:
               properties:
                 name: { type: string, minLength: 1, maxLength: 120, description: Trimmed display name; whitespace-only values are rejected }
       responses:
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Bookmark renamed without changing its position or creation date
           content:
@@ -32,17 +33,16 @@ paths:
         '401': { description: Authentication required }
         '403': { description: Forbidden origin or token authorization }
         '404': { description: Bookmark not found for this reader and book }
-        '502': { description: Reader state service unavailable through public BFF }
     delete:
       summary: Delete a bookmark owned by the authenticated reader
       security: [{ bearerAuth: [] }]
       responses:
+        '503': { description: Current product authorization is unavailable }
         '204': { description: Bookmark deleted }
         '400': { description: Invalid UUID }
         '401': { description: Authentication required }
         '403': { description: Forbidden origin or token authorization }
         '404': { description: Bookmark not found for this reader and book }
-        '502': { description: Reader state service unavailable through public BFF }
   /api/v1/reader/books/{bookId}/bookmarks:
     parameters:
       - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -50,6 +50,7 @@ paths:
       summary: List the authenticated reader's bookmarks, newest first
       security: [{ bearerAuth: [] }]
       responses:
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Bookmarks; legacy entries have a null locator
           content:
@@ -58,7 +59,6 @@ paths:
         '400': { description: Invalid book UUID }
         '401': { description: Authentication required }
         '403': { description: Forbidden origin or token authorization }
-        '502': { description: Reader state service unavailable (public BFF) }
     post:
       summary: Save a Readium locator, returning the existing ID on repeated saves
       security: [{ bearerAuth: [] }]
@@ -77,6 +77,7 @@ paths:
                 name: { type: string, minLength: 1, maxLength: 120, description: Optional for legacy clients; nonblank when supplied }
                 note: { type: string }
       responses:
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Persisted bookmark (including its stable ID)
           content:
@@ -85,7 +86,6 @@ paths:
         '400': { description: Missing position or invalid Readium locator }
         '401': { description: Authentication required }
         '403': { description: Forbidden origin or token authorization }
-        '502': { description: Reader state service unavailable (public BFF) }
   /api/v1/reader/sessions:
     post:
       operationId: startReaderSession
@@ -103,6 +103,8 @@ paths:
               properties:
                 bookId: { type: string, format: uuid, nullable: true }
       responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
         '200': { description: Sessão criada }
         '401': { description: Token ausente ou inválido }
   /api/v1/reader/sessions/{id}/end:
@@ -122,6 +124,8 @@ paths:
               properties:
                 activeSeconds: { type: integer, minimum: 0, description: Tempo ativo informado pelo cliente; o servidor limita ao tempo decorrido desde o início da sessão e a 24 horas. }
       responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Sessão encerrada. activeSeconds na resposta e em READ_SESSION contém o menor valor entre o tempo informado, o tempo decorrido e 86400 segundos.
           content:
@@ -142,6 +146,7 @@ paths:
       summary: Read the authenticated reader's last position for automatic resume
       security: [{ bearerAuth: [] }]
       responses:
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Empty array for a new reader/book; otherwise one saved progress record
           content:
@@ -153,7 +158,6 @@ paths:
         '400': { description: Invalid book UUID }
         '401': { description: Authentication required }
         '403': { description: Forbidden origin or token authorization }
-        '502': { description: Reader state unavailable through the public BFF }
     put:
       summary: Save the latest reading position and publish progress outcomes
       security: [{ bearerAuth: [] }]
@@ -172,6 +176,7 @@ paths:
                 percent: { type: number, minimum: 0, maximum: 100 }
                 locator: { $ref: '#/components/schemas/BookmarkLocator' }
       responses:
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Last position updated (including backwards navigation)
           content:
@@ -185,14 +190,16 @@ paths:
         '400': { description: Invalid progress or locator }
         '401': { description: Authentication required }
         '403': { description: Forbidden origin or token authorization }
-        '502': { description: Reader state unavailable through the public BFF }
   /api/v1/reader/books/{bookId}/opened:
     post:
       summary: Record a successfully loaded reading and mark the book as seen
       description: Called only after content loads. Atomically records history and seen status for the authenticated subject; reopening preserves firstSeenAt. Does not mark a book as completed.
       security: [{bearerAuth: []}]
-      parameters: [{name: bookId, in: path, required: true, schema: {type: string, format: uuid}}]
+      parameters:
+        - {name: Idempotency-Key, in: header, schema: {type: string, format: uuid}, description: Repeat the same key for retries of the same loaded publication.}
+        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
+        '503': { description: Current product authorization is unavailable }
         '200': {description: Opening recorded and private seen status persisted}
         '400': {description: Invalid book ID}
         '401': {description: Authentication required}
@@ -215,6 +222,7 @@ paths:
             maxItems: 100
             items: { type: string, format: uuid }
       responses:
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Seen entries from the requested batch; unseen books are absent
           content:
@@ -235,7 +243,6 @@ paths:
         '400': {description: "Missing, malformed or oversized book ID batch"}
         '401': {description: "Missing, invalid, expired or wrong-audience product token"}
         '403': {description: Disallowed CORS origin}
-        '502': {description: Reader state service unavailable at the gateway}
 
   /api/v1/reader/plant:
     get:
@@ -244,6 +251,8 @@ paths:
       security:
         - bearerAuth: []
       responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Projeção persistida e recalculada para o subject autenticado.
           content:
@@ -269,6 +278,8 @@ paths:
                 activeSeconds: { type: integer, minimum: 1, maximum: 60 }
                 endedAt: { type: string, format: date-time }
       responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
         '200':
           description: Estado atualizado; repetições do mesmo eventId são idempotentes.
           content:
@@ -276,13 +287,149 @@ paths:
               schema: { $ref: '#/components/schemas/PlantState' }
         '400': { description: Intervalo inválido ou fora da janela permitida. }
         '401': { description: Token ausente ou inválido. }
+  /api/v1/reader/library:
+    get:
+      security:
+      - bearerAuth: []
+      responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
+        '200':
+          description: Saved books for the authenticated reader, including books outside
+            the current feed
+        '401':
+          description: Authentication required
+          description: Reader state service unavailable
+  /api/v1/reader/library/{bookId}:
+    put:
+      description: Saves the book identified by the path for the authenticated reader.
+        No request body is required.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
+        '200':
+          description: Library entry saved for the authenticated reader; repeated saves
+            do not create duplicates
+        '400':
+          description: Invalid book UUID
+        '401':
+          description: Authentication required
+          description: Reader state service unavailable
+    delete:
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
+        '200':
+          description: Library entry removed for the authenticated reader; repeated
+            removals succeed
+        '400':
+          description: Invalid book UUID
+        '401':
+          description: Authentication required
+          description: Reader state service unavailable
+  /api/v1/reader/recent:
+    get:
+      security:
+      - bearerAuth: []
+      responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
+        '200':
+          description: Recent books
+        '401':
+          description: Authentication required
+          description: Reader state service unavailable
+  /api/v1/reader/streak:
+    get:
+      security:
+      - bearerAuth: []
+      responses:
+        '403': { description: Current product policy denies access }
+        '503': { description: Current product authorization is unavailable }
+        '200':
+          description: Reading streak
+        '401':
+          description: Authentication required
+          description: Reader state service unavailable
+  /api/internal/v1/reader/supervision/{memberId}/history:
+    get:
+      operationId: supervisedReadingHistory
+      summary: Read one page of the authorized minor reading projection
+      description: The memberId is the UUID of the guardian’s own supervision grant. Each page requires an active grant for the exact scope. Tokens use realm bookrush, audience bookrush-reader-bff and scope supervision.read.
+      security: [{ bearerAuth: [], supervisionWorkload: [] }]
+      parameters:
+        - {name: memberId, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: scope, in: query, required: true, schema: {type: string, enum: [BOOKS_ACCESSED, READING_ACTIVITY]}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 50, default: 25}}
+        - {name: cursor, in: query, schema: {type: string, format: uuid}, description: Opaque cursor bound to this request context.}
+      responses:
+        '200':
+          description: Projection page, possibly empty after authorization
+          headers:
+            Cache-Control: {schema: {type: string, example: no-store}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SupervisedReadingPage'}
+        '400': {description: Invalid scope or pagination parameters}
+        '401': {description: Missing or invalid authentication}
+        '403': {description: Authorization denied or grant no longer applies}
+        '404': {description: No matching grant visible to this guardian}
+        '503': {description: A required dependency could not authorize or return the page}
+
 components:
   securitySchemes:
+    supervisionWorkload:
+      type: apiKey
+      in: header
+      name: X-BookRush-Workload
+      description: Signed platform JWT for bookrush-reader-bff-supervision-s2s with audience bookrush-reader-state-supervision and scope supervision.history.read.
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    SupervisedReadingPage:
+      type: object
+      required: [scope, items]
+      properties:
+        scope: {type: string, enum: [BOOKS_ACCESSED, READING_ACTIVITY]}
+        nextCursor: {type: string, format: uuid, nullable: true}
+        items:
+          type: array
+          maxItems: 50
+          items:
+            oneOf:
+              - type: object
+                additionalProperties: false
+                required: [bookId, accessedAt]
+                properties:
+                  bookId: {type: string, format: uuid}
+                  accessedAt: {type: string, format: date-time}
+              - type: object
+                additionalProperties: false
+                required: [date, minutes, sessions]
+                properties:
+                  date: {type: string, format: date}
+                  minutes: {type: integer, format: int64, minimum: 0}
+                  sessions: {type: integer, format: int64, minimum: 1}
     ReadingProgress:
       type: object
       required: [position_codepoint, percent, updated_at]

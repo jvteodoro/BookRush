@@ -12,8 +12,18 @@ services:
       DB_PASSWORD: ${FAMILY_DB_PASSWORD:-}
       FAMILY_PRODUCT_ISSUER: ${FAMILY_PRODUCT_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
       FAMILY_PRODUCT_JWKS: ${FAMILY_PRODUCT_JWKS:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
+      FAMILY_WORKLOAD_ISSUER: ${FAMILY_WORKLOAD_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+      FAMILY_WORKLOAD_JWKS: ${FAMILY_WORKLOAD_JWKS:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
       FAMILY_TOKEN_URL: ${FAMILY_TOKEN_URL:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
+      FAMILY_PRODUCT_ACCESS_WORKLOADS: ${FAMILY_PRODUCT_ACCESS_WORKLOADS:-}
+      FAMILY_PRODUCT_ACCESS_AGE_VERIFICATION_REQUIRED: ${FAMILY_PRODUCT_ACCESS_AGE_VERIFICATION_REQUIRED:-false}
       FAMILY_SUBSCRIPTION_CLIENT_SECRET: ${SUBSCRIPTION_FAMILY_CLIENT_SECRET:-}
+      FAMILY_IDENTITY_ADMIN_USERS: ${FAMILY_IDENTITY_ADMIN_USERS:-http://keycloak:8080/admin/realms/bookrush/users}
+      FAMILY_IDENTITY_TOKEN_URL: ${FAMILY_IDENTITY_TOKEN_URL:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/token}
+      FAMILY_IDENTITY_CLIENT_SECRET: ${FAMILY_IDENTITY_CLIENT_SECRET:-}
+      SPRING_PROFILES_ACTIVE: ${FAMILY_SPRING_PROFILES:-}
+      BOOKRUSH_ENVIRONMENT: ${BOOKRUSH_ENVIRONMENT:-unknown}
+      FAMILY_SUPERVISION_SIMULATION: ${FAMILY_SUPERVISION_SIMULATION:-false}
       FAMILY_CORS_ORIGINS: ${FAMILY_CORS_ORIGINS:-}
     profiles: [family]
     depends_on:

@@ -1,4 +1,17 @@
 (() => {
+  if (
+    document.currentScript?.dataset.bookrushPageloop != null &&
+    !document.currentScript.isConnected
+  )
+    return;
+  const lifecycle = new AbortController();
+  const overlays = new Set();
+  let disposed = false;
+  const listen = (type, callback, options) =>
+    window.addEventListener(type, callback, {
+      ...options,
+      signal: lifecycle.signal,
+    });
   const getMode = () => (document.body.dataset.mode === "app" ? "app" : "web");
   const profilePath = window.location.pathname.match(
     /^\/usuarios\/([^/]+)\/?$/,
@@ -190,7 +203,7 @@
         ),
       );
   }
-  window.addEventListener("bookrush:navigate", (event) => {
+  listen("bookrush:navigate", (event) => {
     if (
       [...NAV.map((item) => item[0]), "admin", "publisher"].includes(
         event.detail,
@@ -232,7 +245,7 @@
     state.route = "otherProfile";
     render();
   }
-  window.addEventListener("popstate", (event) => {
+  listen("popstate", (event) => {
     const match = window.location.pathname.match(/^\/usuarios\/([^/]+)\/?$/);
     try {
       state.otherUser = match ? decodeURIComponent(match[1]) : "";
@@ -246,6 +259,7 @@
   });
 
   function render() {
+    if (disposed || !document.getElementById("app")) return;
     if (state.route !== "reader") void window.__BOOKRUSH_READIUM__?.unmount?.();
     switch (state.route) {
       case "feed":
@@ -470,7 +484,7 @@
     });
   }
 
-  window.addEventListener("resize", scheduleFeedQuoteFit, { passive: true });
+  listen("resize", scheduleFeedQuoteFit, { passive: true });
 
   function bookCard(b) {
     return `<article class="book-card" style="--cover-a:${b.a};--cover-b:${b.b};${coverStyle(b)}" data-open-book="${b.id}"><div class="book-cover"><span class="cover-mark">BOOKRUSH</span><span class="cover-title">${esc(b.title)}</span></div><h3>${esc(b.title)}</h3><p>${esc(b.author)}</p><div class="book-card-meta"><span>${b.genre}</span><span>${b.rank ? `posição ${b.rank}` : "disponível"}</span></div></article>`;
@@ -1493,6 +1507,8 @@
     const wrap = document.createElement("div");
     wrap.className = "modal-wrap";
     wrap.innerHTML = `<section class="modal ${modalClass}">${body}<div class="modal-actions">${actions || '<button class="primary-btn" data-close-modal>Fechar</button>'}</div></section>`;
+    if (disposed) return;
+    overlays.add(wrap);
     document.body.appendChild(wrap);
     wrap.addEventListener("click", (e) => {
       if (e.target === wrap) wrap.remove();
@@ -1543,6 +1559,8 @@
         })
         .join("") || '<p class="muted">Ainda não há comentários.</p>'
     }</div><div class="comment-compose"><input id="commentInput" placeholder="Escreva um comentário..."/><button class="primary-btn" id="commentSend">Enviar</button></div></aside>`;
+    if (disposed) return;
+    overlays.add(overlay);
     document.body.appendChild(overlay);
     overlay.querySelectorAll("[data-profile-subject]").forEach((link) =>
       link.addEventListener("click", (event) => {
@@ -1605,6 +1623,8 @@
       </div>
       <p class="br-share-dialog__status" role="status" aria-live="polite"></p>
       <footer class="br-share-dialog__footer"><button type="button" class="br-button br-button--ghost br-button--sm" data-close-share>Fechar</button></footer>`;
+    if (disposed) return;
+    overlays.add(dialog);
     document.body.appendChild(dialog);
     dialog.addEventListener("close", () => {
       dialog.remove();
@@ -1662,7 +1682,7 @@
     dialog.showModal();
   }
 
-  window.addEventListener("keydown", (e) => {
+  listen("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       go("search");
@@ -1693,6 +1713,13 @@
     openShare,
     openLucky: openLuckyPrompt,
     openProfile: openUserProfile,
+  };
+  window.__BOOKRUSH_LEGACY_DISPOSE__ = () => {
+    disposed = true;
+    lifecycle.abort();
+    for (const overlay of overlays) overlay.remove();
+    delete window.__BOOKRUSH_LEGACY__;
+    delete window.__BOOKRUSH_LEGACY_DISPOSE__;
   };
   render();
 })();

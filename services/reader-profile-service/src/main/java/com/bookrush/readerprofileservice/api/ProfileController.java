@@ -12,6 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/v1/profile")
 public class ProfileController {
   private final JdbcTemplate jdbc;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private ProfileDiscovery discovery;
 
   public ProfileController(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
@@ -51,6 +53,19 @@ public class ProfileController {
 
   @GetMapping("/public")
   public Object publicProfile(@RequestParam String subject) {
+    if (discovery != null) {
+      String candidate = discovery.subject(subject);
+      if (candidate == null || !discovery.visible(java.util.Set.of(candidate)).contains(candidate)) {
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      }
+      var publicRows = jdbc.queryForList("""
+          select p.subject_key,p.display_name as "displayName",p.bio from reader_profile.profile p
+          left join reader_profile.profile_privacy v on v.subject_key=p.subject_key
+          where p.subject_key=? and p.is_public=true and coalesce(v.profile_visibility,'PUBLIC')='PUBLIC'
+          """, discovery.storedKey(candidate));
+      if (publicRows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      return publicRows.getFirst();
+    }
     var rows = jdbc.queryForList(
         "select subject_key,display_name as \"displayName\",bio from reader_profile.profile where subject_key=? and is_public=true",
         subject);

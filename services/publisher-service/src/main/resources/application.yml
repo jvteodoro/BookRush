@@ -25,6 +25,10 @@ bookrush:
   cors:
     allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}
 publisher:
+  identity:
+    product-issuer: ${BOOKRUSH_PRODUCT_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
+    editorial-issuer: ${BOOKRUSH_ADMIN_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
+    author-clients: ${PUBLISHER_AUTHOR_CLIENTS:bookrush-web,bookrush-mobile}
   metrics:
     token-uri: ${PUBLISHER_METRICS_TOKEN_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/token}
     client-id: ${PUBLISHER_METRICS_CLIENT_ID:bookrush-publisher-metrics-s2s}

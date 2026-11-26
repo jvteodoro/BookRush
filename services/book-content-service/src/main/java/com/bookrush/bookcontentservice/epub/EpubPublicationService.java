@@ -9,7 +9,7 @@ import java.util.zip.ZipInputStream;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
+import com.bookrush.bookcontentservice.CatalogReaderBearer;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.w3c.dom.Element;
@@ -24,9 +24,10 @@ public final class EpubPublicationService {
   public EpubPublicationService(
       RestClient.Builder builder,
       @Value("${bookrush.catalog-url:http://catalog-service:8080}") String catalogUrl,
-      @Value("${bookrush.catalog-service-token:}") String serviceToken) {
-    this.catalog = builder.baseUrl(catalogUrl).build();
-    this.serviceToken = serviceToken;
+      @Value("${bookrush.catalog-service-token:}") String serviceToken, CatalogReaderBearer bearer,
+      @Value("${bookrush.security.product-access.enabled:false}") boolean protectedDistribution) {
+    this.catalog = builder.baseUrl(catalogUrl).requestInterceptor(bearer).build();
+    this.serviceToken = protectedDistribution ? "" : serviceToken;
   }
 
   public Optional<Publication> load(UUID bookId) {
@@ -46,8 +47,7 @@ public final class EpubPublicationService {
   }
 
   public byte[] resource(byte[] epub, String resource) throws Exception {
-    String normalized = normalize("", resource);
-    if (normalized.isBlank() || normalized.contains("..")) throw new IllegalArgumentException("invalid EPUB resource");
+    String normalized = requestedResource(resource);
     try (var zip = new ZipInputStream(new ByteArrayInputStream(epub))) {
       ZipEntry entry;
       while ((entry = zip.getNextEntry()) != null) {
@@ -58,10 +58,21 @@ public final class EpubPublicationService {
   }
 
   public byte[] resource(Publication publication, String resource) throws Exception {
-    String normalized = normalize("", resource);
-    if (normalized.isBlank() || normalized.contains("..")) throw new IllegalArgumentException("invalid EPUB resource");
+    String normalized = requestedResource(resource);
     byte[] value = publication.entries().get(normalized);
     if (value == null) throw new NoSuchElementException("EPUB resource not found");
+    return value;
+  }
+
+  private static String requestedResource(String path) {
+    // MVC already decoded the path. Preserve literal plus and percent in legitimate archive names.
+    if (path == null || path.indexOf('\\') >= 0 || path.indexOf(0) >= 0) {
+      throw new IllegalArgumentException("invalid EPUB resource");
+    }
+    String value = path.startsWith("/") ? path.substring(1) : path;
+    if (Arrays.stream(value.split("/", -1)).anyMatch(part -> part.isEmpty() || part.equals(".") || part.equals(".."))) {
+      throw new IllegalArgumentException("invalid EPUB resource");
+    }
     return value;
   }
 

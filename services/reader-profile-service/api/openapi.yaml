@@ -24,6 +24,7 @@ paths:
           in: query
           schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
+        '503': { description: Current product authorization or required facts unavailable }
         '200':
           description: Stable name/subject ordered page of public readers
           content:
@@ -36,17 +37,23 @@ paths:
     get:
       security: [{ bearerAuth: [] }]
       responses:
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200': { description: Authenticated profile }
         '401': { description: Authentication required }
     put:
       security: [{ bearerAuth: [] }]
       responses:
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200': { description: Updated authenticated profile }
         '401': { description: Authentication required }
   /api/v1/profile/privacy:
     get:
       security: [{ bearerAuth: [] }]
       responses:
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200':
           description: Authenticated privacy policy
           content:
@@ -61,6 +68,8 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/Privacy' }
       responses:
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200':
           description: Updated privacy policy
           content:
@@ -76,6 +85,9 @@ paths:
           required: true
           schema: { type: string }
       responses:
+        '401': { description: Missing or invalid product JWT }
+        '403': { description: Product authorization denied }
+        '503': { description: Current product authorization or required facts unavailable }
         '200': { description: Public profile or an empty profile response }
 components:
   securitySchemes:

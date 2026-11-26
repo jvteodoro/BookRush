@@ -1,0 +1,32 @@
+{
+  "clients": [
+    {
+      "clientId": "bookrush-catalog-product-access-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "product-access.evaluate"
+      ],
+      "secret": "${CATALOG_PRODUCT_ACCESS_CLIENT_SECRET}"
+    },
+    {
+      "clientId": "bookrush-book-content-product-access-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "product-access.evaluate"
+      ],
+      "secret": "${BOOK_CONTENT_PRODUCT_ACCESS_CLIENT_SECRET}"
+    }
+  ]
+}

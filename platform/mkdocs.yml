@@ -2,6 +2,7 @@ site_name: BookRush Java Platform
 docs_dir: docs
 nav:
   - Overview: index.md
+  - Autorização de produto v1: product-access.md
 theme:
   name: material
 markdown_extensions:

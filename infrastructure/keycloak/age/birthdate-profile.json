@@ -1,0 +1,7 @@
+{
+  "name": "birthdate",
+  "displayName": "Data de nascimento (YYYY-MM-DD)",
+  "validations": {"bookrush-birthdate": {}},
+  "permissions": {"view": ["admin", "user"], "edit": ["admin", "user"]},
+  "multivalued": false
+}

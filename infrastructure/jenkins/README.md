@@ -567,3 +567,87 @@ incluindo status, versão/hash, decil, mínimo/máximo e contagem esperados. Se 
 o console mostra somente os campos agregados usados na verificação.
 Os percentis de duração são comparados numericamente, sem depender de a versão
 do `jq` preservar a representação textual `120.0` ou normalizá-la para `120`.
+# Demonstração Premium/Família em uma execução
+
+O job `bookrush-deploy` está provisionado para carregar o `Jenkinsfile` da
+branch `feature/premium-family`; o parâmetro `BRANCH` escolhe o checkout que
+será construído e publicado. O pin do script da pipeline é intencional e deve
+ser alterado somente junto da revisão operacional aprovada. Não use wildcard de
+branch para o script que recebe credentials.
+
+O Jenkins precisa estar iniciado com o profile `ci`. Na primeira configuração,
+crie a credential Jenkins do tipo **Secret file**, ID
+`bookrush-demo-env`, contendo somente segredos e contas sintéticas da demo. O
+pipeline não cria nem recupera secrets de produção para compor essa credencial.
+Os nomes obrigatórios são:
+
+```text
+POSTGRES_PASSWORD
+STORAGE_ACCESS_KEY
+STORAGE_SECRET_KEY
+ASSET_ADMIN_TOKEN
+KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD
+INGESTION_ADMIN_CLIENT_SECRET
+CATALOG_PRODUCT_ACCESS_CLIENT_SECRET
+BOOK_CONTENT_PRODUCT_ACCESS_CLIENT_SECRET
+READER_STATE_PRODUCT_ACCESS_CLIENT_SECRET
+READER_PROFILE_PRODUCT_ACCESS_CLIENT_SECRET
+SOCIAL_PRODUCT_ACCESS_CLIENT_SECRET
+BEHAVIOR_PRODUCT_ACCESS_CLIENT_SECRET
+BEHAVIOR_OPERATIONS_CLIENT_SECRET
+READER_BFF_SESSION_CLIENT_SECRET
+READER_BFF_SUPERVISION_CLIENT_SECRET
+SUBSCRIPTION_FAMILY_CLIENT_SECRET
+SUBSCRIPTION_BILLING_CLIENT_SECRET
+FAMILY_IDENTITY_CLIENT_SECRET
+FAMILY_SUPERVISION_ADMIN_SECRET
+FAMILY_MEMBERSHIP_CLIENT_SECRET
+DEMO_ADULT_USERNAME
+DEMO_ADULT_PASSWORD
+DEMO_MINOR_USERNAME
+DEMO_MINOR_PASSWORD
+```
+
+O `KEYCLOAK_ADMIN_PASSWORD` usa o mesmo valor de
+`KEYCLOAK_CONFIG_CLI_ADMIN_PASSWORD`. Mantenha a credential estável entre
+execuções porque o Keycloak e os bancos da demo são persistentes. As contas
+sintéticas não devem ser reutilizadas por pessoas reais. O reconciliador desliga
+cadastro público neste realm. A simulação parental só fica no Compose isolado,
+com endpoints técnicos fora do gateway.
+
+Depois de cadastrar a Secret file uma vez, execute **Build with Parameters**:
+
+| Parâmetro | Valor para demonstração |
+| --- | --- |
+| `BRANCH` | `feature/premium-family` |
+| `DEPLOY_TARGET` | `compose` |
+| `DEPLOY_ENVIRONMENT` | `demo` |
+| `DEPLOY` | `true` |
+| `REGISTRY` | vazio (imagens locais no daemon de deploy) |
+| `RUN_INFRA_CONTRACTS` | `true` |
+| `FEED_PERSONALIZED_MODE` | `ON` |
+| `RUN_GUTENBERG_IMPORT` | `false` |
+| `RUN_ANALYTICS_SAMPLE` | `false` |
+| `DEMO_ENV_CREDENTIAL_ID` | `bookrush-demo-env` |
+
+O deploy demo usa o projeto Compose `bookrush-demo`, outro PostgreSQL/Keycloak,
+volumes próprios e portas `127.0.0.1:19080–19432`. Não publique esses serviços
+em interfaces externas. Em um host remoto, acesse a aplicação com túnel SSH:
+
+```bash
+ssh -L 19080:127.0.0.1:19080 -L 19088:127.0.0.1:19088 usuario@host-demo
+```
+
+Abra `http://localhost:19080`. O pipeline guarda `artifacts/premium-family-`
+`demo-release.json`, screenshots sem credenciais e backup PostgreSQL no volume
+`bookrush-demo_backups`. O rollback automático só troca imagens quando existe
+uma release anterior completa; na primeira instalação ou em incompatibilidade
+de schema, mantém o stack isolado para recuperação, sem apagar volumes nem
+reverter migrations destrutivamente.
+
+O ambiente não é uma URL pública. A publicação externa requer configurar
+DNS/TLS e um ingresso dedicado para a demo; não aponte os domínios de produção
+para as portas locais. A validação visual cobre OIDC de adulto gratuito e a
+sessão restrita de menor sintético. Fluxos comerciais/supervisão adicionais
+seguem cobertos pela suíte E2E integrada e por APIs; isso não significa que um
+dashboard parental completo esteja disponível.

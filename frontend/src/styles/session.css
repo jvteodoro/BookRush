@@ -1,0 +1,22 @@
+.restricted-session {
+  width: min(100% - 2rem, 42rem);
+  margin: clamp(2rem, 10vh, 7rem) auto;
+  overflow-wrap: anywhere;
+}
+
+.restricted-session section {
+  margin-block: 1.5rem;
+}
+
+.restricted-session ul {
+  list-style: none;
+  padding: 0;
+}
+
+.restricted-session button {
+  margin: 0.25rem 0.5rem 0.25rem 0;
+}
+
+.restricted-session h2 {
+  font-size: 1.25rem;
+}

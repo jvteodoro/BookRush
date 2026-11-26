@@ -37,6 +37,26 @@ docker create --name "$renderer" \
   -e INGESTION_ADMIN_CLIENT_SECRET='disposable-ingestion-secret' \
   -e INGESTION_CANONICAL_CLIENT_SECRET='disposable-canonical-secret' \
   -e INGESTION_ASSET_CLIENT_SECRET='disposable-asset-secret' \
+  -e KEYCLOAK_AGE_PROFILE_ENABLED=true \
+  -e KEYCLOAK_READER_STATE_CLIENT_ENABLED=true \
+  -e KEYCLOAK_CONTENT_DISTRIBUTION_CLIENTS_ENABLED=true \
+  -e KEYCLOAK_COMMUNITY_CLIENTS_ENABLED=true \
+  -e KEYCLOAK_READING_SUPERVISION_ENABLED=true \
+  -e KEYCLOAK_SESSION_BOOTSTRAP_ENABLED=true \
+  -e SUBSCRIPTION_FAMILY_CLIENT_SECRET='disposable-subscription-family-secret' \
+  -e SUBSCRIPTION_BILLING_CLIENT_SECRET='disposable-subscription-billing-secret' \
+  -e CATALOG_PRODUCT_ACCESS_CLIENT_SECRET='disposable-catalog-access-secret' \
+  -e BOOK_CONTENT_PRODUCT_ACCESS_CLIENT_SECRET='disposable-content-access-secret' \
+  -e SOCIAL_PRODUCT_ACCESS_CLIENT_SECRET='disposable-social-access-secret' \
+  -e READER_PROFILE_PRODUCT_ACCESS_CLIENT_SECRET='disposable-profile-access-secret' \
+  -e BEHAVIOR_PRODUCT_ACCESS_CLIENT_SECRET='disposable-behavior-access-secret' \
+  -e BEHAVIOR_OPERATIONS_CLIENT_SECRET='disposable-behavior-operations-secret' \
+  -e READER_STATE_PRODUCT_ACCESS_CLIENT_SECRET='disposable-reader-state-secret' \
+  -e READER_BFF_SESSION_CLIENT_SECRET='disposable-session-secret' \
+  -e READER_BFF_SUPERVISION_CLIENT_SECRET='disposable-supervision-secret' \
+  -e FAMILY_MEMBERSHIP_CLIENT_SECRET='disposable-membership-secret' \
+  -e FAMILY_SUPERVISION_ADMIN_SECRET='disposable-supervision-admin-secret' \
+  -e FAMILY_IDENTITY_CLIENT_SECRET='disposable-family-age-secret' \
   -e GRAFANA_OIDC_CLIENT_SECRET='disposable-grafana-secret' \
   -e GRAFANA_OIDC_REDIRECT_URI='http://grafana:3000/login/generic_oauth' \
   -e GRAFANA_OIDC_WEB_ORIGIN='http://grafana:3000' \
@@ -46,6 +66,31 @@ docker cp "$repo_dir/infrastructure/keycloak/." "$renderer:/tmp/source"
 docker cp "$repo_dir/infrastructure/keycloak/render-config.py" "$renderer:/tmp/render-config.py"
 docker start -a "$renderer" >/dev/null
 docker cp "$renderer:/tmp/rendered/." "$work_dir/rendered"
+python3 - "$work_dir/rendered/bookrush-realm.json" "$work_dir/rendered/bookrush-platform-realm.json" <<'PY'
+import json, sys
+product, platform = (json.load(open(path, encoding="utf-8")) for path in sys.argv[1:])
+clients = {item["clientId"]: item for item in platform["clients"]}
+for client in ("bookrush-web", "bookrush-mobile"):
+    scopes = set(next(item for item in product["clients"] if item["clientId"] == client)["defaultClientScopes"])
+    assert {"family.manage", "family.invites", "supervision.request", "subscription.read"} <= scopes
+expected = {
+    "bookrush-family-s2s", "bookrush-billing-s2s",
+    "bookrush-reader-state-s2s", "bookrush-catalog-product-access-s2s",
+    "bookrush-book-content-product-access-s2s", "bookrush-social-product-access-s2s",
+    "bookrush-reader-profile-product-access-s2s", "bookrush-behavior-product-access-s2s",
+    "bookrush-behavior-operations-s2s", "bookrush-reader-bff-session-s2s",
+    "bookrush-reader-bff-supervision-s2s",
+}
+assert expected <= clients.keys()
+product_clients = {item["clientId"]: item for item in product["clients"]}
+assert "bookrush-family-age-s2s" in product_clients
+assert all("${" not in client.get("secret", "") for client in clients.values())
+assert "defaultClientScopes" not in product_clients["bookrush-family-age-s2s"]
+age_account = next(item for item in product["users"]
+                   if item["username"] == "service-account-bookrush-family-age-s2s")
+assert "view-users" in age_account["clientRoles"]["realm-management"]
+print("Keycloak render: subscription, age, product workloads and user scopes OK")
+PY
 
 docker network create "$network" >/dev/null
 docker create --name "$keycloak" --network "$network" \
@@ -127,6 +172,24 @@ test -n "$service_account_id"
 docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
   "users/$service_account_id/role-mappings/realm" -r bookrush-platform \
   --fields name --format csv --noquotes | grep -x 'platform-operator' >/dev/null
+age_client_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients \
+  -r bookrush -q clientId=bookrush-family-age-s2s --fields id --format csv --noquotes \
+  | awk 'NR == 1 { print; exit }')"
+test -n "$age_client_id"
+age_client="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
+  "clients/$age_client_id" -r bookrush --format json)"
+grep -q '"serviceAccountsEnabled" : true' <<<"$age_client"
+age_service_account_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get users \
+  -r bookrush -q username=service-account-bookrush-family-age-s2s \
+  --fields id --format csv --noquotes | awk 'NR == 1 { print; exit }')"
+test -n "$age_service_account_id"
+realm_management_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients \
+  -r bookrush -q clientId=realm-management --fields id --format csv --noquotes \
+  | awk 'NR == 1 { print; exit }')"
+test -n "$realm_management_id"
+docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get \
+  "users/$age_service_account_id/role-mappings/clients/$realm_management_id" -r bookrush \
+  --fields name --format csv --noquotes | grep -x 'view-users' >/dev/null
 grafana_client_id="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get clients \
   -r bookrush-platform -q clientId=bookrush-grafana \
   --fields id --format csv --noquotes | awk 'NR == 1 { print; exit }')"

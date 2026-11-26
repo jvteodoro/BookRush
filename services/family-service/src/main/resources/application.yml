@@ -37,3 +37,14 @@ family:
   client-id: ${FAMILY_SUBSCRIPTION_CLIENT:bookrush-family-s2s}
   client-secret: ${FAMILY_SUBSCRIPTION_CLIENT_SECRET:}
   expiration-delay: ${FAMILY_EXPIRATION_DELAY_MS:60000}
+  workload-issuer: ${FAMILY_WORKLOAD_ISSUER}
+  workload-jwks: ${FAMILY_WORKLOAD_JWKS}
+  membership-client: ${FAMILY_MEMBERSHIP_CLIENT:bookrush-product-access-s2s}
+  identity-admin-users: ${FAMILY_IDENTITY_ADMIN_USERS:}
+  identity-token-url: ${FAMILY_IDENTITY_TOKEN_URL:}
+  identity-secret: ${FAMILY_IDENTITY_CLIENT_SECRET:}
+  supervision-admin-client: ${FAMILY_SUPERVISION_ADMIN_CLIENT:bookrush-supervision-admin-s2s}
+  supervision-simulation: ${FAMILY_SUPERVISION_SIMULATION:false}
+  supervision-maintenance-delay: ${FAMILY_SUPERVISION_MAINTENANCE_DELAY_MS:60000}
+  product-access-workloads: ${FAMILY_PRODUCT_ACCESS_WORKLOADS:}
+  product-access-age-verification-required: ${FAMILY_PRODUCT_ACCESS_AGE_VERIFICATION_REQUIRED:false}

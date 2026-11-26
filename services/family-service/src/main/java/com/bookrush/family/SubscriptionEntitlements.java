@@ -1,6 +1,8 @@
 package com.bookrush.family;
 
 import com.bookrush.platform.core.TechnicalIdentity;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.time.format.DateTimeParseException;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -43,6 +45,16 @@ class SubscriptionEntitlements {
   }
 
   Instant requirePremium(TechnicalIdentity owner) {
+    Instant until = premiumUntil(owner);
+    checkDeadline(until);
+    return until;
+  }
+
+  Instant premiumUntil(TechnicalIdentity owner) {
+    return evaluate(owner, "PREMIUM_FAMILY").effectiveUntil();
+  }
+
+  Evaluation evaluate(TechnicalIdentity owner, String entitlement) {
     Evaluation rights;
     try {
       if (secret.isBlank()) {
@@ -56,19 +68,30 @@ class SubscriptionEntitlements {
       if (token == null || token.access_token() == null || token.access_token().isBlank()) {
         throw new RestClientException("workload token unavailable");
       }
-      rights = http.post().uri(endpoint).contentType(MediaType.APPLICATION_JSON)
+      JsonNode wire = http.post().uri(endpoint).contentType(MediaType.APPLICATION_JSON)
           .headers(headers -> headers.setBearerAuth(token.access_token()))
-          .body(new EvaluationRequest(owner, "PREMIUM_FAMILY")).retrieve().body(Evaluation.class);
-      if (rights == null || rights.enabled() == null || rights.version() == null || rights.version() < 0
-          || (rights.enabled() && rights.effectiveUntil() == null)) {
-        throw new RestClientException("invalid entitlement response");
-      }
-    } catch (RestClientException failure) {
+          .body(new EvaluationRequest(owner, entitlement)).retrieve().body(JsonNode.class);
+      rights = parse(wire);
+    } catch (RestClientException | DateTimeParseException failure) {
       metrics.counter("bookrush.family.subscription.failures").increment();
       throw FamilyProblem.unavailable();
     }
-    checkDeadline(rights.enabled() ? rights.effectiveUntil() : null);
-    return rights.effectiveUntil();
+    boolean current = rights.enabled() && clock.instant().isBefore(rights.effectiveUntil());
+    return new Evaluation(current, current ? rights.effectiveUntil() : null, rights.version());
+  }
+
+  private static Evaluation parse(JsonNode wire) {
+    if (wire == null || !wire.path("enabled").isBoolean() || !wire.path("version").isIntegralNumber()
+        || !wire.path("version").canConvertToLong() || wire.path("version").longValue() < 0) {
+      throw new RestClientException("invalid entitlement response");
+    }
+    boolean enabled = wire.path("enabled").booleanValue();
+    var cutoff = wire.path("effectiveUntil");
+    if (enabled ? !cutoff.isTextual() : !cutoff.isTextual() && !cutoff.isNull() && !cutoff.isMissingNode()) {
+      throw new RestClientException("invalid entitlement cutoff");
+    }
+    return new Evaluation(enabled, cutoff.isTextual() ? Instant.parse(cutoff.textValue()) : null,
+        wire.path("version").longValue());
   }
 
   void checkDeadline(Instant until) {

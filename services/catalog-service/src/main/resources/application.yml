@@ -9,12 +9,22 @@ springdoc:
     disable-swagger-default-url: true
     url: /v3/api-docs
 bookrush:
+  content-human-clients: ${CONTENT_PRODUCT_ACCESS_HUMAN_CLIENTS:bookrush-web,bookrush-mobile}
   openapi:
     server-url: ${BOOKRUSH_PUBLIC_URL:https://bookrush.jteodoro.tec.br}
   observability:
     correlation:
       enabled: ${BOOKRUSH_CORRELATION_ENABLED:true}
   security:
+    product-access:
+      enabled: ${CONTENT_PRODUCT_ACCESS_ENABLED:false}
+      decision-base-uri: ${CONTENT_PRODUCT_ACCESS_ORIGIN:}
+      token-uri: ${CONTENT_PRODUCT_ACCESS_TOKEN_URI:}
+      jwk-set-uri: ${CONTENT_PRODUCT_ACCESS_JWKS_URI:}
+      workload-issuer: ${CONTENT_PRODUCT_ACCESS_WORKLOAD_ISSUER:}
+      client-id: ${CONTENT_PRODUCT_ACCESS_CLIENT_ID:}
+      client-secret: ${CONTENT_PRODUCT_ACCESS_CLIENT_SECRET:}
+      allow-insecure-http: ${CONTENT_PRODUCT_ACCESS_ALLOW_INSECURE_HTTP:false}
     enabled: ${CATALOG_OIDC_ENABLED:false}
     issuer: ${CATALOG_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
     jwk-set-uri: ${CATALOG_OIDC_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
@@ -88,6 +98,7 @@ canonical:
     token: ${CANONICAL_SERVICE_TOKEN:}
 catalog:
   security:
+    public-bibliography: ${CATALOG_SECURITY_PUBLIC_BIBLIOGRAPHY:false}
     oidc:
       enabled: ${CATALOG_OIDC_ENABLED:false}
       issuer: ${CATALOG_OIDC_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}

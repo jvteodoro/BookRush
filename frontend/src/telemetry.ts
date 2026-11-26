@@ -28,12 +28,14 @@ function safePayload(
 }
 
 export function createTelemetry(send: Sender, flushMs = 3000) {
+  let disposed = false;
   let queue: BehaviorEvent[] = [];
   let timer: number | undefined;
   let retry = 0;
   let flushing: Promise<void> | undefined;
   const flush = async (): Promise<void> => {
-    if (flushing || !queue.length) return flushing ?? Promise.resolve();
+    if (disposed || flushing || !queue.length)
+      return flushing ?? Promise.resolve();
     if (timer !== undefined) {
       window.clearTimeout(timer);
       timer = undefined;
@@ -44,6 +46,7 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
         retry = 0;
       })
       .catch(() => {
+        if (disposed) return;
         queue = [...batch, ...queue].slice(-100);
         retry = Math.min(retry + 1, 6);
         schedule(Math.min(flushMs * 2 ** retry, 60_000));
@@ -77,6 +80,7 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
         ),
       }),
     };
+    if (disposed) return;
     queue.push(event);
     if (queue.length >= MAX_BATCH) void flush();
     else schedule();
@@ -125,5 +129,10 @@ export function createTelemetry(send: Sender, flushMs = 3000) {
     dwell,
     flush,
     pending: () => queue.length,
+    dispose() {
+      disposed = true;
+      queue = [];
+      if (timer !== undefined) window.clearTimeout(timer);
+    },
   };
 }

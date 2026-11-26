@@ -25,14 +25,22 @@ http:
       entryPoints:
         - web
       priority: 400
+{{ if or (eq (env "BOOKRUSH_PROTECTED_DISTRIBUTION") "true") (eq (env "BOOKRUSH_STORAGE_EDGE_CLOSED") "true") }}
+      service: noop@internal
+{{ else }}
       service: seaweedfs-oauth
+{{ end }}
 
     seaweedfs:
       rule: Host(`seaweedfs-bookrush.jteodoro.tec.br`)
       entryPoints:
         - web
       priority: 300
+{{ if or (eq (env "BOOKRUSH_PROTECTED_DISTRIBUTION") "true") (eq (env "BOOKRUSH_STORAGE_EDGE_CLOSED") "true") }}
+      service: noop@internal
+{{ else }}
       service: seaweedfs-oauth
+{{ end }}
 
     seaweedfs-s3:
       # Presigned URLs authenticate the object request. This route must not be
@@ -41,7 +49,11 @@ http:
       entryPoints:
         - web
       priority: 300
+{{ if or (eq (env "BOOKRUSH_PROTECTED_DISTRIBUTION") "true") (eq (env "BOOKRUSH_STORAGE_EDGE_CLOSED") "true") }}
+      service: noop@internal
+{{ else }}
       service: seaweedfs-s3
+{{ end }}
 
     catalog-docs:
       rule: PathPrefix(`/swagger-ui`) || PathPrefix(`/v3/api-docs`)
@@ -79,10 +91,20 @@ http:
       # O frontend usa o BFF como fronteira única para leitura, estado e
       # conteúdo. O reader-state continua atendendo apenas a rota legada de
       # plant e o prefixo /api/v1/library.
-      rule: Path(`/api/v1/reader/feed`) || Path(`/api/v1/reader/recommendations`) || Path(`/api/v1/reader/library`) || PathPrefix(`/api/v1/reader/library/`) || Path(`/api/v1/reader/recent`) || Path(`/api/v1/reader/streak`) || Path(`/api/v1/reader/sessions`) || PathPrefix(`/api/v1/reader/sessions/`) || PathPrefix(`/api/v1/reader/books`) || PathPrefix(`/api/v1/reader/recommendations/impressions`)
+      rule: Path(`/api/v1/session`) || PathRegexp(`^/api/v1/reader/supervision/[^/]+/(history|comments)$`) || Path(`/api/v1/reader/feed`) || Path(`/api/v1/reader/recommendations`) || Path(`/api/v1/reader/library`) || PathPrefix(`/api/v1/reader/library/`) || Path(`/api/v1/reader/recent`) || Path(`/api/v1/reader/streak`) || Path(`/api/v1/reader/sessions`) || PathPrefix(`/api/v1/reader/sessions/`) || PathPrefix(`/api/v1/reader/books`) || PathPrefix(`/api/v1/reader/recommendations/impressions`)
       entryPoints: [web]
       priority: 140
       service: reader-bff
+    family:
+      rule: PathPrefix(`/api/v1/family`)
+      entryPoints: [web]
+      priority: 160
+      service: family
+    subscription:
+      rule: PathPrefix(`/api/v1/subscription`)
+      entryPoints: [web]
+      priority: 160
+      service: subscription
     reader-state:
       rule: PathPrefix(`/api/v1/library`) || Path(`/api/v1/reader/plant`)
       entryPoints: [web]
@@ -113,6 +135,13 @@ http:
       entryPoints: [web]
       priority: 135
       service: admin-api
+{{ if eq (env "BOOKRUSH_PROTECTED_DISTRIBUTION") "true" }}
+    catalog-asset-inspection:
+      rule: Host(`bookrush.jteodoro.tec.br`) && PathRegexp(`^/api/admin/books/[^/]+/assets/[^/]+/(download-url|content)$`)
+      entryPoints: [web]
+      priority: 145
+      service: catalog
+{{ end }}
     admin-reporting-api:
       rule: Host(`bookrush.jteodoro.tec.br`) && PathPrefix(`/api/admin`)
       entryPoints: [web]
@@ -170,6 +199,12 @@ http:
     reader-bff:
       loadBalancer:
         servers: [{url: http://reader-bff-service:8101}]
+    family:
+      loadBalancer:
+        servers: [{url: http://family-service:8103}]
+    subscription:
+      loadBalancer:
+        servers: [{url: http://subscription-service:8102}]
     reader-state:
       loadBalancer:
         servers: [{url: http://reader-state-service:8094}]

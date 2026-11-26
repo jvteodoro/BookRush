@@ -125,17 +125,26 @@ public class AssetController {
     service.approve(bookId, assetId);
   }
 
+  @org.springframework.beans.factory.annotation.Value("${bookrush.security.product-access.enabled:false}")
+  private boolean protectedDistribution;
+
+  @GetMapping("/{assetId}/content")
+  public ResponseEntity<org.springframework.core.io.Resource> operatorContent(
+      @PathVariable UUID bookId, @PathVariable UUID assetId, jakarta.servlet.http.HttpServletRequest request) {
+    if (!protectedDistribution) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);
+    return ReaderContentController.readerResponse(service, service.operatorDownload(bookId, assetId), request);
+  }
+
   @GetMapping("/{assetId}/download-url")
   @Operation(
       summary = "Gerar URL administrativa de download",
       description =
-          "Retorna uma URL pré-assinada temporária para inspeção do arquivo. Não faz proxy do"
-              + " conteúdo pelo catálogo.")
+          "No modo protegido, aponta para a rota de inspeção autenticada.")
   public ResponseEntity<AssetService.DownloadLink> link(
       @PathVariable UUID bookId, @PathVariable UUID assetId) {
     return ResponseEntity.ok()
         .cacheControl(CacheControl.noStore())
-        .body(service.link(bookId, assetId, false));
+        .body(protectedDistribution ? service.authenticatedOperatorLink(bookId, assetId) : service.link(bookId, assetId, false));
   }
 
   @DeleteMapping("/{assetId}")

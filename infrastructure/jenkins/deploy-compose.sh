@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${DEPLOY_ENVIRONMENT:-production}" == demo ]]; then
+  exec bash "${script_dir}/deploy-demo.sh"
+fi
+[[ "${DEPLOY_ENVIRONMENT:-production}" == production ]] || {
+  echo 'DEPLOY_ENVIRONMENT deve ser demo ou production.' >&2
+  exit 2
+}
 : "${BACKEND_IMAGE:?Imagem backend ausente}"
 : "${FRONTEND_IMAGE:?Imagem frontend ausente}"
 : "${INGESTION_IMAGE:?Imagem ingestion ausente}"
@@ -11,11 +19,10 @@ export FEED_PERSONALIZED_MODE="${FEED_PERSONALIZED_MODE:-ON}"
 mode_env_file="$(mktemp /tmp/bookrush-deploy-mode.XXXXXX)"
 trap 'rm -f "$mode_env_file"' EXIT
 printf 'FEED_PERSONALIZED_MODE=%s\n' "$FEED_PERSONALIZED_MODE" > "$mode_env_file"
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "${script_dir}/../.." && pwd)"
 # Pass versioned routes through the container configuration. A workspace bind
 # mount would resolve on the Docker host and could point at another checkout.
-BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$(cat "${repo_dir}/infrastructure/traefik/dynamic.yaml")"
+BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG="$(python3 "${repo_dir}/scripts/render-traefik-config.py" "${repo_dir}/infrastructure/traefik/dynamic.yaml")"
 export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG
 
 # Uma definição antiga do job pode não conhecer os serviços adicionados pela

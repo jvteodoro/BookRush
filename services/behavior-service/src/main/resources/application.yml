@@ -20,7 +20,17 @@ management:
       exposure:
         include: health,info,metrics,prometheus
 bookrush:
+  product-human-clients: ${COMMUNITY_PRODUCT_HUMAN_CLIENTS:bookrush-web,bookrush-mobile}
   security:
+    product-access:
+      enabled: ${COMMUNITY_PRODUCT_ACCESS_ENABLED:false}
+      decision-base-uri: ${COMMUNITY_PRODUCT_ACCESS_ORIGIN:}
+      token-uri: ${COMMUNITY_PRODUCT_ACCESS_TOKEN_URI:}
+      jwk-set-uri: ${COMMUNITY_PRODUCT_ACCESS_JWKS_URI:}
+      workload-issuer: ${COMMUNITY_PRODUCT_ACCESS_WORKLOAD_ISSUER:}
+      client-id: ${COMMUNITY_PRODUCT_ACCESS_CLIENT_ID:}
+      client-secret: ${COMMUNITY_PRODUCT_ACCESS_CLIENT_SECRET:}
+      allow-insecure-http: ${COMMUNITY_PRODUCT_ACCESS_ALLOW_INSECURE_HTTP:false}
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
     issuer: ${BOOKRUSH_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}
     jwk-set-uri: ${BOOKRUSH_SECURITY_JWK_SET_URI:http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
@@ -28,6 +38,7 @@ bookrush:
     s2s-issuer: ${BOOKRUSH_S2S_SECURITY_ISSUER:https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
     s2s-jwk-set-uri: ${BOOKRUSH_S2S_SECURITY_JWK_SET_URI:http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
     s2s-audience: ${BOOKRUSH_S2S_SECURITY_AUDIENCE:bookrush-behavior}
+    operations-client: ${BEHAVIOR_OPERATIONS_CLIENT:bookrush-behavior-operations-s2s}
     s2s-scope: ${BOOKRUSH_S2S_SECURITY_SCOPE:bookrush.behavior.read}
   cors:
     allowed-origins: ${BOOKRUSH_CORS_ALLOWED_ORIGINS:https://bookrush.jteodoro.tec.br,http://localhost:18080}

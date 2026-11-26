@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -23,6 +24,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -39,7 +41,10 @@ public class BookrushSecurityAutoConfiguration {
   @Bean
   @ConditionalOnMissingBean(SecurityFilterChain.class)
   SecurityFilterChain bookrushDefaultSecurity(HttpSecurity http,
-      BookrushJwtAuthenticationConverter converter) throws Exception {
+      BookrushJwtAuthenticationConverter converter, Environment environment) throws Exception {
+    if (environment.getProperty("bookrush.security.product-access.enabled", Boolean.class, false)) {
+      http.cors(Customizer.withDefaults());
+    }
     http
         .csrf(csrf -> csrf.disable())
         .authorizeHttpRequests(auth -> auth

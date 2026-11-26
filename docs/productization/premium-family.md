@@ -1,6 +1,6 @@
 # Premium, família e supervisão parental
 
-[Política etária e de supervisão v1](age-supervision-v1/README.md) detalha as regras de elegibilidade e a revisão jurídica pendente.
+[Política etária e de supervisão v1](age-supervision-v1/README.md) detalha as regras finais do protótipo acadêmico e a revisão necessária para eventual implantação comercial.
 
 Plano de implementação. Baseline da main remota inspecionada em checkout
 isolado: `bd257d74a531f26961c340ef40e50fb7e783ec49`.
@@ -144,8 +144,8 @@ para downloads o evento comprovável e documentar lacunas históricas.
   suspende a família. Expiração conta pela hora do servidor, com cleanup assíncrono.
 - Aos 18, derivar estado por data civil e relógio injetável a cada decisão.
   Encerrar supervisão no instante de corte mesmo com job atrasado; manter
-  vínculo comercial e aplicar política adulta. Fixar timezone e caso de 29/02
-  com aprovação. Revogar concessão por correção de idade e reavaliar direitos.
+  vínculo comercial e aplicar política adulta. O protótipo usa America/Sao_Paulo
+  e 01/03 para 29/02 quando necessário. Reavaliar direitos após correção.
 - Reconciliar webhooks fora de ordem com versão do provedor ou consulta de
   estado autoritativo. Período pago termina pelo relógio mesmo sem webhook.
 - Mudanças simultâneas a operações irreversíveis exigem nova decisão na
@@ -265,7 +265,7 @@ O sistema controla futuras entregas e não recupera arquivos já baixados.
    política restritiva. Preservar migrations e dados; reconciliar outbox e
    assinaturas antes de reativar.
 
-## Pontos de decisão e verificação
+## Revisão para eventual implantação comercial
 
 Produto e Privacidade/Jurídico devem aprovar mercados atendidos, tratamento
 da data autodeclarada e casos que exigem prova, elegibilidade e verificação

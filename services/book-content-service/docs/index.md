@@ -57,3 +57,18 @@ and exception class and returns no storage details. The SeaweedFS single-node
 development runtime reserves 256 volume
 slots because raw, processing, ML and public bucket layouts share one volume
 server; existing volumes are preserved when this limit is increased.
+
+## Distribuição protegida
+
+Em modo protegido, manifests, capítulos, assets, recursos EPUB e metadados
+de leitura exigem `PRODUCT_USE` no content-service. As consultas ao catálogo
+usam o bearer humano já autenticado para que o catálogo aplique a política
+também no acesso direto. Cada serviço usa uma credencial técnica distinta
+ao consultar o avaliador. Os manifests usam links da própria API e deixam
+de persistir novas cópias em `reader-ready/`.
+
+O Readium continua recebendo referências a XHTML e recursos internos da
+publicação. O fallback usa a versão textual atual e entrega HTML escapado.
+O servidor ignora Range em recursos binários do leitor e responde com o
+objeto integral após autorizar. HEAD repete a autorização. Baixar conteúdo
+cria uma cópia que a revogação não consegue recuperar.

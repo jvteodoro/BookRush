@@ -1,7 +1,20 @@
+import {
+  sessionPath,
+  invitationsPath,
+  inviteAddressPath,
+  invitationAction,
+} from "../../../packages/session/session";
+
 const id = (value: string) => encodeURIComponent(value);
 
 /** Central registry for frontend API paths. Keep service ownership visible here. */
 export const apiRoutes = {
+  session: () => sessionPath,
+  family: {
+    invitations: () => invitationsPath,
+    inviteAddress: () => inviteAddressPath,
+    invitationAction,
+  },
   catalog: {
     list: (query = "page=0&size=50") => `/api/v1/books?${query}`,
     book: (bookId: string) => `/api/v1/books/${id(bookId)}`,

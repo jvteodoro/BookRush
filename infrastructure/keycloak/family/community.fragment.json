@@ -1,0 +1,99 @@
+{
+  "clientScopes": [
+    {
+      "name": "bookrush.behavior.operations.read",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "behavior audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "bookrush-behavior",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "bookrush.behavior.rebuild",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "behavior audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "bookrush-behavior",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "bookrush-social-product-access-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "product-access.evaluate"
+      ],
+      "secret": "${SOCIAL_PRODUCT_ACCESS_CLIENT_SECRET}"
+    },
+    {
+      "clientId": "bookrush-reader-profile-product-access-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "product-access.evaluate"
+      ],
+      "secret": "${READER_PROFILE_PRODUCT_ACCESS_CLIENT_SECRET}"
+    },
+    {
+      "clientId": "bookrush-behavior-product-access-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "product-access.evaluate"
+      ],
+      "secret": "${BEHAVIOR_PRODUCT_ACCESS_CLIENT_SECRET}"
+    },
+    {
+      "clientId": "bookrush-behavior-operations-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "bookrush.behavior.operations.read",
+        "bookrush.behavior.rebuild"
+      ],
+      "secret": "${BEHAVIOR_OPERATIONS_CLIENT_SECRET}"
+    }
+  ]
+}

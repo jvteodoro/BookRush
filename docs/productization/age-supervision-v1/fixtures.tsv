@@ -21,3 +21,7 @@ expired_minor	2010-11-24	2026-11-24T03:00:00Z	paid entitlement expired; PRODUCT_
 expired_guardian	2010-11-24	2026-11-24T03:00:00Z	paid entitlement expired; legal grant active; BOOKS_ACCESSED	SUPERVISE_HISTORY:books-accessed	200	—
 other_family	2010-11-24	2026-11-24T03:00:00Z	verified for another minor only	SUPERVISE_HISTORY:books-accessed	403	SUPERVISION_REQUIRED
 decision_down	2010-11-24	2026-11-24T03:00:00Z	required decision unavailable; prior allow exists	PRODUCT_USE	503	DECISION_UNAVAILABLE
+adult_no_automatic_delegation	2008-11-24	2026-11-24T03:00:00Z	adult at cutoff; member but no current delegation	PUBLISH_WRITE	403	DELEGATION_REQUIRED
+scope_window_90_days	2010-11-24	2026-11-24T03:00:00Z	verified exact target; BOOKS_ACCESSED; grant begins before 90d; omit facts beyond 90d	SUPERVISE_HISTORY:books-accessed	200	—
+scope_grant_window	2010-11-24	2026-11-24T03:00:00Z	verified exact target; COMMENTS; grant begins within 90d; omit earlier and moderated comments	SUPERVISE_COMMENTS	200	—
+expired_supervision_scope	2010-11-24	2026-11-24T03:00:00Z	verified exact target; grant expired; historical data retained by owner	SUPERVISE_COMMENTS	403	SUPERVISION_REQUIRED

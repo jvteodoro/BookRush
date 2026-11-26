@@ -155,3 +155,26 @@ O resumo com supressão de amostras pequenas usa a rota separada
 Ela retorna métricas diárias e crescimento em 30 dias; oculta valores quando há
 menos de cinco leitores distintos com leitura no período aplicável. O cliente
 `PublisherBehaviorMetricsClient` usa essa rota.
+
+## Gate de produto e operações
+
+Com `COMMUNITY_PRODUCT_ACCESS_ENABLED=true`, ingestão de eventos e agregados
+próprios exigem `PRODUCT_USE:TELEMETRY`. A ingestão reavalia antes do lote,
+deriva a identidade do JWT com a chave histórica e rejeita campos de identidade
+enviados pelo cliente. A decisão negativa não escreve eventos, outbox ou rejeições.
+
+Agregados globais, dashboard, contagem e diagnóstico são operações do cliente
+de plataforma `bookrush-behavior-operations-s2s`, com audience `bookrush-behavior`
+e scope `bookrush.behavior.operations.read`. A reconstrução usa
+`bookrush.behavior.rebuild`. Os endpoints de recomendação e métricas de publisher
+mantêm seus escopos e audience específicos. O scraper Prometheus e os health
+checks mantêm suas políticas atuais.
+
+Provisione `bookrush-behavior-product-access-s2s` com
+`bookrush-behavior-product-access-s2s=PRODUCT_USE:TELEMETRY` na allowlist do
+avaliador. `KEYCLOAK_COMMUNITY_CLIENTS_ENABLED=true` inclui as credenciais
+de community no reconciliador. Use as variáveis de `.env.example`, configure
+HTTPS e valide os workloads antes de habilitar o gate.
+
+O E2E local dos três serviços usa
+`BOOKRUSH_E2E_COMMUNITY=1 bash scripts/test-premium-family-e2e.sh`.

@@ -117,7 +117,7 @@ replaceParameters(observabilityJob, [
 ])
 def mainScm = new GitSCM(
     [new UserRemoteConfig('https://github.com/jvteodoro/BookRush.git', null, null, null)],
-    [new BranchSpec('*/main')], false, [], null, null, [])
+    [new BranchSpec('*/feature/premium-family')], false, [], null, null, [])
 def mainPipelineDefinition = new CpsScmFlowDefinition(mainScm, 'Jenkinsfile')
 mainPipelineDefinition.setLightweight(false)
 def currentMainDefinition = job.getDefinition()
@@ -126,18 +126,21 @@ def currentMainBranches = currentMainDefinition instanceof CpsScmFlowDefinition
     : []
 if (!(currentMainDefinition instanceof CpsScmFlowDefinition) ||
     currentMainDefinition.getScriptPath() != 'Jenkinsfile' ||
-    currentMainBranches != ['*/main']) {
+    currentMainBranches != ['*/feature/premium-family']) {
     job.setDefinition(mainPipelineDefinition)
     job.save()
 }
 def mainParameters = [
-    new StringParameterDefinition('BRANCH', 'main', 'Branch a compilar e implantar.'),
+    new StringParameterDefinition('BRANCH', 'feature/premium-family', 'Branch a compilar e implantar.'),
     new ChoiceParameterDefinition('DEPLOY_TARGET', ['compose', 'kubernetes'] as String[], 'Destino do deploy.'),
+    new ChoiceParameterDefinition('DEPLOY_ENVIRONMENT', ['demo', 'production'] as String[], 'Ambiente isolado de demonstração ou produção. Demo é o padrão.'),
+    new StringParameterDefinition('DEMO_ENV_CREDENTIAL_ID', 'bookrush-demo-env', 'Credential Secret file com segredos exclusivamente sintéticos da demo.'),
     new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git HTTPS opcional.'),
     new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica imagens.'),
     new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
     new BooleanParameterDefinition('DEPLOY', false, 'Atualizar a aplicação no destino escolhido após o build.'),
     new BooleanParameterDefinition('RUN_INFRA_CONTRACTS', true, 'Executar os contratos de infraestrutura antes de construir as imagens.'),
+    new BooleanParameterDefinition('ANALYTICS_GPU', false, 'Usar runtime CUDA para analytics.'),
     new BooleanParameterDefinition('RUN_ANALYTICS_SAMPLE', false, 'Cancelar jobs analíticos ativos e processar uma amostra controlada de scores.'),
     new StringParameterDefinition('ANALYTICS_SAMPLE_MAX_BOOKS', '4', 'Quantidade máxima de livros no lote controlado de scores.'),
     new ChoiceParameterDefinition('FEED_PERSONALIZED_MODE', ['ON', 'OFF'] as String[], 'Ativar o feed personalizado; ON é o padrão durante a fase de testes.'),
@@ -146,6 +149,10 @@ def mainParameters = [
     new BooleanParameterDefinition('GUTENBERG_DRY_RUN', true, 'Executar a importação Gutenberg em modo dry-run.'),
     new StringParameterDefinition('GUTENBERG_EXTERNAL_IDS', '1342', 'IDs Gutenberg separados por vírgula.'),
     new StringParameterDefinition('INGESTION_BASE_URL', 'https://bookrush.jteodoro.tec.br/ingestion', 'Base externa do gateway para o ingestion-service.'),
+    new StringParameterDefinition('INGESTION_CREDENTIAL_ID', 'bookrush-ingestion-token', 'Credential Jenkins Secret text do operador.'),
+    new BooleanParameterDefinition('RUN_INGESTION_S2S_E2E', false, 'Validar ingestão S2S após deploy de produção.'),
+    new BooleanParameterDefinition('GUTENBERG_PROCESS_ASSETS', true, 'Processar assets junto à importação habilitada.'),
+    new ChoiceParameterDefinition('GUTENBERG_TIMEOUT_MINUTES', ['5', '15', '30', '60'] as String[], 'Tempo máximo de polling da importação.'),
     new StringParameterDefinition('INGESTION_CREDENTIAL_ID', 'bookrush-ingestion-token', 'Credential Jenkins Secret text do operador.'),
     new ChoiceParameterDefinition('GUTENBERG_TIMEOUT_MINUTES', ['5', '15', '30'] as String[], 'Tempo máximo de polling do job Gutenberg.')
 ]

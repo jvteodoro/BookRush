@@ -11,7 +11,17 @@ management:
       exposure:
         include: health,info,metrics,prometheus
 bookrush:
+  content-human-clients: ${CONTENT_PRODUCT_ACCESS_HUMAN_CLIENTS:bookrush-web,bookrush-mobile}
   security:
+    product-access:
+      enabled: ${CONTENT_PRODUCT_ACCESS_ENABLED:false}
+      decision-base-uri: ${CONTENT_PRODUCT_ACCESS_ORIGIN:}
+      token-uri: ${CONTENT_PRODUCT_ACCESS_TOKEN_URI:}
+      jwk-set-uri: ${CONTENT_PRODUCT_ACCESS_JWKS_URI:}
+      workload-issuer: ${CONTENT_PRODUCT_ACCESS_WORKLOAD_ISSUER:}
+      client-id: ${CONTENT_PRODUCT_ACCESS_CLIENT_ID:}
+      client-secret: ${CONTENT_PRODUCT_ACCESS_CLIENT_SECRET:}
+      allow-insecure-http: ${CONTENT_PRODUCT_ACCESS_ALLOW_INSECURE_HTTP:false}
     enabled: ${BOOKRUSH_SECURITY_ENABLED:false}
   catalog-url: ${CATALOG_URL:http://catalog-service:8080}
   catalog-service-token: ${CATALOG_SERVICE_TOKEN:}

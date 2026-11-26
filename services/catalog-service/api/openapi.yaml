@@ -26,81 +26,286 @@ tags:
 paths:
   /api/v1/books/{bookId}/thumbnail:
     get:
-      tags: [Distribuição]
+      tags:
+      - "Distribui\xE7\xE3o"
       summary: Obter thumbnail da capa
-      description: Redireciona para uma URL temporária do thumbnail COVER aprovado.
+      description: "Redireciona para uma URL tempor\xE1ria do thumbnail COVER aprovado."
       operationId: getBookThumbnail
       parameters:
-        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
       responses:
-        '302': {description: Redirecionamento para o objeto público temporário.}
-        '401': {description: "Bearer do usuário ausente, expirado ou inválido."}
-        '404': {description: Livro sem thumbnail aprovado.}
-        '409': {description: Distribuição ainda não autorizada ou objeto inconsistente.}
-      security: [{productUser: []}]
+        '302':
+          description: "Redirecionamento para o objeto p\xFAblico tempor\xE1rio."
+        '401':
+          description: "Bearer do usu\xE1rio ausente, expirado ou inv\xE1lido."
+        '404':
+          description: Livro sem thumbnail aprovado.
+        '409':
+          description: "Distribui\xE7\xE3o ainda n\xE3o autorizada ou objeto inconsistente."
+        '503':
+          description: Current product authorization unavailable
+        '403':
+          description: Product access denied in protected mode
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          headers: &id001
+            Cache-Control:
+              schema:
+                type: string
+              description: private, no-store in protected mode
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+      security:
+      - productBearer: []
+    head:
+      parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+      security:
+      - productBearer: []
+      responses:
+        '302':
+          description: "Redirecionamento para o objeto p\xFAblico tempor\xE1rio."
+        '401':
+          description: "Bearer do usu\xE1rio ausente, expirado ou inv\xE1lido."
+        '404':
+          description: Livro sem thumbnail aprovado.
+        '409':
+          description: "Distribui\xE7\xE3o ainda n\xE3o autorizada ou objeto inconsistente."
+        '503':
+          description: Current product authorization unavailable
+        '403':
+          description: Product access denied in protected mode
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          headers: *id001
   /api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/content:
     get:
-      tags: [Conteúdo reader]
-      summary: Transmitir versão textual exata ao content-service
-      description: Rota interna autenticada pelo token de conteúdo; não expõe URL permanente nem é destinada ao navegador.
+      tags:
+      - "Conte\xFAdo reader"
+      summary: "Transmitir vers\xE3o textual exata ao content-service"
+      description: "Rota interna autenticada pelo token de conte\xFAdo; n\xE3o exp\xF5\
+        e URL permanente nem \xE9 destinada ao navegador."
       operationId: streamTextVersion
       parameters:
-        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
-        - {name: versionId, in: path, required: true, schema: {type: string, format: uuid}}
-        - {name: X-Content-Service-Token, in: header, required: true, schema: {type: string, format: password}}
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Content-Service-Token
+        in: header
+        required: true
+        schema:
+          type: string
+          format: password
       responses:
         '200':
-          description: Texto UTF-8 normalizado da versão aprovada.
+          description: "Texto UTF-8 normalizado da vers\xE3o aprovada."
           content:
             text/plain:
-              schema: {type: string}
-        '401': {description: Token interno ausente ou inválido.}
-        '404': {description: "Livro, asset ou versão não encontrada."}
-        '409': {description: Objeto ausente; reconciliação de storage necessária.}
+              schema:
+                type: string
+        '401':
+          description: "Token interno ausente ou inv\xE1lido."
+        '404':
+          description: "Livro, asset ou vers\xE3o n\xE3o encontrada."
+        '409':
+          description: "Objeto ausente; reconcilia\xE7\xE3o de storage necess\xE1ria."
+        '503':
+          description: Current product authorization unavailable
+        '403':
+          description: Product access denied in protected mode
+      security:
+      - productBearer: []
+    head:
+      parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: "Texto UTF-8 normalizado da vers\xE3o aprovada."
+        '401':
+          description: "Token interno ausente ou inv\xE1lido."
+        '404':
+          description: "Livro, asset ou vers\xE3o n\xE3o encontrada."
+        '409':
+          description: "Objeto ausente; reconcilia\xE7\xE3o de storage necess\xE1ria."
+        '503':
+          description: Current product authorization unavailable
+        '403':
+          description: Product access denied in protected mode
   /api/v1/books/{bookId}/reader-assets/{assetId}/content:
     get:
-      tags: [Conteúdo reader]
+      tags:
+      - "Conte\xFAdo reader"
       summary: Transmitir asset EPUB ao content-service
-      description: Boundary interno autenticado pelo token de conteúdo; o navegador deve usar o manifesto do content-service.
+      description: "Boundary interno autenticado pelo token de conte\xFAdo; o navegador\
+        \ deve usar o manifesto do content-service."
       operationId: streamEpubAsset
       parameters:
-        - {name: bookId, in: path, required: true, schema: {type: string, format: uuid}}
-        - {name: assetId, in: path, required: true, schema: {type: string, format: uuid}}
-        - {name: X-Content-Service-Token, in: header, required: true, schema: {type: string, format: password}}
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Content-Service-Token
+        in: header
+        required: true
+        schema:
+          type: string
+          format: password
       responses:
         '200':
           description: Bytes do EPUB original.
           content:
             application/octet-stream:
-              schema: {type: string, format: binary}
-        '401': {description: Token interno ausente ou inválido.}
-        '404': {description: Livro ou asset EPUB não encontrado.}
-        '409': {description: Objeto ausente; reconciliação de storage necessária.}
-  /api/v1/books:
-    get:
-      tags: [Catálogo público]
-      summary: Listar livros do catálogo
-      description: Consulta pública de metadados bibliográficos com filtros opcionais combinados por AND. Não concede acesso ao conteúdo protegido.
-      operationId: searchPublicBooks
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: "Token interno ausente ou inv\xE1lido."
+        '404':
+          description: "Livro ou asset EPUB n\xE3o encontrado."
+        '409':
+          description: "Objeto ausente; reconcilia\xE7\xE3o de storage necess\xE1ria."
+        '503':
+          description: Current product authorization unavailable
+        '403':
+          description: Product access denied in protected mode
+      security:
+      - productBearer: []
+    head:
       parameters:
-        - name: q
-          in: query
-          required: false
-          schema: {type: string, maxLength: 500}
-          description: Busca livre por título, descrição, autores, categorias literárias ativas.
-        - {name: category, in: query, schema: {type: string, maxLength: 200}, description: Categoria literária ativa; correspondência parcial sem distinguir maiúsculas.}
-        - {name: author, in: query, schema: {type: string, maxLength: 200}, description: Autor creditado como AUTHOR; correspondência parcial.}
-        - {name: year, in: query, schema: {type: integer, minimum: -9999, maximum: 9999, not: {enum: [0]}}, description: Ano apresentado; primeiro ano da obra ou menor ano de edição conhecido.}
-        - {name: page, in: query, required: false, schema: {type: integer, minimum: 0, default: 0}}
-        - {name: size, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+      security:
+      - productBearer: []
       responses:
         '200':
-          description: Página de livros ordenada por relevância, título e ID.
+          description: Bytes do EPUB original.
+        '401':
+          description: "Token interno ausente ou inv\xE1lido."
+        '404':
+          description: "Livro ou asset EPUB n\xE3o encontrado."
+        '409':
+          description: "Objeto ausente; reconcilia\xE7\xE3o de storage necess\xE1ria."
+        '503':
+          description: Current product authorization unavailable
+        '403':
+          description: Product access denied in protected mode
+  /api/v1/books:
+    get:
+      tags:
+      - "Cat\xE1logo p\xFAblico"
+      summary: "Listar livros do cat\xE1logo"
+      description: "Consulta p\xFAblica de metadados bibliogr\xE1ficos com filtros opcionais\
+        \ combinados por AND. N\xE3o concede acesso ao conte\xFAdo protegido."
+      operationId: searchPublicBooks
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 500
+        description: "Busca livre por t\xEDtulo, descri\xE7\xE3o, autores, categorias\
+          \ liter\xE1rias ativas."
+      - name: category
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+        description: "Categoria liter\xE1ria ativa; correspond\xEAncia parcial sem distinguir\
+          \ mai\xFAsculas."
+      - name: author
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+        description: "Autor creditado como AUTHOR; correspond\xEAncia parcial."
+      - name: year
+        in: query
+        schema:
+          type: integer
+          minimum: -9999
+          maximum: 9999
+          not:
+            enum:
+            - 0
+        description: "Ano apresentado; primeiro ano da obra ou menor ano de edi\xE7\xE3\
+          o conhecido."
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - name: size
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      responses:
+        '200':
+          description: "P\xE1gina de livros ordenada por relev\xE2ncia, t\xEDtulo e\
+            \ ID."
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/BookPage'}
-        '400': {description: Filtros ou paginação inválidos.}
-      security: []
+              schema:
+                $ref: '#/components/schemas/BookPage'
+        '400':
+          description: "Filtros ou pagina\xE7\xE3o inv\xE1lidos."
+        '503':
+          description: Current product authorization unavailable
+        '401':
+          description: Missing or invalid product token in protected mode
+        '403':
+          description: Product access denied in protected mode
+      security:
+      - productBearer: []
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: "P\xE1gina de livros ordenada por relev\xE2ncia, t\xEDtulo e\
+            \ ID."
+        '400':
+          description: "Filtros ou pagina\xE7\xE3o inv\xE1lidos."
+        '503':
+          description: Current product authorization unavailable
+        '401':
+          description: Missing or invalid product token in protected mode
+        '403':
+          description: Product access denied in protected mode
   /api/internal/v1/catalog/books:
     get:
       tags: [Catálogo interno]
@@ -573,10 +778,10 @@ paths:
   /api/books/{bookId}/assets/{assetId}/download-url:
     get:
       tags:
-      - Distribuição
-      summary: Gerar URL pública temporária
-      description: Retorna uma URL pré-assinada somente quando o asset está aprovado.
-        O arquivo é baixado diretamente do object storage.
+      - "Distribui\xE7\xE3o"
+      summary: "Gerar URL p\xFAblica tempor\xE1ria"
+      description: "Retorna uma URL pr\xE9-assinada somente quando o asset est\xE1 aprovado.\
+        \ O arquivo \xE9 baixado diretamente do object storage."
       operationId: download
       parameters:
       - name: bookId
@@ -593,11 +798,47 @@ paths:
           format: uuid
       responses:
         '200':
-          description: OK
+          description: Authenticated body or same-origin authenticated link
           content:
-            '*/*':
+            application/json:
               schema:
-                $ref: '#/components/schemas/DownloadLink'
+                type: object
+                required:
+                - url
+                properties:
+                  url:
+                    type: string
+                    format: uri-reference
+                    description: On protected distribution, relative route requiring
+                      a fresh bearer and authorization
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Legacy signed links only
+        '503':
+          description: Current product authorization unavailable
+        '401':
+          description: Missing or invalid product token in protected mode
+        '403':
+          description: Product access denied in protected mode
+      security:
+      - productBearer: []
+    head:
+      parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '503':
+          description: Current product authorization unavailable
+        '401':
+          description: Missing or invalid product token in protected mode
+        '403':
+          description: Product access denied in protected mode
   /api/admin/books/{bookId}/assets/{assetId}:
     get:
       tags:
@@ -714,6 +955,261 @@ paths:
                 type: object
                 additionalProperties:
                   type: string
+  /api/v1/books/{bookId}:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/books/{bookId}/reader-assets:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/books/{bookId}/reader-assets/chapters:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/books/{bookId}/reader-assets/text-versions/{versionId}/download-url:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: versionId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - url
+                properties:
+                  url:
+                    type: string
+                    format: uri-reference
+                    description: On protected distribution, relative route requiring
+                      a fresh bearer and authorization
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Legacy signed links only
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/books/{bookId}/reader-assets/{assetId}/download-url:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - url
+                properties:
+                  url:
+                    type: string
+                    format: uri-reference
+                    description: On protected distribution, relative route requiring
+                      a fresh bearer and authorization
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Legacy signed links only
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/admin/books/{bookId}/assets/{assetId}/content:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - assetAdmin: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              description: private, no-store in protected mode
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
 components:
   schemas:
     BookPage:
@@ -1032,6 +1528,11 @@ components:
         createdAt: {type: string, format: date-time}
         currentStatus: {type: string}
   securitySchemes:
+    productBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Product realm with current PRODUCT_USE when protected distribution is enabled.
     productUser:
       type: http
       description: Bearer JWT do usuário autenticado no realm de produto.

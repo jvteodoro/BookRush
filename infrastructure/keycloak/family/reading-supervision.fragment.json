@@ -1,0 +1,83 @@
+{
+  "bookrush": {
+    "clientScopes": [
+      {
+        "name": "supervision.read",
+        "protocol": "openid-connect",
+        "attributes": {
+          "include.in.token.scope": "true"
+        },
+        "protocolMappers": [
+          {
+            "name": "bookrush-reader-bff",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-audience-mapper",
+            "config": {
+              "included.custom.audience": "bookrush-reader-bff",
+              "access.token.claim": "true",
+              "id.token.claim": "false"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "bookrush-platform": {
+    "clientScopes": [
+      {
+        "name": "supervision.history.read",
+        "protocol": "openid-connect",
+        "attributes": {
+          "include.in.token.scope": "true"
+        },
+        "protocolMappers": [
+          {
+            "name": "bookrush-reader-state-supervision",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-audience-mapper",
+            "config": {
+              "included.custom.audience": "bookrush-reader-state-supervision",
+              "access.token.claim": "true",
+              "id.token.claim": "false"
+            }
+          }
+        ]
+      },
+      {
+        "name": "supervision.comments.read",
+        "protocol": "openid-connect",
+        "attributes": {
+          "include.in.token.scope": "true"
+        },
+        "protocolMappers": [
+          {
+            "name": "bookrush-social-supervision",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-audience-mapper",
+            "config": {
+              "included.custom.audience": "bookrush-social-supervision",
+              "access.token.claim": "true",
+              "id.token.claim": "false"
+            }
+          }
+        ]
+      }
+    ],
+    "client": {
+      "clientId": "bookrush-reader-bff-supervision-s2s",
+      "protocol": "openid-connect",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "supervision.history.read"
+      ],
+      "optionalClientScopes": [
+        "supervision.comments.read"
+      ]
+    }
+  }
+}

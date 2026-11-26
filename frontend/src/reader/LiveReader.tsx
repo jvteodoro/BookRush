@@ -89,6 +89,7 @@ export function LiveReader({
   bookPath,
   userName,
   onLegacy,
+  onLogout,
   initialTab = "feed",
   legacyQuery = "",
 }: {
@@ -96,6 +97,7 @@ export function LiveReader({
   bookPath: string | null;
   userName: string;
   onLegacy: () => void;
+  onLogout?: () => void;
   initialTab?: "feed" | "library" | "search" | "recommendations";
   legacyQuery?: string;
 }) {
@@ -454,6 +456,11 @@ export function LiveReader({
       onNavigate={navigate}
       userName={userName}
     >
+      {tab === "profile" && onLogout && (
+        <button type="button" className="primary-button" onClick={onLogout}>
+          Sair da conta
+        </button>
+      )}
       {seenState.error && (
         <p className="br-seen-warning" role="status">
           {seenState.error}{" "}

@@ -6,7 +6,7 @@ Este pacote especifica a integração futura dos ADRs 0035 e 0036.
 ## Inventário
 
 [Rotas por método, caminho e serviço](routes.tsv) contém 251 mapeamentos Spring
-da baseline, quatorze rotas comerciais implementadas depois dela e cinco
+da baseline, 27 rotas implementadas depois dela e três
 entradas ainda planejadas. O marcador AFTER_BASELINE e o prefixo dev
 identificam os serviços com exposição no gateway local opcional. Cada linha nomeia o
 controller, registra realm, audience e identidade atuais e especifica a ação
@@ -108,10 +108,19 @@ ou maioridade invalidam a elegibilidade mesmo com JWT válido.
 Problemas retornam `status`, `code` e `correlationId`; motivos publicados
 ao cliente podem ser generalizados quando revelariam vínculo ou idade.
 
+## Consumo Spring MVC
+
+O [guia do starter](../../../platform/docs/product-access.md) descreve a
+classificação explícita por método e handler, a integração com chains
+customizadas e a reavaliação de operações sensíveis. A implementação no
+[family-service](../../../services/family-service/docs/index.md) inclui a
+allowlist de pares ação/recurso por cliente e os seletores de operação
+comercial. O teste E2E usa consumidor descartável e a rota canônica real.
+
 ## Verificação do contrato
 
 Execute `python3 scripts/tests/test_product_access_contract.py` com
-`jsonschema` disponível. O teste confronta o conjunto literal
+`jsonschema` e `PyYAML` disponíveis. O teste confronta o conjunto literal
 método/caminho/serviço dos controllers com o TSV e executa os vetores de
 política ligados a rotas reais ou planejadas. Também valida schemas de
 requisição, decisão e erro. Para comparar com a revisão isolada da main,

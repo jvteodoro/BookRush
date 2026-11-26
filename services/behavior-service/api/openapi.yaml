@@ -159,8 +159,162 @@ paths:
         '400': { description: Days outside 1..366 }
         '401': { description: Missing or invalid S2S token }
         '403': { description: Missing S2S scope or audience }
+  /api/v1/behavior/aggregates:
+    get:
+      security:
+      - behaviorOperationsBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+      description: Requires bookrush.behavior.operations.read from the explicit operations
+        client.
+  /api/v1/behavior/aggregates/books/{bookId}:
+    get:
+      parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      security:
+      - behaviorOperationsBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+      description: Requires bookrush.behavior.operations.read from the explicit operations
+        client.
+  /api/v1/behavior/aggregates/dashboard:
+    get:
+      security:
+      - behaviorOperationsBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+      description: Requires bookrush.behavior.operations.read from the explicit operations
+        client.
+  /api/v1/behavior/aggregates/me:
+    get:
+      security:
+      - behaviorProductBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+  /api/v1/behavior/events/count:
+    get:
+      security:
+      - behaviorOperationsBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+      description: Requires bookrush.behavior.operations.read from the explicit operations
+        client.
+  /api/v1/behavior/operations/metrics:
+    get:
+      security:
+      - behaviorOperationsBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+      description: Requires bookrush.behavior.operations.read from the explicit operations
+        client.
+  /api/v1/behavior/aggregates/rebuild:
+    post:
+      security:
+      - behaviorOperationsBearer: []
+      responses:
+        '200':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+      description: Requires bookrush.behavior.rebuild from the explicit operations client.
+  /api/v1/behavior/events:
+    post:
+      security:
+      - behaviorProductBearer: []
+      responses:
+        '202':
+          description: Operation completed
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Insufficient authorization
+        '503':
+          description: Current product authorization or required facts unavailable
+      description: Identity is derived from the JWT. Supplied identity fields are rejected
+        when the gate is enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - events
+              properties:
+                events:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required:
+                    - eventKey
+                    - eventType
+                    - occurredAt
+                    properties:
+                      eventKey:
+                        type: string
+                      eventType:
+                        type: string
+                      occurredAt:
+                        type: string
+                        format: date-time
+                      bookId:
+                        type: string
+                        format: uuid
+                      payload:
+                        type: object
+                        additionalProperties: true
 components:
   securitySchemes:
+    behaviorProductBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Product JWT and PRODUCT_USE.
+    behaviorOperationsBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Platform JWT, bookrush-behavior audience, operations client and dedicated scope.
     behaviorSignalsS2S:
       type: http
       scheme: bearer

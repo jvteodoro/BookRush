@@ -35,7 +35,7 @@ class AssetSecurityCorsTest {
     for (String path : List.of("/api/v1/books", "/api/v1/books/book-id")) {
       var metadata = source.getCorsConfiguration(new MockHttpServletRequest("OPTIONS", path));
       assertThat(metadata).isNotNull();
-      assertThat(metadata.getAllowedMethods()).containsExactly("GET", "OPTIONS");
+      assertThat(metadata.getAllowedMethods()).containsExactly("GET", "HEAD", "OPTIONS");
       assertThat(metadata.getAllowedOrigins()).containsExactlyElementsOf(admin.getAllowedOrigins());
       assertThat(metadata.getAllowCredentials()).isFalse();
     }

@@ -1,0 +1,311 @@
+openapi: 3.0.3
+info:
+  title: BookRush authenticated book content
+  version: 1.0.0
+paths:
+  /api/v1/content/books/{bookId}:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/content/books/{bookId}/assets:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/content/books/{bookId}/assets/{assetId}/download-url:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - url
+                properties:
+                  url:
+                    type: string
+                    format: uri-reference
+                    description: On protected distribution, relative route requiring
+                      a fresh bearer and authorization
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: Legacy signed links only
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/content/books/{bookId}/chapters:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/content/books/{bookId}/chapters/{chapterId}/content:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: chapterId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          headers: &id001
+            Cache-Control:
+              schema:
+                type: string
+              description: private, no-store in protected mode
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          headers: *id001
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/content/books/{bookId}/publication.json:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+  /api/v1/content/books/{bookId}/resources/{resource}:
+    parameters:
+    - name: bookId
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: resource
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          headers: &id002
+            Cache-Control:
+              schema:
+                type: string
+              description: private, no-store in protected mode
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+    head:
+      security:
+      - productBearer: []
+      responses:
+        '200':
+          description: Authenticated body or same-origin authenticated link
+          headers: *id002
+        '401':
+          description: Missing or invalid bearer
+        '403':
+          description: Access denied
+        '404':
+          description: Resource not available
+        '503':
+          description: Current product authorization unavailable
+components:
+  securitySchemes:
+    productBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: BookRush product realm and current PRODUCT_USE when enabled.

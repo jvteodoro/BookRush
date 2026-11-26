@@ -50,7 +50,6 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "defaultClientScopes": [
-        "basic",
         "entitlements.evaluate"
       ],
       "secret": "${SUBSCRIPTION_FAMILY_CLIENT_SECRET}"
@@ -65,7 +64,6 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "defaultClientScopes": [
-        "basic",
         "subscription.transitions.write"
       ],
       "secret": "${SUBSCRIPTION_BILLING_CLIENT_SECRET}"

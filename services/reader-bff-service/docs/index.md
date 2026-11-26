@@ -91,3 +91,60 @@ encaminhamento, bearer, resposta vazia da exclus?o e preserva??o de 404.
 O construtor de produção do controller é selecionado explicitamente pelo
 Spring para manter as URLs upstream injetadas no container. O endpoint
 `/actuator/health` permanece disponível para o healthcheck do Compose.
+
+
+## Histórico supervisionado
+
+`GET /api/v1/reader/supervision/{memberId}/history` exige JWT de produto com
+audience `bookrush-reader-bff` e scope `supervision.read` (solicitado pelo cliente
+OIDC). `memberId` é o UUID da concessão em
+`GET /api/v1/family/supervision/me`; continua válido como seletor quando o
+responsável está fora da família comercial. Informe `scope=BOOKS_ACCESSED` ou
+`scope=READING_ACTIVITY`. O retorno é `{scope,items,nextCursor}`, com até 50
+itens. Use somente o cursor fornecido pelo servidor. Respostas têm
+`Cache-Control: no-store`. Os status 401, 403, 404 e 503 são preservados.
+
+Habilite `KEYCLOAK_READING_SUPERVISION_ENABLED`,
+`READER_STATE_SUPERVISION_ENABLED` e `READER_BFF_SUPERVISION_ENABLED` em conjunto.
+Configure a URL de token e o segredo do BFF e acrescente
+`SUPERVISE_HISTORY:READING_HISTORY` à allowlist do workload
+`bookrush-reader-state-s2s` no family-service. Em redes isoladas de teste,
+`READER_BFF_SUPERVISION_ALLOW_INSECURE_HTTP` permite HTTP interno. Use
+`BOOKRUSH_E2E_READER_STATE=1 bash scripts/test-premium-family-e2e.sh` para o
+fluxo com serviços reais e dados descartáveis.
+
+
+A rota `GET /api/v1/reader/supervision/{memberId}/comments` usa o mesmo JWT
+humano, correlação, limite e cursor do histórico. O escopo COMMENTS é fixo e
+a autorização é avaliada pelo social. O BFF solicita o scope técnico
+`supervision.comments.read` e retorna só os campos da projeção.
+
+## Bootstrap da sessão de leitura
+
+`GET /api/v1/session` recebe o JWT de produto de web ou mobile, com audience
+`bookrush-reader-bff` e scope `session.view`. O BFF usa o starter e o workload
+`bookrush-reader-bff-session-s2s` para pedir ao avaliador canônico as decisões
+SESSION_VIEW e PRODUCT_USE separadamente. O JWT do usuário fica no BFF.
+O snapshot inclui nome de usuário, estado, motivo da restrição, capabilities e
+`validUntil`. A resposta tem `Cache-Control: no-store`.
+
+| Estado | Acesso |
+|---|---|
+| ADULT_ELIGIBLE | Produto gratuito. |
+| MINOR_AUTHORIZED | Produto enquanto vínculo, Premium do titular e concessão estiverem válidos. |
+| MINOR_AWAITING_AUTHORIZATION | Sessão mínima, com benefício familiar ativo e autorização pendente. |
+| MINOR_FAMILY_INACTIVE | Sessão mínima, com vínculo ausente, suspenso ou benefício inativo. |
+| AGE_PROFILE_INCOMPLETE | Sessão mínima, com orientação a operador. |
+| SUSPENDED | Somente status da conta, sem capabilities. |
+
+INVITE_SELF depende também do scope `family.invites` e da audience
+`bookrush-family`. Publicação e administração familiar não são oferecidas
+por este snapshot. A validade é limitada a 60 segundos, à próxima transição
+conhecida ou à expiração do token. Operações protegidas continuam avaliando
+fatos atuais nos serviços proprietários. 401 indica autenticação inválida,
+403 indica cliente ou scope sem permissão, e 503 indica falha temporária.
+
+Antes de publicar os clientes, configure `KEYCLOAK_SESSION_BOOTSTRAP_ENABLED`
+e `READER_BFF_SESSION_ENABLED`, com as URLs internas, issuer e credencial S2S
+de `READER_BFF_SESSION_*`. Confira o preflight e o GET pelo gateway. Clientes
+com tokens emitidos sem os scopes precisam autenticar novamente.

@@ -2,6 +2,7 @@ package com.bookrush.behaviorservice.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.bookrush.behaviorservice.BehaviorMaintenance;
+import com.bookrush.behaviorservice.BehaviorOperationsPolicy;
 import com.bookrush.platform.core.TechnicalIdentity;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -23,6 +24,12 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 public class BehaviorController {
   private final JdbcTemplate jdbc;
   private final BehaviorMaintenance maintenance;
+
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.bookrush.platform.security.ProductAccessAuthorization productAccess;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private BehaviorOperationsPolicy operations;
+
   public BehaviorController(JdbcTemplate jdbc, BehaviorMaintenance maintenance) {
     this.jdbc = jdbc;
     this.maintenance = maintenance;
@@ -48,6 +55,16 @@ public class BehaviorController {
     if (batch.events()==null || batch.events().size()>100) return ResponseEntity.badRequest().body(Map.of("error","batch must contain between 1 and 100 events"));
     String subject = identitySubject(principal);
     if (subject == null || subject.isBlank()) return ResponseEntity.status(401).body(Map.of("error","authentication required"));
+    if (productAccess != null && batch.events().stream().anyMatch(e -> e == null || e.issuer() != null || e.subject() != null
+        || (e.payload() != null && (e.payload().has("issuer") || e.payload().has("subject")
+            || e.payload().has("identityIssuer") || e.payload().has("identitySubject"))))) {
+      return ResponseEntity.badRequest().body(Map.of("error", "event identity comes from authentication"));
+    }
+    if (productAccess != null) {
+      var attributes = (org.springframework.web.context.request.ServletRequestAttributes)
+          org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes();
+      productAccess.recheck(attributes.getRequest());
+    }
     for (Event e: batch.events()) {
       String payload = e.payload()==null?"{}":e.payload().toString();
       try {
@@ -83,6 +100,7 @@ public class BehaviorController {
   }
   @PostMapping("/aggregates/rebuild")
   public Map<String, Object> rebuild() {
+    if (operations != null) operations.require(BehaviorOperationsPolicy.REBUILD);
     maintenance.rebuildNow();
     return Map.of("rebuilt", true);
   }
@@ -90,6 +108,7 @@ public class BehaviorController {
 
   @GetMapping("/aggregates")
   public Object aggregates() {
+    if (operations != null) operations.require(BehaviorOperationsPolicy.READ);
     return jdbc.queryForList("""
         SELECT day, book_id, impressions, opens, likes, reads, shares, comments
         FROM behavior.daily_book ORDER BY day DESC LIMIT 500
@@ -97,12 +116,14 @@ public class BehaviorController {
   }
   @GetMapping("/aggregates/books/{bookId}")
   public Object bookAggregates(@PathVariable UUID bookId) {
+    if (operations != null) operations.require(BehaviorOperationsPolicy.READ);
     return jdbc.queryForList("SELECT day, book_id, impressions, opens, likes, reads, shares, comments FROM behavior.daily_book WHERE book_id=? ORDER BY day DESC LIMIT 365", bookId);
   }
 
   @GetMapping("/aggregates/dashboard")
   public Map<String, Object> dashboardAggregates(
       @RequestParam(defaultValue = "30") int days) {
+    if (operations != null) operations.require(BehaviorOperationsPolicy.READ);
     int window = Math.max(1, Math.min(days, 365));
     var rows = jdbc.queryForList("""
         SELECT day, sum(impressions) impressions, sum(opens) opens, sum(likes) likes,
@@ -127,10 +148,12 @@ public class BehaviorController {
   }
  @GetMapping("/events/count")
   public Map<String, Object> count() {
+    if (operations != null) operations.require(BehaviorOperationsPolicy.READ);
     return Map.of("events", jdbc.queryForObject("select count(*) from behavior.events", Long.class));
   }
   @GetMapping("/operations/metrics")
   public Map<String, Object> operationsMetrics() {
+    if (operations != null) operations.require(BehaviorOperationsPolicy.READ);
     return maintenance.snapshot();
   }
 }

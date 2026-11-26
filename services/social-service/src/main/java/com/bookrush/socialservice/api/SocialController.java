@@ -38,6 +38,8 @@ public class SocialController {
   private final JdbcTemplate jdbc;
   private final RestClient profiles;
   private final BehaviorEventPublisher behavior;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.bookrush.platform.security.ProductAccessAuthorization productAccess;
 
   public SocialController(JdbcTemplate jdbc,
       BehaviorEventPublisher behavior,
@@ -45,6 +47,11 @@ public class SocialController {
     this.jdbc = jdbc;
     this.behavior = behavior;
     this.profiles = RestClient.builder().baseUrl(profileUrl).build();
+  }
+
+  static HttpServletRequest currentRequest() {
+    return ((org.springframework.web.context.request.ServletRequestAttributes)
+        org.springframework.web.context.request.RequestContextHolder.currentRequestAttributes()).getRequest();
   }
 
   private String subject(Principal principal) {
@@ -82,7 +89,17 @@ public class SocialController {
     }
   }
 
+  @org.springframework.beans.factory.annotation.Value("${bookrush.social.admin-issuer}")
+  private String moderationIssuer;
+  @org.springframework.beans.factory.annotation.Value("${bookrush.social.admin-audience}")
+  private String moderationAudience;
+
   private void requireOperator(Authentication authentication) {
+    if (productAccess != null && (!(authentication instanceof JwtAuthenticationToken jwt)
+        || !moderationIssuer.equals(jwt.getToken().getClaimAsString("iss"))
+        || jwt.getToken().getAudience() == null || !jwt.getToken().getAudience().contains(moderationAudience))) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN, "platform moderator required");
+    }
     if (authentication == null || authentication.getAuthorities().stream()
         .noneMatch(a -> a.getAuthority().equals("ROLE_platform-admins")
             || a.getAuthority().equals("ROLE_operators")
@@ -163,11 +180,23 @@ public class SocialController {
         Boolean.class, viewer, target));
     boolean visible = true;
     if (!viewer.equals(target)) {
+      String lookup = target;
+      if (productAccess != null && principal instanceof JwtAuthenticationToken jwt) {
+        String issuer = jwt.getToken().getIssuer().toString();
+        String prefix = "TechnicalIdentity[issuer=" + issuer + ", subject=";
+        String candidate = target.startsWith(prefix) && target.endsWith("]")
+            ? target.substring(prefix.length(), target.length() - 1) : target;
+        if (!candidate.matches("[a-zA-Z0-9._:@-]{1,256}")
+            || !productAccess.discoverableProfiles(currentRequest(), Set.of(candidate)).contains(candidate)) {
+          throw new ResponseStatusException(HttpStatus.NOT_FOUND, "profile not found");
+        }
+        lookup = new com.bookrush.platform.core.TechnicalIdentity(issuer, candidate).toString();
+      }
       var profiles = jdbc.queryForList("SELECT p.is_public, COALESCE(v.profile_visibility, "
           + "CASE WHEN p.is_public THEN 'PUBLIC' ELSE 'PRIVATE' END) AS profile_visibility, "
           + "COALESCE(v.social_graph_visibility, 'PUBLIC') AS social_graph_visibility "
           + "FROM reader_profile.profile p LEFT JOIN reader_profile.profile_privacy v "
-          + "ON v.subject_key=p.subject_key WHERE p.subject_key=?", target);
+          + "ON v.subject_key=p.subject_key WHERE p.subject_key=?", lookup);
       if (profiles.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "profile not found");
       var profile = profiles.getFirst();
       visible = visibleTo(profile.get("profile_visibility"), following)
@@ -210,6 +239,7 @@ public class SocialController {
       }
     }
     UUID id = UUID.randomUUID();
+    if (productAccess != null) productAccess.recheck(request);
     jdbc.update("INSERT INTO social.reports(id, reporter, book_id, comment_id, reason) "
         + "VALUES (?, ?, ?, ?, ?)", id, subject(principal), report.bookId(), report.commentId(),
         report.reason());
@@ -263,6 +293,7 @@ public class SocialController {
       }
     }
     String author = profileDisplayName(identity, request);
+    if (productAccess != null) productAccess.recheck(request);
     jdbc.update("INSERT INTO social.comments(id, subject_key, author_display_name, book_id, body, parent_comment_id) "
         + "VALUES (?, ?, ?, ?, ?, ?)", id, identity, author == null ? displayName(principal) : author, bookId,
         comment.body(), comment.parentCommentId());
@@ -276,11 +307,14 @@ public class SocialController {
     return result;
   }
 
+  static final String COMMENT_AVAILABLE =
+      "c.author_deleted_at IS NULL AND COALESCE(m.visibility, 'VISIBLE') = 'VISIBLE'";
+
   @GetMapping("/books/{bookId}/comments")
   public Object comments(@PathVariable UUID bookId, HttpServletRequest request, Principal principal,
       @RequestParam(defaultValue = "false") boolean includeUnavailable) {
     var rows = jdbc.queryForList("SELECT c.id, c.parent_comment_id, c.subject_key, c.author_display_name, c.body, c.created_at, "
-        + "(c.author_deleted_at IS NULL AND COALESCE(m.visibility, 'VISIBLE') = 'VISIBLE') AS available "
+        + "(" + COMMENT_AVAILABLE + ") AS available "
         + "FROM social.comments c LEFT JOIN social.comment_moderation_state m ON m.comment_id=c.id "
         + "WHERE c.book_id = ? ORDER BY c.created_at, c.id", bookId);
     Map<Object, Map<String, Object>> byId = new HashMap<>();
@@ -330,6 +364,7 @@ public class SocialController {
     if (!owner.equals(rows.get(0).get("subject_key"))) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only the author can remove this comment");
     }
+    if (productAccess != null) productAccess.recheck(currentRequest());
     // Idempotent: never overwrite the original deletion timestamp or moderation.
     jdbc.update("UPDATE social.comments SET author_deleted_at=clock_timestamp() "
         + "WHERE id=? AND subject_key=? AND author_deleted_at IS NULL", commentId, owner);
