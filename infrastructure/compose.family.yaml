@@ -25,6 +25,7 @@ services:
       BOOKRUSH_ENVIRONMENT: ${BOOKRUSH_ENVIRONMENT:-unknown}
       FAMILY_SUPERVISION_SIMULATION: ${FAMILY_SUPERVISION_SIMULATION:-false}
       FAMILY_CORS_ORIGINS: ${FAMILY_CORS_ORIGINS:-}
+    networks: [bookrush]
     profiles: [family]
     depends_on:
       postgres:
@@ -43,6 +44,7 @@ services:
     volumes:
       - ../infrastructure/traefik/family.yaml:/etc/traefik/family.yaml:ro
     ports: ["127.0.0.1:18103:8080"]
+    networks: [bookrush]
     profiles: [family]
     depends_on:
       family-service:

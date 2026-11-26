@@ -656,3 +656,7 @@ Para atualizar o ambiente de testes existente, use `DEPLOY_ENVIRONMENT=productio
 O job inclui os overlays de subscription e family no projeto `bookrush` e
 verifica as credenciais de banco e S2S em `/run/bookrush.env` antes de
 reconciliar o Keycloak. Os gateways dos overlays não são iniciados.
+
+Família e Assinatura usam a rede `bookrush` dos serviços principais. Isso
+mantém acessíveis os nomes internos `postgres`, `keycloak` e
+`subscription-service` durante a implantação.
