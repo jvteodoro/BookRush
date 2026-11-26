@@ -651,3 +651,8 @@ para as portas locais. A validação visual cobre OIDC de adulto gratuito e a
 sessão restrita de menor sintético. Fluxos comerciais/supervisão adicionais
 seguem cobertos pela suíte E2E integrada e por APIs; isso não significa que um
 dashboard parental completo esteja disponível.
+
+Para atualizar o ambiente de testes existente, use `DEPLOY_ENVIRONMENT=production`.
+O job inclui os overlays de subscription e family no projeto `bookrush` e
+verifica as credenciais de banco e S2S em `/run/bookrush.env` antes de
+reconciliar o Keycloak. Os gateways dos overlays não são iniciados.

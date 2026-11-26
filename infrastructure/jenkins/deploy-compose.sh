@@ -73,7 +73,7 @@ fi
 : "${ADMIN_SERVICE_IMAGE:?Imagem admin-service ausente}"
 : "${ADMIN_WEB_IMAGE:?Imagem admin-web ausente}"
 : "${BEHAVIOR_IMAGE:?Imagem behavior ausente}"
-compose=(docker compose --project-name bookrush -f /opt/bookrush/compose.yaml -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --env-file "$mode_env_file" --profile auth)
+compose=(docker compose --project-name bookrush -f "$repo_dir/infrastructure/compose.yaml" -f "$repo_dir/infrastructure/compose.subscription.yaml" -f "$repo_dir/infrastructure/compose.family.yaml" -f "${script_dir}/deploy-images.compose.yaml" --env-file /run/bookrush.env --env-file "$mode_env_file" --profile auth --profile subscription --profile family)
 if [[ "${ANALYTICS_GPU:-false}" == "true" ]]; then
   compose+=( -f "${script_dir}/../compose.analytics-gpu.yaml" )
   export ANALYTICS_NLI_ENABLED=true
@@ -113,9 +113,9 @@ fi
 # Não inicie uma recriação parcial se a pipeline não entregou todas as imagens.
 # Este preflight também detecta builds feitos em um daemon diferente do deploy.
 missing_images=false
-for variable in BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE BEHAVIOR_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
-  if ! docker image inspect "${!variable}" >/dev/null 2>&1; then
-    echo "Imagem de deploy ausente no daemon: $variable=${!variable}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
+for variable in FAMILY_IMAGE SUBSCRIPTION_IMAGE PUBLISHER_IMAGE BOOK_CONTENT_IMAGE KEYCLOAK_IMAGE BACKEND_IMAGE FRONTEND_IMAGE INGESTION_IMAGE ANALYTICS_IMAGE ANALYTICS_RUNTIME_IMAGE BEHAVIOR_IMAGE RECOMMENDATION_IMAGE READER_BFF_IMAGE READER_STATE_IMAGE READER_PROFILE_IMAGE SOCIAL_IMAGE ADMIN_SERVICE_IMAGE ADMIN_WEB_IMAGE; do
+  if ! docker image inspect "${!variable:-}" >/dev/null 2>&1; then
+    echo "Imagem de deploy ausente no daemon: $variable=${!variable:-ausente}. Verifique a etapa Imagens e o daemon Docker do agente." >&2
     missing_images=true
   fi
 done
@@ -156,7 +156,17 @@ diagnose() {
     fi
   done
 }
-compose_services=(reverse-proxy catalog-service book-ingestion-service book-content-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
+premium_services=(book-content-service publisher-service subscription-service family-service)
+declare -A previous_premium_images=()
+rollback_services=(reverse-proxy catalog-service book-ingestion-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
+for service in "${premium_services[@]}"; do
+  image="$(docker inspect --format '{{.Config.Image}}' "bookrush-$service-1" 2>/dev/null || true)"
+  if [[ -n "$image" ]]; then
+    previous_premium_images["$service"]="$image"
+    rollback_services+=("$service")
+  fi
+done
+compose_services=(subscription-service family-service publisher-service reverse-proxy catalog-service book-ingestion-service book-content-service book-analytics-runtime book-analytics-service behavior-service recommendation-service reader-bff-service reader-state-service reader-profile-service social-service admin-service admin-web frontend)
 report_release_events() {
   local event_type="$1" status="$2" use_previous="${3:-false}"
   [[ -n "${JENKINS_RELEASE_REPORTING_CLIENT_SECRET:-}" ]] || return 0
@@ -416,7 +426,12 @@ rollback() {
     export BOOKRUSH_TRAEFIK_DYNAMIC_CONFIG
   fi
   if [[ -n "$old_backend" && -n "$old_frontend" && -n "$old_ingestion" && -n "$old_analytics" && -n "$old_analytics_runtime" && -n "$old_behavior" && -n "$old_recommendation" && -n "$old_reader_bff" && -n "$old_reader_state" && -n "$old_reader_profile" && -n "$old_social" && -n "$old_admin_service" && -n "$old_admin_web" ]]; then
-    BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${compose_services[@]}" || return $?
+    for service in "${premium_services[@]}"; do
+      if [[ -z "${previous_premium_images[$service]:-}" ]]; then
+        "${compose[@]}" stop "$service" || return $?
+      fi
+    done
+    FAMILY_IMAGE="${previous_premium_images[family-service]:-$FAMILY_IMAGE}" SUBSCRIPTION_IMAGE="${previous_premium_images[subscription-service]:-$SUBSCRIPTION_IMAGE}" PUBLISHER_IMAGE="${previous_premium_images[publisher-service]:-$PUBLISHER_IMAGE}" BOOK_CONTENT_IMAGE="${previous_premium_images[book-content-service]:-$BOOK_CONTENT_IMAGE}" BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" INGESTION_IMAGE="$old_ingestion" ANALYTICS_IMAGE="$old_analytics" ANALYTICS_RUNTIME_IMAGE="$old_analytics_runtime" BEHAVIOR_IMAGE="$old_behavior" RECOMMENDATION_IMAGE="$old_recommendation" READER_BFF_IMAGE="$old_reader_bff" READER_STATE_IMAGE="$old_reader_state" READER_PROFILE_IMAGE="$old_reader_profile" SOCIAL_IMAGE="$old_social" ADMIN_SERVICE_IMAGE="$old_admin_service" ADMIN_WEB_IMAGE="$old_admin_web" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 "${rollback_services[@]}" || return $?
     rollback_status=SUCCESS
   elif [[ -n "$old_backend" && -n "$old_frontend" ]]; then
     BACKEND_IMAGE="$old_backend" FRONTEND_IMAGE="$old_frontend" "${compose[@]}" up -d --no-build --no-deps --force-recreate --wait --wait-timeout 180 reverse-proxy catalog-service frontend || return $?

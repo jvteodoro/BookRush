@@ -4,7 +4,7 @@ pipeline {
   parameters {
     string(name: 'BRANCH', defaultValue: 'feature/premium-family', description: 'Branch a compilar e implantar.')
     choice(name: 'DEPLOY_TARGET', choices: ['compose', 'kubernetes'], description: 'Destino do deploy.')
-    choice(name: 'DEPLOY_ENVIRONMENT', choices: ['demo', 'production'], description: 'Compose isolado de demonstração por padrão; produção exige seleção explícita.')
+    choice(name: 'DEPLOY_ENVIRONMENT', choices: ['production', 'demo'], description: 'Ambiente Compose existente por padrão.')
     string(name: 'DEMO_ENV_CREDENTIAL_ID', defaultValue: '', description: 'Credential Jenkins Secret file com ambiente isolado, URLs localhost e segredos sintéticos da demonstração.')
     string(name: 'GIT_CREDENTIAL_ID', defaultValue: '', description: 'Credential Git opcional para repositório privado (HTTPS).')
     string(name: 'REGISTRY', defaultValue: '', description: 'Registry sem barra final. Vazio: não publica imagens.')
@@ -186,7 +186,7 @@ pipeline {
       steps {
         script {
           withCredentials([string(credentialsId: params.INGESTION_CREDENTIAL_ID, variable: 'INGESTION_ADMIN_CLIENT_SECRET')]) {
-            sh '''
+            sh '''#!/usr/bin/env bash
           set -euo pipefail
           # Jenkins launches shell steps with xtrace enabled. Disable it before
           # sourcing the protected runtime file so credentials never enter the
@@ -195,6 +195,12 @@ pipeline {
           set -a
           . /run/bookrush.env
           set +a
+          for key in FAMILY_DB_USERNAME FAMILY_DB_PASSWORD SUBSCRIPTION_DB_USERNAME SUBSCRIPTION_DB_PASSWORD SUBSCRIPTION_FAMILY_CLIENT_SECRET FAMILY_IDENTITY_CLIENT_SECRET; do
+            if [[ -z "${!key:-}" ]]; then
+              printf 'Configuração de produção ausente: %s\n' "$key" >&2
+              exit 2
+            fi
+          done
           set -x
           bash scripts/reconcile-keycloak-agent.sh
             '''

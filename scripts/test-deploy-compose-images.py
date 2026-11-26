@@ -72,7 +72,9 @@ exit 99
                        MISSING_IMAGE=missing_image,
                        BACKEND_IMAGE=backend or 'registry.example:5000/team/bookrush/catalog-service:42-abcdef0',
                        FRONTEND_IMAGE='registry.example:5000/team/bookrush/frontend:42-abcdef0',
-                       INGESTION_IMAGE='test/ingestion:42', ANALYTICS_IMAGE='registry.example:5000/team/bookrush/book-analytics-service:42-abcdef0',
+                       FAMILY_IMAGE='test/family:42', SUBSCRIPTION_IMAGE='test/subscription:42',
+                       PUBLISHER_IMAGE='test/publisher:42', BOOK_CONTENT_IMAGE='test/content:42',
+                       KEYCLOAK_IMAGE='test/keycloak:42', INGESTION_IMAGE='test/ingestion:42', ANALYTICS_IMAGE='registry.example:5000/team/bookrush/book-analytics-service:42-abcdef0',
                        ADMIN_SERVICE_IMAGE='test/admin:42', ADMIN_WEB_IMAGE='test/admin-web:42')
             if explicit:
                 env['ANALYTICS_RUNTIME_IMAGE'] = 'custom/runtime:selected'
