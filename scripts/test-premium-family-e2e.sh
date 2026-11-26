@@ -163,10 +163,11 @@ if [[ ${BOOKRUSH_E2E_CONTENT:-0} == 1 ]]; then
     docker run --rm --network "$run" --entrypoint curl curlimages/curl:8.10.1 \
       --fail --silent --show-error --aws-sigv4 'aws:amz:us-east-1:s3' -u content-fixture:content-fixture-only \
       -X PUT "http://seaweedfs:8333/$bucket"
-    docker run --rm --network "$run" --entrypoint curl \
-      --mount "type=bind,src=$tmp/$file,dst=/fixture,readonly" curlimages/curl:8.10.1 \
+    create "upload-$bucket" --entrypoint curl curlimages/curl:8.10.1 \
       --fail --silent --show-error --aws-sigv4 'aws:amz:us-east-1:s3' -u content-fixture:content-fixture-only \
       --upload-file /fixture "http://seaweedfs:8333/$bucket/$file"
+    docker cp "$tmp/$file" "$run-upload-$bucket:/fixture"
+    docker start -a "$run-upload-$bucket"
   done
   product_issuer=http://keycloak:8080/realms/bookrush
   authorize_content=(--bookrush.security.product-access.enabled=true --bookrush.security.product-access.allow-insecure-http=true
