@@ -4,7 +4,9 @@ set -Eeuo pipefail
 : "${E2E_BASE_URL:?E2E_BASE_URL is required}"
 : "${E2E_OIDC_USERNAME:?E2E_OIDC_USERNAME is required}"
 : "${E2E_OIDC_PASSWORD:?E2E_OIDC_PASSWORD is required}"
-: "${E2E_BOOK_ID:?E2E_BOOK_ID is required}"
+if [[ "${E2E_PREMIUM_READ_ONLY:-false}" != true ]]; then
+  : "${E2E_BOOK_ID:?E2E_BOOK_ID is required}"
+fi
 
 base_url="${E2E_BASE_URL%/}"
 authority="${E2E_OIDC_AUTHORITY:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush}"
@@ -198,6 +200,17 @@ if int(claims.get('exp', 0)) <= int(time.time()):
 print('oidc_refresh=valid')
 PY
 access_token="$refreshed_access_token"
+
+if [[ "${E2E_PREMIUM_READ_ONLY:-false}" == true ]]; then
+  for path in /api/v1/subscription/me /api/v1/subscription/me/entitlements /api/v1/family/invitations/me; do
+    status=$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' \
+      -H "Authorization: Bearer $access_token" "$base_url$path")
+    printf 'Smoke Premium/Família: %s HTTP %s\n' "$path" "$status"
+    [[ "$status" == 200 ]] || exit 1
+  done
+  exit 0
+fi
+
 
 echo '[3/5] composição autenticada do reader BFF'
 auth_header="Authorization: Bearer $access_token"

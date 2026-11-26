@@ -337,6 +337,15 @@ pipeline {
       }
     }
 
+    stage('Smoke Premium/Família em produção') {
+      when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'production' } }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'bookrush-product-e2e', usernameVariable: 'E2E_OIDC_USERNAME', passwordVariable: 'E2E_OIDC_PASSWORD')]) {
+          sh 'E2E_BASE_URL=https://bookrush.jteodoro.tec.br E2E_PREMIUM_READ_ONLY=true bash scripts/test-reader-bff-e2e.sh'
+        }
+      }
+    }
+
     stage('Smoke da demonstração pelo gateway') {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'demo' } }
       steps {
