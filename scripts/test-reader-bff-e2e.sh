@@ -68,7 +68,11 @@ verifier=$(openssl rand -base64 64 | tr '+/' '-_' | tr -d '=\n' | cut -c1-64)
 challenge=$(pkce_challenge "$verifier")
 state=$(openssl rand -hex 24)
 nonce=$(openssl rand -hex 24)
-auth_url="$authority/protocol/openid-connect/auth?client_id=$(urlencode "$client_id")&redirect_uri=$(urlencode "$redirect_uri")&response_type=code&scope=$(urlencode 'openid profile email bookrush.catalog.read')&state=$state&nonce=$nonce&code_challenge=$challenge&code_challenge_method=S256&response_mode=query"
+request_scope='openid profile email bookrush.catalog.read'
+if [[ "${E2E_PREMIUM_READ_ONLY:-false}" == true ]]; then
+  request_scope+=' session.view family.invites'
+fi
+auth_url="$authority/protocol/openid-connect/auth?client_id=$(urlencode "$client_id")&redirect_uri=$(urlencode "$redirect_uri")&response_type=code&scope=$(urlencode "$request_scope")&state=$state&nonce=$nonce&code_challenge=$challenge&code_challenge_method=S256&response_mode=query"
 curl -fsS -L -c "$cookie" -b "$cookie" "$auth_url" -o "$auth_html"
 action=$(python3 - "$auth_html" <<'PY'
 import html, re, sys
@@ -202,6 +206,14 @@ PY
 access_token="$refreshed_access_token"
 
 if [[ "${E2E_PREMIUM_READ_ONLY:-false}" == true ]]; then
+  status=$(curl --silent --show-error --max-time 15 -o "$tmp_dir/session.json" -w '%{http_code}' \
+    -H "Authorization: Bearer $access_token" "$base_url/api/v1/session")
+  printf 'Smoke Premium/Família: /api/v1/session HTTP %s\n' "$status"
+  [[ "$status" == 200 ]] || exit 1
+  jq -e '(.username | type == "string" and length > 0) and
+    (.accessState | type == "string" and length > 0) and
+    (.capabilities | type == "array") and (.validUntil | type == "string") and
+    (has("birthdate") | not)' "$tmp_dir/session.json" >/dev/null
   for path in /api/v1/subscription/me /api/v1/subscription/me/entitlements /api/v1/family/invitations/me; do
     status=$(curl --silent --show-error --max-time 15 -o /dev/null -w '%{http_code}' \
       -H "Authorization: Bearer $access_token" "$base_url$path")

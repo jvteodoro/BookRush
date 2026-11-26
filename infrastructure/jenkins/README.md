@@ -663,4 +663,4 @@ mantém acessíveis os nomes internos `postgres`, `keycloak` e
 
 Em produção, o smoke Premium/Família usa a credencial de teste existente
 `bookrush-product-e2e` para obter um JWT OIDC e consultar a assinatura,
-os entitlements e os convites da conta de teste pelo gateway público.
+os entitlements, os convites e a sessão da conta de teste pelo gateway público.
