@@ -739,12 +739,12 @@ for _ in $(seq 1 30); do
     curl -fsS -H "Authorization: Bearer $ACCESS_TOKEN" \
       "http://admin-service:8100/api/admin/v1/reporting/content-coverage?days=1"
   ' 2>/dev/null || true)"
-  [[ "$(jq -r '[.series[]? | select(.language == "pt" and .rights_status == "RIGHTS_ALLOWED" and .reader_ready_books == 1)] | length' <<<"$coverage_json")" == 1 ]] && break
+  [[ "$(jq -r '[.series[]? | select(.language == "pt" and .rights_status == "RIGHTS_ALLOWED")] | last | .reader_ready_books' <<<"$coverage_json")" == 1 ]] && break
   sleep 1
 done
 [[ "$(jq -r '.status' <<<"$coverage_json")" == UNTRUSTED ]]
-[[ "$(jq -r '[.series[] | select(.language == "pt" and .rights_status == "RIGHTS_ALLOWED") | .active_books, .reader_ready_books, .eligible_excerpt_books, .ranked_books, .eligible_excerpts, .ranked_excerpts] | @tsv' <<<"$coverage_json")" == $'1\t1\t1\t1\t1\t1' ]]
-[[ "$(jq -r '[.series[] | select(.language == "en" and .rights_status == "RIGHTS_NOT_CONFIRMED") | .active_books, .available_asset_books, .reader_ready_books] | @tsv' <<<"$coverage_json")" == $'1\t1\t0' ]]
+[[ "$(jq -r '([.series[] | select(.language == "pt" and .rights_status == "RIGHTS_ALLOWED")] | last | [.active_books, .reader_ready_books, .eligible_excerpt_books, .ranked_books, .eligible_excerpts, .ranked_excerpts]) | @tsv' <<<"$coverage_json")" == $'1\t1\t1\t1\t1\t1' ]]
+[[ "$(jq -r '([.series[] | select(.language == "en" and .rights_status == "RIGHTS_NOT_CONFIRMED")] | last | [.active_books, .available_asset_books, .reader_ready_books]) | @tsv' <<<"$coverage_json")" == $'1\t1\t0' ]]
 ! jq -e '.. | objects | has("book_id")' <<<"$coverage_json" >/dev/null
 echo 'Content coverage E2E: V28, 401/200, language/rights/readiness aggregation and no book IDs OK'
 rank_scores_unauthenticated_status="$(docker exec "$probe" curl -sS -o /dev/null -w '%{http_code}' \
