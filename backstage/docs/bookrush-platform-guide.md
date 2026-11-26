@@ -301,3 +301,5 @@ ordem: catalog-info/API, documentação do serviço, matriz de identidade/CORS,
 Compose, pipeline e smoke. Depois execute o checklist, registre o resultado no
 bead e atualize esta página apenas com decisões e contratos que continuarão
 úteis para a próxima pessoa.
+
+A imagem de validação inclui os descritores, a documentação e os contratos OpenAPI dos serviços de família, assinatura e conteúdo.

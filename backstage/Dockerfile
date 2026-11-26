@@ -28,6 +28,13 @@ COPY services/book-analytics-service/catalog-info.yaml services/book-analytics-s
 COPY services/book-analytics-service/docs /repo/services/book-analytics-service/docs
 COPY services/book-content-service/catalog-info.yaml services/book-content-service/mkdocs.yml /repo/services/book-content-service/
 COPY services/book-content-service/docs /repo/services/book-content-service/docs
+COPY services/book-content-service/api /repo/services/book-content-service/api
+COPY services/family-service/catalog-info.yaml services/family-service/mkdocs.yml /repo/services/family-service/
+COPY services/family-service/docs /repo/services/family-service/docs
+COPY services/family-service/api /repo/services/family-service/api
+COPY services/subscription-service/catalog-info.yaml services/subscription-service/mkdocs.yml /repo/services/subscription-service/
+COPY services/subscription-service/docs /repo/services/subscription-service/docs
+COPY services/subscription-service/api /repo/services/subscription-service/api
 COPY services/reader-state-service/catalog-info.yaml services/reader-state-service/mkdocs.yml /repo/services/reader-state-service/
 COPY services/reader-state-service/docs /repo/services/reader-state-service/docs
 COPY services/reader-profile-service/catalog-info.yaml services/reader-profile-service/mkdocs.yml /repo/services/reader-profile-service/
