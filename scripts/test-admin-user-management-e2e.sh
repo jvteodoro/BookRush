@@ -40,6 +40,7 @@ if docker inspect "$HOSTNAME" >/dev/null 2>&1; then
     -w "$repo_dir" \
     -e KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
     -e INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
+    -e SUBSCRIPTION_FAMILY_CLIENT_SECRET=disposable-family -e SUBSCRIPTION_BILLING_CLIENT_SECRET=disposable-billing \
     python:3.12-slim python3 infrastructure/keycloak/render-config.py \
     infrastructure/keycloak "$work_dir/rendered"
 else
@@ -47,6 +48,7 @@ else
   docker run --rm --user "$(id -u):$(id -g)" \
     -e KEYCLOAK_ADMIN_CLIENT_SECRET="$product_secret" \
     -e INGESTION_ADMIN_CLIENT_SECRET="$platform_secret" \
+    -e SUBSCRIPTION_FAMILY_CLIENT_SECRET=disposable-family -e SUBSCRIPTION_BILLING_CLIENT_SECRET=disposable-billing \
     -v "$repo_dir:/repo:ro" -v "$work_dir:/out" \
     python:3.12-slim python3 /repo/infrastructure/keycloak/render-config.py \
     /repo/infrastructure/keycloak /out/rendered
