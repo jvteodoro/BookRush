@@ -72,7 +72,7 @@ product, platform = (json.load(open(path, encoding="utf-8")) for path in sys.arg
 clients = {item["clientId"]: item for item in platform["clients"]}
 for client in ("bookrush-web", "bookrush-mobile"):
     scopes = set(next(item for item in product["clients"] if item["clientId"] == client)["defaultClientScopes"])
-    assert {"family.manage", "family.invites", "supervision.request", "subscription.read"} <= scopes
+    assert {"profile", "email", "bookrush.catalog.read", "family.manage", "family.invites", "supervision.request", "subscription.read"} <= scopes
 expected = {
     "bookrush-family-s2s", "bookrush-billing-s2s",
     "bookrush-reader-state-s2s", "bookrush-catalog-product-access-s2s",

@@ -116,3 +116,7 @@ mapper `preferred_username`, o client secret e o redirect exato.
 
 A reconciliação é incremental e não importa um realm vazio sobre uma instalação
 populada nem remove usuários.
+
+A configuração declarativa dos clientes de produto web e mobile mantém
+`profile`, `email` e `bookrush.catalog.read` ao adicionar os escopos de Família
+e Assinatura. O smoke pós-deploy verifica a obtenção do JWT de produto.

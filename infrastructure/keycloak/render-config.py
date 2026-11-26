@@ -208,7 +208,7 @@ def add_product_user_scopes(source: pathlib.Path, realm: dict) -> None:
     for client in realm.get("clients", []):
         if client.get("clientId") in ("bookrush-web", "bookrush-mobile"):
             defaults = client.setdefault("defaultClientScopes", [])
-            client["defaultClientScopes"] = list(dict.fromkeys([*defaults, *sorted(grants)]))
+            client["defaultClientScopes"] = list(dict.fromkeys([*defaults, "profile", "email", "bookrush.catalog.read", *sorted(grants)]))
 
 
 def main() -> int:
