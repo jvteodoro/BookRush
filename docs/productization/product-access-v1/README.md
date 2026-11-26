@@ -110,10 +110,10 @@ ao cliente podem ser generalizados quando revelariam vínculo ou idade.
 
 ## Consumo Spring MVC
 
-O [guia do starter](../../../platform/docs/product-access.md) descreve a
+O guia do starter em `platform/docs/product-access.md` descreve a
 classificação explícita por método e handler, a integração com chains
 customizadas e a reavaliação de operações sensíveis. A implementação no
-[family-service](../../../services/family-service/docs/index.md) inclui a
+`family-service` em `services/family-service/docs/index.md` inclui a
 allowlist de pares ação/recurso por cliente e os seletores de operação
 comercial. O teste E2E usa consumidor descartável e a rota canônica real.
 
