@@ -5,7 +5,7 @@ pipeline {
     string(name: 'BRANCH', defaultValue: 'feature/premium-family', description: 'Branch a compilar e implantar.')
     choice(name: 'DEPLOY_TARGET', choices: ['compose', 'kubernetes'], description: 'Destino do deploy.')
     choice(name: 'DEPLOY_ENVIRONMENT', choices: ['demo', 'production'], description: 'Compose isolado de demonstração por padrão; produção exige seleção explícita.')
-    string(name: 'DEMO_ENV_CREDENTIAL_ID', defaultValue: 'bookrush-demo-env', description: 'Credential Jenkins Secret file com ambiente isolado, URLs localhost e segredos sintéticos da demonstração.')
+    string(name: 'DEMO_ENV_CREDENTIAL_ID', defaultValue: '', description: 'Credential Jenkins Secret file com ambiente isolado, URLs localhost e segredos sintéticos da demonstração.')
     string(name: 'GIT_CREDENTIAL_ID', defaultValue: '', description: 'Credential Git opcional para repositório privado (HTTPS).')
     string(name: 'REGISTRY', defaultValue: '', description: 'Registry sem barra final. Vazio: não publica imagens.')
     string(name: 'REGISTRY_CREDENTIAL_ID', defaultValue: 'docker-registry', description: 'Credential Jenkins de usuário/senha do registry.')
@@ -132,13 +132,11 @@ pipeline {
         sh 'docker build -t "$BACKEND_IMAGE" -f services/catalog-service/Dockerfile .'
         script {
           if (params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'demo') {
-            withCredentials([file(credentialsId: params.DEMO_ENV_CREDENTIAL_ID, variable: 'BOOKRUSH_DEMO_ENV_FILE')]) {
+            withDemoEnvironment {
               sh '''#!/usr/bin/env bash
                 set -euo pipefail
                 set +x
-                authority="$(awk -F= '$1 == "VITE_OIDC_AUTHORITY" {sub(/^[^=]*=/, ""); print; exit}' "$BOOKRUSH_DEMO_ENV_FILE")"
-                [[ "$authority" == http://localhost:*/realms/bookrush ]] || { echo 'VITE_OIDC_AUTHORITY da demo deve usar localhost e o Keycloak isolado.' >&2; exit 2; }
-                docker build --build-arg "VITE_OIDC_AUTHORITY=$authority" -t "$FRONTEND_IMAGE" -f frontend/Dockerfile .
+                docker build --build-arg VITE_OIDC_AUTHORITY=http://localhost:19088/realms/bookrush -t "$FRONTEND_IMAGE" -f frontend/Dockerfile .
               '''
             }
           } else {
@@ -322,7 +320,7 @@ pipeline {
         script {
           withEnv(["ANALYTICS_GPU=${params.ANALYTICS_GPU}", "FEED_PERSONALIZED_MODE=${params.FEED_PERSONALIZED_MODE}", "DEPLOY_ENVIRONMENT=${params.DEPLOY_ENVIRONMENT}"]) {
             if (params.DEPLOY_ENVIRONMENT == 'demo') {
-              withCredentials([file(credentialsId: params.DEMO_ENV_CREDENTIAL_ID, variable: 'BOOKRUSH_DEMO_ENV_FILE')]) {
+              withDemoEnvironment {
                 sh 'bash infrastructure/jenkins/deploy-compose.sh'
               }
             } else {
@@ -336,10 +334,10 @@ pipeline {
     stage('Smoke da demonstração pelo gateway') {
       when { expression { return params.DEPLOY && params.DEPLOY_TARGET == 'compose' && params.DEPLOY_ENVIRONMENT == 'demo' } }
       steps {
-        withCredentials([file(credentialsId: params.DEMO_ENV_CREDENTIAL_ID, variable: 'BOOKRUSH_DEMO_ENV_FILE')]) {
+        script { withDemoEnvironment {
           sh 'bash scripts/test-premium-family-demo-smoke.sh'
           archiveArtifacts artifacts: 'artifacts/premium-family-*.png,artifacts/premium-family-demo-release.json', allowEmptyArchive: false, fingerprint: true
-        }
+        } }
       }
     }
 
@@ -384,5 +382,16 @@ pipeline {
         }
       }
     }
+  }
+}
+
+
+def withDemoEnvironment(Closure body) {
+  def credential = params.DEMO_ENV_CREDENTIAL_ID?.trim()
+  if (credential) {
+    withCredentials([file(credentialsId: credential, variable: 'BOOKRUSH_DEMO_ENV_FILE')], body)
+  } else {
+    def path = sh(script: 'bash infrastructure/jenkins/prepare-demo-env.sh', returnStdout: true).trim()
+    withEnv(["BOOKRUSH_DEMO_ENV_FILE=${path}"], body)
   }
 }

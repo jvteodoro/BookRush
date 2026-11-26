@@ -575,10 +575,10 @@ será construído e publicado. O pin do script da pipeline é intencional e deve
 ser alterado somente junto da revisão operacional aprovada. Não use wildcard de
 branch para o script que recebe credentials.
 
-O Jenkins precisa estar iniciado com o profile `ci`. Na primeira configuração,
-crie a credential Jenkins do tipo **Secret file**, ID
-`bookrush-demo-env`, contendo somente segredos e contas sintéticas da demo. O
-pipeline não cria nem recupera secrets de produção para compor essa credencial.
+O Jenkins precisa estar iniciado com o profile `ci`. Com
+`DEMO_ENV_CREDENTIAL_ID` vazio, o job gera segredos sintéticos na primeira
+execução e os preserva no volume protegido do Jenkins. Para uma demo que já
+usa uma credential própria, informe o ID da **Secret file** existente.
 Os nomes obrigatórios são:
 
 ```text
@@ -615,7 +615,7 @@ sintéticas não devem ser reutilizadas por pessoas reais. O reconciliador desli
 cadastro público neste realm. A simulação parental só fica no Compose isolado,
 com endpoints técnicos fora do gateway.
 
-Depois de cadastrar a Secret file uma vez, execute **Build with Parameters**:
+Execute **Build with Parameters** com os seguintes valores.
 
 | Parâmetro | Valor para demonstração |
 | --- | --- |
@@ -628,7 +628,7 @@ Depois de cadastrar a Secret file uma vez, execute **Build with Parameters**:
 | `FEED_PERSONALIZED_MODE` | `ON` |
 | `RUN_GUTENBERG_IMPORT` | `false` |
 | `RUN_ANALYTICS_SAMPLE` | `false` |
-| `DEMO_ENV_CREDENTIAL_ID` | `bookrush-demo-env` |
+| `DEMO_ENV_CREDENTIAL_ID` | vazio na primeira instalação |
 
 O deploy demo usa o projeto Compose `bookrush-demo`, outro PostgreSQL/Keycloak,
 volumes próprios e portas `127.0.0.1:19080–19432`. Não publique esses serviços

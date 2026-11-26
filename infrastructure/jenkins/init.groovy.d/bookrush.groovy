@@ -134,7 +134,7 @@ def mainParameters = [
     new StringParameterDefinition('BRANCH', 'feature/premium-family', 'Branch a compilar e implantar.'),
     new ChoiceParameterDefinition('DEPLOY_TARGET', ['compose', 'kubernetes'] as String[], 'Destino do deploy.'),
     new ChoiceParameterDefinition('DEPLOY_ENVIRONMENT', ['demo', 'production'] as String[], 'Ambiente isolado de demonstração ou produção. Demo é o padrão.'),
-    new StringParameterDefinition('DEMO_ENV_CREDENTIAL_ID', 'bookrush-demo-env', 'Credential Secret file com segredos exclusivamente sintéticos da demo.'),
+    new StringParameterDefinition('DEMO_ENV_CREDENTIAL_ID', '', 'Credential Secret file com segredos exclusivamente sintéticos da demo.'),
     new StringParameterDefinition('GIT_CREDENTIAL_ID', '', 'Credential Git HTTPS opcional.'),
     new StringParameterDefinition('REGISTRY', '', 'Registry sem barra final. Vazio: não publica imagens.'),
     new StringParameterDefinition('REGISTRY_CREDENTIAL_ID', 'docker-registry', 'Credential Jenkins do registry.'),
