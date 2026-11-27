@@ -603,6 +603,9 @@ def commercial():
         assert request(GATEWAY + FAMILY + "/invitations/me", token=juvenile_session)[0]["id"] == invitation["id"]
     member = write(accept, juvenile_session if READER_E2E else invitee)
     assert write(accept, invitee) == member and request(GATEWAY + FAMILY + "/me", token=holder)["occupiedOrReserved"] == 5
+    view = request(GATEWAY + FAMILY + "/me", token=invitee)
+    assert view["role"] == "MEMBER" and view["members"] == [] and view["id"] == member["householdId"]
+    assert request(GATEWAY + FAMILY + "/me", token=holder)["role"] == "OWNER"
     if READER_E2E:
         bootstrap(juvenile_session, "MINOR_AWAITING_AUTHORIZATION", "SUPERVISION_REQUIRED")
     lookup = "/api/internal/v1/family/membership/evaluate"

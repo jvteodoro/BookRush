@@ -38,7 +38,7 @@ class FamilyStore {
 
   record Address(String code, Instant expiresAt) {}
   record Household(UUID id) {}
-  record HouseholdView(UUID id, int additionalSeats, int occupiedOrReserved, List<Member> members) {}
+  record HouseholdView(UUID id, String role, int additionalSeats, int occupiedOrReserved, List<Member> members) {}
   enum MemberState { ACTIVE, SUSPENDED, REMOVED }
   record Member(UUID id, MemberState state, boolean delegationEnabled, long version, long permissionVersion) {}
   record Accepted(UUID membershipId, UUID householdId) {}
@@ -102,9 +102,22 @@ class FamilyStore {
 
   @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
   HouseholdView mine(TechnicalIdentity owner) {
-    UUID id = findHousehold(owner).stream().findFirst().orElseThrow(FamilyStore::notFound);
-    var members = members(owner, id);
-    return new HouseholdView(id, ADDITIONAL_SEATS, members.size() + reservationCount(id, now()), members);
+    var owned = findHousehold(owner);
+    if (!owned.isEmpty()) {
+      UUID id = owned.getFirst();
+      var members = members(owner, id);
+      return new HouseholdView(id, "OWNER", ADDITIONAL_SEATS, members.size() + reservationCount(id, now()), members);
+    }
+    // Members see their household without the holder-only member list.
+    var memberOf = db.queryForList("""
+        SELECT household_id FROM family.membership
+        WHERE identity_issuer = ? AND identity_subject = ? AND state = 'ACTIVE'
+        """, UUID.class, owner.issuer(), owner.subject());
+    UUID id = memberOf.stream().findFirst().orElseThrow(FamilyStore::notFound);
+    int active = db.queryForObject("""
+        SELECT count(*) FROM family.membership WHERE household_id = ? AND state IN ('ACTIVE','SUSPENDED')
+        """, Integer.class, id);
+    return new HouseholdView(id, "MEMBER", ADDITIONAL_SEATS, active + reservationCount(id, now()), List.of());
   }
 
   Address address(TechnicalIdentity recipient) {

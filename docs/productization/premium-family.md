@@ -353,3 +353,14 @@ período; os benefícios continuam até `effectiveUntil`.
 Os serviços de assinatura e família liberam o despacho de `/error` antes da regra
 `denyAll`. Sem isso, erros de negócio (409 em cancelamento sem assinatura, por
 exemplo) voltam ao cliente como 403 `insufficient_scope`.
+
+## Fluxo do convidado
+
+Quem ainda não tem família Premium e tem acesso ao produto usa a aba Família para
+entrar numa família: gera o próprio código (`POST /api/v1/family/invite-address`,
+válido por tempo limitado), envia o código ao titular, e aceita ou recusa os
+convites que recebe (`GET /api/v1/family/invitations/me`; `POST .../{id}/accept` ou
+`.../decline`). Depois de aceitar, `GET /api/v1/family/me` devolve a família com
+`role: MEMBER`, lista de membros vazia (somente o titular vê a lista), vagas
+ocupadas e vagas totais. O titular continua vendo `role: OWNER` com a lista completa.
+A oferta do Premium Família permanece abaixo dessas seções.

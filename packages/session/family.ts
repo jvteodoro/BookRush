@@ -1,4 +1,12 @@
-import type { Request } from "./session";
+import {
+  invitationAction,
+  invitationRequest,
+  inviteAddressPath,
+  invitationsPath,
+  type Invitation,
+  type InviteAddress,
+  type Request,
+} from "./session";
 
 /** Premium family management API shared by the web and mobile clients. */
 export const familyPath = "/api/v1/family/me";
@@ -23,6 +31,8 @@ export type Member = {
 
 export type Household = {
   id: string;
+  /** OWNER lists the members; MEMBER sees the household without the member list. */
+  role: "OWNER" | "MEMBER";
   additionalSeats: number;
   occupiedOrReserved: number;
   members: Member[];
@@ -182,4 +192,50 @@ export function newIdempotencyKey(): string {
     byte.toString(16).padStart(2, "0"),
   ).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+export function isMemberHousehold(household: Household): boolean {
+  return household.role === "MEMBER";
+}
+
+export function canRespondToInvitation(invitation: Invitation): boolean {
+  return invitation.state === "PENDING";
+}
+
+/** Invitations received by the caller, as the guest sees them (same endpoint as the restricted screen). */
+export function loadReceivedInvitations(
+  request: Request,
+  init?: RequestInit,
+): Promise<Invitation[]> {
+  return invitationRequest<Invitation[]>(request, invitationsPath, {
+    ...init,
+    method: "GET",
+  });
+}
+
+/** The caller's own invitation code, to be given to the holder who invites them. */
+export function createInviteAddress(
+  request: Request,
+  init?: RequestInit,
+): Promise<InviteAddress> {
+  return invitationRequest<InviteAddress>(request, inviteAddressPath, {
+    ...init,
+    method: "POST",
+  });
+}
+
+export async function respondToInvitation(
+  request: Request,
+  invitationId: string,
+  action: "accept" | "decline",
+  init?: RequestInit,
+): Promise<void> {
+  await invitationRequest<unknown>(
+    request,
+    invitationAction(invitationId, action),
+    {
+      ...init,
+      method: "POST",
+    },
+  );
 }

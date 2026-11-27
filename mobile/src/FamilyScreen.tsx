@@ -10,21 +10,30 @@ import {
   View,
 } from "react-native";
 import {
+  canRespondToInvitation,
   cancelInvitation,
   createHousehold,
+  createInviteAddress,
   freeSeats,
   inviteMember,
   invitationStateLabel,
+  isMemberHousehold,
   isRecipientCode,
   loadHousehold,
   loadHouseholdInvitations,
+  loadReceivedInvitations,
   memberStateLabel,
   newIdempotencyKey,
   removeMember,
+  respondToInvitation,
   type Household,
   type HouseholdInvitation,
 } from "../../packages/session/family";
-import type { Request } from "../../packages/session/session";
+import type {
+  Invitation,
+  InviteAddress,
+  Request,
+} from "../../packages/session/session";
 import {
   cancelSubscription,
   checkoutPremiumFamily,
@@ -34,7 +43,7 @@ import {
   type Subscription,
 } from "../../packages/session/subscription";
 
-/** Premium family management for the mobile app, using the shared family rules. */
+/** Family tab for the mobile app: holder management, member status, and the guest flow. */
 export function MobileFamily({
   request,
   onClose,
@@ -45,6 +54,8 @@ export function MobileFamily({
   const [subscription, setSubscription] = useState<Subscription>();
   const [household, setHousehold] = useState<Household | null>();
   const [invitations, setInvitations] = useState<HouseholdInvitation[]>([]);
+  const [received, setReceived] = useState<Invitation[]>([]);
+  const [address, setAddress] = useState<InviteAddress>();
   const [recipientCode, setRecipientCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,16 +64,14 @@ export function MobileFamily({
   async function refresh() {
     const current = await loadSubscription(request);
     setSubscription(current);
-    if (!current.premiumFamily) {
-      setHousehold(null);
-      setInvitations([]);
-      return;
-    }
     const family = await loadHousehold(request);
     setHousehold(family);
-    setInvitations(
-      family ? await loadHouseholdInvitations(request, family.id) : [],
-    );
+    if (family && !isMemberHousehold(family)) {
+      setInvitations(await loadHouseholdInvitations(request, family.id));
+    } else {
+      setInvitations([]);
+    }
+    setReceived(family ? [] : await loadReceivedInvitations(request));
   }
 
   useEffect(() => {
@@ -71,6 +80,7 @@ export function MobileFamily({
         cause instanceof Error ? cause.message : "Falha ao carregar a família.",
       ),
     );
+    // refresh only depends on the request, which is stable for the screen lifetime
   }, []);
 
   async function run(action: () => Promise<void>, success: string) {
@@ -88,7 +98,10 @@ export function MobileFamily({
     }
   }
 
-  const loading = subscription === undefined;
+  const loading = subscription === undefined || household === undefined;
+  const member = household ? isMemberHousehold(household) : false;
+  const owner = household !== null && household !== undefined && !member;
+  const guest = !loading && household === null && !subscription.premiumFamily;
 
   return (
     <SafeAreaView style={styles.root}>
@@ -103,8 +116,85 @@ export function MobileFamily({
           <Text style={styles.subtitle}>Carregando família…</Text>
         ) : null}
 
-        {!loading && !subscription.premiumFamily ? (
+        {member && household ? (
           <>
+            <Text style={styles.subtitle}>
+              Você é membro de uma família Premium.
+            </Text>
+            <Text style={styles.subtitle}>
+              {household.occupiedOrReserved} de {household.additionalSeats}{" "}
+              vagas ocupadas ou reservadas.
+            </Text>
+          </>
+        ) : null}
+
+        {guest ? (
+          <>
+            <Text style={styles.heading}>Entrar em uma família</Text>
+            <Text style={styles.subtitle}>
+              Envie este código ao titular da família para ser convidado.
+            </Text>
+            <Pressable
+              style={styles.primary}
+              disabled={busy}
+              onPress={() =>
+                void run(async () => {
+                  setAddress(await createInviteAddress(request));
+                }, "Código gerado.")
+              }
+            >
+              <Text style={styles.primaryText}>Gerar código</Text>
+            </Pressable>
+            {address ? (
+              <>
+                <Text selectable style={styles.rowText}>
+                  {address.code}
+                </Text>
+                <Text style={styles.subtitle}>
+                  Válido até{" "}
+                  {new Date(address.expiresAt).toLocaleString("pt-BR")}. Toque e
+                  segure o código para copiar.
+                </Text>
+              </>
+            ) : null}
+
+            <Text style={styles.heading}>Convites recebidos</Text>
+            {received.length === 0 ? (
+              <Text style={styles.subtitle}>Nenhum convite recebido.</Text>
+            ) : null}
+            {received.map((invitation) => (
+              <View key={invitation.id} style={styles.row}>
+                <Text style={styles.rowText}>
+                  {invitationStateLabel(invitation.state)} · válido até{" "}
+                  {new Date(invitation.expiresAt).toLocaleString("pt-BR")}
+                </Text>
+                <Pressable
+                  disabled={busy || !canRespondToInvitation(invitation)}
+                  onPress={() =>
+                    void run(
+                      () =>
+                        respondToInvitation(request, invitation.id, "accept"),
+                      "Convite aceito. Você agora é membro da família.",
+                    )
+                  }
+                >
+                  <Text style={styles.link}>Aceitar</Text>
+                </Pressable>
+                <Pressable
+                  disabled={busy || !canRespondToInvitation(invitation)}
+                  onPress={() =>
+                    void run(
+                      () =>
+                        respondToInvitation(request, invitation.id, "decline"),
+                      "Convite recusado.",
+                    )
+                  }
+                >
+                  <Text style={styles.link}>Recusar</Text>
+                </Pressable>
+              </View>
+            ))}
+
             <Text style={styles.heading}>Premium Família</Text>
             {premiumFamilyBenefits.map((benefit) => (
               <Text key={benefit} style={styles.subtitle}>
@@ -135,7 +225,10 @@ export function MobileFamily({
           </>
         ) : null}
 
-        {!loading && subscription.premiumFamily && household === null ? (
+        {!loading &&
+        !member &&
+        subscription.premiumFamily &&
+        household === null ? (
           <>
             <Text style={styles.subtitle}>
               Crie sua família para começar a convidar membros.
@@ -154,7 +247,7 @@ export function MobileFamily({
           </>
         ) : null}
 
-        {household ? (
+        {owner && household ? (
           <>
             <Text style={styles.subtitle}>
               {household.occupiedOrReserved} de {household.additionalSeats}{" "}
@@ -165,13 +258,13 @@ export function MobileFamily({
             {household.members.length === 0 ? (
               <Text style={styles.subtitle}>Nenhum membro ainda.</Text>
             ) : null}
-            {household.members.map((member) => (
-              <View key={member.id} style={styles.row}>
+            {household.members.map((item) => (
+              <View key={item.id} style={styles.row}>
                 <Text style={styles.rowText}>
-                  Membro · {memberStateLabel(member.state)}
+                  Membro · {memberStateLabel(item.state)}
                 </Text>
                 <Pressable
-                  disabled={busy || member.state !== "ACTIVE"}
+                  disabled={busy || item.state !== "ACTIVE"}
                   onPress={() =>
                     Alert.alert(
                       "Remover membro",
@@ -183,7 +276,7 @@ export function MobileFamily({
                           style: "destructive",
                           onPress: () =>
                             void run(
-                              () => removeMember(request, household.id, member),
+                              () => removeMember(request, household.id, item),
                               "Membro removido.",
                             ),
                         },

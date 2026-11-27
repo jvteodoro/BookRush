@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  canRespondToInvitation,
   cancelInvitation,
   createHousehold,
+  createInviteAddress,
   freeSeats,
   inviteMember,
   invitationStateLabel,
+  isMemberHousehold,
   isRecipientCode,
   loadHousehold,
   loadHouseholdInvitations,
+  loadReceivedInvitations,
   memberStateLabel,
   newIdempotencyKey,
   removeMember,
+  respondToInvitation,
   type Household,
   type HouseholdInvitation,
 } from "../../../packages/session/family";
@@ -22,14 +27,20 @@ import {
   subscriptionStateLabel,
   type Subscription,
 } from "../../../packages/session/subscription";
+import type {
+  Invitation,
+  InviteAddress,
+} from "../../../packages/session/session";
 import { authClient } from "../auth";
 
-/** Premium family management: seats, members, invitations sent by the holder. */
+/** Family tab: holder management, member status, and the guest flow (code, invitations, plan). */
 export function FamilyScreen({ onClose }: { onClose?: () => void }) {
   const request = useMemo(() => authClient.fetch.bind(authClient), []);
   const [subscription, setSubscription] = useState<Subscription>();
   const [household, setHousehold] = useState<Household | null>();
   const [invitations, setInvitations] = useState<HouseholdInvitation[]>([]);
+  const [received, setReceived] = useState<Invitation[]>([]);
+  const [address, setAddress] = useState<InviteAddress>();
   const [recipientCode, setRecipientCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -38,16 +49,14 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
   const refresh = useCallback(async () => {
     const current = await loadSubscription(request);
     setSubscription(current);
-    if (!current.premiumFamily) {
-      setHousehold(null);
-      setInvitations([]);
-      return;
-    }
     const family = await loadHousehold(request);
     setHousehold(family);
-    setInvitations(
-      family ? await loadHouseholdInvitations(request, family.id) : [],
-    );
+    if (family && !isMemberHousehold(family)) {
+      setInvitations(await loadHouseholdInvitations(request, family.id));
+    } else {
+      setInvitations([]);
+    }
+    setReceived(family ? [] : await loadReceivedInvitations(request));
   }, [request]);
 
   useEffect(() => {
@@ -73,7 +82,10 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
     }
   }
 
-  const loading = subscription === undefined;
+  const loading = subscription === undefined || household === undefined;
+  const member = household ? isMemberHousehold(household) : false;
+  const owner = household !== null && household !== undefined && !member;
+  const guest = !loading && household === null && !subscription.premiumFamily;
 
   return (
     <section
@@ -93,8 +105,93 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
 
       {loading && <p role="status">Carregando família…</p>}
 
-      {!loading && !subscription.premiumFamily && (
+      {member && household && (
         <div>
+          <p>Você é membro de uma família Premium.</p>
+          <p>
+            {household.occupiedOrReserved} de {household.additionalSeats} vagas
+            ocupadas ou reservadas.
+          </p>
+        </div>
+      )}
+
+      {guest && (
+        <div>
+          <h2>Entrar em uma família</h2>
+          <h3>Meu código de convite</h3>
+          <p>Envie este código ao titular da família para ser convidado.</p>
+          <button
+            className="primary-button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                setAddress(await createInviteAddress(request));
+              }, "Código gerado.")
+            }
+            type="button"
+          >
+            Gerar código
+          </button>
+          {address && (
+            <div>
+              <p>
+                <strong>{address.code}</strong> · válido até{" "}
+                {new Date(address.expiresAt).toLocaleString("pt-BR")}
+              </p>
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(address.code);
+                  setNotice("Código copiado.");
+                }}
+                type="button"
+              >
+                Copiar código
+              </button>
+            </div>
+          )}
+
+          <h3>Convites recebidos</h3>
+          {received.length === 0 && <p>Nenhum convite recebido.</p>}
+          <ul>
+            {received.map((invitation) => (
+              <li key={invitation.id}>
+                <span>
+                  {invitationStateLabel(invitation.state)} · válido até{" "}
+                  {new Date(invitation.expiresAt).toLocaleString("pt-BR")}
+                </span>{" "}
+                <button
+                  className="primary-button"
+                  disabled={busy || !canRespondToInvitation(invitation)}
+                  onClick={() =>
+                    void run(
+                      () =>
+                        respondToInvitation(request, invitation.id, "accept"),
+                      "Convite aceito. Você agora é membro da família.",
+                    )
+                  }
+                  type="button"
+                >
+                  Aceitar
+                </button>{" "}
+                <button
+                  className="secondary-button"
+                  disabled={busy || !canRespondToInvitation(invitation)}
+                  onClick={() =>
+                    void run(
+                      () =>
+                        respondToInvitation(request, invitation.id, "decline"),
+                      "Convite recusado.",
+                    )
+                  }
+                  type="button"
+                >
+                  Recusar
+                </button>
+              </li>
+            ))}
+          </ul>
+
           <h2>Premium Família</h2>
           <ul>
             {premiumFamilyBenefits.map((benefit) => (
@@ -126,25 +223,28 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
         </div>
       )}
 
-      {!loading && subscription.premiumFamily && household === null && (
-        <div>
-          <p>Crie sua família para começar a convidar membros.</p>
-          <button
-            className="primary-button"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                await createHousehold(request);
-              }, "Família criada.")
-            }
-            type="button"
-          >
-            Criar família
-          </button>
-        </div>
-      )}
+      {!loading &&
+        !member &&
+        subscription.premiumFamily &&
+        household === null && (
+          <div>
+            <p>Crie sua família para começar a convidar membros.</p>
+            <button
+              className="primary-button"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  await createHousehold(request);
+                }, "Família criada.")
+              }
+              type="button"
+            >
+              Criar família
+            </button>
+          </div>
+        )}
 
-      {household && (
+      {owner && household && (
         <>
           <p>
             {household.occupiedOrReserved} de {household.additionalSeats} vagas
@@ -154,17 +254,17 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
           <h2>Membros</h2>
           {household.members.length === 0 && <p>Nenhum membro ainda.</p>}
           <ul>
-            {household.members.map((member) => (
-              <li key={member.id}>
-                <span>Membro · {memberStateLabel(member.state)}</span>{" "}
+            {household.members.map((item) => (
+              <li key={item.id}>
+                <span>Membro · {memberStateLabel(item.state)}</span>{" "}
                 <button
                   className="secondary-button"
-                  disabled={busy || member.state !== "ACTIVE"}
+                  disabled={busy || item.state !== "ACTIVE"}
                   onClick={() => {
                     if (!window.confirm("Remover este membro da família?"))
                       return;
                     void run(
-                      () => removeMember(request, household.id, member),
+                      () => removeMember(request, household.id, item),
                       "Membro removido.",
                     );
                   }}

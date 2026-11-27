@@ -40,6 +40,8 @@ assinatura** (`POST /api/v1/subscription/cancel`, 202), que mantém os benefíci
 A tela aparece como aba **Família** no shell visível do leitor (`AppShell`), renderizada
 pelo `LiveReader`. A sidebar legada escondida não é usada para essa navegação.
 
+O convidado (sem família e com acesso ao produto) gera o próprio código e aceita ou recusa convites na mesma aba, usando as funções de `packages/session` que a tela restrita também usa. Um membro vê o estado do vínculo, sem os controles de titular.
+
 O código de convite é o da própria pessoa, obtido pela seção "Convites
 familiares" da tela restrita (`invite-address`). A validação de formato usa
 `isRecipientCode`; erros de API viram mensagens de `familyMessage`, nunca o corpo

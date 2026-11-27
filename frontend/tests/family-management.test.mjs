@@ -147,3 +147,71 @@ test("newIdempotencyKey returns a version 4 UUID", () => {
   );
   assert.notEqual(family.newIdempotencyKey(), key);
 });
+
+test("member households are recognised and only pending invitations can be answered", () => {
+  assert.equal(
+    family.isMemberHousehold({
+      id: "h",
+      role: "MEMBER",
+      additionalSeats: 5,
+      occupiedOrReserved: 2,
+      members: [],
+    }),
+    true,
+  );
+  assert.equal(
+    family.isMemberHousehold({
+      id: "h",
+      role: "OWNER",
+      additionalSeats: 5,
+      occupiedOrReserved: 1,
+      members: [],
+    }),
+    false,
+  );
+  assert.equal(
+    family.canRespondToInvitation({
+      id: "i",
+      state: "PENDING",
+      expiresAt: "2026-12-04T09:30:12Z",
+    }),
+    true,
+  );
+  assert.equal(
+    family.canRespondToInvitation({
+      id: "i",
+      state: "ACCEPTED",
+      expiresAt: "2026-12-04T09:30:12Z",
+    }),
+    false,
+  );
+});
+
+test("guest actions use the same invitation endpoints as the restricted screen", async () => {
+  const { request, calls } = recorder([
+    json({
+      code: "c476d684-64e4-4392-a375-ade5bd64e251",
+      expiresAt: "2026-12-04T09:30:12Z",
+    }),
+    json({ state: "ok" }, 200),
+    json(undefined, 204),
+  ]);
+  const address = await family.createInviteAddress(request);
+  assert.equal(address.code, "c476d684-64e4-4392-a375-ade5bd64e251");
+  assert.equal(calls[0].method, "POST");
+  assert.equal(calls[0].path, "/api/v1/family/invite-address");
+  await family.respondToInvitation(request, "inv-1", "accept");
+  assert.equal(calls[1].path, "/api/v1/family/invitations/inv-1/accept");
+  await family.respondToInvitation(request, "inv-2", "decline");
+  assert.equal(calls[2].path, "/api/v1/family/invitations/inv-2/decline");
+  assert.equal(calls[2].method, "POST");
+});
+
+test("received invitations are listed from the invitations endpoint", async () => {
+  const inbox = [
+    { id: "inv-1", state: "PENDING", expiresAt: "2026-12-04T09:30:12Z" },
+  ];
+  const { request, calls } = recorder([json(inbox)]);
+  assert.deepEqual(await family.loadReceivedInvitations(request), inbox);
+  assert.equal(calls[0].path, "/api/v1/family/invitations/me");
+});

@@ -28,8 +28,9 @@ paths:
   /api/v1/family/me:
     get:
       operationId: getOwnHousehold
-      description: Scope family.manage. Owner only; minimal commercial state regardless
-        of entitlement.
+      description: Scope family.manage. Returns the household owned by the caller
+        (role OWNER) or, when the caller is an active member, the household they belong
+        to (role MEMBER). 404 when the caller has neither.
       security:
       - productBearer: []
       responses:
@@ -1042,6 +1043,7 @@ components:
       type: object
       required:
       - id
+      - role
       - additionalSeats
       - occupiedOrReserved
       - members
@@ -1050,6 +1052,11 @@ components:
         id:
           type: string
           format: uuid
+        role:
+          type: string
+          enum: [OWNER, MEMBER]
+          description: OWNER returns the full member list; MEMBER returns the household
+            with an empty member list, visible only to an active member.
         additionalSeats:
           type: integer
           minimum: 0
