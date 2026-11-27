@@ -14,6 +14,7 @@ export type ReaderTab =
   | "library"
   | "plant"
   | "profile"
+  | "family"
   | "privacy"
   | "admin"
   | "publisher";
@@ -29,6 +30,7 @@ const tabs: {
   { id: "library", label: "Biblioteca", icon: "library" },
   { id: "plant", label: "Minha planta", icon: "leaf" },
   { id: "profile", label: "Perfil", icon: "user" },
+  { id: "family", label: "Família", icon: "user" },
   { id: "privacy", label: "Privacidade", icon: "shield" },
   { id: "admin", label: "Administração", icon: "admin", separator: true },
   { id: "publisher", label: "Publicador", icon: "upload", separator: true },

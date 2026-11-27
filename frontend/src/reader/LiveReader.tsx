@@ -19,6 +19,7 @@ import { Button } from "../components/ui/Button";
 import { loadSharedBook } from "./sharedBook";
 import { readerSessionOrigin } from "./readerSessionOrigin";
 import { AccountPage } from "./AccountPages";
+import { FamilyScreen } from "../family/FamilyScreen";
 import type { FeedExcerpt } from "../app/types";
 
 type SourceBook = {
@@ -518,6 +519,8 @@ export function LiveReader({
           onDetails={setDetailsBook}
           onDiscover={() => navigate("feed")}
         />
+      ) : tab === "family" ? (
+        <FamilyScreen onClose={() => navigate("feed")} />
       ) : ["plant", "profile", "privacy", "admin", "publisher"].includes(
           tab,
         ) ? (

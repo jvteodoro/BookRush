@@ -37,6 +37,9 @@ Quando a assinatura está ativa, a tela mostra o estado e o botão **Cancelar
 assinatura** (`POST /api/v1/subscription/cancel`, 202), que mantém os benefícios até
 `effectiveUntil`. Os textos e chamadas ficam em `packages/session/subscription.ts`.
 
+A tela aparece como aba **Família** no shell visível do leitor (`AppShell`), renderizada
+pelo `LiveReader`. A sidebar legada escondida não é usada para essa navegação.
+
 O código de convite é o da própria pessoa, obtido pela seção "Convites
 familiares" da tela restrita (`invite-address`). A validação de formato usa
 `isRecipientCode`; erros de API viram mensagens de `familyMessage`, nunca o corpo

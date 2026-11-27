@@ -25,7 +25,7 @@ import {
 import { authClient } from "../auth";
 
 /** Premium family management: seats, members, invitations sent by the holder. */
-export function FamilyScreen({ onClose }: { onClose: () => void }) {
+export function FamilyScreen({ onClose }: { onClose?: () => void }) {
   const request = useMemo(() => authClient.fetch.bind(authClient), []);
   const [subscription, setSubscription] = useState<Subscription>();
   const [household, setHousehold] = useState<Household | null>();
@@ -78,22 +78,17 @@ export function FamilyScreen({ onClose }: { onClose: () => void }) {
   return (
     <section
       aria-label="Gestão da família"
-      className="landing restricted-session"
-      style={{
-        position: "fixed",
-        inset: 0,
-        overflowY: "auto",
-        zIndex: 1000,
-        padding: "32px 24px",
-      }}
+      style={{ padding: "24px", maxWidth: 880, margin: "0 auto" }}
     >
       <header
         style={{ display: "flex", justifyContent: "space-between", gap: 16 }}
       >
         <h1>Minha família</h1>
-        <button className="secondary-button" onClick={onClose} type="button">
-          Voltar ao feed
-        </button>
+        {onClose && (
+          <button className="secondary-button" onClick={onClose} type="button">
+            Voltar ao feed
+          </button>
+        )}
       </header>
 
       {loading && <p role="status">Carregando família…</p>}
