@@ -74,7 +74,17 @@ docker create --name "$keycloak" --network "$network" --network-alias keycloak \
   -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD="$admin_password" \
   --entrypoint /bin/sh quay.io/keycloak/keycloak:25.0 \
   -c 'mkdir -p /opt/keycloak/data/import && cp /tmp/realms/*.json /opt/keycloak/data/import/ && exec /opt/keycloak/bin/kc.sh start-dev --http-port=8080 --import-realm' >/dev/null
-docker cp "$work_dir/rendered" "$keycloak:/tmp/realms"
+# keycloak-config-cli applies userProfile after boot; Keycloak's --import-realm rejects it.
+mkdir -m 700 "$work_dir/realms-import"
+python3 - "$work_dir/rendered" "$work_dir/realms-import" <<'PY'
+import glob, json, os, sys
+source, target = sys.argv[1], sys.argv[2]
+for path in glob.glob(os.path.join(source, "*.json")):
+    realm = json.load(open(path, encoding="utf-8"))
+    realm.pop("userProfile", None)
+    json.dump(realm, open(os.path.join(target, os.path.basename(path)), "w", encoding="utf-8"))
+PY
+docker cp "$work_dir/realms-import" "$keycloak:/tmp/realms"
 docker start "$keycloak" >/dev/null
 probe="$(docker run -d --name "$probe" --network "$network" curlimages/curl:8.10.1 tail -f /dev/null)"
 for _ in $(seq 1 120); do
