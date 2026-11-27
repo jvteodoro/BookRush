@@ -12,6 +12,7 @@ import {
 import {
   canRespondToInvitation,
   cancelInvitation,
+  familyView,
   createHousehold,
   createInviteAddress,
   freeSeats,
@@ -98,10 +99,11 @@ export function MobileFamily({
     }
   }
 
-  const loading = subscription === undefined || household === undefined;
-  const member = household ? isMemberHousehold(household) : false;
-  const owner = household !== null && household !== undefined && !member;
-  const guest = !loading && household === null && !subscription.premiumFamily;
+  const view = familyView(subscription, household);
+  const loading = view === "loading";
+  const member = view === "member";
+  const owner = view === "owner";
+  const guest = view === "guest";
 
   return (
     <SafeAreaView style={styles.root}>
@@ -225,10 +227,7 @@ export function MobileFamily({
           </>
         ) : null}
 
-        {!loading &&
-        !member &&
-        subscription.premiumFamily &&
-        household === null ? (
+        {view === "premium-without-family" ? (
           <>
             <Text style={styles.subtitle}>
               Crie sua família para começar a convidar membros.
@@ -354,7 +353,7 @@ export function MobileFamily({
           </>
         ) : null}
 
-        {!loading && subscription.premiumFamily ? (
+        {subscription?.premiumFamily ? (
           <>
             <Text style={styles.subtitle}>
               {subscriptionStateLabel(subscription)}

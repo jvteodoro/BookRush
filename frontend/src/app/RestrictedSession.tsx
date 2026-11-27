@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import {
   accessMessage,
-  invitationRequest,
   type Invitation,
   type InviteAddress,
   type Session,
 } from "../../../packages/session/session";
+import {
+  createInviteAddress,
+  loadReceivedInvitations,
+  respondToInvitation,
+} from "../../../packages/session/family";
 import { authClient } from "../auth";
-import { apiRoutes } from "./apiRoutes";
 
 export function RestrictedSession({
   session,
@@ -31,11 +34,9 @@ export function RestrictedSession({
     operations.current = controller;
     setBusy(false);
     if (permitted) {
-      void invitationRequest<Invitation[]>(
-        authClient.fetch.bind(authClient),
-        apiRoutes.family.invitations(),
-        { signal: controller.signal },
-      )
+      void loadReceivedInvitations(authClient.fetch.bind(authClient), {
+        signal: controller.signal,
+      })
         .then((result) => {
           if (!controller.signal.aborted) {
             setInvitations(result);
@@ -49,7 +50,10 @@ export function RestrictedSession({
     return () => controller.abort();
   }, [permitted, session.validUntil]);
 
-  async function act(path: string, code = false) {
+  async function act(
+    run: (signal: AbortSignal) => Promise<InviteAddress | void>,
+    code = false,
+  ) {
     const controller = operations.current;
     if (
       !controller ||
@@ -60,13 +64,9 @@ export function RestrictedSession({
     setBusy(true);
     setError("");
     try {
-      const result = await invitationRequest<InviteAddress>(
-        authClient.fetch.bind(authClient),
-        path,
-        { method: "POST", signal: controller.signal },
-      );
+      const result = await run(controller.signal);
       if (controller.signal.aborted) return;
-      if (code) setAddress(result);
+      if (code && result) setAddress(result);
       else onRefresh();
     } catch (cause) {
       if (!controller.signal.aborted)
@@ -100,8 +100,13 @@ export function RestrictedSession({
                 <button
                   disabled={busy || invite.state !== "PENDING"}
                   onClick={() =>
-                    void act(
-                      apiRoutes.family.invitationAction(invite.id, "accept"),
+                    void act((signal) =>
+                      respondToInvitation(
+                        authClient.fetch.bind(authClient),
+                        invite.id,
+                        "accept",
+                        { signal },
+                      ),
                     )
                   }
                 >
@@ -110,8 +115,13 @@ export function RestrictedSession({
                 <button
                   disabled={busy || invite.state !== "PENDING"}
                   onClick={() =>
-                    void act(
-                      apiRoutes.family.invitationAction(invite.id, "decline"),
+                    void act((signal) =>
+                      respondToInvitation(
+                        authClient.fetch.bind(authClient),
+                        invite.id,
+                        "decline",
+                        { signal },
+                      ),
                     )
                   }
                 >
@@ -123,7 +133,15 @@ export function RestrictedSession({
           <button
             className="primary-button"
             disabled={busy}
-            onClick={() => void act(apiRoutes.family.inviteAddress(), true)}
+            onClick={() =>
+              void act(
+                (signal) =>
+                  createInviteAddress(authClient.fetch.bind(authClient), {
+                    signal,
+                  }),
+                true,
+              )
+            }
           >
             Gerar código de convite
           </button>

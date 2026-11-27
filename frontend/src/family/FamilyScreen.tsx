@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   canRespondToInvitation,
   cancelInvitation,
+  familyView,
   createHousehold,
   createInviteAddress,
   freeSeats,
@@ -82,10 +83,11 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
     }
   }
 
-  const loading = subscription === undefined || household === undefined;
-  const member = household ? isMemberHousehold(household) : false;
-  const owner = household !== null && household !== undefined && !member;
-  const guest = !loading && household === null && !subscription.premiumFamily;
+  const view = familyView(subscription, household);
+  const loading = view === "loading";
+  const member = view === "member";
+  const owner = view === "owner";
+  const guest = view === "guest";
 
   return (
     <section
@@ -223,26 +225,23 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
         </div>
       )}
 
-      {!loading &&
-        !member &&
-        subscription.premiumFamily &&
-        household === null && (
-          <div>
-            <p>Crie sua família para começar a convidar membros.</p>
-            <button
-              className="primary-button"
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  await createHousehold(request);
-                }, "Família criada.")
-              }
-              type="button"
-            >
-              Criar família
-            </button>
-          </div>
-        )}
+      {view === "premium-without-family" && (
+        <div>
+          <p>Crie sua família para começar a convidar membros.</p>
+          <button
+            className="primary-button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await createHousehold(request);
+              }, "Família criada.")
+            }
+            type="button"
+          >
+            Criar família
+          </button>
+        </div>
+      )}
 
       {owner && household && (
         <>
@@ -344,7 +343,7 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
         </>
       )}
 
-      {!loading && subscription.premiumFamily && (
+      {subscription?.premiumFamily && (
         <div>
           <p>
             {subscriptionStateLabel(subscription)}

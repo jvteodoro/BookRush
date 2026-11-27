@@ -239,3 +239,19 @@ export async function respondToInvitation(
     },
   );
 }
+
+export type FamilyView = "loading" | "member" | "owner" | "guest" | "premium-without-family";
+
+/**
+ * Decides which family view a signed-in user sees. Shared by the web and mobile
+ * screens so both platforms show the same state for the same data.
+ */
+export function familyView(
+  subscription: { premiumFamily: boolean } | undefined,
+  household: Household | null | undefined,
+): FamilyView {
+  if (subscription === undefined || household === undefined) return "loading";
+  if (household !== null) return isMemberHousehold(household) ? "member" : "owner";
+  return subscription.premiumFamily ? "premium-without-family" : "guest";
+}
+

@@ -215,3 +215,29 @@ test("received invitations are listed from the invitations endpoint", async () =
   assert.deepEqual(await family.loadReceivedInvitations(request), inbox);
   assert.equal(calls[0].path, "/api/v1/family/invitations/me");
 });
+
+test("familyView decides the family screen state for every account situation", () => {
+  const premium = { premiumFamily: true };
+  const free = { premiumFamily: false };
+  const owner = {
+    id: "h",
+    role: "OWNER",
+    additionalSeats: 5,
+    occupiedOrReserved: 1,
+    members: [],
+  };
+  const member = {
+    id: "h",
+    role: "MEMBER",
+    additionalSeats: 5,
+    occupiedOrReserved: 2,
+    members: [],
+  };
+  assert.equal(family.familyView(undefined, undefined), "loading");
+  assert.equal(family.familyView(premium, undefined), "loading");
+  assert.equal(family.familyView(free, null), "guest");
+  assert.equal(family.familyView(premium, null), "premium-without-family");
+  assert.equal(family.familyView(premium, owner), "owner");
+  assert.equal(family.familyView(free, member), "member");
+  assert.equal(family.familyView(premium, member), "member");
+});
