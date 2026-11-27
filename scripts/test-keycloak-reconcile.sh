@@ -215,4 +215,7 @@ for mapper in grafana-preferred-username grafana-email grafana-email-verified; d
     "clients/$grafana_client_id/protocol-mappers/models" -r bookrush-platform \
     --fields name --format csv --noquotes | grep -x "$mapper" >/dev/null
 done
+# keycloak-config-cli applies userProfile only when userProfileEnabled is declared; prove it was applied.
+user_profile="$(docker exec "$keycloak" /opt/keycloak/bin/kcadm.sh get users/profile -r bookrush)"
+grep -q '"name" : "birthdate"' <<<"$user_profile"
 echo 'Keycloak IaC + Grafana OAuth redirect: OK (ambiente descartável)'

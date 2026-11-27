@@ -56,6 +56,9 @@
       }
     }
   ],
+  "attributes": {
+    "userProfileEnabled": "true"
+  },
   "userProfile": {
     "attributes": [
       {

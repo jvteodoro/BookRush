@@ -51,9 +51,12 @@ O realm `bookrush` declara o atributo `birthdate` no `userProfile` de
 (ISO `yyyy-MM-dd`). Ele é editável pelo próprio usuário e pelo administrador.
 Sem essa declaração o Keycloak descarta o atributo silenciosamente e a
 `AgePolicy` retorna MISSING, deixando a conta em `AGE_PROFILE_INCOMPLETE`.
-O `keycloak-config-cli` aplica o perfil depois do boot; o `--import-realm`
-do Keycloak não deve receber a chave `userProfile`, por isso o teste
-descartável importa uma cópia sem ela.
+O `keycloak-config-cli` aplica o perfil depois do boot somente quando o
+atributo de realm `userProfileEnabled` está declarado como `"true"`; sem ele
+o import do perfil é pulado silenciosamente. O `--import-realm` do Keycloak
+não deve receber a chave `userProfile`, por isso os testes descartáveis
+importam uma cópia sem ela. O teste de reconcile confirma `birthdate` em
+`users/profile` depois da aplicação.
 
 ## Contrato para autorização
 
