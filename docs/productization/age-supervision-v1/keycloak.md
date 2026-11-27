@@ -47,8 +47,8 @@ preserva a data e não repete a atualização.
 ## Perfil de usuário com data de nascimento
 
 O realm `bookrush` declara o atributo `birthdate` no `userProfile` de
-`infrastructure/keycloak/bookrush-realm.json`, no formato `local-date`
-(ISO `yyyy-MM-dd`). Ele é editável pelo próprio usuário e pelo administrador.
+`infrastructure/keycloak/bookrush-realm.json`, validado por `pattern` no formato
+ISO `yyyy-MM-dd`. Ele é editável pelo próprio usuário e pelo administrador.
 Sem essa declaração o Keycloak descarta o atributo silenciosamente e a
 `AgePolicy` retorna MISSING, deixando a conta em `AGE_PROFILE_INCOMPLETE`.
 O `keycloak-config-cli` aplica o perfil depois do boot somente quando o

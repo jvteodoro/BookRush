@@ -84,7 +84,7 @@ expected = {
 assert expected <= clients.keys()
 product_clients = {item["clientId"]: item for item in product["clients"]}
 birth = next(item for item in product["userProfile"]["attributes"] if item["name"] == "birthdate")
-assert birth["permissions"]["edit"] == ["admin", "user"] and "local-date" in birth["validations"]
+assert birth["permissions"]["edit"] == ["admin", "user"] and "pattern" in birth["validations"]
 assert "bookrush-family-age-s2s" in product_clients
 assert all("${" not in client.get("secret", "") for client in clients.values())
 assert "defaultClientScopes" not in product_clients["bookrush-family-age-s2s"]
