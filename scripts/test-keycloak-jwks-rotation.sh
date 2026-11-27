@@ -20,7 +20,16 @@ container="$(docker create --name "$name" \
   -e KC_SPI_KEY_PROVIDER__RSA_GENERATED__ROTATION_PERIOD=5 \
   --entrypoint /bin/sh quay.io/keycloak/keycloak:25.0 \
   -c 'mkdir -p /opt/keycloak/data/import && cp /opt/keycloak/bookrush-*.json /opt/keycloak/data/import/ && exec /opt/keycloak/bin/kc.sh start-dev --http-port=8080 --import-realm')"
-docker cp "$repo_dir/infrastructure/keycloak/bookrush-realm.json" "$container:/opt/keycloak/bookrush-realm.json"
+# Keycloak's --import-realm rejects the userProfile key; keycloak-config-cli applies it after boot.
+import_copy="$(mktemp "${TMPDIR:-/tmp}/bookrush-realm-import.XXXXXX.json")"
+python3 - "$repo_dir/infrastructure/keycloak/bookrush-realm.json" "$import_copy" <<'PY'
+import json, sys
+realm = json.load(open(sys.argv[1], encoding="utf-8"))
+realm.pop("userProfile", None)
+json.dump(realm, open(sys.argv[2], "w", encoding="utf-8"))
+PY
+docker cp "$import_copy" "$container:/opt/keycloak/bookrush-realm.json"
+rm -f -- "$import_copy"
 docker start "$container" >/dev/null
 probe_container="$(docker run -d --network "container:$container" --entrypoint /bin/sh curlimages/curl:8.10.1 -c 'sleep 300')"
 probe() { docker exec "$probe_container" curl -fsS "$@"; }
