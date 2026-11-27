@@ -8,6 +8,10 @@ http:
       rule: (Method(`POST`) || Method(`OPTIONS`)) && Path(`/api/v1/subscription/checkout`)
       entryPoints: [web]
       service: subscription
+    subscription-cancel:
+      rule: (Method(`POST`) || Method(`OPTIONS`)) && Path(`/api/v1/subscription/cancel`)
+      entryPoints: [web]
+      service: subscription
   services:
     subscription:
       loadBalancer:

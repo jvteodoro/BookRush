@@ -344,3 +344,8 @@ provedor real. Ele fica ativo por padrão em todo ambiente pelo Compose
 `SUBSCRIPTION_MOCK_PRODUCTION_ALLOWED=true`). Nenhum pagamento real é feito: o
 checkout confirma a assinatura de 30 dias na hora. Para tirar o mock de
 produção, defina `SUBSCRIPTION_MOCK_PRODUCTION_ALLOWED=false` no ambiente.
+
+O cancelamento do titular usa `POST /api/v1/subscription/cancel` (202), roteado pelo
+gateway de assinatura (`infrastructure/traefik/subscription.yaml`) e pelo prefixo
+`/api/v1/subscription` do gateway principal. Ele agenda o cancelamento ao fim do
+período; os benefícios continuam até `effectiveUntil`.

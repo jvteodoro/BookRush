@@ -580,8 +580,7 @@ def commercial():
         "Access-Control-Request-Headers": "Authorization, Idempotency-Key",
     }, parse=False)
     key = str(uuid4())
-    checkout = write(GATEWAY + CHECKOUT, holder, key=key, payload={
-        "owner": {"issuer": owner["issuer"], "subject": claims(other)["sub"]}})
+    checkout = write(GATEWAY + CHECKOUT, holder, key=key, payload={"planId": "premium-family"})
     assert checkout["simulation"] and not checkout["realPayment"] and checkout["state"] == "APPLIED"
     assert checkout == write(GATEWAY + CHECKOUT, holder, key=key)
     rights = request(GATEWAY + SELF + "/entitlements", token=holder)
