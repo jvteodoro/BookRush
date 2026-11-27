@@ -364,3 +364,8 @@ convites que recebe (`GET /api/v1/family/invitations/me`; `POST .../{id}/accept`
 `role: MEMBER`, lista de membros vazia (somente o titular vê a lista), vagas
 ocupadas e vagas totais. O titular continua vendo `role: OWNER` com a lista completa.
 A oferta do Premium Família permanece abaixo dessas seções.
+
+As origens CORS dos serviços de família e assinatura incluem por padrão o site
+público (`https://bookrush.jteodoro.tec.br`), porque o navegador envia `Origin` nas
+requisições POST da aba Família e do checkout. Sem essa origem, o serviço responde
+`403 Invalid CORS request` e a ação falha na tela.

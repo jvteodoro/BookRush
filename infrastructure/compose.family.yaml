@@ -24,7 +24,7 @@ services:
       SPRING_PROFILES_ACTIVE: ${FAMILY_SPRING_PROFILES:-}
       BOOKRUSH_ENVIRONMENT: ${BOOKRUSH_ENVIRONMENT:-unknown}
       FAMILY_SUPERVISION_SIMULATION: ${FAMILY_SUPERVISION_SIMULATION:-false}
-      FAMILY_CORS_ORIGINS: ${FAMILY_CORS_ORIGINS:-}
+      FAMILY_CORS_ORIGINS: ${FAMILY_CORS_ORIGINS:-https://bookrush.jteodoro.tec.br}
     networks: [bookrush]
     profiles: [family]
     depends_on:
