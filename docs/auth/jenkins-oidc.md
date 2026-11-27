@@ -119,4 +119,8 @@ populada nem remove usuários.
 
 A configuração declarativa dos clientes de produto web e mobile mantém
 `profile`, `email` e `bookrush.catalog.read` ao adicionar os escopos de Família
-e Assinatura. O smoke pós-deploy verifica a obtenção do JWT de produto.
+e Assinatura. Como o keycloak-config-cli resolve cada default client scope pelo
+`clientScopes` do próprio realm, `profile` e `email` também são declarados em
+`infrastructure/keycloak/bookrush-realm.json`; sem essa declaração o reconcile
+falha com NullPointerException em `addDefaultClientScopes`. O smoke pós-deploy
+verifica a obtenção do JWT de produto.
