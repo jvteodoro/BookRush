@@ -17,11 +17,11 @@ const family = await import(
   `data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`
 );
 
-const json = (body, status = 200) =>
-  new Response(body === undefined ? null : JSON.stringify(body), {
-    status,
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
-  });
+const json = (body, status = 200) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => body,
+});
 
 function recorder(responses) {
   const calls = [];
