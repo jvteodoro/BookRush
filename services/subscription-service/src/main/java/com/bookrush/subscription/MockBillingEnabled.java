@@ -15,8 +15,12 @@ final class MockBillingEnabled implements Condition {
   }
 
   static boolean allowed(Environment environment) {
-    return environment.matchesProfiles("billing-mock & !prod & !production")
-        && NON_PRODUCTION.contains(environment.getProperty("bookrush.observability.environment", "unknown"))
-        && environment.getProperty("subscription.mock.enabled", Boolean.class, false);
+    boolean declaredNonProduction =
+        NON_PRODUCTION.contains(environment.getProperty("bookrush.observability.environment", "unknown"))
+            && !environment.matchesProfiles("prod", "production");
+    boolean productionAllowed = environment.getProperty("subscription.mock.production-allowed", Boolean.class, false);
+    return environment.matchesProfiles("billing-mock")
+        && environment.getProperty("subscription.mock.enabled", Boolean.class, false)
+        && (declaredNonProduction || productionAllowed);
   }
 }

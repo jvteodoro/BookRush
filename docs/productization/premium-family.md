@@ -335,3 +335,12 @@ openapi-spec-validator docs/productization/product-access-v1/openapi.json \
 
 A suíte cobre a superfície comercial disponível e não altera os gates de
 identidade, aceite ou supervisão.
+
+## Provedor de cobrança mock
+
+O provedor mock é o provedor de cobrança adotado neste produto enquanto não há
+provedor real. Ele fica ativo por padrão em todo ambiente pelo Compose
+(`SUBSCRIPTION_SPRING_PROFILES=billing-mock`, `SUBSCRIPTION_MOCK_ENABLED=true`,
+`SUBSCRIPTION_MOCK_PRODUCTION_ALLOWED=true`). Nenhum pagamento real é feito: o
+checkout confirma a assinatura de 30 dias na hora. Para tirar o mock de
+produção, defina `SUBSCRIPTION_MOCK_PRODUCTION_ALLOWED=false` no ambiente.

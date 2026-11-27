@@ -55,6 +55,19 @@ class SubscriptionController {
     return store.snapshot(identity(token));
   }
 
+  @PostMapping("/api/v1/subscription/cancel")
+  @ResponseStatus(HttpStatus.ACCEPTED)
+  Receipt cancel(@AuthenticationPrincipal Jwt token) {
+    var owner = identity(token);
+    var snapshot = store.snapshot(owner);
+    if (snapshot.state() != State.ACTIVE) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "no active subscription to cancel");
+    }
+    long version = store.apply(owner, owner, new SubscriptionStore.BillingEvent(UUID.randomUUID(),
+        snapshot.version() + 1, Operation.CANCEL_AT_END, null, null));
+    return new Receipt(version);
+  }
+
   @GetMapping("/api/v1/subscription/me/entitlements")
   Rights entitlements(@AuthenticationPrincipal Jwt token) {
     var snapshot = me(token);

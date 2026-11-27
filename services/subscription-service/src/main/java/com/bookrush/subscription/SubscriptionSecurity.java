@@ -26,6 +26,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration(proxyBeanMethods = false)
 class SubscriptionSecurity {
   static final String CHECKOUT = "/api/v1/subscription/checkout";
+  static final String CANCEL = "/api/v1/subscription/cancel";
   static final String MOCK_SIMULATE = "/api/internal/v1/subscription/billing/mock/simulate";
   static final String EVALUATE = "/api/internal/v1/subscription/entitlements/evaluate";
   static final String BILLING_EVENT = "/api/internal/v1/subscription/billing/events";
@@ -70,6 +71,7 @@ class SubscriptionSecurity {
                 .hasAuthority("SCOPE_subscription.read")
             .requestMatchers(HttpMethod.POST, EVALUATE).access(client(evaluator, "entitlements.evaluate"))
             .requestMatchers(HttpMethod.POST, CHECKOUT).hasAuthority("SCOPE_subscription.read")
+            .requestMatchers(HttpMethod.POST, CANCEL).hasAuthority("SCOPE_subscription.read")
             .requestMatchers(HttpMethod.POST, TRANSITION, BILLING_EVENT, MOCK_SIMULATE).access(client(writer, "subscription.transitions.write"))
             .anyRequest().denyAll())
         .oauth2ResourceServer(oauth -> oauth.authenticationManagerResolver(request ->

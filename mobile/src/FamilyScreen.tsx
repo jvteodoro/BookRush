@@ -25,6 +25,14 @@ import {
   type HouseholdInvitation,
 } from "../../packages/session/family";
 import type { Request } from "../../packages/session/session";
+import {
+  cancelSubscription,
+  checkoutPremiumFamily,
+  loadSubscription,
+  premiumFamilyBenefits,
+  subscriptionStateLabel,
+  type Subscription,
+} from "../../packages/session/subscription";
 
 /** Premium family management for the mobile app, using the shared family rules. */
 export function MobileFamily({
@@ -34,6 +42,7 @@ export function MobileFamily({
   request: Request;
   onClose: () => void;
 }) {
+  const [subscription, setSubscription] = useState<Subscription>();
   const [household, setHousehold] = useState<Household | null>();
   const [invitations, setInvitations] = useState<HouseholdInvitation[]>([]);
   const [recipientCode, setRecipientCode] = useState("");
@@ -42,10 +51,17 @@ export function MobileFamily({
   const [notice, setNotice] = useState("");
 
   async function refresh() {
-    const current = await loadHousehold(request);
-    setHousehold(current);
+    const current = await loadSubscription(request);
+    setSubscription(current);
+    if (!current.premiumFamily) {
+      setHousehold(null);
+      setInvitations([]);
+      return;
+    }
+    const family = await loadHousehold(request);
+    setHousehold(family);
     setInvitations(
-      current ? await loadHouseholdInvitations(request, current.id) : [],
+      family ? await loadHouseholdInvitations(request, family.id) : [],
     );
   }
 
@@ -72,7 +88,7 @@ export function MobileFamily({
     }
   }
 
-  const loading = household === undefined;
+  const loading = subscription === undefined;
 
   return (
     <SafeAreaView style={styles.root}>
@@ -87,10 +103,42 @@ export function MobileFamily({
           <Text style={styles.subtitle}>Carregando família…</Text>
         ) : null}
 
-        {!loading && household === null ? (
+        {!loading && !subscription.premiumFamily ? (
+          <>
+            <Text style={styles.heading}>Premium Família</Text>
+            {premiumFamilyBenefits.map((benefit) => (
+              <Text key={benefit} style={styles.subtitle}>
+                • {benefit}
+              </Text>
+            ))}
+            <Text style={styles.subtitle}>
+              Assinatura simulada: nenhum pagamento real é feito neste ambiente.
+            </Text>
+            <Pressable
+              style={styles.primary}
+              disabled={busy}
+              onPress={() =>
+                void run(async () => {
+                  await checkoutPremiumFamily(request, newIdempotencyKey());
+                  const current = await loadSubscription(request);
+                  if (
+                    current.premiumFamily &&
+                    (await loadHousehold(request)) === null
+                  ) {
+                    await createHousehold(request);
+                  }
+                }, "Assinatura confirmada. Bem-vindo ao Premium Família.")
+              }
+            >
+              <Text style={styles.primaryText}>Assinar Premium Família</Text>
+            </Pressable>
+          </>
+        ) : null}
+
+        {!loading && subscription.premiumFamily && household === null ? (
           <>
             <Text style={styles.subtitle}>
-              Você ainda não tem uma família Premium.
+              Crie sua família para começar a convidar membros.
             </Text>
             <Pressable
               style={styles.primary}
@@ -210,6 +258,42 @@ export function MobileFamily({
                 </Pressable>
               </View>
             ))}
+          </>
+        ) : null}
+
+        {!loading && subscription.premiumFamily ? (
+          <>
+            <Text style={styles.subtitle}>
+              {subscriptionStateLabel(subscription)}
+              {subscription.effectiveUntil
+                ? ` · válida até ${new Date(subscription.effectiveUntil).toLocaleDateString("pt-BR")}`
+                : ""}
+            </Text>
+            {subscription.state === "ACTIVE" ? (
+              <Pressable
+                disabled={busy}
+                onPress={() =>
+                  Alert.alert(
+                    "Cancelar assinatura",
+                    "Cancelar a assinatura Premium Família ao fim do período?",
+                    [
+                      { text: "Manter", style: "cancel" },
+                      {
+                        text: "Cancelar assinatura",
+                        style: "destructive",
+                        onPress: () =>
+                          void run(
+                            () => cancelSubscription(request),
+                            "Cancelamento agendado.",
+                          ),
+                      },
+                    ],
+                  )
+                }
+              >
+                <Text style={styles.link}>Cancelar assinatura</Text>
+              </Pressable>
+            ) : null}
           </>
         ) : null}
 

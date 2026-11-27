@@ -40,4 +40,15 @@ class MockBillingEnabledTest {
     environment.setActiveProfiles("billing-mock");
     assertThat(MockBillingEnabled.allowed(environment)).isTrue();
   }
+
+  @Test
+  void explicitProductionAllowanceEnablesTheMockOnlyWithTheFlag() {
+    var environment = new MockEnvironment().withProperty("subscription.mock.enabled", "true")
+        .withProperty("bookrush.observability.environment", "production")
+        .withProperty("subscription.mock.production-allowed", "false");
+    environment.setActiveProfiles("billing-mock");
+    assertThat(MockBillingEnabled.allowed(environment)).isFalse();
+    environment.setProperty("subscription.mock.production-allowed", "true");
+    assertThat(MockBillingEnabled.allowed(environment)).isTrue();
+  }
 }

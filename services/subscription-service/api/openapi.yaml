@@ -161,12 +161,39 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Unavailable'
+  /api/v1/subscription/cancel:
+    post:
+      operationId: cancelPremiumSubscription
+      description: Schedules cancellation at the end of the current period. Entitlements
+        stay active until effectiveUntil. Requires subscription.read and an ACTIVE
+        subscription (409 otherwise).
+      security:
+      - productBearer: []
+      responses:
+        '202':
+          description: Cancellation scheduled.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: integer
+                    format: int64
+        '401':
+          description: Missing or invalid bearer token.
+        '403':
+          description: Token without subscription.read.
+        '409':
+          description: No active subscription to cancel.
   /api/v1/subscription/checkout:
     post:
       operationId: checkoutMockPremium
-      description: Local simulation only. Requires subscription.read, allowlisted environment,
-        billing-mock profile and explicit opt-in. Owner is derived from the bearer,
-        no payment details are accepted.
+      description: Mock provider checkout, enabled by default in every environment
+        through the billing-mock profile and subscription.mock.enabled. Production
+        requires subscription.mock.production-allowed. Requires subscription.read.
+        Owner is derived from the bearer; no payment details are accepted. The
+        optional planId must be premium-family.
       security:
       - productBearer: []
       parameters:
@@ -176,6 +203,17 @@ paths:
         schema:
           type: string
           format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                planId:
+                  type: string
+                  enum: [premium-family]
       responses:
         '200':
           description: Simulated receipt. No real payment was made.

@@ -14,9 +14,10 @@ services:
       SUBSCRIPTION_PRODUCT_JWKS: ${SUBSCRIPTION_PRODUCT_JWKS:-http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs}
       SUBSCRIPTION_WORKLOAD_ISSUER: ${SUBSCRIPTION_WORKLOAD_ISSUER:-https://keycloak-bookrush.jteodoro.tec.br/realms/bookrush-platform}
       SUBSCRIPTION_WORKLOAD_JWKS: ${SUBSCRIPTION_WORKLOAD_JWKS:-http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs}
-      SPRING_PROFILES_ACTIVE: ${SUBSCRIPTION_SPRING_PROFILES:-}
+      SPRING_PROFILES_ACTIVE: ${SUBSCRIPTION_SPRING_PROFILES:-billing-mock}
       BOOKRUSH_ENVIRONMENT: ${BOOKRUSH_ENVIRONMENT:-unknown}
-      SUBSCRIPTION_MOCK_ENABLED: ${SUBSCRIPTION_MOCK_ENABLED:-false}
+      SUBSCRIPTION_MOCK_ENABLED: ${SUBSCRIPTION_MOCK_ENABLED:-true}
+      SUBSCRIPTION_MOCK_PRODUCTION_ALLOWED: ${SUBSCRIPTION_MOCK_PRODUCTION_ALLOWED:-true}
       SUBSCRIPTION_CORS_ORIGINS: ${SUBSCRIPTION_CORS_ORIGINS:-}
     networks: [bookrush]
     profiles: [subscription]

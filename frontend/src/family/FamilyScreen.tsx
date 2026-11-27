@@ -14,11 +14,20 @@ import {
   type Household,
   type HouseholdInvitation,
 } from "../../../packages/session/family";
+import {
+  cancelSubscription,
+  checkoutPremiumFamily,
+  loadSubscription,
+  premiumFamilyBenefits,
+  subscriptionStateLabel,
+  type Subscription,
+} from "../../../packages/session/subscription";
 import { authClient } from "../auth";
 
 /** Premium family management: seats, members, invitations sent by the holder. */
 export function FamilyScreen({ onClose }: { onClose: () => void }) {
   const request = useMemo(() => authClient.fetch.bind(authClient), []);
+  const [subscription, setSubscription] = useState<Subscription>();
   const [household, setHousehold] = useState<Household | null>();
   const [invitations, setInvitations] = useState<HouseholdInvitation[]>([]);
   const [recipientCode, setRecipientCode] = useState("");
@@ -27,10 +36,17 @@ export function FamilyScreen({ onClose }: { onClose: () => void }) {
   const [notice, setNotice] = useState("");
 
   const refresh = useCallback(async () => {
-    const current = await loadHousehold(request);
-    setHousehold(current);
+    const current = await loadSubscription(request);
+    setSubscription(current);
+    if (!current.premiumFamily) {
+      setHousehold(null);
+      setInvitations([]);
+      return;
+    }
+    const family = await loadHousehold(request);
+    setHousehold(family);
     setInvitations(
-      current ? await loadHouseholdInvitations(request, current.id) : [],
+      family ? await loadHouseholdInvitations(request, family.id) : [],
     );
   }, [request]);
 
@@ -57,7 +73,7 @@ export function FamilyScreen({ onClose }: { onClose: () => void }) {
     }
   }
 
-  const loading = household === undefined;
+  const loading = subscription === undefined;
 
   return (
     <section
@@ -82,9 +98,42 @@ export function FamilyScreen({ onClose }: { onClose: () => void }) {
 
       {loading && <p role="status">Carregando família…</p>}
 
-      {!loading && household === null && (
+      {!loading && !subscription.premiumFamily && (
         <div>
-          <p>Você ainda não tem uma família Premium.</p>
+          <h2>Premium Família</h2>
+          <ul>
+            {premiumFamilyBenefits.map((benefit) => (
+              <li key={benefit}>{benefit}</li>
+            ))}
+          </ul>
+          <p>
+            Assinatura simulada: nenhum pagamento real é feito neste ambiente.
+          </p>
+          <button
+            className="primary-button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await checkoutPremiumFamily(request, newIdempotencyKey());
+                const current = await loadSubscription(request);
+                if (
+                  current.premiumFamily &&
+                  (await loadHousehold(request)) === null
+                ) {
+                  await createHousehold(request);
+                }
+              }, "Assinatura confirmada. Bem-vindo ao Premium Família.")
+            }
+            type="button"
+          >
+            Assinar Premium Família
+          </button>
+        </div>
+      )}
+
+      {!loading && subscription.premiumFamily && household === null && (
+        <div>
+          <p>Crie sua família para começar a convidar membros.</p>
           <button
             className="primary-button"
             disabled={busy}
@@ -198,6 +247,38 @@ export function FamilyScreen({ onClose }: { onClose: () => void }) {
             ))}
           </ul>
         </>
+      )}
+
+      {!loading && subscription.premiumFamily && (
+        <div>
+          <p>
+            {subscriptionStateLabel(subscription)}
+            {subscription.effectiveUntil
+              ? ` · válida até ${new Date(subscription.effectiveUntil).toLocaleDateString("pt-BR")}`
+              : ""}
+          </p>
+          {subscription.state === "ACTIVE" && (
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    "Cancelar a assinatura Premium Família ao fim do período?",
+                  )
+                )
+                  return;
+                void run(
+                  () => cancelSubscription(request),
+                  "Cancelamento agendado.",
+                );
+              }}
+              type="button"
+            >
+              Cancelar assinatura
+            </button>
+          )}
+        </div>
       )}
 
       {error && <p role="alert">{error}</p>}

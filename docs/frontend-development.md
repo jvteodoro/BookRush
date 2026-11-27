@@ -30,6 +30,13 @@ estão em `packages/session/family.ts` e são compartilhadas pelos dois clientes
 - `DELETE /api/v1/family/{id}/members/{memberId}?expectedVersion=` para remover,
   usando a versão do membro retornada por `family/me`.
 
+Sem assinatura Premium Família, a mesma tela mostra o plano e o botão **Assinar**,
+que chama `POST /api/v1/subscription/checkout` com `planId=premium-family` e uma
+`Idempotency-Key`. Com a assinatura confirmada, a família é criada automaticamente.
+Quando a assinatura está ativa, a tela mostra o estado e o botão **Cancelar
+assinatura** (`POST /api/v1/subscription/cancel`, 202), que mantém os benefícios até
+`effectiveUntil`. Os textos e chamadas ficam em `packages/session/subscription.ts`.
+
 O código de convite é o da própria pessoa, obtido pela seção "Convites
 familiares" da tela restrita (`invite-address`). A validação de formato usa
 `isRecipientCode`; erros de API viram mensagens de `familyMessage`, nunca o corpo

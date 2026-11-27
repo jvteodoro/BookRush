@@ -23,6 +23,8 @@ class MockBillingController {
   record Simulation(@Valid @NotNull SubscriptionController.Identity owner,
                     @NotNull MockBillingProvider.Scenario scenario) {}
   record Receipt(boolean simulation, boolean realPayment, UUID externalEventId, String state, UUID billingEventId) {}
+  record CheckoutRequest(String planId) {}
+  static final String PREMIUM_FAMILY_PLAN = "premium-family";
 
   private final MockBillingProvider provider;
   private final BillingInbox inbox;
@@ -38,7 +40,11 @@ class MockBillingController {
   }
 
   @PostMapping("/api/v1/subscription/checkout")
-  ResponseEntity<Receipt> checkout(@AuthenticationPrincipal Jwt jwt, @RequestHeader("Idempotency-Key") UUID requestId) {
+  ResponseEntity<Receipt> checkout(@AuthenticationPrincipal Jwt jwt, @RequestHeader("Idempotency-Key") UUID requestId,
+      @RequestBody(required = false) CheckoutRequest request) {
+    if (request != null && request.planId() != null && !PREMIUM_FAMILY_PLAN.equals(request.planId())) {
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown plan");
+    }
     var owner = identity(jwt);
     return deliver(provider.checkout(owner, requestId), owner);
   }
