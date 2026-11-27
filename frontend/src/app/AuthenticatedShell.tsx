@@ -12,6 +12,7 @@ type AuthenticatedShellProps = {
   onRetry: () => void;
   onShowLegacy: () => void;
   onLogout: () => void;
+  onFamily: () => void;
   readerTab: ReaderTab;
   user?: User;
 };
@@ -25,6 +26,7 @@ export function AuthenticatedShell({
   onRetry,
   onShowLegacy,
   onLogout,
+  onFamily,
   readerTab,
   user,
 }: AuthenticatedShellProps) {
@@ -44,7 +46,7 @@ export function AuthenticatedShell({
   return (
     <>
       <div id="app" hidden={!legacyVisible} />
-      <LegacySidebar />
+      <LegacySidebar onFamily={onFamily} />
       {!feedReady && (
         <div className="splash">
           <p>Preparando seu feed…</p>

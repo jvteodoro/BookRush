@@ -33,6 +33,7 @@ import {
 } from "../../packages/session/session";
 import type { User } from "oidc-client-ts";
 import { RestrictedSession } from "./app/RestrictedSession";
+import { FamilyScreen } from "./family/FamilyScreen";
 import { AuthLanding } from "./app/AuthLanding";
 import {
   loadLibrary,
@@ -205,6 +206,7 @@ function SessionApp({
 
 function ProductApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [error, setError] = useState("");
+  const [familyOpen, setFamilyOpen] = useState(false);
   const [feedReady, setFeedReady] = useState(false);
   const { bookPath, legacyQuery, legacyVisible, readerTab, showLegacy } =
     useLegacyNavigation();
@@ -797,18 +799,22 @@ function ProductApp({ user, onLogout }: { user: User; onLogout: () => void }) {
     };
   }, []);
   return (
-    <AuthenticatedShell
-      error={error}
-      bookPath={bookPath}
-      feedReady={feedReady}
-      legacyQuery={legacyQuery}
-      legacyVisible={legacyVisible}
-      onRetry={() => window.location.reload()}
-      onShowLegacy={showLegacy}
-      readerTab={readerTab}
-      user={user}
-      onLogout={onLogout}
-    />
+    <>
+      <AuthenticatedShell
+        error={error}
+        bookPath={bookPath}
+        feedReady={feedReady}
+        legacyQuery={legacyQuery}
+        legacyVisible={legacyVisible}
+        onRetry={() => window.location.reload()}
+        onShowLegacy={showLegacy}
+        onFamily={() => setFamilyOpen(true)}
+        readerTab={readerTab}
+        user={user}
+        onLogout={onLogout}
+      />
+      {familyOpen && <FamilyScreen onClose={() => setFamilyOpen(false)} />}
+    </>
   );
 }
 

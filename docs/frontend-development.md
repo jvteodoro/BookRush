@@ -15,6 +15,26 @@ para um hook/serviço quando eles não forem específicos da apresentação. Use
 `authClient.fetch` para APIs protegidas e mantenha o tratamento de loading,
 `401`, `403`, `404` e erro de rede explícito na interface.
 
+## Gestão da família Premium
+
+A tela de família fica no web (`frontend/src/family/FamilyScreen.tsx`, aberta
+pelo item **Família** da sidebar) e no mobile (`mobile/src/FamilyScreen.tsx`,
+aberta pelo botão **Família** do cabeçalho). As regras de API e de resposta
+estão em `packages/session/family.ts` e são compartilhadas pelos dois clientes:
+
+- `GET /api/v1/family/me` (404 = conta sem família; o botão "Criar família" chama
+  `POST /api/v1/family`);
+- `GET /api/v1/family/{id}/invitations` e `POST` com `recipientCode` e
+  `Idempotency-Key` para convidar;
+- `DELETE /api/v1/family/{id}/invitations/{invitationId}` para cancelar;
+- `DELETE /api/v1/family/{id}/members/{memberId}?expectedVersion=` para remover,
+  usando a versão do membro retornada por `family/me`.
+
+O código de convite é o da própria pessoa, obtido pela seção "Convites
+familiares" da tela restrita (`invite-address`). A validação de formato usa
+`isRecipientCode`; erros de API viram mensagens de `familyMessage`, nunca o corpo
+bruto da resposta. Os testes ficam em `frontend/tests/family-management.test.mjs`.
+
 ## Testes e qualidade
 
 Na pasta `frontend`, execute:

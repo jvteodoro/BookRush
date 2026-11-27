@@ -38,6 +38,7 @@ import {
   type SessionView,
 } from "../packages/session/session";
 import { updateSavedBook } from "./src/updateSavedBook";
+import { MobileFamily } from "./src/FamilyScreen";
 import { createTelemetry } from "./src/telemetry";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -481,6 +482,13 @@ function MobileProduct({
     if (controller.signal.aborted) throw new Error("Session changed");
     return token;
   };
+  const [familyOpen, setFamilyOpen] = useState(false);
+  const familyRequest: Request = async (path, init) => {
+    const controller = product.current;
+    if (!controller || controller.signal.aborted)
+      throw new Error("Session changed");
+    return authenticatedRequest(await accessToken(controller), path, init);
+  };
   function report(cause: unknown, controller: AbortController) {
     if (controller.signal.aborted) return;
     failureListener.current(cause);
@@ -583,14 +591,23 @@ function MobileProduct({
       pendingSaves.current.delete(bookId);
     }
   }
+  if (familyOpen)
+    return (
+      <MobileFamily request={familyRequest} onClose={() => setFamilyOpen(false)} />
+    );
   return (
     <SafeAreaView style={styles.root}>
       <StatusBar style="light" />
       <View style={styles.header}>
         <Text style={styles.brand}>BookRush</Text>
-        <Pressable onPress={onLogout}>
-          <Text style={styles.logout}>Sair</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable onPress={() => setFamilyOpen(true)}>
+            <Text style={styles.logout}>Família</Text>
+          </Pressable>
+          <Pressable onPress={onLogout}>
+            <Text style={styles.logout}>Sair</Text>
+          </Pressable>
+        </View>
       </View>
       <View style={styles.hero}>
         <Text style={styles.kicker}>DESCUBRA SUA PRÓXIMA LEITURA</Text>
@@ -776,6 +793,7 @@ const styles = StyleSheet.create({
   },
   brand: { color: "#f3f4f5", fontSize: 24, fontWeight: "700" },
   logout: { color: "#356157" },
+  headerActions: { flexDirection: "row", gap: 16 },
   hero: { padding: 25 },
   heading: { color: "#f3f4f5", fontSize: 34, fontWeight: "700", marginTop: 10 },
   italic: { color: "#d76c51", fontStyle: "italic" },

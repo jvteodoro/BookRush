@@ -12,6 +12,7 @@ const items = [
   ["library", "Biblioteca", "library"],
   ["plant", "Minha planta", "leaf"],
   ["profile", "Perfil", "user"],
+  ["family", "Família", "user"],
   ["privacy", "Privacidade", "shield"],
   ["admin", "Administração", "admin"],
   ["publisher", "Publicador", "upload"],
@@ -23,7 +24,7 @@ const items = [
 }));
 
 /** Adapter for the production screens still rendered by pageloop.js. */
-export function LegacySidebar() {
+export function LegacySidebar({ onFamily }: { onFamily: () => void }) {
   const [mount, setMount] = useState<HTMLElement | null>(null);
   const [active, setActive] = useState("feed");
   const [collapsed, setCollapsed] = useState(false);
@@ -43,8 +44,13 @@ export function LegacySidebar() {
     window.addEventListener("bookrush:legacy-route", update);
     return () => window.removeEventListener("bookrush:legacy-route", update);
   }, []);
-  const navigate = (id: string) =>
+  const navigate = (id: string) => {
+    if (id === "family") {
+      onFamily();
+      return;
+    }
     window.dispatchEvent(new CustomEvent("bookrush:navigate", { detail: id }));
+  };
   return mount
     ? createPortal(
         <Sidebar
