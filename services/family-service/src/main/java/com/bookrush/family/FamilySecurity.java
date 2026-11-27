@@ -90,6 +90,7 @@ class FamilySecurity {
             .requestMatchers(HttpMethod.POST, SUPERVISION_ADMIN + "*").access(client(administrator, "supervision.manage"))
             .requestMatchers(HttpMethod.DELETE, "/api/v1/family/*/invitations/*", "/api/v1/family/*/members/*")
                 .hasAuthority("SCOPE_family.manage")
+            .requestMatchers("/error").permitAll()
             .anyRequest().denyAll())
         .exceptionHandling(errors -> errors
             .defaultAuthenticationEntryPointFor((request, response, failure) -> ProductAccessController.problem(response,

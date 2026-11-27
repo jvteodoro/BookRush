@@ -73,6 +73,7 @@ class SubscriptionSecurity {
             .requestMatchers(HttpMethod.POST, CHECKOUT).hasAuthority("SCOPE_subscription.read")
             .requestMatchers(HttpMethod.POST, CANCEL).hasAuthority("SCOPE_subscription.read")
             .requestMatchers(HttpMethod.POST, TRANSITION, BILLING_EVENT, MOCK_SIMULATE).access(client(writer, "subscription.transitions.write"))
+            .requestMatchers("/error").permitAll()
             .anyRequest().denyAll())
         .oauth2ResourceServer(oauth -> oauth.authenticationManagerResolver(request ->
             request.getRequestURI().startsWith(request.getContextPath() + "/api/internal/") ? workload::authenticate : product::authenticate))

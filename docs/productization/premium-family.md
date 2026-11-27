@@ -349,3 +349,7 @@ O cancelamento do titular usa `POST /api/v1/subscription/cancel` (202), roteado 
 gateway de assinatura (`infrastructure/traefik/subscription.yaml`) e pelo prefixo
 `/api/v1/subscription` do gateway principal. Ele agenda o cancelamento ao fim do
 período; os benefícios continuam até `effectiveUntil`.
+
+Os serviços de assinatura e família liberam o despacho de `/error` antes da regra
+`denyAll`. Sem isso, erros de negócio (409 em cancelamento sem assinatura, por
+exemplo) voltam ao cliente como 403 `insufficient_scope`.
