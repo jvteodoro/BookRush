@@ -83,6 +83,8 @@ expected = {
 }
 assert expected <= clients.keys()
 product_clients = {item["clientId"]: item for item in product["clients"]}
+birth = next(item for item in product["userProfile"]["attributes"] if item["name"] == "birthdate")
+assert birth["permissions"]["edit"] == ["admin", "user"] and "local-date" in birth["validations"]
 assert "bookrush-family-age-s2s" in product_clients
 assert all("${" not in client.get("secret", "") for client in clients.values())
 assert "defaultClientScopes" not in product_clients["bookrush-family-age-s2s"]
@@ -100,7 +102,14 @@ docker create --name "$keycloak" --network "$network" \
   -e KEYCLOAK_ADMIN_PASSWORD="$admin_password" \
   --entrypoint /bin/sh quay.io/keycloak/keycloak:25.0 \
   -c 'mkdir -p /opt/keycloak/data/import && cp /opt/keycloak/bookrush-*.json /opt/keycloak/data/import/ && exec /opt/keycloak/bin/kc.sh start-dev --http-port=8080 --import-realm' >/dev/null
-docker cp "$work_dir/rendered/bookrush-realm.json" "$keycloak:/opt/keycloak/bookrush-realm.json"
+python3 - "$work_dir/rendered/bookrush-realm.json" "$work_dir/keycloak-import-realm.json" <<'PY'
+import json, sys
+realm = json.load(open(sys.argv[1], encoding="utf-8"))
+# keycloak-config-cli applies userProfile after boot; Keycloak's --import-realm rejects it.
+realm.pop("userProfile", None)
+json.dump(realm, open(sys.argv[2], "w", encoding="utf-8"))
+PY
+docker cp "$work_dir/keycloak-import-realm.json" "$keycloak:/opt/keycloak/bookrush-realm.json"
 docker cp "$work_dir/rendered/bookrush-platform-realm.json" "$keycloak:/opt/keycloak/bookrush-platform-realm.json"
 docker start "$keycloak" >/dev/null
 probe="$(docker run -d --network "container:$keycloak" --entrypoint /bin/sh \

@@ -20,8 +20,16 @@ container="$(docker create --name "$name" \
   -e KEYCLOAK_ADMIN_PASSWORD=validation-only \
   --entrypoint /bin/sh quay.io/keycloak/keycloak:25.0 \
   -c 'mkdir -p /opt/keycloak/data/import && cp /opt/keycloak/bookrush-*.json /opt/keycloak/data/import/ && exec /opt/keycloak/bin/kc.sh start-dev --http-port=8080 --import-realm')"
-docker cp "$repo_dir/infrastructure/keycloak/bookrush-realm.json" \
-  "$container:/opt/keycloak/bookrush-realm.json"
+# keycloak-config-cli applies userProfile after boot; Keycloak's --import-realm rejects it.
+import_copy="$(mktemp "${TMPDIR:-/tmp}/bookrush-realm-import.XXXXXX.json")"
+python3 - "$repo_dir/infrastructure/keycloak/bookrush-realm.json" "$import_copy" <<'PY'
+import json, sys
+realm = json.load(open(sys.argv[1], encoding="utf-8"))
+realm.pop("userProfile", None)
+json.dump(realm, open(sys.argv[2], "w", encoding="utf-8"))
+PY
+docker cp "$import_copy" "$container:/opt/keycloak/bookrush-realm.json"
+rm -f -- "$import_copy"
 docker cp "$repo_dir/infrastructure/keycloak/bookrush-platform-realm.json" \
   "$container:/opt/keycloak/bookrush-platform-realm.json"
 docker start "$container" >/dev/null

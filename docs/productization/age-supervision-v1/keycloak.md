@@ -44,6 +44,17 @@ um evento de atualização de usuário com ator, alvo e instante, sem valores
 do atributo. Um erro interrompe o lote. Repetir os itens já aplicados
 preserva a data e não repete a atualização.
 
+## Perfil de usuário com data de nascimento
+
+O realm `bookrush` declara o atributo `birthdate` no `userProfile` de
+`infrastructure/keycloak/bookrush-realm.json`, no formato `local-date`
+(ISO `yyyy-MM-dd`). Ele é editável pelo próprio usuário e pelo administrador.
+Sem essa declaração o Keycloak descarta o atributo silenciosamente e a
+`AgePolicy` retorna MISSING, deixando a conta em `AGE_PROFILE_INCOMPLETE`.
+O `keycloak-config-cli` aplica o perfil depois do boot; o `--import-realm`
+do Keycloak não deve receber a chave `userProfile`, por isso o teste
+descartável importa uma cópia sem ela.
+
 ## Contrato para autorização
 
 `AgePolicy.Source.classify(TechnicalIdentity)` aceita a identidade
