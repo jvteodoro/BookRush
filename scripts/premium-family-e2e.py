@@ -611,7 +611,6 @@ def commercial():
     assert request(GATEWAY + FAMILY + "/me", token=holder)["role"] == "OWNER"
     supervision = GATEWAY + FAMILY + "/" + household + "/members/" + member["membershipId"] + "/supervision"
     request(supervision, 404, method="POST", token=other, headers={"Idempotency-Key": str(uuid4())}, parse=False)
-    write(supervision, holder, status=201, key=str(uuid4()))
     if READER_E2E:
         bootstrap(juvenile_session, "MINOR_AWAITING_AUTHORIZATION", "SUPERVISION_REQUIRED")
     lookup = "/api/internal/v1/family/membership/evaluate"
