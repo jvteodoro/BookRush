@@ -48,3 +48,4 @@ family:
   supervision-maintenance-delay: ${FAMILY_SUPERVISION_MAINTENANCE_DELAY_MS:60000}
   product-access-workloads: ${FAMILY_PRODUCT_ACCESS_WORKLOADS:}
   product-access-age-verification-required: ${FAMILY_PRODUCT_ACCESS_AGE_VERIFICATION_REQUIRED:false}
+  supervision-simulated-approval: ${FAMILY_SUPERVISION_SIMULATED_APPROVAL:false}

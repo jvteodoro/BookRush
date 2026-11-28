@@ -12,6 +12,7 @@ import {
   newIdempotencyKey,
   removeMember,
   respondToInvitation,
+  authorizeSupervision,
   type Household,
   type HouseholdInvitation,
 } from "../../../packages/session/family";
@@ -115,6 +116,13 @@ export function FamilyScreen({ onClose }: { onClose?: () => void }) {
       void run(
         () => removeMember(request, household.id, member),
         "Membro removido.",
+      );
+    },
+    authorizeSupervision: (member: Household["members"][number]) => {
+      if (!household) return;
+      void run(
+        () => authorizeSupervision(request, household.id, member.id),
+        "Acompanhamento autorizado.",
       );
     },
     invite: () => {

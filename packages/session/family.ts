@@ -240,7 +240,12 @@ export async function respondToInvitation(
   );
 }
 
-export type FamilyView = "loading" | "member" | "owner" | "guest" | "premium-without-family";
+export type FamilyView =
+  | "loading"
+  | "member"
+  | "owner"
+  | "guest"
+  | "premium-without-family";
 
 /**
  * Decides which family view a signed-in user sees. Shared by the web and mobile
@@ -251,7 +256,28 @@ export function familyView(
   household: Household | null | undefined,
 ): FamilyView {
   if (subscription === undefined || household === undefined) return "loading";
-  if (household !== null) return isMemberHousehold(household) ? "member" : "owner";
+  if (household !== null)
+    return isMemberHousehold(household) ? "member" : "owner";
   return subscription.premiumFamily ? "premium-without-family" : "guest";
 }
 
+/** Holder authorizes supervision of an active member (prototype: approval is recorded immediately). */
+export async function authorizeSupervision(
+  request: Request,
+  householdId: string,
+  memberId: string,
+  init?: RequestInit,
+): Promise<void> {
+  const response = await request(
+    `/api/v1/family/${encodeURIComponent(householdId)}/members/${encodeURIComponent(memberId)}/supervision`,
+    {
+      ...init,
+      method: "POST",
+      headers: {
+        ...(init?.headers as Record<string, string> | undefined),
+        "Idempotency-Key": newIdempotencyKey(),
+      },
+    },
+  );
+  if (!response.ok) throw new Error(familyMessage(response.status));
+}

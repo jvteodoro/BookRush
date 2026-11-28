@@ -68,6 +68,7 @@ class FamilySecurity {
             .requestMatchers(HttpMethod.PUT, "/api/v1/family/*/members/*/state", "/api/v1/family/*/members/*/publication")
                 .hasAuthority("SCOPE_family.manage")
             .requestMatchers(HttpMethod.POST, "/api/v1/family/supervision").hasAuthority("SCOPE_supervision.request")
+            .requestMatchers(HttpMethod.POST, "/api/v1/family/*/members/*/supervision").hasAuthority("SCOPE_family.manage")
             .requestMatchers(HttpMethod.GET, "/api/v1/family/supervision/me").hasAuthority("SCOPE_supervision.request")
             .requestMatchers(HttpMethod.POST, ProfileDiscoveryFacts.PATH)
                 .access((auth, route) -> new AuthorizationDecision(auth.get() instanceof JwtAuthenticationToken token

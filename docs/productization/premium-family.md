@@ -369,3 +369,13 @@ As origens CORS dos serviços de família e assinatura incluem por padrão o sit
 público (`https://bookrush.jteodoro.tec.br`), porque o navegador envia `Origin` nas
 requisições POST da aba Família e do checkout. Sem essa origem, o serviço responde
 `403 Invalid CORS request` e a ação falha na tela.
+
+## Autorização de supervisão (protótipo)
+
+O titular autoriza o acompanhamento de um membro menor com
+`POST /api/v1/family/{householdId}/members/{memberId}/supervision`. A rota exige
+`family.manage`, confirma que o titular é dono da família e que o membro está ativo,
+e registra a solicitação e a aprovação com escopo `PRODUCT_ACCESS` até o menor
+completar a maioridade. Ela fica ativa por `FAMILY_SUPERVISION_SIMULATED_APPROVAL`
+(padrão `true` no Compose) e serve ao protótipo, sem verificação de responsabilidade.
+

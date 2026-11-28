@@ -54,6 +54,20 @@ class SupervisionController {
     return store.request(actor(token), identity(request.minor()), request.scopes(), key);
   }
 
+  @PostMapping("/api/v1/family/{household}/members/{member}/supervision")
+  @ResponseStatus(HttpStatus.CREATED)
+  Receipt simulatedApproval(@AuthenticationPrincipal Jwt token, @PathVariable UUID household,
+      @PathVariable UUID member, @RequestHeader("Idempotency-Key") UUID key) {
+    if (!simulatedApprovalEnabled(environment)) {
+      throw FamilyProblem.forbidden("SIMULATION_DISABLED");
+    }
+    return store.simulatedApproval(actor(token), household, member, key);
+  }
+
+  static boolean simulatedApprovalEnabled(Environment environment) {
+    return environment.getProperty("family.supervision-simulated-approval", Boolean.class, false);
+  }
+
   @GetMapping("/api/v1/family/supervision/me")
   List<View> own(@AuthenticationPrincipal Jwt token) {
     return store.own(actor(token));

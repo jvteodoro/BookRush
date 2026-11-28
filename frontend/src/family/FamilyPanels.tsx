@@ -25,6 +25,7 @@ export type FamilyActions = {
   checkout: () => void;
   createFamily: () => void;
   removeMember: (member: Household["members"][number]) => void;
+  authorizeSupervision: (member: Household["members"][number]) => void;
   invite: () => void;
   setRecipientCode: (value: string) => void;
   cancelInvitation: (invitationId: string) => void;
@@ -201,6 +202,14 @@ export function FamilyPanels({
                   type="button"
                 >
                   Remover
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={busy || item.state !== "ACTIVE"}
+                  onClick={() => actions.authorizeSupervision(item)}
+                  type="button"
+                >
+                  Autorizar acompanhamento
                 </button>
               </li>
             ))}

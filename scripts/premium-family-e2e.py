@@ -136,7 +136,10 @@ def request(url, status=200, *, token=None, payload=None, method=None, headers=N
         expected = status if isinstance(status, tuple) else (status,)
         if response.status not in expected:
             authentication_error = response.headers.get("WWW-Authenticate", "")
-            raise AssertionError(f"{req.get_method()} {url}: expected {status}, got {response.status} {authentication_error}")
+            problem = response.read(2000).decode("utf-8", "replace")
+            code = re.search(r'"code":"([A-Z_]+)"', problem)
+            detail = f" code={code.group(1)}" if code else ""
+            raise AssertionError(f"{req.get_method()} {url}: expected {status}, got {response.status}{detail} {authentication_error}")
         if isinstance(status, tuple):
             return response.status
         data = response.read()
@@ -606,6 +609,9 @@ def commercial():
     view = request(GATEWAY + FAMILY + "/me", token=invitee)
     assert view["role"] == "MEMBER" and view["members"] == [] and view["id"] == member["householdId"]
     assert request(GATEWAY + FAMILY + "/me", token=holder)["role"] == "OWNER"
+    supervision = GATEWAY + FAMILY + "/" + household + "/members/" + member["membershipId"] + "/supervision"
+    request(supervision, 404, method="POST", token=other, headers={"Idempotency-Key": str(uuid4())}, parse=False)
+    write(supervision, holder, status=201, key=str(uuid4()))
     if READER_E2E:
         bootstrap(juvenile_session, "MINOR_AWAITING_AUTHORIZATION", "SUPERVISION_REQUIRED")
     lookup = "/api/internal/v1/family/membership/evaluate"

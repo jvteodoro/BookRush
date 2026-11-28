@@ -491,6 +491,53 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/MembershipQuery'
+  /api/v1/family/{householdId}/members/{memberId}/supervision:
+    post:
+      operationId: authorizeMemberSupervision
+      description: Scope family.manage. The household owner requests and approves supervision
+        of an active member who is a minor, with PRODUCT_ACCESS until the minor reaches adulthood.
+        Enabled by family.supervision-simulated-approval (FAMILY_SUPERVISION_SIMULATED_APPROVAL).
+      security:
+      - productBearer: []
+      parameters:
+      - name: householdId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: Supervision approved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  state:
+                    type: string
+                  version:
+                    type: integer
+                    format: int64
+        '403':
+          description: Target is not a minor, owner is not an adult, or simulation is disabled.
+        '404':
+          description: Household or active member not found for this owner.
   /api/v1/family/supervision:
     post:
       operationId: requestSupervision

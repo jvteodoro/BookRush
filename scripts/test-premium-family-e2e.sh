@@ -70,7 +70,7 @@ subscription() {
   run_probe wait "http://$1:8102/actuator/health"
 }
 subscription subscription-service billing-mock
-create family-service "${db[@]}" -e FAMILY_PRODUCT_ISSUER=http://keycloak:8080/realms/bookrush \
+create family-service "${db[@]}" -e FAMILY_SUPERVISION_SIMULATED_APPROVAL=true -e FAMILY_PRODUCT_ISSUER=http://keycloak:8080/realms/bookrush \
   -e FAMILY_PRODUCT_JWKS=http://keycloak:8080/realms/bookrush/protocol/openid-connect/certs \
   -e FAMILY_WORKLOAD_ISSUER=http://keycloak:8080/realms/bookrush-platform \
   -e FAMILY_WORKLOAD_JWKS=http://keycloak:8080/realms/bookrush-platform/protocol/openid-connect/certs \

@@ -31,6 +31,7 @@ const actions = {
   checkout: noop,
   createFamily: noop,
   removeMember: noop,
+  authorizeSupervision: noop,
   invite: noop,
   setRecipientCode: noop,
   cancelInvitation: noop,
@@ -179,4 +180,9 @@ test("error and notice messages are rendered for the user", () => {
   });
   assert.match(html, /role="alert">Falha de teste/);
   assert.match(html, /role="status">Tudo certo/);
+});
+
+test("holder can authorize supervision of an active member", () => {
+  const html = render({ subscription: active, household: owner });
+  assert.match(html, /Autorizar acompanhamento/);
 });

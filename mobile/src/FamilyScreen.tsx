@@ -27,6 +27,7 @@ import {
   newIdempotencyKey,
   removeMember,
   respondToInvitation,
+  authorizeSupervision,
   type Household,
   type HouseholdInvitation,
 } from "../../packages/session/family";
@@ -284,6 +285,18 @@ export function MobileFamily({
                   }
                 >
                   <Text style={styles.link}>Remover</Text>
+                </Pressable>
+                <Pressable
+                  disabled={busy || item.state !== "ACTIVE"}
+                  onPress={() =>
+                    void run(
+                      () =>
+                        authorizeSupervision(request, household.id, item.id),
+                      "Acompanhamento autorizado.",
+                    )
+                  }
+                >
+                  <Text style={styles.link}>Autorizar acompanhamento</Text>
                 </Pressable>
               </View>
             ))}

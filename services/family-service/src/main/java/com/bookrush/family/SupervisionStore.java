@@ -128,6 +128,56 @@ class SupervisionStore {
         GRANT, guardian.issuer(), guardian.subject()).stream().map(Grant::view).toList();
   }
 
+  /**
+   * The household owner requests and approves supervision of an active minor member, with the
+   * PRODUCT_ACCESS scope until the minor reaches adulthood. The approval is recorded with a
+   * simulated verification reference.
+   */
+  @Transactional
+  Receipt simulatedApproval(TechnicalIdentity guardian, UUID household, UUID member, UUID key) {
+    var minors = db.query("""
+        SELECT m.identity_issuer, m.identity_subject FROM family.membership m
+        JOIN family.household h ON h.id = m.household_id
+        WHERE h.id = ? AND h.owner_issuer = ? AND h.owner_subject = ? AND m.id = ? AND m.state = 'ACTIVE'
+        """, (row, n) -> new TechnicalIdentity(row.getString("identity_issuer"), row.getString("identity_subject")),
+        household, guardian.issuer(), guardian.subject(), member);
+    if (minors.isEmpty()) {
+      throw FamilyProblem.missing("RESOURCE_NOT_FOUND");
+    }
+    TechnicalIdentity minor = minors.getFirst();
+    var target = ages.read(minor);
+    if (!target.is(AgePolicy.State.MINOR)) {
+      throw FamilyProblem.forbidden("TARGET_NOT_ELIGIBLE");
+    }
+    // The store re-reads the clock when approving, so the window starts shortly in the future.
+    Instant from = clock.instant().plusSeconds(60).truncatedTo(ChronoUnit.MICROS);
+    Instant until = target.age().adultFrom();
+    var open = db.query("""
+        SELECT id, state, version FROM family.supervision_grant
+        WHERE guardian_issuer=? AND guardian_subject=? AND minor_issuer=? AND minor_subject=?
+          AND state IN ('REQUESTED','ACTIVE') ORDER BY created_at DESC, id LIMIT 1
+        """, (row, n) -> new Receipt(row.getObject("id", UUID.class), State.valueOf(row.getString("state")),
+            row.getLong("version")), guardian.issuer(), guardian.subject(), minor.issuer(), minor.subject());
+    if (!open.isEmpty() && open.getFirst().state() == State.ACTIVE) {
+      return open.getFirst();
+    }
+    Set<Scope> scopes;
+    Receipt pending;
+    if (open.isEmpty()) {
+      scopes = Set.of(Scope.PRODUCT_ACCESS);
+      pending = request(guardian, minor, scopes, key);
+    } else {
+      // An existing pending request is approved with the scopes the guardian already asked for.
+      pending = open.getFirst();
+      String asked = db.queryForObject("SELECT array_to_string(requested_scopes, ',') FROM family.supervision_grant WHERE id=?",
+          String.class, pending.id());
+      scopes = Arrays.stream(asked.split(",")).map(Scope::valueOf).collect(Collectors.toUnmodifiableSet());
+    }
+    UUID verification = UUID.nameUUIDFromBytes(("simulated-approval:" + key).getBytes(StandardCharsets.UTF_8));
+    return change(guardian, pending.id(), guardian, minor,
+        new Change(Action.APPROVE, pending.version(), scopes, from, until, verification), key);
+  }
+
   @Transactional
   Receipt change(TechnicalIdentity admin, UUID id, TechnicalIdentity guardian, TechnicalIdentity minor,
       Change command, UUID key) {
